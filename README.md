@@ -1,6 +1,6 @@
-# CipherSwarm Go Agent
+# CipherSwarm Agent
 
-The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecosystem, designed to manage and execute distributed hash cracking tasks efficiently. Built in Go and leveraging the Cobra library for command-line operations, this agent provides a robust solution for scaling and managing cryptographic computations across the CipherSwarm network.
+The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecosystem, designed to manage and execute distributed hash cracking tasks efficiently. Built in Go, this agent provides a robust solution for scaling and managing cryptographic computations across the CipherSwarm network.
 
 ## Features
 
