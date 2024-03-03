@@ -53,30 +53,6 @@ To start the agent, simply run:
 
 This will activate the agent, connecting it to the CipherSwarm network to begin receiving and processing tasks.
 
-## Using GoReleaser for Packaging and Release
-
-### Prerequisites
-
-- Install GoReleaser: Follow the [official documentation](https://goreleaser.com/install/) for installation instructions.
-
-### Creating a Release
-
-1. Configure `.goreleaser.yml` in your project root (refer to GoReleaser documentation for specifics).
-2. Tag your release:
-
-```bash
-git tag -a v0.1.0 -m "First release"
-git push origin v0.1.0
-```
-
-3. Run GoReleaser in your project directory:
-
-```bash
-goreleaser release --rm-dist
-```
-
-GoReleaser will package your application and handle the release process as configured.
-
 ## Contributing
 
 We welcome contributions! To contribute to the CipherSwarm Go Agent, please fork the repository, create a feature branch, push your changes, and submit a pull request.
