@@ -2,6 +2,7 @@ package lib
 
 import (
 	"errors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"strconv"
 
 	"github.com/imroc/req/v3"
@@ -81,6 +82,7 @@ func GetAgentConfiguration(client *req.Client) AgentConfiguration {
 	} else {
 		logrus.Fatalf("bad response: %v", rep)
 	}
+	logrus.Infoln("Configuration updated from server")
 	return result
 }
 
@@ -92,6 +94,7 @@ func GetAgentConfiguration(client *req.Client) AgentConfiguration {
 // If there is an error retrieving the host information or updating the agent metadata, an error message is logged.
 // The updated agent metadata is also logged for debugging purposes.
 func UpdateAgentMetadata(client *req.Client, agentId int) {
+	logrus.Infoln("Updating agent metadata with the CipherSwarm API")
 	info, err := host.Info()
 	if err != nil {
 		logrus.Errorln("Error getting info info: ", err)
@@ -100,10 +103,16 @@ func UpdateAgentMetadata(client *req.Client, agentId int) {
 	// client_signature represents the signature of the client, which includes the CipherSwarm Agent version, operating system, and kernel architecture.
 	client_signature := "CipherSwarm Agent/" + AgentVersion + " " + info.OS + "/" + info.KernelArch
 
+	devices, err := arch.GetDevices()
+	if err != nil {
+		logrus.Errorln("Error getting devices: ", err)
+
+	}
+
 	agentMetadata := AgentMetadata{
 		Name:            info.Hostname,
 		ClientSignature: client_signature,
-		Devices:         []string{"GPU0", "CPU0"},
+		Devices:         devices,
 	}
 
 	switch info.OS {
@@ -117,11 +126,16 @@ func UpdateAgentMetadata(client *req.Client, agentId int) {
 		agentMetadata.OperatingSystem = Other
 	}
 
-	_, err = client.R().SetBody(agentMetadata).Put("/agents/" + strconv.Itoa(agentId))
+	resp, err := client.R().SetBody(agentMetadata).Put("/agents/" + strconv.Itoa(agentId))
 	if err != nil {
 		logrus.Errorln("Error updating agent metadata: ", err)
 	}
-	logrus.Debugf("Agent metadata: %v", agentMetadata)
+
+	if resp.IsSuccessState() {
+		logrus.Infoln("Agent metadata updated with the CipherSwarm API")
+	} else {
+		logrus.Errorln("Error updating agent metadata: ", resp.String())
+	}
 }
 
 type AgentMetadata struct {

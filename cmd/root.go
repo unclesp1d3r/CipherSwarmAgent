@@ -54,6 +54,13 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cipherswarmagent.yaml)")
 	viper.SetDefault("pid_file", "lock.pid")
+	viper.SetDefault("file_path", "files")
+	viper.SetDefault("crackers_path", "crackers")
+	viper.SetDefault("hashlist_path", "hashlists")
+	viper.SetDefault("zaps_path", "zaps")
+	viper.SetDefault("preprocessors_path", "preprocessors")
+	viper.SetDefault("debug", false)
+	viper.SetDefault("gpu_temp_threshold", 80)
 }
 
 // initConfig initializes the configuration for the CipherSwarmAgent.
@@ -90,8 +97,11 @@ func startAgent(cmd *cobra.Command, args []string) {
 	client := req.SetTimeout(5*time.Second).
 		SetUserAgent("CipherSwarm Agent/"+lib.AgentVersion).
 		SetCommonHeader("Accept", "application/json").
-		SetCommonQueryParam("token", viper.GetString("api_token")).
+		//SetCommonQueryParam("token", viper.GetString("api_token")).
 		SetBaseURL(viper.GetString("api_url")).
+		SetCommonRetryCount(5).
+		SetCommonRetryBackoffInterval(5*time.Second, 30*time.Second).
+		SetCommonBearerAuthToken(viper.GetString("api_token")).
 		DevMode() // Enable development mode TODO: Remove this line in production
 
 	log.Infoln("Starting CipherSwarm Agent")
@@ -108,14 +118,12 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 	// Get the configuration
 	lib.Configuration = lib.GetAgentConfiguration(client)
-	log.Infoln("Configuration updated from server")
 
 	// Update the configuration
 	lib.UpdateClientConfig()
 
 	// Update the agent metadata with the CipherSwarm API
 	lib.UpdateAgentMetadata(client, agentId)
-	log.Infoln("Agent metadata updated with the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
 	log.Infoln("Checking for dangling hashcat processes")
