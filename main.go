@@ -15,7 +15,9 @@ limitations under the License.
 */
 package main
 
-import "github.com/unclesp1d3r/cipherswarmagent/cmd"
+import (
+	"github.com/unclesp1d3r/cipherswarmagent/cmd"
+)
 
 func main() {
 	cmd.Execute()

@@ -3,17 +3,15 @@
 package arch
 
 import (
-	log "github.com/sirupsen/logrus"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 )
 
 func GetDevices() ([]string, error) {
-	log.Debugln("Getting GPU devices")
 	out, err := exec.Command("system_profiler", "SPDisplaysDataType", "-detaillevel", "mini").Output()
 	if err != nil {
-		log.Errorf("Error getting GPU devices: %v", err)
 		return []string{}, err
 	}
 
@@ -27,4 +25,17 @@ func GetDevices() ([]string, error) {
 	}
 
 	return newArray, nil
+}
+
+func GetHashcatVersion(hashcatPath string) (string, error) {
+	execPath := path.Join(hashcatPath, "hashcat")
+	out, err := exec.Command(execPath, "--version").Output()
+	if err != nil {
+		return "0.0.0", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func GetPlatform() string {
+	return "darwin"
 }
