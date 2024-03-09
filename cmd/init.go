@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"net/url"
 
+	log "github.com/charmbracelet/log"
 	"github.com/manifoldco/promptui"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

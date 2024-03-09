@@ -2,27 +2,41 @@ package lib
 
 import (
 	"errors"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"strconv"
 
+	"github.com/charmbracelet/log"
 	"github.com/imroc/req/v3"
 	"github.com/shirou/gopsutil/v3/host"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
+
+	"time"
+)
+
+var (
+	// AgentPlatform represents the platform on which the agent is running.
+	AgentPlatform = ""
+	// logger is a logger instance used for logging in the agentClient package.
+	logger log.Logger = *Logger
 )
 
 type AgentAuthenticationResult struct {
 	// Authenticated represents the authentication status of the agent client.
 	Authenticated bool `json:"authenticated"`
-	AgentId       int  `json:"agent_id"`
+	// AgentId represents the unique identifier of the agent.
+	AgentId int `json:"agent_id"`
 }
 
 type AgentConfiguration struct {
-	// Configuration represents the configuration for the agent client.
-	// It is a JSON field with the key "config".
-	Configuration string `json:"config"`
+	Config struct {
+		// UseNativeHashcat specifies whether to use the native Hashcat implementation.
+		// If set to true, the agent will use the native Hashcat implementation.
+		// If set to false, the agent will use a different implementation.
+		UseNativeHashcat bool `json:"use_native_hashcat" yaml:"use_native_hashcat"`
+	} `json:"config" yaml:"config"`
 	// ApiVersion represents the version of the API used by the agent client.
-	ApiVersion int `json:"api_version"`
+	// It is specified as an integer and is used for JSON and YAML serialization.
+	ApiVersion int `json:"api_version" yaml:"api_version"`
 }
 
 // AuthenticateAgent authenticates the agent with the CipherSwarm API.
@@ -36,14 +50,14 @@ func AuthenticateAgent(client *req.Client) (int, error) {
 	result := AgentAuthenticationResult{}
 	resp, err := client.R().Get("/authenticate")
 	if err != nil {
-		logrus.Errorln("Error connecting to the CipherSwarm API", err)
+		logger.Error("Error connecting to the CipherSwarm API", err)
 		return 0, err
 	}
 
 	if resp.IsSuccessState() {
 		err = resp.Into(&result)
 		if err != nil {
-			logrus.Fatal(err)
+			logger.Fatal(err)
 			return 0, err
 		}
 
@@ -51,11 +65,10 @@ func AuthenticateAgent(client *req.Client) (int, error) {
 			viper.Set("agent_id", result.AgentId)
 			return result.AgentId, nil
 		} else {
-			logrus.Fatalln("Failed to authenticate with the CipherSwarm API")
 			return 0, errors.New("failed to authenticate with the CipherSwarm API")
 		}
 	} else {
-		logrus.Fatalf("bad response: %v", resp)
+		logger.Error("bad response: %v", resp)
 		return 0, resp.Err
 	}
 }
@@ -65,25 +78,24 @@ func AuthenticateAgent(client *req.Client) (int, error) {
 // If there is an error connecting to the API or if the response is not successful,
 // it logs the error and returns an empty AgentConfiguration.
 // If the response is successful, it logs the response body for debugging purposes.
-func GetAgentConfiguration(client *req.Client) AgentConfiguration {
+func GetAgentConfiguration(client *req.Client) (AgentConfiguration, error) {
 	rep, err := client.R().Get("/configuration")
 	if err != nil {
-		logrus.Errorln("Error connecting to the CipherSwarm API", err)
+		return AgentConfiguration{}, err
 	}
 
 	result := AgentConfiguration{}
 	if rep.IsSuccessState() {
-		logrus.Debugln(rep.String())
+		logger.Debug(rep.String())
 		err = rep.Into(&result)
 		if err != nil {
-			logrus.Fatal(err)
+			return AgentConfiguration{}, err
 		}
 
 	} else {
-		logrus.Fatalf("bad response: %v", rep)
+		return AgentConfiguration{}, errors.New("bad response: " + rep.String())
 	}
-	logrus.Infoln("Configuration updated from server")
-	return result
+	return result, nil
 }
 
 // UpdateAgentMetadata updates the metadata of an agent.
@@ -94,26 +106,28 @@ func GetAgentConfiguration(client *req.Client) AgentConfiguration {
 // If there is an error retrieving the host information or updating the agent metadata, an error message is logged.
 // The updated agent metadata is also logged for debugging purposes.
 func UpdateAgentMetadata(client *req.Client, agentId int) {
-	logrus.Infoln("Updating agent metadata with the CipherSwarm API")
+	logger.Info("Updating agent metadata with the CipherSwarm API")
 	info, err := host.Info()
 	if err != nil {
-		logrus.Errorln("Error getting info info: ", err)
+		logger.Error("Error getting info info: ", err)
 	}
 
 	// client_signature represents the signature of the client, which includes the CipherSwarm Agent version, operating system, and kernel architecture.
-	client_signature := "CipherSwarm Agent/" + AgentVersion + " " + info.OS + "/" + info.KernelArch
+	clientSignature := "CipherSwarm Agent/" + AgentVersion + " " + info.OS + "/" + info.KernelArch
 
 	devices, err := arch.GetDevices()
 	if err != nil {
-		logrus.Errorln("Error getting devices: ", err)
+		logger.Error("Error getting devices: ", err)
 
 	}
 
 	agentMetadata := AgentMetadata{
 		Name:            info.Hostname,
-		ClientSignature: client_signature,
+		ClientSignature: clientSignature,
 		Devices:         devices,
 	}
+
+	AgentPlatform = info.OS
 
 	switch info.OS {
 	case "linux":
@@ -128,21 +142,78 @@ func UpdateAgentMetadata(client *req.Client, agentId int) {
 
 	resp, err := client.R().SetBody(agentMetadata).Put("/agents/" + strconv.Itoa(agentId))
 	if err != nil {
-		logrus.Errorln("Error updating agent metadata: ", err)
+		logger.Error("Error updating agent metadata: ", err)
 	}
 
 	if resp.IsSuccessState() {
-		logrus.Infoln("Agent metadata updated with the CipherSwarm API")
+		logger.Info("Agent metadata updated with the CipherSwarm API")
 	} else {
-		logrus.Errorln("Error updating agent metadata: ", resp.String())
+		logger.Error("Error updating agent metadata: ", resp.String())
 	}
 }
 
 type AgentMetadata struct {
-	Name            string   `json:"name"`
-	ClientSignature string   `json:"client_signature"`
-	Devices         []string `json:"devices"`
-	OperatingSystem int      `json:"operating_system"`
+	// Name represents the hostname of the agent client.
+	Name string `json:"name"`
+	// ClientSignature represents the signature of the client.
+	ClientSignature string `json:"client_signature"`
+	// Devices represents a list of device GPU names.
+	Devices []string `json:"devices"`
+	// OperatingSystem represents the operating system of the agent.
+	// 0: Linux
+	// 1: Windows
+	// 2: MacOS
+	OperatingSystem int `json:"operating_system"`
 }
 
+// Configuration represents the agent configuration.
 var Configuration AgentConfiguration
+
+// UpdateCracker checks for an updated version of the cracker and performs the necessary actions.
+// It takes a client object as a parameter and uses it to make a request to check for updates.
+// If an updated version is available, it logs the information about the latest version.
+// If any errors occur during the process, they are logged as well.
+func UpdateCracker(client *req.Client) {
+	updateCrackerResponse := UpdateCrackerResponse{}
+	logger.Info("Checking for updated cracker")
+	currentVersion, err := GetCurrentHashcatVersion()
+	if err != nil {
+		logger.Error("Error getting current hashcat version: ", err)
+	}
+
+	resp := client.Get("/crackers/check_for_cracker_update").
+		AddQueryParams("version", currentVersion).
+		AddQueryParams("operating_system", AgentPlatform).Do()
+	if resp.Err != nil {
+		logger.Error("Error checking for updated cracker: ", resp.Err)
+	}
+
+	if resp.IsSuccessState() {
+		err := resp.Into(&updateCrackerResponse)
+		if err != nil {
+			logger.Error("Error parsing response: ", err)
+		}
+		if updateCrackerResponse.Available {
+			logger.Info("New cracker available: ", updateCrackerResponse.LatestVersion.Version)
+		}
+	} else {
+		logger.Error("Error checking for updated cracker: ", resp.String())
+	}
+}
+
+type UpdateCrackerResponse struct {
+	// Available represents the availability status of the agent.
+	// It is a boolean value indicating whether an updated agent is available or not.
+	Available bool `json:"available"`
+	// LatestVersion represents the latest version of the agent.
+	LatestVersion struct {
+		Id        int       `json:"id"`
+		Name      string    `json:"name"`
+		Version   string    `json:"version"`
+		Active    bool      `json:"active"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+	} `json:"latest_version"`
+	// DownloadUrl represents the URL from which the file can be downloaded.
+	DownloadUrl string `json:"download_url"`
+}
