@@ -3,8 +3,11 @@ package lib
 import (
 	"errors"
 	"os"
+	"path"
 	"strconv"
+	"strings"
 	"syscall"
+	"unicode"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/afero"
@@ -12,13 +15,15 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 )
 
-var AppFs = afero.NewOsFs()
-var Logger = log.NewWithOptions(os.Stderr, log.Options{
-	Prefix:          "cipherswarm-agent",
-	Level:           log.InfoLevel,
-	ReportTimestamp: true,
-	ReportCaller:    true,
-})
+var (
+	AppFs  = afero.NewOsFs()
+	Logger = log.NewWithOptions(os.Stderr, log.Options{
+		Prefix:          "cipherswarm-agent",
+		Level:           log.InfoLevel,
+		ReportTimestamp: true,
+		ReportCaller:    true,
+	})
+)
 
 // UpdateClientConfig updates the client configuration settings.
 // It sets the API version and advanced configuration settings based on the values in the Configuration struct.
@@ -26,11 +31,11 @@ var Logger = log.NewWithOptions(os.Stderr, log.Options{
 // If there is an error while writing the config file, it logs the error.
 func UpdateClientConfig() {
 	// These settings are mostly just placeholders for now
-	viper.Set("api_version", Configuration.ApiVersion)
+	viper.Set("api_version", Configuration.APIVersion)
 	viper.Set("advanced_config", Configuration.Config)
 	err := viper.WriteConfig()
 	if err != nil {
-		log.Error("Error writing config file: ", err)
+		log.Error("Error writing config file", "error", err)
 	}
 }
 
@@ -42,10 +47,32 @@ func UpdateClientConfig() {
 // Otherwise, it returns the Hashcat version and no error.
 func GetCurrentHashcatVersion() (string, error) {
 	afs := &afero.Afero{Fs: AppFs}
-	hashcatDirExists, _ := afs.DirExists(viper.GetString("hashcat_path"))
-	if !hashcatDirExists {
-		return "0.0.0", errors.New("hashcat directory does not exist")
+
+	// Check where the hashcat binary should be
+	hashcatExists, _ := afs.Exists(viper.GetString("hashcat_path"))
+	if !hashcatExists {
+		Logger.Debug("Cannot find hashcat binary, checking fallback location.", "path", viper.GetString("hashcat_path"))
+
+		// Check if the hashcat binary exists in the crackers directory
+		fallbackPath := path.Join(
+			viper.GetString("crackers_path"),
+			"hashcat",
+			arch.GetDefaultHashcatBinaryName(),
+		)
+		hashcatExists, _ = afs.Exists(fallbackPath)
+		if hashcatExists {
+			Logger.Debug("Using hashcat binary from crackers directory", "path", fallbackPath)
+			viper.Set("hashcat_path", fallbackPath)
+		} else {
+			Logger.Error("Hashcat binary does not exist", "path", fallbackPath)
+		}
 	}
+	if !hashcatExists {
+		Logger.Error("Hashcat binary does not exist", "path", viper.GetString("hashcat_path"))
+		return "0.0.0", errors.New("hashcat binary does not exist")
+	}
+
+	// Found the hashcat binary, get the version
 	hashcatVersion, err := arch.GetHashcatVersion(viper.GetString("hashcat_path"))
 	if err != nil {
 		return "0.0.0", err
@@ -64,7 +91,7 @@ func GetPlatform() string {
 // It returns a boolean value indicating whether the cleanup was performed successfully,
 // and an error if any occurred during the cleanup process.
 func CleanUpDanglingProcess(pidFilePath string, killIfFound bool) (bool, error) {
-	logger.Info("Checking for dangling processes")
+	Logger.Info("Checking for dangling processes")
 	pidExists, err := afero.Exists(AppFs, pidFilePath)
 	if err != nil {
 		return false, err
@@ -126,17 +153,50 @@ func CreateLockFile() (afero.File, error) {
 	currentPid := os.Getpid()
 
 	pidFile, err := AppFs.Create(lockFilePath)
-
 	if err != nil {
-		logger.Fatal("Failed to create PID file", "error", lockFilePath)
+		Logger.Fatal("Failed to create PID file", "error", lockFilePath)
 	}
 	defer func(pidFile afero.File) {
 		err := pidFile.Close()
 		if err != nil {
-			logger.Fatal("Failed to close PID file", "error", err)
+			Logger.Fatal("Failed to close PID file", "error", err)
 		}
 	}(pidFile)
 	_, err = pidFile.WriteString(strconv.Itoa(currentPid))
-	logger.Debug("PID file created", "path", lockFilePath, "pid", currentPid)
+	Logger.Debug("PID file created", "path", lockFilePath, "pid", currentPid)
 	return pidFile, err
+}
+
+func CleanString(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, s)
+}
+
+func CreateDataDirs() error {
+	dataDirs := []string{
+		viper.GetString("file_path"),
+		viper.GetString("crackers_path"),
+		viper.GetString("hashlist_path"),
+		viper.GetString("zaps_path"),
+		viper.GetString("preprocessors_path"),
+		viper.GetString("tools_path"),
+	}
+	for _, dir := range dataDirs {
+		if dir == "" {
+			Logger.Error("Data directory not set")
+		}
+
+		if _, err := AppFs.Stat(dir); os.IsNotExist(err) {
+			err := AppFs.MkdirAll(dir, 0o755)
+			if err != nil {
+				return err
+			}
+			Logger.Info("Created directory", "path", dir)
+		}
+	}
+	return nil
 }

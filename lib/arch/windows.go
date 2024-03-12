@@ -3,6 +3,7 @@
 package arch
 
 import log "github.com/sirupsen/logrus"
+
 import (
 	"os/exec"
 	"regexp"
@@ -29,4 +30,7 @@ func GetDevices() ([]string, error) {
 	}
 
 	return newArray, nil
+}
+func GetDefaultHashcatBinaryName() string {
+	return "hashcat.exe"
 }
