@@ -4,7 +4,6 @@ package arch
 
 import (
 	"os/exec"
-	"path"
 	"regexp"
 	"strings"
 )
@@ -28,8 +27,7 @@ func GetDevices() ([]string, error) {
 }
 
 func GetHashcatVersion(hashcatPath string) (string, error) {
-	execPath := path.Join(hashcatPath, "hashcat")
-	out, err := exec.Command(execPath, "--version").Output()
+	out, err := exec.Command(hashcatPath, "--version", "--quiet").Output()
 	if err != nil {
 		return "0.0.0", err
 	}
@@ -38,4 +36,13 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 
 func GetPlatform() string {
 	return "darwin"
+}
+
+func Extract7z(srcFile string, destDir string) error {
+	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output()
+	return err
+}
+
+func GetDefaultHashcatBinaryName() string {
+	return "hashcat.bin"
 }

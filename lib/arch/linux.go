@@ -3,11 +3,11 @@
 package arch
 
 import (
-	log "github.com/sirupsen/logrus"
-
 	"os/exec"
 	"regexp"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func GetDevices() ([]string, error) {
@@ -29,4 +29,12 @@ func GetDevices() ([]string, error) {
 	}
 
 	return newArray, nil
+}
+
+func Extract7z(srcFile string, destDir string) error {
+	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output()
+	return err
+}
+func GetDefaultHashcatBinaryName() string {
+	return "hashcat.bin"
 }
