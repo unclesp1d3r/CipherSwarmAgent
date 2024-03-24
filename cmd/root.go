@@ -77,8 +77,10 @@ func init() {
 	viper.SetDefault("zaps_path", path.Join(dataRoot, "zaps"))                   // Set the default zaps path
 	viper.SetDefault("preprocessors_path", path.Join(dataRoot, "preprocessors")) // Set the default preprocessors path
 	viper.SetDefault("tools_path", path.Join(dataRoot, "tools"))                 // Set the default tools path
+	viper.SetDefault("out_path", path.Join(dataRoot, "out"))                     // Set the default output path
 	viper.SetDefault("debug", false)                                             // Set the default debug mode
 	viper.SetDefault("gpu_temp_threshold", 80)                                   // Set the default GPU temperature threshold
+	viper.SetDefault("benchmark_update_frequency", 168*time.Hour)                // Set the default benchmark age in hours (7 days)
 
 	if viper.GetBool("debug") {
 		lib.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug
@@ -152,6 +154,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 			// 429: Too many requests
 			return err != nil || resp.StatusCode >= 500 || resp.StatusCode == 408 || resp.StatusCode == 429
 		}).
+		//DevMode().
 		SetLogger(lib.Logger) // Set the logger to the global logger instance
 
 	if enableDebug {
@@ -230,16 +233,49 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 			// - Check for an updated version of the agent
 			//   - If an updated version is available, download and install it
+
+			// - Check if we need to update the agent benchmarks
+			//   - If we need to update the benchmarks, run the benchmarks and upload the results to the CipherSwarm API
+			benchmarkUpdateCheck(agentID)
+
 			// - Request a new job from the CipherSwarm API
 			//   - If a job is available, download the job and start processing it
-			// - If no job is available, sleep for a few seconds and check again
-			// For the job processing, we'll set up hashcat and run it in a separate goroutine
-			// We'll track the hashcat process and update the CipherSwarm API with the status of the job
-			// Once the job is complete, we'll upload the results to the CipherSwarm API
-			// We'll also track the resource usage of the machine and the temperature of the GPUs and update the CipherSwarm API with the data
+			task, err := lib.GetNewTask()
+			if err != nil {
+				lib.Logger.Error("Failed to get new task", "error", err)
+			}
+			if task.Available {
+				lib.Logger.Info("New task available", "task", task)
 
+				// Process the task
+				// - Get the attack parameters
+				attack, err := lib.GetAttackParameters(task.AttackID)
+				if err != nil {
+					lib.Logger.Error("Failed to get attack parameters", "error", err)
+				}
+				lib.Logger.Info("Attack parameters", "attack", attack)
+
+				// - Download the files
+				err = lib.DownloadFiles(attack)
+				if err != nil {
+					lib.Logger.Error("Failed to download files", "error", err)
+				}
+
+				// - Run the job
+				lib.RunTask(task, attack)
+				// - Upload the results
+				// - Update the CipherSwarm API with the status of the job
+
+				// For the job processing, we'll set up hashcat and run it in a separate goroutine
+				// We'll track the hashcat process and update the CipherSwarm API with the status of the job
+				// Once the job is complete, we'll upload the results to the CipherSwarm API
+				// We'll also track the resource usage of the machine and the temperature of the GPUs and update the CipherSwarm API with the data
+			} else {
+				lib.Logger.Info("No new task available")
+			}
 			sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
-			lib.Logger.Info("No job available, sleeping", "seconds", sleepTime)
+			lib.Logger.Info("Sleeping", "seconds", sleepTime)
+			lib.SendHeartBeat(agentID)
 			time.Sleep(sleepTime)
 		}
 	}()
@@ -247,6 +283,26 @@ func startAgent(cmd *cobra.Command, args []string) {
 	sig := <-signChan // Wait for a signal to shut down the agent
 	lib.Logger.Debug("Received signal", "signal", sig)
 	lib.Logger.Info("Shutting down CipherSwarm Agent")
+}
+
+func benchmarkUpdateCheck(agentID int) {
+	benchmarkFrequency := viper.GetDuration("benchmark_update_frequency")
+	oldestUpdate := time.Now().Add(-benchmarkFrequency)
+	lastBenchmarkDate, err := lib.GetLastBenchmarkDate(agentID)
+	if err != nil {
+		lib.Logger.Error("Failed to get last benchmark date", "error", err)
+		return
+	}
+	lib.Logger.Debug("Got benchmark age", "benchmark_age", time.Since(lastBenchmarkDate).String())
+
+	if lastBenchmarkDate.Before(oldestUpdate) {
+		lib.Logger.Info("Benchmarks out of date", "benchmark_age", time.Since(lastBenchmarkDate).String(),
+			"maximum_age", oldestUpdate.String())
+		lib.UpdateBenchmarks(agentID)
+		lib.Logger.Info("Updated benchmarks")
+	} else {
+		lib.Logger.Info("Benchmarks up to date")
+	}
 }
 
 // cleanUpPidFile returns a function that can be used to clean up a PID file.

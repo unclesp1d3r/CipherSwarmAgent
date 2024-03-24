@@ -34,3 +34,7 @@ func GetDevices() ([]string, error) {
 func GetDefaultHashcatBinaryName() string {
 	return "hashcat.exe"
 }
+
+func GetAdditionalHashcatArgs() []string {
+	return []string{}
+}
