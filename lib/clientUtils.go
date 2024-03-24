@@ -51,7 +51,7 @@ func GetCurrentHashcatVersion() (string, error) {
 	// Check where the hashcat binary should be
 	hashcatExists, _ := afs.Exists(viper.GetString("hashcat_path"))
 	if !hashcatExists {
-		Logger.Debug("Cannot find hashcat binary, checking fallback location.", "path", viper.GetString("hashcat_path"))
+		Logger.Error("Cannot find hashcat binary, checking fallback location.", "path", viper.GetString("hashcat_path"))
 
 		// Check if the hashcat binary exists in the crackers directory
 		fallbackPath := path.Join(
@@ -77,6 +77,7 @@ func GetCurrentHashcatVersion() (string, error) {
 	if err != nil {
 		return "0.0.0", err
 	}
+	Logger.Debug("Current hashcat version", "version", hashcatVersion)
 	return hashcatVersion, nil
 }
 
@@ -184,6 +185,7 @@ func CreateDataDirs() error {
 		viper.GetString("zaps_path"),
 		viper.GetString("preprocessors_path"),
 		viper.GetString("tools_path"),
+		viper.GetString("out_path"),
 	}
 	for _, dir := range dataDirs {
 		if dir == "" {

@@ -1,8 +1,12 @@
 package lib
 
 import (
+	"crypto/md5"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"github.com/spf13/afero"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"os"
 	"os/exec"
 	"path"
@@ -14,6 +18,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 )
+
+// TODO: Organize this into a proper API
 
 var (
 	// AgentPlatform represents the platform on which the agent is running.
@@ -47,9 +53,8 @@ func AuthenticateAgent() (int, error) {
 		if result.Authenticated {
 			viper.Set("agent_id", result.AgentID)
 			return result.AgentID, nil
-		} else {
-			return 0, errors.New("failed to authenticate with the CipherSwarm API")
 		}
+		return 0, errors.New("failed to authenticate with the CipherSwarm API")
 	} else {
 		Logger.Error("bad response: %v", resp)
 		return 0, resp.Err
@@ -109,7 +114,7 @@ func UpdateAgentMetadata(agentID int) {
 
 	// client_signature represents the signature of the client, which includes the CipherSwarm Agent version, operating system,
 	//   and kernel architecture.
-	clientSignature := "CipherSwarm Agent/" + AgentVersion + " " + info.OS + "/" + info.KernelArch
+	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
 	devices, err := arch.GetDevices()
 	if err != nil {
@@ -124,26 +129,18 @@ func UpdateAgentMetadata(agentID int) {
 
 	AgentPlatform = info.OS
 
-	switch info.OS {
-	case "linux":
-		agentMetadata.OperatingSystem = Linux
-	case "windows":
-		agentMetadata.OperatingSystem = Windows
-	case "darwin":
-		agentMetadata.OperatingSystem = Darwin
-	default:
-		agentMetadata.OperatingSystem = Other
-	}
+	agentMetadata.OperatingSystem = info.OS
 
 	resp, err := Client.R().SetBody(agentMetadata).Put("/agents/" + strconv.Itoa(agentID))
 	if err != nil {
-		Logger.Error("Error updating agent metadata: ", err)
+		Logger.Error("Error updating agent metadata", "error", err)
 	}
 
 	if resp.IsSuccessState() {
 		Logger.Info("Agent metadata updated with the CipherSwarm API")
+		Logger.Debug("Agent metadata", "metadata", agentMetadata)
 	} else {
-		Logger.Error("Error updating agent metadata: ", resp.String())
+		Logger.Error("Error updating agent metadata ", "response", resp.String())
 	}
 }
 
@@ -167,9 +164,13 @@ func UpdateCracker() {
 	}
 
 	if resp.IsSuccessState() {
+		if resp.StatusCode == 204 {
+			Logger.Debug("No new cracker available")
+			return
+		}
 		err := resp.Into(&updateCrackerResponse)
 		if err != nil {
-			Logger.Error("Error parsing response: ", err)
+			Logger.Error("Error parsing response", "error", err, "response", resp.String())
 		}
 		if updateCrackerResponse.Available {
 			Logger.Info("New cracker available", "latest_version", updateCrackerResponse.LatestVersion.Version)
@@ -242,10 +243,203 @@ func UpdateCracker() {
 				path.Join(viper.GetString("crackers_path"), "hashcat", updateCrackerResponse.ExecName),
 			)
 			_ = viper.WriteConfig()
+		} else {
+			Logger.Debug("No new cracker available", "latest_version", updateCrackerResponse.LatestVersion.Version)
 		}
 	} else {
 		Logger.Error("Error checking for updated cracker: ", resp.String())
 	}
+}
+
+func GetNewTask() (Task, error) {
+	task := Task{}
+	resp := Client.Get("/tasks/new").Do()
+
+	if resp.Err != nil {
+		return task, resp.Err
+	}
+
+	if resp.IsSuccessState() {
+		if resp.StatusCode == 204 {
+			task.Available = false
+			return task, nil
+		}
+		err := resp.Into(&task)
+		if err != nil {
+			return task, err
+		}
+
+		task.Available = true
+		return task, nil
+	}
+	return task, errors.New("bad response: " + resp.String())
+}
+
+func GetAttackParameters(attackID int) (AttackParameters, error) {
+	attackParameters := AttackParameters{}
+	resp := Client.Get("/attacks/" + strconv.Itoa(attackID)).Do()
+
+	if resp.Err != nil {
+		return attackParameters, resp.Err
+	}
+
+	if resp.IsSuccessState() {
+		err := resp.Into(&attackParameters)
+		if err != nil {
+			return attackParameters, err
+		}
+		return attackParameters, nil
+	}
+	return attackParameters, errors.New("bad response: " + resp.String())
+}
+
+type BenchmarkResultResponse struct {
+	Results []BenchmarkResult `json:"hashcat_benchmarks"`
+}
+
+func SendBenchmarkResults(agentID int, benchmarkResults []BenchmarkResult) error {
+	results := BenchmarkResultResponse{
+		Results: benchmarkResults,
+	}
+	resp, err := Client.R().SetBody(results).Post("/agents/" + strconv.Itoa(agentID) + "/submit_benchmark")
+	if err != nil {
+		return err
+	}
+
+	if resp.Err != nil {
+		return resp.Err
+	}
+
+	if resp.IsSuccessState() {
+		return nil
+	}
+	return errors.New("bad response: " + resp.String())
+}
+
+type benchmarkDateResponse struct {
+	LastBenchmarkDate time.Time `json:"last_benchmark_date"`
+}
+
+func GetLastBenchmarkDate(agentID int) (time.Time, error) {
+	lastBenchmarkDate := benchmarkDateResponse{}
+
+	resp := Client.Get("/agents/" + strconv.Itoa(agentID) + "/last_benchmark").Do()
+	if resp.Err != nil {
+		return time.Time{}, resp.Err
+	}
+
+	if resp.IsSuccessState() {
+		err := resp.Into(&lastBenchmarkDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return lastBenchmarkDate.LastBenchmarkDate, nil
+	}
+	return time.Time{}, errors.New("bad response: " + resp.String())
+}
+
+func UpdateBenchmarks(agentID int) {
+	jobParams := hashcat.HashcatParams{
+		AttackMode:     hashcat.AttackBenchmark,
+		AdditionalArgs: arch.GetAdditionalHashcatArgs(),
+	}
+
+	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
+	if err != nil {
+		Logger.Error("Failed to create benchmark session", "error", err)
+		return
+	}
+
+	Logger.Info("Performing benchmarks")
+	benchmarkResult, done := RunBenchmarkTask(sess)
+	if done {
+		return
+	}
+	Logger.Debug("Benchmark session completed", "results", benchmarkResult)
+	err = SendBenchmarkResults(agentID, benchmarkResult)
+	if err != nil {
+		Logger.Error("Failed to send benchmark results", "error", err)
+		return
+	}
+}
+
+func DownloadFiles(attack AttackParameters) error {
+	Logger.Info("Downloading files for attack", "attack_id", attack.ID)
+
+	// Download the hashlist
+	hashlistPath := path.Join(viper.GetString("hashlist_path"), strconv.Itoa(attack.HashListID)+".txt")
+	Logger.Debug("Downloading hashlist", "url", attack.HashListURL, "path", hashlistPath)
+	err := downloadFile(attack.HashListURL, hashlistPath, attack.HashListChecksum)
+	if err != nil {
+		Logger.Error("Error downloading hashlist", "error", err)
+		return err
+	}
+
+	// Download the wordlists
+	for _, wordlist := range attack.WordLists {
+		wordlistPath := path.Join(viper.GetString("file_path"), wordlist.FileName)
+		Logger.Debug("Downloading wordlist", "url", wordlist.DownloadURL, "path", wordlistPath)
+		err := downloadFile(wordlist.DownloadURL, wordlistPath, wordlist.Checksum)
+		if err != nil {
+			Logger.Error("Error downloading wordlist", "error", err)
+			return err
+		}
+	}
+
+	// Download the rulelists
+	for _, rulelist := range attack.RuleLists {
+		rulelistPath := path.Join(viper.GetString("file_path"), rulelist.FileName)
+		Logger.Debug("Downloading rulelist", "url", rulelist.DownloadURL, "path", rulelistPath)
+		err := downloadFile(rulelist.DownloadURL, rulelistPath, rulelist.Checksum)
+		if err != nil {
+			Logger.Error("Error downloading rulelist", "error", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func downloadFile(url string, path string, checksum string) error {
+	if _, err := os.Stat(path); err == nil {
+		if checksum != "" {
+			// MD5 hash the file and compare it to the checksum
+			// If the checksums match, the file is already downloaded
+			plainTextByte, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			// Check the checksum
+			md5sum := md5.Sum(plainTextByte) //nolint:gosec
+			// base64 encoded md5 hash
+			fileChecksum := base64.StdEncoding.EncodeToString(md5sum[:])
+			if fileChecksum == checksum {
+				Logger.Debug("Download already exists", "path", path)
+				return nil
+			}
+			Logger.Debug("Checksums do not match", "path", path)
+			err = os.Remove(path)
+			if err != nil {
+				return err
+			}
+		}
+		Logger.Debug("Download already exists", "path", path)
+		return nil
+	}
+	Logger.Info("Downloading file", "url", url, "path", path)
+	_, err := Client.R().
+		SetOutputFile(path).
+		SetDownloadCallbackWithInterval(func(info req.DownloadInfo) {
+			if info.Response.Response != nil {
+				Logger.Infof("downloaded %.2f%%\n", float64(info.DownloadedSize)/float64(info.Response.ContentLength)*100.0)
+			}
+		}, 1*time.Second).
+		Get(url)
+	if err != nil {
+		return err
+	}
+	Logger.Debug("Downloaded file", "url", url, "path", path)
+	return nil
 }
 
 func extractHashcatArchive(newArchivePath string) (string, error) {
@@ -283,4 +477,123 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 	}
 	Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
 	return newArchivePath, err
+}
+
+func SendHeartBeat(agentID int) {
+	resp, err := Client.R().Post("/agents/" + strconv.Itoa(agentID) + "/heartbeat")
+	if err != nil {
+		Logger.Error("Error sending heartbeat", "error", err)
+		return
+	}
+
+	if resp.IsSuccessState() {
+		Logger.Debug("Heartbeat sent")
+	} else {
+		Logger.Error("Error sending heartbeat", "response", resp.String())
+	}
+
+}
+
+func RunTask(task Task, attack AttackParameters) {
+	Logger.Info("Running task", "task_id", task.ID)
+	// Create the hashcat session
+
+	// TODO: Need to unify the AttackParameters and HashcatParams structs
+	jobParams := hashcat.HashcatParams{
+		AttackMode:         attack.GetAttackMode(),
+		HashType:           uint(attack.HashMode),
+		HashFile:           path.Join(viper.GetString("hashlist_path"), strconv.Itoa(attack.HashListID)+".txt"),
+		Mask:               attack.Mask,
+		MaskIncrement:      attack.IncrementMode,
+		MaskIncrementMin:   uint(attack.IncrementMinimum),
+		MaskIncrementMax:   uint(attack.IncrementMaximum),
+		MaskShardedCharset: "",
+		MaskCustomCharsets: nil,
+		WordlistFilenames:  attack.GetWordlistFilenames(),
+		RulesFilenames:     attack.GetRulelistFilenames(),
+		AdditionalArgs:     arch.GetAdditionalHashcatArgs(),
+		OptimizedKernels:   attack.Optimized,
+		SlowCandidates:     attack.SlowCandidateGenerators,
+		Skip:               task.Skip,
+		Limit:              task.Limit,
+	}
+
+	sess, err := hashcat.NewHashcatSession("attack", jobParams)
+	if err != nil {
+		Logger.Error("Failed to create attack session", "error", err)
+		return
+	}
+
+	Logger.Info("Running attack")
+	if !AcceptTask(task) {
+		Logger.Error("Failed to accept task", "task_id", task.ID)
+		return
+	}
+	RunAttackTask(sess, task)
+
+	Logger.Info("Attack completed")
+}
+
+func SendStatusUpdate(update hashcat.HashcatStatus, task Task) {
+	// TODO: Implement this
+	Logger.Debug("Sending status update", "status", update)
+	resp, err := Client.R().SetBody(update).Post("/tasks/" + strconv.Itoa(task.ID) + "/submit_status")
+	if err != nil {
+		Logger.Error("Error sending status update", "error", err)
+		return
+	}
+	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
+	if resp.IsSuccessState() {
+
+	}
+}
+
+func AcceptTask(task Task) bool {
+	resp, err := Client.R().Post("/tasks/" + strconv.Itoa(task.ID) + "/accept_task")
+	if err != nil {
+		Logger.Error("Error accepting task", "error", err)
+		return false
+	}
+
+	if resp.IsSuccessState() {
+		Logger.Debug("Task accepted")
+		return true
+	} else {
+		if resp.StatusCode == 422 {
+			Logger.Error("Task already completed", "task_id", task.ID, "status", resp.StatusCode)
+			return false
+		}
+		Logger.Error("Error accepting task", "response", resp.String())
+		return false
+	}
+
+}
+
+func MarkTaskExhausted(task Task) {
+	_, err := Client.R().Post("/tasks/" + strconv.Itoa(task.ID) + "/exhausted")
+	if err != nil {
+		Logger.Error("Error notifying server", "error", err)
+	}
+
+}
+
+func SendCrackedHash(hash hashcat.HashcatResult, task Task) {
+	// Send cracked hash to the server
+	resp, err := Client.R().
+		SetBody(hash).
+		Post("/tasks/" + strconv.Itoa(task.ID) + "/submit_crack")
+	if err != nil {
+		Logger.Error("Error sending cracked hash", "error", err)
+		return
+	}
+
+	if resp.IsSuccessState() {
+		Logger.Debug("Cracked hash sent")
+		if resp.StatusCode == 204 {
+			Logger.Info("Hashlist completed", "hash", hash.Hash)
+		}
+	} else {
+		Logger.Error("Error sending cracked hash", "response", resp.String())
+	}
+
 }

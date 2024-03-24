@@ -38,3 +38,7 @@ func Extract7z(srcFile string, destDir string) error {
 func GetDefaultHashcatBinaryName() string {
 	return "hashcat.bin"
 }
+
+func GetAdditionalHashcatArgs() []string {
+	return []string{}
+}
