@@ -422,6 +422,7 @@ func downloadFile(url string, path string, checksum string) error {
 			if err != nil {
 				return err
 			}
+			return nil
 		}
 		Logger.Debug("Download already exists", "path", path)
 		return nil
@@ -544,7 +545,9 @@ func SendStatusUpdate(update hashcat.HashcatStatus, task Task) {
 	}
 	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
 	if resp.IsSuccessState() {
-
+		Logger.Debug("Status update sent successfully")
+	} else {
+		Logger.Error("Error sending status update", "response", resp.String())
 	}
 }
 
