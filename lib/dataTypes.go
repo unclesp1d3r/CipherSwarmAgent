@@ -39,7 +39,6 @@ type UpdateCrackerResponse struct {
 		Name      string    `json:"name"`
 		Version   string    `json:"version"`
 		Active    bool      `json:"active"`
-		CrackerID int       `json:"cracker_id"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 	} `json:"latest_version,omitempty"`
