@@ -1,6 +1,6 @@
 module github.com/unclesp1d3r/cipherswarmagent
 
-go 1.22.0
+go 1.22
 
 require (
 	github.com/charmbracelet/log v0.4.0
