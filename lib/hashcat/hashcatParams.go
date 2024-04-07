@@ -2,7 +2,6 @@ package hashcat
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
@@ -75,7 +74,7 @@ func (params HashcatParams) maskArgs() ([]string, error) {
 		return nil, fmt.Errorf("too many custom charsets supplied (%d), the max is %d", len(params.MaskCustomCharsets), maxCharsets)
 	}
 
-	args := []string{}
+	var args []string
 
 	for i, charset := range params.MaskCustomCharsets {
 		// Hashcat accepts parameters --custom-charset1 to --custom-charset4
@@ -120,7 +119,7 @@ func (params HashcatParams) ToCmdArgs(session, hashFile string, outFile string) 
 		args = append(
 			args,
 			"--quiet",
-			"--session", "sess-"+session+"_"+uuid.New().String(),
+			"--session", "sess-"+session,
 			"--outfile-format", "1,3,5",
 			"--outfile", outFile,
 			"--status",
