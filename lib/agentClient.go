@@ -1,7 +1,7 @@
 package lib
 
 import (
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -55,10 +55,9 @@ func AuthenticateAgent() (int, error) {
 			return result.AgentID, nil
 		}
 		return 0, errors.New("failed to authenticate with the CipherSwarm API")
-	} else {
-		Logger.Error("bad response: %v", resp)
-		return 0, resp.Err
 	}
+	Logger.Error("bad response: %v", resp)
+	return 0, resp.Err
 }
 
 // GetAgentConfiguration retrieves the agent configuration from the CipherSwarm API.
@@ -536,7 +535,14 @@ func RunTask(task Task, attack AttackParameters) {
 }
 
 func SendStatusUpdate(update hashcat.HashcatStatus, task Task) {
-	// TODO: Implement this
+	// TODO: Implement receiving a result code when sending this status update
+	// Depending on the code, we should stop the job or pause it
+
+	// Hashcat doesn't seem to update the time consistently, so we'll set it here
+	if update.Time.IsZero() {
+		update.Time = time.Now()
+	}
+
 	Logger.Debug("Sending status update", "status", update)
 	resp, err := Client.R().SetBody(update).Post("/tasks/" + strconv.Itoa(task.ID) + "/submit_status")
 	if err != nil {

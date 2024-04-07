@@ -87,8 +87,9 @@ func RunAttackTask(sess *hashcat.HashcatSession, task Task) {
 				if err != nil {
 
 					if err.Error() == "exit status 1" {
-						Logger.Info("Job session completed", "status", "completed")
+						Logger.Info("Job session exhausted", "status", "exhausted")
 						MarkTaskExhausted(task)
+						
 					} else {
 						Logger.Error("Job session failed", "error", err)
 					}
