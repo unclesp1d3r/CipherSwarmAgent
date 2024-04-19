@@ -4,7 +4,6 @@ go 1.22
 
 require (
 	github.com/charmbracelet/log v0.4.0
-	github.com/google/uuid v1.6.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/imroc/req/v3 v3.43.1
 	github.com/manifoldco/promptui v0.9.0
@@ -64,7 +63,7 @@ require (
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
 	golang.org/x/mod v0.16.0 // indirect
-	golang.org/x/net v0.22.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.19.0 // indirect
