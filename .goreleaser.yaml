@@ -13,8 +13,7 @@ builds:
     env:
       - CGO_ENABLED=0
     goos:
-#      - linux # not tested yet
-#      - windows # not tested yet
+      - linux
       - darwin # reliable
     goarch:
       - amd64
