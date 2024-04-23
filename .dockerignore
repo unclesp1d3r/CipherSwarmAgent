@@ -1,0 +1,11 @@
+.vscode/*
+.devcontainer/*
+.github/*
+.idea/*
+data/*
+dist/*
+.codeclimate.yml
+.editorconfig
+.gitignore
+.goreleaser.yaml
+README.md
