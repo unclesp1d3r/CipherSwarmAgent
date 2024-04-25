@@ -2,8 +2,11 @@
 engines:
   gofmt:
     enabled: true
-  govet:
+  golangci-lint:
     enabled: true
 ratings:
   paths:
     - "**.go"
+exclude_patterns:
+  - "data/"
+  - "dist/"
