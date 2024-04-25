@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+//goland:noinspection SpellCheckingInspection
 func GetDevices() ([]string, error) {
 	log.Debugln("Getting GPU devices")
 	out, err := exec.Command("lspci").Output()

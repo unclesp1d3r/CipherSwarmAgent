@@ -91,7 +91,7 @@ func GetPlatform() string {
 // The `killIfFound` boolean parameter determines whether to kill the process if it is found.
 // It returns a boolean value indicating whether the cleanup was performed successfully,
 // and an error if any occurred during the cleanup process.
-func CleanUpDanglingProcess(pidFilePath string, killIfFound bool) (bool, error) {
+func CleanUpDanglingProcess(pidFilePath string) (bool, error) {
 	Logger.Info("Checking for dangling processes")
 	pidExists, err := afero.Exists(AppFs, pidFilePath)
 	if err != nil {
@@ -129,9 +129,8 @@ func CleanUpDanglingProcess(pidFilePath string, killIfFound bool) (bool, error) 
 			if err != nil {
 				if err.Error() == "os: process already finished" {
 					return false, err
-				} else {
-					return true, err
 				}
+				return true, err
 			}
 			return true, err
 		}

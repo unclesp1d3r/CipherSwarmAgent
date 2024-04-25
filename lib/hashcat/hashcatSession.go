@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/hpcloud/tail"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/hpcloud/tail"
 )
 
 type HashcatSession struct {
@@ -47,7 +48,11 @@ func (sess *HashcatSession) Start() error {
 
 	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true})
 	if err != nil {
-		sess.Kill()
+		err = sess.Kill()
+		if err != nil {
+			fmt.Println("couldn't kill hashcat process", "error", err)
+		}
+
 		return fmt.Errorf("couldn't tail outfile %q: %w", sess.outFile.Name(), err)
 	}
 
@@ -149,6 +154,7 @@ func (sess *HashcatSession) Kill() error {
 	return err
 }
 
+//goland:noinspection GoUnhandledErrorResult,GoUnhandledErrorResult,GoUnhandledErrorResult
 func (sess *HashcatSession) Cleanup() {
 	if sess.hashFile != nil {
 		os.Remove(sess.hashFile.Name())
@@ -156,12 +162,14 @@ func (sess *HashcatSession) Cleanup() {
 	}
 
 	if sess.outFile != nil {
+		//goland:noinspection GoUnhandledErrorResult
 		os.Remove(sess.outFile.Name())
 		sess.outFile = nil
 	}
 
 	for _, f := range sess.charsetFiles {
 		if f != nil {
+			//goland:noinspection GoUnhandledErrorResult
 			os.Remove(f.Name())
 		}
 	}
