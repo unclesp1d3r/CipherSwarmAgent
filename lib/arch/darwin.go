@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+//goland:noinspection SpellCheckingInspection
 func GetDevices() ([]string, error) {
 	out, err := exec.Command("system_profiler", "SPDisplaysDataType", "-detaillevel", "mini").Output()
 	if err != nil {
@@ -38,6 +39,7 @@ func GetPlatform() string {
 	return "darwin"
 }
 
+//goland:noinspection GoLinter
 func Extract7z(srcFile string, destDir string) error {
 	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output()
 	return err

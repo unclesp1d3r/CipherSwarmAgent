@@ -3,10 +3,11 @@ package hashcat
 // Borrowed from PhatCrack, a password cracking tool
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"os/exec"
 	"strconv"
+
+	"github.com/spf13/viper"
 )
 
 type uintIf interface {
@@ -23,7 +24,7 @@ func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error)
 	var hashFile *os.File
 	var outFile *os.File
 	var shardedCharsetFile *os.File
-	charsetFiles := []*os.File{}
+	var charsetFiles []*os.File
 
 	defer func() {
 		if err == nil {
@@ -52,7 +53,10 @@ func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't make a temp file to store output: %v", err)
 	}
-	outFile.Chmod(0600)
+	err = outFile.Chmod(0600)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't set permissions on output file: %v", err)
+	}
 
 	charsetFiles = []*os.File{}
 	for i, charset := range params.MaskCustomCharsets {
@@ -74,7 +78,11 @@ func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't make a temp file to store charset")
 		}
-		outFile.Chmod(0600)
+		err = outFile.Chmod(0600)
+		if err != nil {
+			return nil, err
+		}
+
 		_, err = shardedCharsetFile.Write([]byte(params.MaskShardedCharset))
 		if err != nil {
 			return nil, err

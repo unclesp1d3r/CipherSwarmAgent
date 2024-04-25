@@ -1,10 +1,12 @@
+#file: noinspection SpellCheckingInspection
 engines:
   gofmt:
     enabled: true
-  govet:
-    enabled: true
-  golint:
+  golangci-lint:
     enabled: true
 ratings:
   paths:
     - "**.go"
+exclude_patterns:
+  - "data/"
+  - "dist/"

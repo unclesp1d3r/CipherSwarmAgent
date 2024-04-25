@@ -13,6 +13,7 @@ import (
 
 type SubprocessStatus int
 
+//goland:noinspection ALL
 const (
 	SubprocessStatusNotStarted SubprocessStatus = iota
 	SubprocessStatusRunning
@@ -81,6 +82,7 @@ func (p *Subprocess) Execute() {
 	p.PostProcess()
 }
 
+//goland:noinspection GoUnusedParameter
 func (p *Subprocess) PostKey(key uint8) (uintptr, error) {
 	return 0, fmt.Errorf("unsupported os")
 }
