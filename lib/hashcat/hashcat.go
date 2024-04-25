@@ -23,7 +23,7 @@ func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error)
 	var hashFile *os.File
 	var outFile *os.File
 	var shardedCharsetFile *os.File
-	charsetFiles := []*os.File{}
+	var charsetFiles []*os.File
 
 	defer func() {
 		if err == nil {

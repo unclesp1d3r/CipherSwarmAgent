@@ -2,8 +2,10 @@ package lib
 
 import (
 	"encoding/json"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"strings"
+
+	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
 func RunBenchmarkTask(sess *hashcat.HashcatSession) ([]BenchmarkResult, bool) {
@@ -54,7 +56,7 @@ func RunBenchmarkTask(sess *hashcat.HashcatSession) ([]BenchmarkResult, bool) {
 	return benchmarkResult, false
 }
 
-func RunAttackTask(sess *hashcat.HashcatSession, task Task) {
+func RunAttackTask(sess *hashcat.HashcatSession, task *cipherswarm.Task) {
 	err := sess.Start()
 	if err != nil {
 		Logger.Error("Failed to start benchmark session", "error", err)
@@ -89,7 +91,7 @@ func RunAttackTask(sess *hashcat.HashcatSession, task Task) {
 					if err.Error() == "exit status 1" {
 						Logger.Info("Job session exhausted", "status", "exhausted")
 						MarkTaskExhausted(task)
-						
+
 					} else {
 						Logger.Error("Job session failed", "error", err)
 					}

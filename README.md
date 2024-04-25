@@ -6,21 +6,26 @@
 [![LoC](https://tokei.rs/b1/github/unclesp1d3r/CipherSwarmAgent?category=code)](https://github.com/unclesp1d3r/CipherSwarmAgent)
 [![wakatime](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent.svg)](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent)
 
-
 # CipherSwarm Agent
 
-The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecosystem, designed to manage and execute distributed hash cracking tasks efficiently. Built in Go, this agent provides a robust solution for scaling and managing cryptographic computations across the CipherSwarm network.
+The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecosystem, designed to manage and execute
+distributed hash cracking tasks efficiently. Built in Go, this agent provides a robust solution for scaling and managing
+cryptographic computations across the CipherSwarm network.
 
 ## Features
 
-- **Command-Line Interface**: Utilizes the Cobra library for easy configuration and operation through command-line commands.
-- **Efficient Task Management**: Streamlines the distribution and execution of hash cracking tasks across distributed systems.
-- **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks with ease.
-- **Secure Communication**: Ensures secure and reliable communication with the CipherSwarm server for task distribution and result submission.
+- **Command-Line Interface**: Utilizes the Cobra library for easy configuration and operation through command-line
+  commands.
+- **Efficient Task Management**: Streamlines the distribution and execution of hash cracking tasks across distributed
+  systems.
+- **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks with
+  ease.
+- **Secure Communication**: Ensures secure and reliable communication with the CipherSwarm server for task distribution
+  and result submission.
 
 > [!CAUTION]
-> This project is currently under active development and is not yet ready for production use. Please use it with caution.
-
+> This project is currently under active development and is not yet ready for production use. Please use it with
+> caution.
 
 ## Getting Started
 
@@ -40,7 +45,7 @@ git clone https://github.com/unclesp1d3r/cipherswarm-agent.git
 cd cipherswarm-agent
 ```
 
-2. Build the agent using Go:
+1. Build the agent using Go:
 
 ```bash
 go build -o cipherswarm-agent
@@ -68,7 +73,8 @@ This will activate the agent, connecting it to the CipherSwarm network to begin 
 
 ## Contributing
 
-We welcome contributions! To contribute to the CipherSwarm Go Agent, please fork the repository, create a feature branch, push your changes, and submit a pull request.
+We welcome contributions! To contribute to the CipherSwarm Go Agent, please fork the repository, create a feature
+branch, push your changes, and submit a pull request.
 
 ## License
 

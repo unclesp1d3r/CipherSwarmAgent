@@ -1,31 +1,18 @@
-/*
-Copyright © 2024 UncleSp1d3r
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Package cmd /*
 package cmd
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
 	"time"
 
+	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 
 	"github.com/charmbracelet/log"
-	"github.com/imroc/req/v3"
 	gap "github.com/muesli/go-app-paths"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -127,6 +114,8 @@ func initConfig() {
 }
 
 // startAgent is a function that starts the CipherSwarm Agent.
+//
+//goland:noinspection GoUnusedParameter,GoUnusedParameter
 func startAgent(cmd *cobra.Command, args []string) {
 	if viper.GetString("api_url") == "" {
 		lib.Logger.Fatal("API URL not set")
@@ -140,36 +129,20 @@ func startAgent(cmd *cobra.Command, args []string) {
 	// This will allow us to clean up the PID file when the agent is stopped
 	// We'll also use this to clean up any dangling hashcat processes
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
-	lib.Client.SetTimeout(5*time.Second). // Set a 5-second timeout
-						SetUserAgent("CipherSwarm Agent/"+lib.AgentVersion).          // Set a common user agent
-						SetCommonHeader("Accept", "application/json").                // Accept only JSON responses
-						SetBaseURL(viper.GetString("api_url")).                       // Set the base URL for the API
-						SetCommonBearerAuthToken(viper.GetString("api_token")).       // Set the API token as a common bearer token
-						SetCommonRetryCount(5).                                       // Retry 5 times
-						SetCommonRetryBackoffInterval(5*time.Second, 30*time.Second). // Retry with exponential backoff
-						AddCommonRetryCondition(func(resp *req.Response, err error) bool {
-			// Retry on 5xx status codes, 408, and 429, and on error
-			// 500-599: Server error
-			// 408: Request timeout
-			// 429: Too many requests
-			return err != nil || resp.StatusCode >= 500 || resp.StatusCode == 408 || resp.StatusCode == 429
-		}).
-		//DevMode().
-		SetLogger(lib.Logger) // Set the logger to the global logger instance
-
 	if enableDebug {
 		lib.Logger.SetLevel(log.DebugLevel)
-		// client.DevMode()
-		lib.Client.EnableDebugLog()
 	} else {
 		lib.Logger.SetLevel(log.InfoLevel)
 	}
+
+	setupAPI()
 
 	lib.Logger.Info("Starting CipherSwarm Agent")
 
 	pidFilePath := viper.GetString("pid_file")
 	// Check if the agent is already running
-	lockFound, err := lib.CleanUpDanglingProcess(pidFilePath, false)
+	// I don't think this works the way I thought it would. I will probably need to change this.
+	lockFound, err := lib.CleanUpDanglingProcess(pidFilePath)
 	if err != nil {
 		lib.Logger.Fatal("Error checking for dangling processes", "error", err)
 	}
@@ -204,13 +177,12 @@ func startAgent(cmd *cobra.Command, args []string) {
 	// Update the configuration
 	lib.UpdateClientConfig()
 	lib.Logger.Info("Configuration updated from server")
-
 	// Update the agent metadata with the CipherSwarm API
 	lib.UpdateAgentMetadata(agentID)
 	lib.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
-	processFound, err := lib.CleanUpDanglingProcess(viper.GetString("hashcat_pid_file"), true)
+	processFound, err := lib.CleanUpDanglingProcess(viper.GetString("hashcat_pid_file"))
 	if err != nil {
 		lib.Logger.Fatal("Error checking for dangling hashcat processes", "error", err)
 	}
@@ -241,15 +213,16 @@ func startAgent(cmd *cobra.Command, args []string) {
 			// - Request a new job from the CipherSwarm API
 			//   - If a job is available, download the job and start processing it
 			task, err := lib.GetNewTask()
+
 			if err != nil {
 				lib.Logger.Error("Failed to get new task", "error", err)
 			}
-			if task.Available {
+			if task != nil {
 				lib.Logger.Info("New task available", "task", task)
 
 				// Process the task
 				// - Get the attack parameters
-				attack, err := lib.GetAttackParameters(task.AttackID)
+				attack, err := lib.GetAttackParameters(task.GetAttackId())
 				if err != nil {
 					lib.Logger.Error("Failed to get attack parameters", "error", err)
 				}
@@ -285,7 +258,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	lib.Logger.Info("Shutting down CipherSwarm Agent")
 }
 
-func benchmarkUpdateCheck(agentID int) {
+func benchmarkUpdateCheck(agentID int64) {
 	benchmarkFrequency := viper.GetDuration("benchmark_update_frequency")
 	oldestUpdate := time.Now().Add(-benchmarkFrequency)
 	lastBenchmarkDate, err := lib.GetLastBenchmarkDate(agentID)
@@ -303,6 +276,19 @@ func benchmarkUpdateCheck(agentID int) {
 	} else {
 		lib.Logger.Info("Benchmarks up to date")
 	}
+}
+
+// setupAPI initializes the API configuration and context for the CipherSwarm Agent.
+func setupAPI() {
+	lib.APIConfiguration.Debug = enableDebug
+	lib.APIConfiguration.UserAgent = "CipherSwarm Agent/" + lib.AgentVersion
+	lib.APIConfiguration.Servers = cipherswarm.ServerConfigurations{
+		{
+			URL: viper.GetString("api_url"),
+		},
+	}
+	lib.Context = context.WithValue(context.Background(), cipherswarm.ContextAccessToken, viper.GetString("api_token"))
+
 }
 
 // cleanUpPidFile returns a function that can be used to clean up a PID file.

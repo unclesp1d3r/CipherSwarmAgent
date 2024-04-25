@@ -47,6 +47,7 @@ func (sess *HashcatSession) Start() error {
 
 	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true})
 	if err != nil {
+		//goland:noinspection GoUnhandledErrorResult,GoUnhandledErrorResult
 		sess.Kill()
 		return fmt.Errorf("couldn't tail outfile %q: %w", sess.outFile.Name(), err)
 	}
@@ -149,6 +150,7 @@ func (sess *HashcatSession) Kill() error {
 	return err
 }
 
+//goland:noinspection GoUnhandledErrorResult,GoUnhandledErrorResult,GoUnhandledErrorResult
 func (sess *HashcatSession) Cleanup() {
 	if sess.hashFile != nil {
 		os.Remove(sess.hashFile.Name())
@@ -156,12 +158,14 @@ func (sess *HashcatSession) Cleanup() {
 	}
 
 	if sess.outFile != nil {
+		//goland:noinspection GoUnhandledErrorResult
 		os.Remove(sess.outFile.Name())
 		sess.outFile = nil
 	}
 
 	for _, f := range sess.charsetFiles {
 		if f != nil {
+			//goland:noinspection GoUnhandledErrorResult
 			os.Remove(f.Name())
 		}
 	}

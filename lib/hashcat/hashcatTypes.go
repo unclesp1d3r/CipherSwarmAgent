@@ -24,16 +24,16 @@ type HashcatStatusGuess struct {
 	GuessModOffset  uint64  `json:"guess_mod_offset"`
 	GuessModPercent float32 `json:"guess_mod_percent"`
 
-	GuessMode int `json:"guess_mode"`
+	GuessMode int32 `json:"guess_mode"`
 }
 
 type HashcatStatusDevice struct {
-	DeviceID   int    `json:"device_id"`
+	DeviceID   int32  `json:"device_id"`
 	DeviceName string `json:"device_name"`
 	DeviceType string `json:"device_type"`
-	Speed      int    `json:"speed"`
-	Util       int    `json:"util"`
-	Temp       int    `json:"temp"`
+	Speed      int64  `json:"speed"`
+	Util       int32  `json:"util"`
+	Temp       int32  `json:"temp"`
 }
 
 type HashcatStatus struct {
@@ -42,13 +42,13 @@ type HashcatStatus struct {
 
 	Session         string                `json:"session"`
 	Guess           HashcatStatusGuess    `json:"guess"`
-	Status          int                   `json:"status"`
+	Status          int32                 `json:"status"`
 	Target          string                `json:"target"`
-	Progress        []int                 `json:"progress"`
-	RestorePoint    int                   `json:"restore_point"`
-	RecoveredHashes []int                 `json:"recovered_hashes"`
-	RecoveredSalts  []int                 `json:"recovered_salts"`
-	Rejected        int                   `json:"rejected"`
+	Progress        []int64               `json:"progress"`
+	RestorePoint    int64                 `json:"restore_point"`
+	RecoveredHashes []int32               `json:"recovered_hashes"`
+	RecoveredSalts  []int32               `json:"recovered_salts"`
+	Rejected        int64                 `json:"rejected"`
 	Devices         []HashcatStatusDevice `json:"devices"`
 
 	TimeStart     int64 `json:"time_start"`
