@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -42,7 +43,7 @@ func AuthenticateAgent() (int64, error) {
 		return 0, err
 	}
 
-	if httpRes.StatusCode == 200 {
+	if httpRes.StatusCode == http.StatusOK {
 		agentID := resp.GetAgentId()
 		viper.Set("agent_id", agentID)
 
@@ -69,12 +70,12 @@ func GetAgentConfiguration() (AgentConfiguration, error) {
 		return agentConfig, err
 	}
 
-	if httpRes.StatusCode == 200 {
+	if httpRes.StatusCode == http.StatusOK {
 		agentConfig.APIVersion = result.GetApiVersion()
 
 		advancedConfig := result.GetConfig()
 		agentConfig.Config.UseNativeHashcat = advancedConfig.GetUseNativeHashcat()
-		agentConfig.Config.AgentUpdateInterval = int(advancedConfig.GetAgentUpdateInterval())
+		agentConfig.Config.AgentUpdateInterval = advancedConfig.GetAgentUpdateInterval()
 		agentConfig.Config.BackendDevices = advancedConfig.GetBackendDevice()
 
 		if agentConfig.Config.UseNativeHashcat {
@@ -126,7 +127,7 @@ func UpdateAgentMetadata(agentID int64) {
 		Logger.Error("Error updating agent metadata", "error", err)
 	}
 
-	if httpRes.StatusCode == 200 {
+	if httpRes.StatusCode == http.StatusOK {
 		Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", agentID)
 		Logger.Debug("Agent metadata", "metadata", result)
 	} else {
@@ -152,12 +153,12 @@ func UpdateCracker() {
 		return
 	}
 
-	if httpRes.StatusCode == 204 {
+	if httpRes.StatusCode == http.StatusNoContent {
 		Logger.Debug("No new cracker available")
 		return
 	}
 
-	if httpRes.StatusCode == 200 {
+	if httpRes.StatusCode == http.StatusOK {
 		if result.GetAvailable() {
 			Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
 			Logger.Info("Download URL", "url", result.GetDownloadUrl())
@@ -236,11 +237,11 @@ func GetNewTask() (*cipherswarm.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	if httpRes.StatusCode == 204 {
+	if httpRes.StatusCode == http.StatusNoContent {
 		return nil, nil
 	}
 
-	if httpRes.StatusCode == 200 {
+	if httpRes.StatusCode == http.StatusOK {
 		return result, nil
 	}
 
@@ -254,7 +255,7 @@ func GetAttackParameters(attackID int64) (*cipherswarm.Attack, error) {
 		return nil, err
 	}
 
-	if httpRes.StatusCode == 200 {
+	if httpRes.StatusCode == http.StatusOK {
 
 		return result, nil
 	}
@@ -278,7 +279,7 @@ func SendBenchmarkResults(agentID int64, benchmarkResults []BenchmarkResult) err
 		return err
 	}
 
-	if httpRes.StatusCode == 204 {
+	if httpRes.StatusCode == http.StatusNoContent {
 		return nil
 	}
 	return errors.New("bad response: " + httpRes.Status)
@@ -291,7 +292,7 @@ func GetLastBenchmarkDate(agentID int64) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	if httpRes.StatusCode == 200 {
+	if httpRes.StatusCode == http.StatusOK {
 		return result.GetLastBenchmarkDate(), nil
 	}
 
@@ -449,7 +450,7 @@ func SendHeartBeat(agentID int64) {
 		return
 	}
 
-	if httpRes.StatusCode == 204 {
+	if httpRes.StatusCode == http.StatusNoContent {
 		Logger.Debug("Heartbeat sent")
 	} else {
 		Logger.Error("Error sending heartbeat", "response", httpRes)
@@ -553,7 +554,7 @@ func SendStatusUpdate(update hashcat.HashcatStatus, task *cipherswarm.Task) {
 		return
 	}
 	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
-	if httpRes.StatusCode == 204 {
+	if httpRes.StatusCode == http.StatusNoContent {
 		Logger.Debug("Status update sent successfully")
 	} else {
 		Logger.Error("Error sending status update", "response", httpRes)
@@ -567,11 +568,11 @@ func AcceptTask(task *cipherswarm.Task) bool {
 		return false
 	}
 
-	if httpRes.StatusCode == 204 {
+	if httpRes.StatusCode == http.StatusNoContent {
 		Logger.Debug("Task accepted")
 		return true
 	} else {
-		if httpRes.StatusCode == 422 {
+		if httpRes.StatusCode == http.StatusUnprocessableEntity {
 			Logger.Error("Task already completed", "task_id", task.GetId(), "status", httpRes)
 			return false
 		}
@@ -599,9 +600,9 @@ func SendCrackedHash(hash hashcat.HashcatResult, task *cipherswarm.Task) {
 		return
 	}
 
-	if httpRes.StatusCode == 200 || httpRes.StatusCode == 204 {
+	if httpRes.StatusCode == http.StatusOK || httpRes.StatusCode == http.StatusNoContent {
 		Logger.Debug("Cracked hash sent")
-		if httpRes.StatusCode == 204 {
+		if httpRes.StatusCode == http.StatusNoContent {
 			Logger.Info("Hashlist completed", "hash", hash.Hash)
 		}
 	} else {
