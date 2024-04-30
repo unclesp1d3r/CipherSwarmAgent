@@ -7,7 +7,7 @@ import (
 type AgentConfiguration struct {
 	Config struct {
 		UseNativeHashcat    bool   `json:"use_native_hashcat" yaml:"use_native_hashcat"` // UseNativeHashcat specifies whether to use the native Hashcat implementation.
-		AgentUpdateInterval int    `json:"agent_update_interval" yaml:"agent_update_interval"`
+		AgentUpdateInterval int32  `json:"agent_update_interval" yaml:"agent_update_interval"`
 		BackendDevices      string `json:"backend_devices,omitempty" yaml:"backend_devices,omitempty"`
 	} `json:"config" yaml:"config"`
 	APIVersion int32 `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
