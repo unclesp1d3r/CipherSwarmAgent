@@ -32,6 +32,10 @@ var (
 func UpdateClientConfig() {
 	// These settings are mostly just placeholders for now
 	viper.Set("api_version", Configuration.APIVersion)
+	if viper.GetBool("always_use_native_hashcat") {
+		Configuration.Config.UseNativeHashcat = true
+	}
+
 	viper.Set("advanced_config", Configuration.Config)
 	err := viper.WriteConfig()
 	if err != nil {
