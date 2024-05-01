@@ -9,3 +9,4 @@ dist/*
 .gitignore
 .goreleaser.yaml
 README.md
+cipherswarmagent.yaml

@@ -68,6 +68,7 @@ func init() {
 	viper.SetDefault("debug", false)                                             // Set the default debug mode
 	viper.SetDefault("gpu_temp_threshold", 80)                                   // Set the default GPU temperature threshold
 	viper.SetDefault("benchmark_update_frequency", 168*time.Hour)                // Set the default benchmark age in hours (7 days)
+	viper.SetDefault("always_use_native_hashcat", false)                         // Set the default to not always use native hashcat
 
 	if viper.GetBool("debug") {
 		lib.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug
@@ -83,26 +84,29 @@ func init() {
 // If a configuration file is found, it logs the file path.
 // If no configuration file is found, it writes a new one.
 func initConfig() {
+	home, err := os.UserConfigDir()
+	cobra.CheckErr(err) // Check for errors
+	configDirs, err := scope.ConfigDirs()
+	cobra.CheckErr(err)              // Check for errors
+	cwd, err := os.Getwd()           // Get the current working directory
+	cobra.CheckErr(err)              // Check for errors
+	viper.AddConfigPath(cwd)         // Add the current working directory to the configuration path
+	for _, dir := range configDirs { // Add the config directories to the configuration path
+		viper.AddConfigPath(dir)
+	}
+	viper.AddConfigPath(home)               // Add the home directory to the configuration path
+	viper.SetConfigType("yaml")             // Set the configuration type to YAML
+	viper.SetConfigName("cipherswarmagent") // Set the configuration name
+
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
-	} else {
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err) // Check for errors
-		configDirs, err := scope.ConfigDirs()
-		cobra.CheckErr(err)              // Check for errors
-		viper.AddConfigPath(home)        // Add the home directory to the configuration path
-		for _, dir := range configDirs { // Add the config directories to the configuration path
-			viper.AddConfigPath(dir)
-		}
-		viper.SetConfigType("yaml")              // Set the configuration type to YAML
-		viper.SetConfigName(".cipherswarmagent") // Set the configuration name
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in. Otherwise, write a new one.
 	if err := viper.ReadInConfig(); err == nil {
-		lib.Logger.Debug("Using config file:", viper.ConfigFileUsed())
+		lib.Logger.Info("Using config file", "config_file", viper.ConfigFileUsed())
 	} else {
 		err := viper.SafeWriteConfig()
 		if err != nil {

@@ -136,3 +136,4 @@ modules.xml
 # End of https://www.toptal.com/developers/gitignore/api/goland+iml,visualstudiocode,go
 
 data/
+cipherswarmagent.yaml
