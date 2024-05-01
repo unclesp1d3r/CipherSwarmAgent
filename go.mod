@@ -13,7 +13,7 @@ require (
 	github.com/spf13/afero v1.11.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
-	github.com/unclesp1d3r/cipherswarm-agent-go-api v0.1.10
+	github.com/unclesp1d3r/cipherswarm-agent-go-api v0.1.11
 )
 
 require (
