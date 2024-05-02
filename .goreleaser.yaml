@@ -57,10 +57,10 @@ universal_binaries:
   - replace: true
 dockers:
   - image_templates:
-      - "gcr.io/unclesp1d3r/cipherswarmagent:{{ .Tag }}"
-      - "gcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}"
-      - "gcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}.{{ .Minor }}"
-      - "gcr.io/unclesp1d3r/cipherswarmagent:latest"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:{{ .Tag }}"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}.{{ .Minor }}"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:latest"
     use: buildx
     dockerfile: Dockerfile.releaser
     goarch: amd64
@@ -73,10 +73,10 @@ dockers:
       - "--build-arg=branch=latest"
       - "--platform=linux/amd64"
   - image_templates:
-      - "gcr.io/unclesp1d3r/cipherswarmagent:{{ .Tag }}-pocl"
-      - "gcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}-pocl"
-      - "gcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}.{{ .Minor }}-pocl"
-      - "gcr.io/unclesp1d3r/cipherswarmagent:latest"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:{{ .Tag }}-pocl"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}-pocl"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}.{{ .Minor }}-pocl"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:latest"
     use: buildx
     dockerfile: Dockerfile.releaser
     goarch: amd64
