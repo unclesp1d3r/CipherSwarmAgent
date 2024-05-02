@@ -14,7 +14,7 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin # reliable
+      - darwin
     goarch:
       - amd64
       - arm64
@@ -38,6 +38,7 @@ archives:
 
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
       - "^docs:"
@@ -49,7 +50,52 @@ release:
     owner: "unclesp1d3r"
     name: "CipherSwarmAgent"
   prerelease: auto
+  include_meta: true
 source:
   enabled: true
 universal_binaries:
   - replace: true
+dockers:
+  - image_templates:
+      - "gcr.io/unclesp1d3r/cipherswarmagent:{{ .Tag }}"
+      - "gcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}"
+      - "gcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}.{{ .Minor }}"
+      - "gcr.io/unclesp1d3r/cipherswarmagent:latest"
+    use: buildx
+    dockerfile: Dockerfile.releaser
+    goarch: amd64
+    goos: linux
+    build_flag_templates:
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--build-arg=branch=latest"
+      - "--platform=linux/amd64"
+  - image_templates:
+      - "gcr.io/unclesp1d3r/cipherswarmagent:{{ .Tag }}-pocl"
+      - "gcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}-pocl"
+      - "gcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}.{{ .Minor }}-pocl"
+      - "gcr.io/unclesp1d3r/cipherswarmagent:latest"
+    use: buildx
+    dockerfile: Dockerfile.releaser
+    goarch: amd64
+    goos: linux
+    build_flag_templates:
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--build-arg=branch=pocl"
+      - "--platform=linux/amd64"
+docker_manifests:
+  - name_template: "unclesp1d3r/cipherswarmagent:{{ .Version }}"
+    image_templates:
+      - "unclesp1d3r/cipherswarmagent:{{ .Version }}-amd64"
+      - "unclesp1d3r/cipherswarmagent:{{ .Version }}-aarch64"
+milestones:
+  - repo:
+      owner: "unclesp1d3r"
+      name: CipherSwarmAgent
+    close: true
+    fail_on_error: false
