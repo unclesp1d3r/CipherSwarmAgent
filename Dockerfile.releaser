@@ -1,0 +1,13 @@
+ARG branch=pocl
+FROM dizcza/docker-hashcat:$branch 
+
+WORKDIR /
+
+ENV API_URL=http://localhost:3000/api/v1/client/
+ENV API_TOKEN=1234567890
+ENV ALWAYS_USE_NATIVE_HASHCAT=true
+
+COPY  cipherswarm-agent /
+
+# Set the startup command
+CMD ["./cipherswarm-agent"]
