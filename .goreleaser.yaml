@@ -76,7 +76,7 @@ dockers:
       - "ghcr.io/unclesp1d3r/cipherswarmagent:{{ .Tag }}-pocl"
       - "ghcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}-pocl"
       - "ghcr.io/unclesp1d3r/cipherswarmagent:v{{ .Major }}.{{ .Minor }}-pocl"
-      - "ghcr.io/unclesp1d3r/cipherswarmagent:latest"
+      - "ghcr.io/unclesp1d3r/cipherswarmagent:pocl"
     use: buildx
     dockerfile: Dockerfile.releaser
     goarch: amd64
@@ -88,11 +88,6 @@ dockers:
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--build-arg=branch=pocl"
       - "--platform=linux/amd64"
-docker_manifests:
-  - name_template: "unclesp1d3r/cipherswarmagent:{{ .Version }}"
-    image_templates:
-      - "unclesp1d3r/cipherswarmagent:{{ .Version }}-amd64"
-      - "unclesp1d3r/cipherswarmagent:{{ .Version }}-aarch64"
 milestones:
   - repo:
       owner: "unclesp1d3r"
