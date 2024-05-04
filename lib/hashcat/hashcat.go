@@ -3,6 +3,7 @@ package hashcat
 // Borrowed from PhatCrack, a password cracking tool
 import (
 	"fmt"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"os/exec"
 	"strconv"
@@ -18,7 +19,7 @@ func fmtUint[T uintIf](x T) string {
 	return strconv.FormatUint(uint64(x), 10)
 }
 
-func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error) {
+func NewHashcatSession(id string, params Params) (*Session, error) {
 	var err error
 
 	var hashFile *os.File
@@ -48,19 +49,18 @@ func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error)
 	}()
 
 	binaryPath := viper.GetString("hashcat_path")
-	outPath := viper.GetString("out_path")
-	outFile, err = os.CreateTemp(outPath, id)
+	outFile, err = os.CreateTemp(shared.SharedState.OutPath, id)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't make a temp file to store output: %v", err)
+		return nil, fmt.Errorf("couldn't make a temp file to store output: %w", err)
 	}
 	err = outFile.Chmod(0600)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't set permissions on output file: %v", err)
+		return nil, fmt.Errorf("couldn't set permissions on output file: %w", err)
 	}
 
 	charsetFiles = []*os.File{}
 	for i, charset := range params.MaskCustomCharsets {
-		charsetFile, err := os.CreateTemp(outPath, "charset*")
+		charsetFile, err := os.CreateTemp(shared.SharedState.OutPath, "charset*")
 		if err != nil {
 			return nil, fmt.Errorf("couldn't make a temp file to store charset")
 		}
@@ -74,7 +74,7 @@ func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error)
 	}
 
 	if params.MaskShardedCharset != "" {
-		shardedCharsetFile, err = os.CreateTemp(outPath, "charset*")
+		shardedCharsetFile, err = os.CreateTemp(shared.SharedState.OutPath, "charset*")
 		if err != nil {
 			return nil, fmt.Errorf("couldn't make a temp file to store charset")
 		}
@@ -91,19 +91,19 @@ func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error)
 		params.MaskShardedCharset = shardedCharsetFile.Name()
 	}
 
-	args, err := params.ToCmdArgs(id, params.HashFile, outFile.Name())
+	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	return &HashcatSession{
+	return &Session{
 		proc:               exec.Command(binaryPath, args...),
 		hashFile:           hashFile,
 		outFile:            outFile,
 		charsetFiles:       charsetFiles,
 		shardedCharsetFile: shardedCharsetFile,
-		CrackedHashes:      make(chan HashcatResult, 5),
-		StatusUpdates:      make(chan HashcatStatus, 5),
+		CrackedHashes:      make(chan Result, 5),
+		StatusUpdates:      make(chan Status, 5),
 		StderrMessages:     make(chan string, 5),
 		StdoutLines:        make(chan string, 5),
 		DoneChan:           make(chan error),

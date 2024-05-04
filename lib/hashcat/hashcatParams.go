@@ -2,44 +2,24 @@ package hashcat
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"path/filepath"
 	"strconv"
 )
 
-type HashcatParams struct {
-	AttackMode uint8  `json:"attack_mode"`
-	HashType   uint   `json:"hash_type"`
-	HashFile   string `json:"hash_file"`
-
-	Mask               string   `json:"mask"`
-	MaskIncrement      bool     `json:"mask_increment"`
-	MaskIncrementMin   uint     `json:"mask_increment_min"`
-	MaskIncrementMax   uint     `json:"mask_increment_max"`
-	MaskShardedCharset string   `json:"mask_sharded_charset"` // Internal use: for sharding charsets
-	MaskCustomCharsets []string `json:"mask_custom_charsets"`
-
-	WordlistFilenames []string `json:"wordlist_filenames"`
-	RulesFilenames    []string `json:"rules_filenames"`
-	AdditionalArgs    []string `json:"additional_args"`
-	OptimizedKernels  bool     `json:"optimized_kernels"`
-	SlowCandidates    bool     `json:"slow_candidates"`
-
-	Skip  int64 `json:"skip"`
-	Limit int64 `json:"limit"`
-}
-
-func (params HashcatParams) Validate() error {
+func (params Params) Validate() error {
 	switch params.AttackMode {
 	case AttackModeDictionary:
 		if len(params.WordlistFilenames) != 1 {
-			return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but %d given", AttackModeDictionary, len(params.WordlistFilenames))
+			return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but %d given", AttackModeDictionary,
+				len(params.WordlistFilenames))
 		}
 
 	case AttackModeCombinator:
 		if len(params.WordlistFilenames) != 2 {
-			return fmt.Errorf("expected 2 wordlists for combinator attack (%d), but %d given", AttackModeCombinator, len(params.WordlistFilenames))
+			return fmt.Errorf("expected 2 wordlists for combinator attack (%d), but %d given", AttackModeCombinator,
+				len(params.WordlistFilenames))
 		}
 
 	case AttackModeMask:
@@ -52,7 +32,8 @@ func (params HashcatParams) Validate() error {
 			return fmt.Errorf("using hybrid attack (%d), but no mask was given", params.AttackMode)
 		}
 		if len(params.WordlistFilenames) != 1 {
-			return fmt.Errorf("using hybrid attack (%d), but %d wordlist were given", params.AttackMode, len(params.WordlistFilenames))
+			return fmt.Errorf("using hybrid attack (%d), but %d wordlist were given", params.AttackMode,
+				len(params.WordlistFilenames))
 		}
 	case AttackBenchmark:
 		// No additional validation needed
@@ -65,7 +46,7 @@ func (params HashcatParams) Validate() error {
 	return nil
 }
 
-func (params HashcatParams) maskArgs() ([]string, error) {
+func (params Params) maskArgs() ([]string, error) {
 	maxCharsets := 4
 	if params.MaskShardedCharset != "" {
 		maxCharsets = 3
@@ -101,12 +82,11 @@ func (params HashcatParams) maskArgs() ([]string, error) {
 	return args, nil
 }
 
-func (params HashcatParams) ToCmdArgs(session, hashFile string, outFile string) (args []string, err error) {
+func (params Params) toCmdArgs(session, hashFile string, outFile string) (args []string, err error) {
 	if err = params.Validate(); err != nil {
 		return
 	}
 
-	listFilePath := viper.GetString("file_path")
 	if params.AttackMode == AttackBenchmark {
 		args = append(
 			args,
@@ -115,21 +95,20 @@ func (params HashcatParams) ToCmdArgs(session, hashFile string, outFile string) 
 			"--benchmark",
 		)
 		return
-	} else {
-		args = append(
-			args,
-			"--quiet",
-			"--session", "sess-"+session,
-			"--outfile-format", "1,3,5",
-			"--outfile", outFile,
-			"--status",
-			"--status-json",
-			"--status-timer", "3",
-			"--potfile-disable",
-			"-a", fmtUint(params.AttackMode),
-			"-m", fmtUint(params.HashType),
-		)
 	}
+	args = append(
+		args,
+		"--quiet",
+		"--session", "sess-"+session,
+		"--outfile-format", "1,3,5",
+		"--outfile", outFile,
+		"--status",
+		"--status-json",
+		"--status-timer", "3",
+		"--potfile-disable",
+		"-a", fmtUint(params.AttackMode),
+		"-m", fmtUint(params.HashType),
+	)
 
 	args = append(args, params.AdditionalArgs...)
 
@@ -151,7 +130,7 @@ func (params HashcatParams) ToCmdArgs(session, hashFile string, outFile string) 
 
 	wordlists := make([]string, len(params.WordlistFilenames))
 	for i, list := range params.WordlistFilenames {
-		wordlists[i] = filepath.Join(listFilePath, filepath.Clean(list))
+		wordlists[i] = filepath.Join(shared.SharedState.FilePath, filepath.Clean(list))
 		if _, err = os.Stat(wordlists[i]); err != nil {
 			err = fmt.Errorf("provided wordlist %q couldn't be opened on filesystem", wordlists[i])
 			return
@@ -160,7 +139,7 @@ func (params HashcatParams) ToCmdArgs(session, hashFile string, outFile string) 
 
 	rules := make([]string, len(params.RulesFilenames))
 	for i, rule := range params.RulesFilenames {
-		rules[i] = filepath.Join(listFilePath, filepath.Clean(rule))
+		rules[i] = filepath.Join(shared.SharedState.FilePath, filepath.Clean(rule))
 		if _, err = os.Stat(rules[i]); err != nil {
 			err = fmt.Errorf("provided rules file %q couldn't be opened on filesystem", wordlists[i])
 			return
@@ -199,4 +178,26 @@ func (params HashcatParams) ToCmdArgs(session, hashFile string, outFile string) 
 	}
 
 	return
+}
+
+type Params struct {
+	AttackMode uint8  `json:"attack_mode"`
+	HashType   uint   `json:"hash_type"`
+	HashFile   string `json:"hash_file"`
+
+	Mask               string   `json:"mask"`
+	MaskIncrement      bool     `json:"mask_increment"`
+	MaskIncrementMin   uint     `json:"mask_increment_min"`
+	MaskIncrementMax   uint     `json:"mask_increment_max"`
+	MaskShardedCharset string   `json:"mask_sharded_charset"` // Internal use: for sharding charsets
+	MaskCustomCharsets []string `json:"mask_custom_charsets"`
+
+	WordlistFilenames []string `json:"wordlist_filenames"`
+	RulesFilenames    []string `json:"rules_filenames"`
+	AdditionalArgs    []string `json:"additional_args"`
+	OptimizedKernels  bool     `json:"optimized_kernels"`
+	SlowCandidates    bool     `json:"slow_candidates"`
+
+	Skip  int64 `json:"skip"`
+	Limit int64 `json:"limit"`
 }

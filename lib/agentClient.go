@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"net/http"
 	"os"
 	"os/exec"
@@ -36,28 +37,28 @@ var (
 // AuthenticateAgent authenticates the agent with the CipherSwarm API.
 // It sends an authentication request to the API and returns the agent ID if successful.
 // If there is an error connecting to the API or if the authentication fails, an error is returned.
-func AuthenticateAgent() (int64, error) {
+func AuthenticateAgent() error {
 	resp, httpRes, err := apiClient.ClientAPI.Authenticate(Context).Execute()
 	if err != nil {
 		Logger.Error("Error connecting to the CipherSwarm API", err)
-		return 0, err
+		return err
 	}
 
 	if httpRes.StatusCode == http.StatusOK {
 		agentID := resp.GetAgentId()
-		viper.Set("agent_id", agentID)
+		shared.SharedState.AgentID = agentID
 
 		if !resp.GetAuthenticated() {
 			Logger.Error("Error authenticating with the CipherSwarm API", "response", httpRes.Status)
-			return 0, errors.New("failed to authenticate with the CipherSwarm API")
+			return errors.New("failed to authenticate with the CipherSwarm API")
 		}
 		Logger.Info("Agent authenticated with the CipherSwarm API", "agent_id", agentID)
-		return agentID, nil
+		return nil
 
 	}
 
 	Logger.Error("bad response: %v", resp)
-	return 0, errors.New("bad response: " + httpRes.Status)
+	return errors.New("bad response: " + httpRes.Status)
 }
 
 // GetAgentConfiguration retrieves the agent configuration from the CipherSwarm API.
@@ -103,7 +104,7 @@ func GetAgentConfiguration() (AgentConfiguration, error) {
 // The agent metadata is then sent to the server using a PUT request.
 // If there is an error retrieving the host information or updating the agent metadata, an error message is logged.
 // The updated agent metadata is also logged for debugging purposes.
-func UpdateAgentMetadata(agentID int64) {
+func UpdateAgentMetadata() {
 	Logger.Info("Updating agent metadata with the CipherSwarm API")
 	info, err := host.Info()
 	if err != nil {
@@ -120,16 +121,16 @@ func UpdateAgentMetadata(agentID int64) {
 	}
 
 	agentPlatform = info.OS
-	agentUpdate := *cipherswarm.NewAgentUpdate(agentID, info.Hostname, clientSignature, info.OS, devices)
+	agentUpdate := *cipherswarm.NewAgentUpdate(shared.SharedState.AgentID, info.Hostname, clientSignature, info.OS, devices)
 
-	result, httpRes, err := apiClient.AgentsAPI.UpdateAgent(Context, agentID).AgentUpdate(agentUpdate).Execute()
+	result, httpRes, err := apiClient.AgentsAPI.UpdateAgent(Context, shared.SharedState.AgentID).AgentUpdate(agentUpdate).Execute()
 	if err != nil {
 		Logger.Error("Error updating agent metadata", "error", err)
 	}
 
 	if httpRes.StatusCode == http.StatusOK {
-		Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", agentID)
-		Logger.Debug("Agent metadata", "metadata", result)
+		DisplayAgentMetadataUpdated(result)
+
 	} else {
 		Logger.Error("bad response: %v", result)
 	}
@@ -160,8 +161,7 @@ func UpdateCracker() {
 
 	if httpRes.StatusCode == http.StatusOK {
 		if result.GetAvailable() {
-			Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
-			Logger.Info("Download URL", "url", result.GetDownloadUrl())
+			DisplayNewCrackerAvailable(result)
 
 			// Get the file to a temporary location and then move it to the correct location
 			// This is to prevent the file from being corrupted if the download is interrupted
@@ -262,18 +262,30 @@ func GetAttackParameters(attackID int64) (*cipherswarm.Attack, error) {
 	return nil, errors.New("bad response: " + httpRes.Status)
 }
 
-func SendBenchmarkResults(agentID int64, benchmarkResults []BenchmarkResult) error {
+func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 	var results []cipherswarm.HashcatBenchmark
 	for _, result := range benchmarkResults {
-		hashType, _ := strconv.Atoi(result.HashType)
-		runtimeMs, _ := strconv.ParseInt(result.RuntimeMs, 10, 64)
-		speedHs, _ := strconv.ParseFloat(result.SpeedHs, 32)
-		device, _ := strconv.Atoi(result.Device)
+		hashType, err := strconv.Atoi(result.HashType)
+		if err != nil {
+			continue
+		}
+		runtimeMs, err := strconv.ParseInt(result.RuntimeMs, 10, 64)
+		if err != nil {
+			continue
+		}
+		speedHs, err := strconv.ParseFloat(result.SpeedHs, 32)
+		if err != nil {
+			continue
+		}
+		device, err := strconv.Atoi(result.Device)
+		if err != nil {
+			continue
+		}
 
 		benchmark := cipherswarm.NewHashcatBenchmark(int32(hashType), runtimeMs, float32(speedHs), int32(device))
 		results = append(results, *benchmark)
 	}
-	httpRes, err := apiClient.AgentsAPI.SubmitBenchmarkAgent(Context, agentID).
+	httpRes, err := apiClient.AgentsAPI.SubmitBenchmarkAgent(Context, shared.SharedState.AgentID).
 		HashcatBenchmark(results).Execute()
 	if err != nil {
 		return err
@@ -285,8 +297,8 @@ func SendBenchmarkResults(agentID int64, benchmarkResults []BenchmarkResult) err
 	return errors.New("bad response: " + httpRes.Status)
 }
 
-func GetLastBenchmarkDate(agentID int64) (time.Time, error) {
-	result, httpRes, err := apiClient.AgentsAPI.LastBenchmarkAgent(Context, agentID).Execute()
+func GetLastBenchmarkDate() (time.Time, error) {
+	result, httpRes, err := apiClient.AgentsAPI.LastBenchmarkAgent(Context, shared.SharedState.AgentID).Execute()
 	if err != nil {
 		Logger.Error("Error connecting to the CipherSwarm API", err)
 		return time.Time{}, err
@@ -299,8 +311,8 @@ func GetLastBenchmarkDate(agentID int64) (time.Time, error) {
 	return time.Time{}, errors.New("bad response: " + httpRes.Status)
 }
 
-func UpdateBenchmarks(agentID int64) {
-	jobParams := hashcat.HashcatParams{
+func UpdateBenchmarks() {
+	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackBenchmark,
 		AdditionalArgs: arch.GetAdditionalHashcatArgs(),
 	}
@@ -311,13 +323,13 @@ func UpdateBenchmarks(agentID int64) {
 		return
 	}
 
-	Logger.Info("Performing benchmarks")
+	DisplayBenchmarkStarting()
 	benchmarkResult, done := RunBenchmarkTask(sess)
 	if done {
 		return
 	}
-	Logger.Debug("Benchmark session completed", "results", benchmarkResult)
-	err = SendBenchmarkResults(agentID, benchmarkResult)
+	DisplayBenchmarksComplete(benchmarkResult)
+	err = SendBenchmarkResults(benchmarkResult)
 	if err != nil {
 		Logger.Error("Failed to send benchmark results", "error", err)
 		return
@@ -325,7 +337,7 @@ func UpdateBenchmarks(agentID int64) {
 }
 
 func DownloadFiles(attack *cipherswarm.Attack) error {
-	Logger.Info("Downloading files for attack", "attack_id", attack.GetId())
+	DisplayDownloadFileStart(attack)
 
 	// Download the hashlist
 	hashlistPath := path.Join(viper.GetString("hashlist_path"), strconv.FormatInt(attack.GetHashListId(), 10)+".txt")
@@ -388,26 +400,26 @@ func downloadFile(url string, path string, checksum string) error {
 		Logger.Debug("Download already exists", "path", path)
 		return nil
 	}
-	Logger.Info("Downloading file", "url", url, "path", path)
+	DisplayDownloadFile(url, path)
 	_, err := req.SetTimeout(5*time.Second).
 		SetCommonHeader("Accept", "application/json").
 		R().
 		SetOutputFile(path).
 		SetDownloadCallbackWithInterval(func(info req.DownloadInfo) {
 			if info.Response.Response != nil {
-				Logger.Infof("downloaded %.2f%%\n", float64(info.DownloadedSize)/float64(info.Response.ContentLength)*100.0)
+				DisplayDownloadFileStatusUpdate(info)
 			}
 		}, 1*time.Second).
 		Get(url)
 	if err != nil {
 		return err
 	}
-	Logger.Debug("Downloaded file", "url", url, "path", path)
+	DisplayDownloadFileComplete(url, path)
 	return nil
 }
 
 func extractHashcatArchive(newArchivePath string) (string, error) {
-	hashcatDirectory := path.Join(viper.GetString("crackers_path"), "hashcat")
+	hashcatDirectory := path.Join(shared.SharedState.CrackersPath, "hashcat")
 	hashcatBackupDirectory := hashcatDirectory + "_old"
 	// Get rid of the old hashcat backup directory
 	err := os.RemoveAll(hashcatBackupDirectory)
@@ -424,7 +436,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	}
 
 	// Extract the new hashcat directory using the 7z command
-	err = arch.Extract7z(newArchivePath, viper.GetString("crackers_path"))
+	err = arch.Extract7z(newArchivePath, shared.SharedState.CrackersPath)
 	if err != nil {
 		Logger.Error("Error extracting file: ", "error", err)
 		return "", err // Don't continue if we can't extract the file
@@ -433,7 +445,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 }
 
 func moveArchiveFile(tempArchivePath string) (string, error) {
-	newArchivePath := path.Join(viper.GetString("crackers_path"), "hashcat.7z")
+	newArchivePath := path.Join(shared.SharedState.CrackersPath, "hashcat.7z")
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
 		Logger.Error("Error moving file: ", err)
@@ -443,8 +455,8 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 	return newArchivePath, err
 }
 
-func SendHeartBeat(agentID int64) {
-	httpRes, err := apiClient.AgentsAPI.HeartbeatAgent(Context, agentID).Execute()
+func SendHeartBeat() {
+	httpRes, err := apiClient.AgentsAPI.HeartbeatAgent(Context, shared.SharedState.AgentID).Execute()
 	if err != nil {
 		Logger.Error("Error sending heartbeat", "error", err)
 		return
@@ -459,11 +471,11 @@ func SendHeartBeat(agentID int64) {
 }
 
 func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
-	Logger.Info("Running task", "task_id", task.GetId())
+	DisplayRunTaskStarting(task)
 	// Create the hashcat session
 
 	// TODO: Need to unify the AttackParameters and HashcatParams structs
-	jobParams := hashcat.HashcatParams{
+	jobParams := hashcat.Params{
 		AttackMode:         GetAttackMode(attack),
 		HashType:           uint(attack.HashMode),
 		HashFile:           path.Join(viper.GetString("hashlist_path"), strconv.Itoa(int(attack.GetHashListId()))+".txt"),
@@ -488,17 +500,19 @@ func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
 		return
 	}
 
-	Logger.Info("Running attack")
-	if !AcceptTask(task) {
+	if AcceptTask(task) {
+		DisplayRunTaskAccepted(task)
+	} else {
 		Logger.Error("Failed to accept task", "task_id", task.GetId())
 		return
 	}
 	RunAttackTask(sess, task)
 
-	Logger.Info("Attack completed")
+	DisplayRunTaskCompleted()
+
 }
 
-func SendStatusUpdate(update hashcat.HashcatStatus, task *cipherswarm.Task) {
+func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
 	// TODO: Implement receiving a result code when sending this status update
 	// Depending on the code, we should stop the job or pause it
 
@@ -590,7 +604,7 @@ func MarkTaskExhausted(task *cipherswarm.Task) {
 
 }
 
-func SendCrackedHash(hash hashcat.HashcatResult, task *cipherswarm.Task) {
+func SendCrackedHash(hash hashcat.Result, task *cipherswarm.Task) {
 	result := *cipherswarm.NewHashcatResult(hash.Timestamp, hash.Hash, hash.Plaintext)
 
 	httpRes, err := apiClient.TasksAPI.SubmitCrack(Context, task.GetId()).

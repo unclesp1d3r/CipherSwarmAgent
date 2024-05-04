@@ -15,21 +15,21 @@ import (
 	"github.com/hpcloud/tail"
 )
 
-type HashcatSession struct {
+type Session struct {
 	proc               *exec.Cmd
 	hashFile           *os.File
 	outFile            *os.File
 	charsetFiles       []*os.File
 	shardedCharsetFile *os.File
-	CrackedHashes      chan HashcatResult
-	StatusUpdates      chan HashcatStatus
+	CrackedHashes      chan Result
+	StatusUpdates      chan Status
 	StderrMessages     chan string
 	StdoutLines        chan string
 	DoneChan           chan error
 	SkipStatusUpdates  bool
 }
 
-func (sess *HashcatSession) Start() error {
+func (sess *Session) Start() error {
 	pStdout, err := sess.proc.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("couldn't attach stdout to hashcat: %w", err)
@@ -87,7 +87,7 @@ func (sess *HashcatSession) Start() error {
 				continue
 			}
 
-			sess.CrackedHashes <- HashcatResult{
+			sess.CrackedHashes <- Result{
 				Timestamp: time.Unix(timestampI, 0),
 				Hash:      hash,
 				Plaintext: plain,
@@ -107,7 +107,7 @@ func (sess *HashcatSession) Start() error {
 			if !sess.SkipStatusUpdates {
 				switch line[0] {
 				case '{':
-					var status HashcatStatus
+					var status Status
 					err := json.Unmarshal([]byte(line), &status)
 					if err != nil {
 						fmt.Println("WARN: couldn't unmarshal hashcat status", "error", err)
@@ -140,7 +140,7 @@ func (sess *HashcatSession) Start() error {
 	return nil
 }
 
-func (sess *HashcatSession) Kill() error {
+func (sess *Session) Kill() error {
 	if sess.proc == nil || sess.proc.Process == nil {
 		return nil
 	}
@@ -154,22 +154,20 @@ func (sess *HashcatSession) Kill() error {
 	return err
 }
 
-//goland:noinspection GoUnhandledErrorResult,GoUnhandledErrorResult,GoUnhandledErrorResult
-func (sess *HashcatSession) Cleanup() {
+//goland:noinspection GoUnhandledErrorResult
+func (sess *Session) Cleanup() {
 	if sess.hashFile != nil {
 		os.Remove(sess.hashFile.Name())
 		sess.hashFile = nil
 	}
 
 	if sess.outFile != nil {
-		//goland:noinspection GoUnhandledErrorResult
 		os.Remove(sess.outFile.Name())
 		sess.outFile = nil
 	}
 
 	for _, f := range sess.charsetFiles {
 		if f != nil {
-			//goland:noinspection GoUnhandledErrorResult
 			os.Remove(f.Name())
 		}
 	}
@@ -179,6 +177,6 @@ func (sess *HashcatSession) Cleanup() {
 	}
 }
 
-func (sess *HashcatSession) CmdLine() string {
+func (sess *Session) CmdLine() string {
 	return sess.proc.String()
 }

@@ -13,7 +13,7 @@ const (
 	AttackBenchmark      = 9
 )
 
-type HashcatStatusGuess struct {
+type StatusGuess struct {
 	GuessBase        string  `json:"guess_base"`
 	GuessBaseCount   uint64  `json:"guess_base_count"`
 	GuessBaseOffset  uint64  `json:"guess_base_offset"`
@@ -27,7 +27,7 @@ type HashcatStatusGuess struct {
 	GuessMode int32 `json:"guess_mode"`
 }
 
-type HashcatStatusDevice struct {
+type StatusDevice struct {
 	DeviceID   int32  `json:"device_id"`
 	DeviceName string `json:"device_name"`
 	DeviceType string `json:"device_type"`
@@ -36,26 +36,26 @@ type HashcatStatusDevice struct {
 	Temp       int32  `json:"temp"`
 }
 
-type HashcatStatus struct {
+type Status struct {
 	OriginalLine string    `json:"original_line"`
 	Time         time.Time `json:"time"`
 
-	Session         string                `json:"session"`
-	Guess           HashcatStatusGuess    `json:"guess"`
-	Status          int32                 `json:"status"`
-	Target          string                `json:"target"`
-	Progress        []int64               `json:"progress"`
-	RestorePoint    int64                 `json:"restore_point"`
-	RecoveredHashes []int32               `json:"recovered_hashes"`
-	RecoveredSalts  []int32               `json:"recovered_salts"`
-	Rejected        int64                 `json:"rejected"`
-	Devices         []HashcatStatusDevice `json:"devices"`
+	Session         string         `json:"session"`
+	Guess           StatusGuess    `json:"guess"`
+	Status          int32          `json:"status"`
+	Target          string         `json:"target"`
+	Progress        []int64        `json:"progress"`
+	RestorePoint    int64          `json:"restore_point"`
+	RecoveredHashes []int32        `json:"recovered_hashes"`
+	RecoveredSalts  []int32        `json:"recovered_salts"`
+	Rejected        int64          `json:"rejected"`
+	Devices         []StatusDevice `json:"devices"`
 
 	TimeStart     int64 `json:"time_start"`
 	EstimatedStop int64 `json:"estimated_stop"`
 }
 
-type HashcatResult struct {
+type Result struct {
 	Timestamp time.Time `json:"timestamp"`
 	Hash      string    `json:"hash"`
 	Plaintext string    `json:"plaintext"`

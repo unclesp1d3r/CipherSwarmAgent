@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"os/signal"
 	"path"
@@ -48,29 +49,33 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cipherswarmagent.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&enableDebug, "debug", false, "Enable debug mode")
+	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		lib.Logger.Fatal("Failed to get current working directory", err)
 	}
 
-	viper.SetDefault("data_path", path.Join(cwd, "data"))                        // Set the default data path
-	dataRoot := viper.GetString("data_path")                                     // Get the data path
-	viper.SetDefault("pid_file", path.Join(dataRoot, "lock.pid"))                // Set the default PID file path
-	viper.SetDefault("hashcat_pid_file", path.Join(dataRoot, "hashcat.pid"))     // Set the default hashcat PID file path
-	viper.SetDefault("file_path", path.Join(dataRoot, "files"))                  // Set the default file path
-	viper.SetDefault("crackers_path", path.Join(dataRoot, "crackers"))           // Set the default crackers path
-	viper.SetDefault("hashlist_path", path.Join(dataRoot, "hashlists"))          // Set the default hashlists path
-	viper.SetDefault("zaps_path", path.Join(dataRoot, "zaps"))                   // Set the default zaps path
-	viper.SetDefault("preprocessors_path", path.Join(dataRoot, "preprocessors")) // Set the default preprocessors path
-	viper.SetDefault("tools_path", path.Join(dataRoot, "tools"))                 // Set the default tools path
-	viper.SetDefault("out_path", path.Join(dataRoot, "out"))                     // Set the default output path
-	viper.SetDefault("debug", false)                                             // Set the default debug mode
-	viper.SetDefault("gpu_temp_threshold", 80)                                   // Set the default GPU temperature threshold
-	viper.SetDefault("benchmark_update_frequency", 168*time.Hour)                // Set the default benchmark age in hours (7 days)
-	viper.SetDefault("always_use_native_hashcat", false)                         // Set the default to not always use native hashcat
+	viper.SetDefault("data_path", path.Join(cwd, "data")) // Set the default data path
+	dataRoot := viper.GetString("data_path")              // Get the data path
 
-	if viper.GetBool("debug") {
+	viper.SetDefault("gpu_temp_threshold", 80)                    // Set the default GPU temperature threshold
+	viper.SetDefault("benchmark_update_frequency", 168*time.Hour) // Set the default benchmark age in hours (7 days)
+	viper.SetDefault("always_use_native_hashcat", false)          // Set the default to not always use native hashcat
+
+	shared.SharedState.DataPath = dataRoot                                           // Set the data path in the shared state
+	shared.SharedState.PidFile = path.Join(dataRoot, "lock.pid")                     // Set the default PID file path
+	shared.SharedState.HashcatPidFile = path.Join(dataRoot, "hashcat.pid")           // Set the default hashcat PID file path
+	shared.SharedState.CrackersPath = path.Join(dataRoot, "crackers_path")           // Set the crackers path in the shared state
+	shared.SharedState.FilePath = path.Join(dataRoot, "file_path")                   // Set the file path in the shared state
+	shared.SharedState.HashlistPath = path.Join(dataRoot, "hashlist_path")           // Set the hashlist path in the shared state
+	shared.SharedState.ZapsPath = path.Join(dataRoot, "zaps_path")                   // Set the zaps path in the shared state
+	shared.SharedState.PreprocessorsPath = path.Join(dataRoot, "preprocessors_path") // Set the preprocessors path in the shared state
+	shared.SharedState.ToolsPath = path.Join(dataRoot, "tools_path")                 // Set the tools path in the shared state
+	shared.SharedState.OutPath = path.Join(dataRoot, "out_path")                     // Set the output path in the shared state
+	shared.SharedState.Debug = enableDebug                                           // Set the debug flag in the shared state
+
+	if shared.SharedState.Debug {
 		lib.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug
 		lib.Logger.SetReportCaller(true)    // Report the caller for debugging
 	} else {
@@ -133,7 +138,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	// This will allow us to clean up the PID file when the agent is stopped
 	// We'll also use this to clean up any dangling hashcat processes
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
-	if enableDebug {
+	if shared.SharedState.Debug {
 		lib.Logger.SetLevel(log.DebugLevel)
 	} else {
 		lib.Logger.SetLevel(log.InfoLevel)
@@ -141,36 +146,37 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 	setupAPI()
 
-	lib.Logger.Info("Starting CipherSwarm Agent")
+	lib.DisplayStartup()
 
-	pidFilePath := viper.GetString("pid_file")
-	// Check if the agent is already running
-	// I don't think this works the way I thought it would. I will probably need to change this.
-	lockFound, err := lib.CleanUpDanglingProcess(pidFilePath)
-	if err != nil {
-		lib.Logger.Fatal("Error checking for dangling processes", "error", err)
-	}
+	lockFound := lib.CheckForExistingClient(shared.SharedState.PidFile)
 	if lockFound {
-		lib.Logger.Fatal("Aborting agent start, lock file found", "path", pidFilePath)
+		lib.Logger.Fatal("Aborting agent start, lock file found", "path", shared.SharedState.PidFile)
 	}
 
-	err = lib.CreateDataDirs() // Create the data directories
+	err := lib.CreateDataDirs() // Create the data directories
 	if err != nil {
 		lib.Logger.Fatal("Error creating data directories", "error", err)
 	}
 
-	// Write the PID file
+	// Create a lock file to prevent multiple instances of the agent from running
 	pidFile, _ := lib.CreateLockFile()
-	defer cleanUpPidFile()(pidFile.Name())
+	defer func(pidFile string) {
+		lib.Logger.Debug("Cleaning up PID file", "path", pidFile)
+
+		err := lib.AppFs.Remove(pidFile)
+		if err != nil {
+			lib.Logger.Fatal("Failed to remove PID file", "error", err)
+		}
+	}(pidFile.Name())
 
 	// Connect to the CipherSwarm API URL and authenticate
 	// Right now, we're just logging the result of the authentication.
 	// Failure to authenticate will result in a fatal error.
-	agentID, err := lib.AuthenticateAgent()
+	err = lib.AuthenticateAgent()
 	if err != nil {
 		lib.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
 	}
-	lib.Logger.Info("Agent authenticated with the CipherSwarm API")
+	lib.DisplayAuthenticated()
 
 	// Get the configuration
 	lib.Configuration, err = lib.GetAgentConfiguration()
@@ -178,15 +184,17 @@ func startAgent(cmd *cobra.Command, args []string) {
 		lib.Logger.Fatal("Failed to get agent configuration from the CipherSwarm API", "error", err)
 	}
 
-	// Update the configuration
-	lib.UpdateClientConfig()
-	lib.Logger.Info("Configuration updated from server")
+	// Override the configuration with the always_use_native_hashcat setting
+	if viper.GetBool("always_use_native_hashcat") {
+		lib.Configuration.Config.UseNativeHashcat = true
+	}
+
 	// Update the agent metadata with the CipherSwarm API
-	lib.UpdateAgentMetadata(agentID)
+	lib.UpdateAgentMetadata()
 	lib.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
-	processFound, err := lib.CleanUpDanglingProcess(viper.GetString("hashcat_pid_file"))
+	processFound := lib.CheckForExistingClient(shared.SharedState.HashcatPidFile)
 	if err != nil {
 		lib.Logger.Fatal("Error checking for dangling hashcat processes", "error", err)
 	}
@@ -212,7 +220,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 			// - Check if we need to update the agent benchmarks
 			//   - If we need to update the benchmarks, run the benchmarks and upload the results to the CipherSwarm API
-			benchmarkUpdateCheck(agentID)
+			benchmarkUpdateCheck()
 
 			// - Request a new job from the CipherSwarm API
 			//   - If a job is available, download the job and start processing it
@@ -222,7 +230,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 				lib.Logger.Error("Failed to get new task", "error", err)
 			}
 			if task != nil {
-				lib.Logger.Info("New task available", "task", task)
+				lib.DisplayNewTask(task)
 
 				// Process the task
 				// - Get the attack parameters
@@ -230,7 +238,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 				if err != nil {
 					lib.Logger.Error("Failed to get attack parameters", "error", err)
 				}
-				lib.Logger.Info("Attack parameters", "attack", attack)
+				lib.DisplayNewAttack(attack)
 
 				// - Download the files
 				err = lib.DownloadFiles(attack)
@@ -251,21 +259,21 @@ func startAgent(cmd *cobra.Command, args []string) {
 				lib.Logger.Info("No new task available")
 			}
 			sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
-			lib.Logger.Info("Sleeping", "seconds", sleepTime)
-			lib.SendHeartBeat(agentID)
+			lib.DisplayInactive(sleepTime)
+			lib.SendHeartBeat()
 			time.Sleep(sleepTime)
 		}
 	}()
 
 	sig := <-signChan // Wait for a signal to shut down the agent
 	lib.Logger.Debug("Received signal", "signal", sig)
-	lib.Logger.Info("Shutting down CipherSwarm Agent")
+	lib.DisplayShuttingDown()
 }
 
-func benchmarkUpdateCheck(agentID int64) {
+func benchmarkUpdateCheck() {
 	benchmarkFrequency := viper.GetDuration("benchmark_update_frequency")
 	oldestUpdate := time.Now().Add(-benchmarkFrequency)
-	lastBenchmarkDate, err := lib.GetLastBenchmarkDate(agentID)
+	lastBenchmarkDate, err := lib.GetLastBenchmarkDate()
 	if err != nil {
 		lib.Logger.Error("Failed to get last benchmark date", "error", err)
 		return
@@ -275,7 +283,7 @@ func benchmarkUpdateCheck(agentID int64) {
 	if lastBenchmarkDate.Before(oldestUpdate) {
 		lib.Logger.Info("Benchmarks out of date", "benchmark_age", time.Since(lastBenchmarkDate).String(),
 			"maximum_age", oldestUpdate.String())
-		lib.UpdateBenchmarks(agentID)
+		lib.UpdateBenchmarks()
 		lib.Logger.Info("Updated benchmarks")
 	} else {
 		lib.Logger.Info("Benchmarks up to date")
@@ -284,7 +292,7 @@ func benchmarkUpdateCheck(agentID int64) {
 
 // setupAPI initializes the API configuration and context for the CipherSwarm Agent.
 func setupAPI() {
-	lib.APIConfiguration.Debug = enableDebug
+	lib.APIConfiguration.Debug = shared.SharedState.Debug
 	lib.APIConfiguration.UserAgent = "CipherSwarm Agent/" + lib.AgentVersion
 	lib.APIConfiguration.Servers = cipherswarm.ServerConfigurations{
 		{
@@ -293,18 +301,4 @@ func setupAPI() {
 	}
 	lib.Context = context.WithValue(context.Background(), cipherswarm.ContextAccessToken, viper.GetString("api_token"))
 
-}
-
-// cleanUpPidFile returns a function that can be used to clean up a PID file.
-// The returned function takes a `pidFile` string parameter and removes the file from the file system.
-// If an error occurs while removing the file, it logs a fatal error.
-func cleanUpPidFile() func(pidFile string) {
-	return func(pidFile string) {
-		lib.Logger.Debug("Cleaning up PID file", "path", pidFile)
-
-		err := lib.AppFs.Remove(pidFile)
-		if err != nil {
-			lib.Logger.Fatal("Failed to remove PID file", "error", err)
-		}
-	}
 }
