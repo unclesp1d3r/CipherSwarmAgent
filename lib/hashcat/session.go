@@ -16,19 +16,22 @@ import (
 )
 
 type Session struct {
-	proc               *exec.Cmd
-	hashFile           *os.File
-	outFile            *os.File
-	charsetFiles       []*os.File
-	shardedCharsetFile *os.File
-	CrackedHashes      chan Result
-	StatusUpdates      chan Status
-	StderrMessages     chan string
-	StdoutLines        chan string
-	DoneChan           chan error
-	SkipStatusUpdates  bool
+	proc               *exec.Cmd   // The hashcat process
+	hashFile           *os.File    // The file containing the hashes to crack
+	outFile            *os.File    // The file to write cracked hashes to
+	charsetFiles       []*os.File  // Charset files for mask attacks
+	shardedCharsetFile *os.File    // Sharded charset file for mask attacks
+	CrackedHashes      chan Result // Channel to send cracked hashes to
+	StatusUpdates      chan Status // Channel to send status updates to
+	StderrMessages     chan string // Channel to send stderr messages to
+	StdoutLines        chan string // Channel to send stdout lines to
+	DoneChan           chan error  // Channel to send the done signal to
+	SkipStatusUpdates  bool        // Whether to skip sending status updates
 }
 
+// Start starts the hashcat session by attaching the stdout and stderr pipes,
+// starting the hashcat process, and setting up goroutines to handle the output.
+// It returns an error if any of the steps fail.
 func (sess *Session) Start() error {
 	pStdout, err := sess.proc.StdoutPipe()
 	if err != nil {
@@ -56,6 +59,7 @@ func (sess *Session) Start() error {
 		return fmt.Errorf("couldn't tail outfile %q: %w", sess.outFile.Name(), err)
 	}
 
+	// Read the tailer output in a separate goroutine
 	go func() {
 		for tLine := range tailer.Lines {
 			line := tLine.Text
@@ -95,6 +99,7 @@ func (sess *Session) Start() error {
 		}
 	}()
 
+	// Read the stdout and stderr pipes in separate goroutines
 	go func() {
 		scanner := bufio.NewScanner(pStdout)
 		for scanner.Scan() {
@@ -122,7 +127,6 @@ func (sess *Session) Start() error {
 		}
 
 		done := sess.proc.Wait()
-		// Give us a hot moment to read any cracked hashes that are still being written to disk
 		time.Sleep(time.Second)
 		sess.DoneChan <- done
 
@@ -140,6 +144,9 @@ func (sess *Session) Start() error {
 	return nil
 }
 
+// Kill terminates the running process associated with the session.
+// If the session process is already terminated or not started, it returns nil.
+// If an error occurs while terminating the process, it returns the error.
 func (sess *Session) Kill() error {
 	if sess.proc == nil || sess.proc.Process == nil {
 		return nil
@@ -154,6 +161,9 @@ func (sess *Session) Kill() error {
 	return err
 }
 
+// Cleanup removes any temporary files associated with the session.
+// It deletes the hash file, output file, charset files, and sharded charset file (if present).
+//
 //goland:noinspection GoUnhandledErrorResult
 func (sess *Session) Cleanup() {
 	if sess.hashFile != nil {
@@ -177,6 +187,7 @@ func (sess *Session) Cleanup() {
 	}
 }
 
+// CmdLine returns the command line string used to start the session.
 func (sess *Session) CmdLine() string {
 	return sess.proc.String()
 }

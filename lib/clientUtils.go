@@ -2,12 +2,13 @@ package lib
 
 import (
 	"errors"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/afero"
@@ -72,6 +73,8 @@ func GetPlatform() string {
 	return arch.GetPlatform()
 }
 
+// CheckForExistingClient checks if the specified PID file exists.
+// It returns true if the file exists, and false otherwise.
 func CheckForExistingClient(pidFilePath string) bool {
 	pidExists, err := afero.Exists(AppFs, pidFilePath)
 	if err != nil {
@@ -102,6 +105,11 @@ func CreateLockFile() (afero.File, error) {
 	return pidFile, err
 }
 
+// CleanString removes any non-printable characters from the input string.
+// It uses the strings.Map function to iterate over each rune in the string
+// and checks if it is printable using the unicode.IsPrint function.
+// If a rune is printable, it is returned as is, otherwise it is replaced with -1.
+// The resulting string with only printable characters is returned.
 func CleanString(s string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsPrint(r) {
@@ -111,6 +119,9 @@ func CleanString(s string) string {
 	}, s)
 }
 
+// CreateDataDirs creates the necessary data directories for the CipherSwarmAgent.
+// It checks if the directories already exist, and if not, it creates them.
+// Returns an error if there was a problem creating the directories.
 func CreateDataDirs() error {
 	dataDirs := []string{
 		shared.SharedState.FilePath,

@@ -2,12 +2,37 @@ package hashcat
 
 import (
 	"fmt"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+type Params struct {
+	AttackMode uint8  `json:"attack_mode"` // Attack mode to use
+	HashType   uint   `json:"hash_type"`   // Hash type to crack
+	HashFile   string `json:"hash_file"`   // Path to the file containing the hashes to crack
+
+	Mask               string   `json:"mask"`                 // Mask to use for mask attack
+	MaskIncrement      bool     `json:"mask_increment"`       // Whether to use mask increment
+	MaskIncrementMin   uint     `json:"mask_increment_min"`   // Min mask length for increment
+	MaskIncrementMax   uint     `json:"mask_increment_max"`   // Max mask length for increment
+	MaskShardedCharset string   `json:"mask_sharded_charset"` // Internal use: for sharding charsets
+	MaskCustomCharsets []string `json:"mask_custom_charsets"` // Custom charsets for mask attack
+
+	WordlistFilenames []string `json:"wordlist_filenames"` // Wordlists to use for dictionary and combinator attacks
+	RulesFilenames    []string `json:"rules_filenames"`    // Rules to use for dictionary attack
+	AdditionalArgs    []string `json:"additional_args"`    // Additional arguments to pass to hashcat
+	OptimizedKernels  bool     `json:"optimized_kernels"`  // Whether to use optimized kernels
+	SlowCandidates    bool     `json:"slow_candidates"`    // Whether to use slow candidates
+
+	Skip  int64 `json:"skip"`  // Keyspace offset to start at
+	Limit int64 `json:"limit"` // Maximum keyspace to process
+}
+
+// Validate checks if the parameters for the attack mode are valid.
+// It returns an error if the parameters are invalid, or nil if they are valid.
 func (params Params) Validate() error {
 	switch params.AttackMode {
 	case AttackModeDictionary:
@@ -82,6 +107,9 @@ func (params Params) maskArgs() ([]string, error) {
 	return args, nil
 }
 
+// toCmdArgs converts the Params struct into a slice of command-line arguments for the hashcat command.
+// It takes the session name, hash file path, and output file path as input parameters.
+// It returns the generated command-line arguments and any error encountered during the conversion.
 func (params Params) toCmdArgs(session, hashFile string, outFile string) (args []string, err error) {
 	if err = params.Validate(); err != nil {
 		return
@@ -178,26 +206,4 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	}
 
 	return
-}
-
-type Params struct {
-	AttackMode uint8  `json:"attack_mode"`
-	HashType   uint   `json:"hash_type"`
-	HashFile   string `json:"hash_file"`
-
-	Mask               string   `json:"mask"`
-	MaskIncrement      bool     `json:"mask_increment"`
-	MaskIncrementMin   uint     `json:"mask_increment_min"`
-	MaskIncrementMax   uint     `json:"mask_increment_max"`
-	MaskShardedCharset string   `json:"mask_sharded_charset"` // Internal use: for sharding charsets
-	MaskCustomCharsets []string `json:"mask_custom_charsets"`
-
-	WordlistFilenames []string `json:"wordlist_filenames"`
-	RulesFilenames    []string `json:"rules_filenames"`
-	AdditionalArgs    []string `json:"additional_args"`
-	OptimizedKernels  bool     `json:"optimized_kernels"`
-	SlowCandidates    bool     `json:"slow_candidates"`
-
-	Skip  int64 `json:"skip"`
-	Limit int64 `json:"limit"`
 }

@@ -1,11 +1,12 @@
 package lib
 
 import (
+	"time"
+
 	"github.com/imroc/req/v3"
 	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
-	"time"
 )
 
 // Put all the functions that display output here so that they can be easily changed later
@@ -76,48 +77,63 @@ func DisplayJobStatus(update hashcat.Status) {
 	Logger.Debug("Job status update", "status", update)
 }
 
+// DisplayJobResult displays the results of a job session
 func DisplayAgentMetadataUpdated(result *cipherswarm.Agent) {
 	Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", shared.SharedState.AgentID)
 	Logger.Debug("Agent metadata", "metadata", result)
 }
 
+// DisplayNewCrackerAvailable displays information about a new cracker available.
+// It logs the latest version and the download URL of the new cracker.
 func DisplayNewCrackerAvailable(result *cipherswarm.CrackerUpdate) {
 	Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
 	Logger.Info("Download URL", "url", result.GetDownloadUrl())
 }
 
+// DisplayBenchmarkStarting displays a message indicating that benchmarking is starting.
 func DisplayBenchmarkStarting() {
 	Logger.Info("Performing benchmarks")
 }
 
+// DisplayBenchmarksComplete displays the completed benchmark session results.
+// It takes a slice of BenchmarkResult as input and logs the results using the Logger.
 func DisplayBenchmarksComplete(benchmarkResult []BenchmarkResult) {
 	Logger.Debug("Benchmark session completed", "results", benchmarkResult)
 }
 
+// DisplayDownloadFileStart displays a log message indicating the start of file downloading for an attack.
 func DisplayDownloadFileStart(attack *cipherswarm.Attack) {
 	Logger.Info("Downloading files for attack", "attack_id", attack.GetId())
 }
 
+// DisplayDownloadFileComplete displays a message indicating that a file has been downloaded.
+// It logs the URL and path of the downloaded file.
 func DisplayDownloadFileComplete(url string, path string) {
 	Logger.Debug("Downloaded file", "url", url, "path", path)
 }
 
+// DisplayDownloadFileStatusUpdate displays the download file status update.
+// It calculates the percentage of the downloaded file and logs it using the Logger.
 func DisplayDownloadFileStatusUpdate(info req.DownloadInfo) {
 	Logger.Infof("downloaded %.2f%%\n", float64(info.DownloadedSize)/float64(info.Response.ContentLength)*100.0)
 }
 
+// DisplayDownloadFile downloads a file from the specified URL and saves it to the given path.
 func DisplayDownloadFile(url string, path string) {
 	Logger.Info("Downloading file", "url", url, "path", path)
 }
 
+// DisplayRunTaskCompleted displays a message indicating that the attack has completed.
 func DisplayRunTaskCompleted() {
 	Logger.Info("Attack completed")
 }
 
+// DisplayRunTaskAccepted displays a log message indicating that a task has been accepted.
 func DisplayRunTaskAccepted(task *cipherswarm.Task) {
 	Logger.Info("Task accepted", "task_id", task.GetId())
 }
 
+// DisplayRunTaskStarting displays a log message indicating that a task is starting.
 func DisplayRunTaskStarting(task *cipherswarm.Task) {
 	Logger.Info("Running task", "task_id", task.GetId())
 }

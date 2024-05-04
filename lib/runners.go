@@ -8,6 +8,11 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
+// RunBenchmarkTask runs a benchmark session using the provided hashcat session.
+// It starts the session, reads the output lines from stdout, and processes them to extract benchmark results.
+// Any errors encountered during the benchmark session are logged and returned.
+// The benchmark results are returned as a slice of BenchmarkResult structs.
+// The second return value indicates whether the benchmark session was successful or not.
 func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 	err := sess.Start()
 	if err != nil {
@@ -55,6 +60,10 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 	return benchmarkResult, false
 }
 
+// RunAttackTask executes an attack task using the provided hashcat session and task.
+// It starts the session, monitors the status updates, and sends the updates and results to the appropriate handlers.
+// If an error occurs during the session start, it logs the error and returns.
+// Once the session is done, it cleans up the session resources and waits for the completion of the goroutine.
 func RunAttackTask(sess *hashcat.Session, task *cipherswarm.Task) {
 	err := sess.Start()
 	if err != nil {

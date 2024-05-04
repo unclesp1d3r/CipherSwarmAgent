@@ -3,10 +3,11 @@ package hashcat
 // Borrowed from PhatCrack, a password cracking tool
 import (
 	"fmt"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"os/exec"
 	"strconv"
+
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
 	"github.com/spf13/viper"
 )
@@ -53,7 +54,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't make a temp file to store output: %w", err)
 	}
-	err = outFile.Chmod(0600)
+	err = outFile.Chmod(0o600)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't set permissions on output file: %w", err)
 	}
@@ -78,7 +79,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't make a temp file to store charset")
 		}
-		err = outFile.Chmod(0600)
+		err = outFile.Chmod(0o600)
 		if err != nil {
 			return nil, err
 		}

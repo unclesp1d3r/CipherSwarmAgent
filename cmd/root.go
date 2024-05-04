@@ -3,15 +3,16 @@ package cmd
 
 import (
 	"context"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
 	"time"
 
-	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
+
+	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
 
 	"github.com/charmbracelet/log"
 	gap "github.com/muesli/go-app-paths"
@@ -124,7 +125,7 @@ func initConfig() {
 
 // startAgent is a function that starts the CipherSwarm Agent.
 //
-//goland:noinspection GoUnusedParameter,GoUnusedParameter
+//goland:noinspection GoUnusedParameter
 func startAgent(cmd *cobra.Command, args []string) {
 	if viper.GetString("api_url") == "" {
 		lib.Logger.Fatal("API URL not set")
@@ -225,7 +226,6 @@ func startAgent(cmd *cobra.Command, args []string) {
 			// - Request a new job from the CipherSwarm API
 			//   - If a job is available, download the job and start processing it
 			task, err := lib.GetNewTask()
-
 			if err != nil {
 				lib.Logger.Error("Failed to get new task", "error", err)
 			}
@@ -300,5 +300,4 @@ func setupAPI() {
 		},
 	}
 	lib.Context = context.WithValue(context.Background(), cipherswarm.ContextAccessToken, viper.GetString("api_token"))
-
 }
