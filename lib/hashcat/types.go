@@ -15,13 +15,13 @@ const (
 
 type StatusGuess struct {
 	GuessBase        string  `json:"guess_base"`         // The base wordlist used for the attack
-	GuessBaseCount   uint64  `json:"guess_base_count"`   // The number of words in the base wordlist
-	GuessBaseOffset  uint64  `json:"guess_base_offset"`  // The offset into the base wordlist
+	GuessBaseCount   int64   `json:"guess_base_count"`   // The number of words in the base wordlist
+	GuessBaseOffset  int64   `json:"guess_base_offset"`  // The offset into the base wordlist
 	GuessBasePercent float32 `json:"guess_base_percent"` // The percentage of the base wordlist that has been processed
 
 	GuessMod        string  `json:"guess_mod"`         // The modifier wordlist used for the attack
-	GuessModCount   uint64  `json:"guess_mod_count"`   // The number of words in the modifier wordlist
-	GuessModOffset  uint64  `json:"guess_mod_offset"`  // The offset into the modifier wordlist
+	GuessModCount   int64   `json:"guess_mod_count"`   // The number of words in the modifier wordlist
+	GuessModOffset  int64   `json:"guess_mod_offset"`  // The offset into the modifier wordlist
 	GuessModPercent float32 `json:"guess_mod_percent"` // The percentage of the modifier wordlist that has been processed
 
 	GuessMode int32 `json:"guess_mode"` // The attack mode

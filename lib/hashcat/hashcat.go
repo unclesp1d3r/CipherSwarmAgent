@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 
+	"github.com/duke-git/lancet/fileutil"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
 	"github.com/spf13/viper"
@@ -29,23 +30,8 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	var charsetFiles []*os.File
 
 	defer func() {
-		if err == nil {
-			return
-		}
-		// We returned because of an error, clean up temp files
-		if hashFile != nil {
-			os.Remove(hashFile.Name())
-		}
 		if outFile != nil {
-			os.Remove(outFile.Name())
-		}
-		if shardedCharsetFile != nil {
-			os.Remove(shardedCharsetFile.Name())
-		}
-		for _, f := range charsetFiles {
-			if f != nil {
-				os.Remove(f.Name())
-			}
+			fileutil.RemoveFile(outFile.Name())
 		}
 	}()
 

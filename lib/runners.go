@@ -2,8 +2,10 @@ package lib
 
 import (
 	"encoding/json"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"strings"
 
+	"github.com/duke-git/lancet/validator"
 	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
@@ -16,7 +18,7 @@ import (
 func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 	err := sess.Start()
 	if err != nil {
-		Logger.Error("Failed to start benchmark session", "error", err)
+		shared.Logger.Error("Failed to start benchmark session", "error", err)
 		return nil, true
 	}
 	var benchmarkResult []BenchmarkResult
@@ -28,7 +30,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 			case stdOutLine := <-sess.StdoutLines:
 				fields := strings.Split(stdOutLine, ":")
 				if len(fields) != 6 {
-					Logger.Debug("Unknown benchmark line", "line", stdOutLine)
+					shared.Logger.Debug("Unknown benchmark line", "line", stdOutLine)
 				} else {
 					result := BenchmarkResult{
 						Device:    fields[0],
@@ -43,12 +45,12 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 			case stdErrLine := <-sess.StderrMessages:
 				DisplayBenchmarkError(stdErrLine)
 			case statusUpdate := <-sess.StatusUpdates:
-				Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
+				shared.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
 			case crackedHash := <-sess.CrackedHashes:
-				Logger.Debug("Benchmark cracked hash", "hash", crackedHash) // This should never happen
+				shared.Logger.Debug("Benchmark cracked hash", "hash", crackedHash) // This should never happen
 			case err := <-sess.DoneChan:
 				if err != nil {
-					Logger.Error("Benchmark session failed", "error", err)
+					shared.Logger.Error("Benchmark session failed", "error", err)
 				}
 				break procLoop
 			}
@@ -67,7 +69,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 func RunAttackTask(sess *hashcat.Session, task *cipherswarm.Task) {
 	err := sess.Start()
 	if err != nil {
-		Logger.Error("Failed to start benchmark session", "error", err)
+		shared.Logger.Error("Failed to start benchmark session", "error", err)
 		return
 	}
 	waitChan := make(chan int)
@@ -76,11 +78,11 @@ func RunAttackTask(sess *hashcat.Session, task *cipherswarm.Task) {
 		for {
 			select {
 			case stdoutLine := <-sess.StdoutLines:
-				if stdoutLine != "" && stdoutLine[0] == '{' {
+				if validator.IsJSON(stdoutLine) {
 					update := hashcat.Status{}
 					err := json.Unmarshal([]byte(stdoutLine), &update)
 					if err != nil {
-						Logger.Error("Failed to parse status update", "error", err)
+						shared.Logger.Error("Failed to parse status update", "error", err)
 					} else {
 						DisplayJobStatus(update)
 						SendStatusUpdate(update, task)

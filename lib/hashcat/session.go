@@ -6,12 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/duke-git/lancet/convertor"
+	"github.com/duke-git/lancet/fileutil"
+	"github.com/duke-git/lancet/validator"
 	"github.com/hpcloud/tail"
 )
 
@@ -43,7 +46,7 @@ func (sess *Session) Start() error {
 		return fmt.Errorf("couldn't attach stderr to hashcat: %w", err)
 	}
 
-	fmt.Println("Running hashcat command", "command", sess.proc.String())
+	shared.Logger.Debug("Running hashcat command", "command", sess.proc.String())
 	err = sess.proc.Start()
 	if err != nil {
 		return fmt.Errorf("couldn't start hashcat: %w", err)
@@ -53,7 +56,7 @@ func (sess *Session) Start() error {
 	if err != nil {
 		err = sess.Kill()
 		if err != nil {
-			fmt.Println("couldn't kill hashcat process", "error", err)
+			shared.Logger.Error("couldn't kill hashcat process", "error", err)
 		}
 
 		return fmt.Errorf("couldn't tail outfile %q: %w", sess.outFile.Name(), err)
@@ -65,7 +68,7 @@ func (sess *Session) Start() error {
 			line := tLine.Text
 			values := strings.Split(line, ":")
 			if len(values) < 3 {
-				fmt.Println("unexpected line contents", "line", line)
+				shared.Logger.Error("unexpected line contents", "line", line)
 				continue
 			}
 
@@ -76,7 +79,7 @@ func (sess *Session) Start() error {
 
 			bs, err := hex.DecodeString(plainHex)
 			if err != nil {
-				fmt.Println("couldn't decode hex string", "hex", plainHex, "error", err)
+				shared.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
 				continue
 			}
 			plain := string(bs)
@@ -85,9 +88,9 @@ func (sess *Session) Start() error {
 			hashParts := values[1 : len(values)-1]
 			hash := strings.Join(hashParts, ":")
 
-			timestampI, err := strconv.ParseInt(timestamp, 10, 64)
+			timestampI, err := convertor.ToInt(timestamp)
 			if err != nil {
-				fmt.Println("couldn't parse hashcat timestamp.", "timestamp", timestamp, "error", err)
+				shared.Logger.Error("couldn't parse hashcat timestamp.", "timestamp", timestamp, "error", err)
 				continue
 			}
 
@@ -110,18 +113,17 @@ func (sess *Session) Start() error {
 				continue
 			}
 			if !sess.SkipStatusUpdates {
-				switch line[0] {
-				case '{':
+
+				if validator.IsJSON(line) {
 					var status Status
 					err := json.Unmarshal([]byte(line), &status)
 					if err != nil {
-						fmt.Println("WARN: couldn't unmarshal hashcat status", "error", err)
+						shared.Logger.Error("WARN: couldn't unmarshal hashcat status", "error", err)
 						continue
 					}
 					sess.StatusUpdates <- status
-
-				default:
-					fmt.Println("Unexpected stdout line", "line", line)
+				} else {
+					shared.Logger.Error("Unexpected stdout line", "line", line)
 				}
 			}
 		}
@@ -136,7 +138,7 @@ func (sess *Session) Start() error {
 	go func() {
 		scanner := bufio.NewScanner(pStderr)
 		for scanner.Scan() {
-			fmt.Println("read stderr", "text", scanner.Text())
+			shared.Logger.Error("read stderr", "text", scanner.Text())
 			sess.StderrMessages <- scanner.Text()
 		}
 	}()
@@ -166,24 +168,19 @@ func (sess *Session) Kill() error {
 //
 //goland:noinspection GoUnhandledErrorResult
 func (sess *Session) Cleanup() {
-	if sess.hashFile != nil {
-		os.Remove(sess.hashFile.Name())
-		sess.hashFile = nil
-	}
-
 	if sess.outFile != nil {
-		os.Remove(sess.outFile.Name())
+		fileutil.RemoveFile(sess.outFile.Name())
 		sess.outFile = nil
 	}
 
 	for _, f := range sess.charsetFiles {
 		if f != nil {
-			os.Remove(f.Name())
+			fileutil.RemoveFile(f.Name())
 		}
 	}
 
 	if sess.shardedCharsetFile != nil {
-		os.Remove(sess.shardedCharsetFile.Name())
+		fileutil.RemoveFile(sess.shardedCharsetFile.Name())
 	}
 }
 

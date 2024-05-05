@@ -5,7 +5,8 @@ package arch
 import (
 	"os/exec"
 	"regexp"
-	"strings"
+
+	"github.com/duke-git/lancet/strutil"
 )
 
 // GetDevices retrieves a list of devices using the system_profiler command.
@@ -27,7 +28,7 @@ func GetDevices() ([]string, error) {
 
 	var newArray []string
 	for _, match := range matches {
-		newArray = append(newArray, strings.TrimSpace(match[1]))
+		newArray = append(newArray, strutil.Trim(match[1]))
 	}
 
 	return newArray, nil
@@ -41,7 +42,7 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 	if err != nil {
 		return "0.0.0", err
 	}
-	return strings.TrimSpace(string(out)), nil
+	return strutil.Trim(strutil.BytesToString(out)), nil
 }
 
 func GetPlatform() string {

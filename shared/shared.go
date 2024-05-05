@@ -1,5 +1,10 @@
 package shared
 
+import (
+	"github.com/charmbracelet/log"
+	"os"
+)
+
 var SharedState = AgentState{}
 
 type AgentState struct {
@@ -15,4 +20,13 @@ type AgentState struct {
 	FilePath          string // FilePath is the path to the file containing various files for attacks.
 	Debug             bool   // Debug specifies whether the agent is running in debug mode.
 	AgentID           int64  // AgentID is the unique identifier of the agent.
+	APIURL            string // APIURL is the URL of the CipherSwarm API.
+	APIToken          string // APIToken is the token used to authenticate with the CipherSwarm API.
 }
+
+var (
+	Logger = log.NewWithOptions(os.Stderr, log.Options{
+		Prefix: "cipherswarm-agent",
+		Level:  log.InfoLevel,
+	})
+)

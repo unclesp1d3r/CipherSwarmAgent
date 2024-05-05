@@ -2,16 +2,16 @@ package hashcat
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"strconv"
 
+	"github.com/duke-git/lancet/convertor"
+	"github.com/duke-git/lancet/fileutil"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
 type Params struct {
 	AttackMode uint8  `json:"attack_mode"` // Attack mode to use
-	HashType   uint   `json:"hash_type"`   // Hash type to crack
+	HashType   int32  `json:"hash_type"`   // Hash type to crack
 	HashFile   string `json:"hash_file"`   // Path to the file containing the hashes to crack
 
 	Mask               string   `json:"mask"`                 // Mask to use for mask attack
@@ -96,11 +96,11 @@ func (params Params) maskArgs() ([]string, error) {
 		args = append(args, "--increment")
 
 		if params.MaskIncrementMin > 0 {
-			args = append(args, "--increment-min", fmtUint(params.MaskIncrementMin))
+			args = append(args, "--increment-min", convertor.ToString(params.MaskIncrementMin))
 		}
 
 		if params.MaskIncrementMax > 0 {
-			args = append(args, "--increment-max", fmtUint(params.MaskIncrementMax))
+			args = append(args, "--increment-max", convertor.ToString(params.MaskIncrementMax))
 		}
 	}
 
@@ -134,8 +134,8 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		"--status-json",
 		"--status-timer", "3",
 		"--potfile-disable",
-		"-a", fmtUint(params.AttackMode),
-		"-m", fmtUint(params.HashType),
+		"-a", convertor.ToString(params.AttackMode),
+		"-m", convertor.ToString(params.HashType),
 	)
 
 	args = append(args, params.AdditionalArgs...)
@@ -149,17 +149,17 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	}
 
 	if params.Skip > 0 {
-		args = append(args, "--skip", strconv.FormatInt(params.Skip, 10))
+		args = append(args, "--skip", convertor.ToString(params.Skip))
 	}
 
 	if params.Limit > 0 {
-		args = append(args, "--limit", strconv.FormatInt(params.Limit, 10))
+		args = append(args, "--limit", convertor.ToString(params.Limit))
 	}
 
 	wordlists := make([]string, len(params.WordlistFilenames))
 	for i, list := range params.WordlistFilenames {
 		wordlists[i] = filepath.Join(shared.SharedState.FilePath, filepath.Clean(list))
-		if _, err = os.Stat(wordlists[i]); err != nil {
+		if !fileutil.IsExist(wordlists[i]) {
 			err = fmt.Errorf("provided wordlist %q couldn't be opened on filesystem", wordlists[i])
 			return
 		}
@@ -168,7 +168,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	rules := make([]string, len(params.RulesFilenames))
 	for i, rule := range params.RulesFilenames {
 		rules[i] = filepath.Join(shared.SharedState.FilePath, filepath.Clean(rule))
-		if _, err = os.Stat(rules[i]); err != nil {
+		if !fileutil.IsExist(rules[i]) {
 			err = fmt.Errorf("provided rules file %q couldn't be opened on filesystem", wordlists[i])
 			return
 		}

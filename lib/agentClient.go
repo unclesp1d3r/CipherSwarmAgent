@@ -2,8 +2,6 @@ package lib
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,9 +11,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/duke-git/lancet/cryptor"
+	"github.com/duke-git/lancet/fileutil"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
-	"github.com/spf13/afero"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 
 	"github.com/imroc/req/v3"
@@ -43,7 +42,7 @@ var (
 func AuthenticateAgent() error {
 	resp, httpRes, err := apiClient.ClientAPI.Authenticate(Context).Execute()
 	if err != nil {
-		Logger.Error("Error connecting to the CipherSwarm API", err)
+		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return err
 	}
 
@@ -52,15 +51,15 @@ func AuthenticateAgent() error {
 		shared.SharedState.AgentID = agentID
 
 		if !resp.GetAuthenticated() {
-			Logger.Error("Error authenticating with the CipherSwarm API", "response", httpRes.Status)
+			shared.Logger.Error("Error authenticating with the CipherSwarm API", "response", httpRes.Status)
 			return errors.New("failed to authenticate with the CipherSwarm API")
 		}
-		Logger.Info("Agent authenticated with the CipherSwarm API", "agent_id", agentID)
+		shared.Logger.Info("Agent authenticated with the CipherSwarm API", "agent_id", agentID)
 		return nil
 
 	}
 
-	Logger.Error("bad response: %v", resp)
+	shared.Logger.Error("bad response: %v", resp)
 	return errors.New("bad response: " + httpRes.Status)
 }
 
@@ -70,7 +69,7 @@ func GetAgentConfiguration() (AgentConfiguration, error) {
 	agentConfig := AgentConfiguration{}
 	result, httpRes, err := apiClient.ClientAPI.Configuration(Context).Execute()
 	if err != nil {
-		Logger.Error("Error connecting to the CipherSwarm API", err)
+		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return agentConfig, err
 	}
 
@@ -83,21 +82,21 @@ func GetAgentConfiguration() (AgentConfiguration, error) {
 		agentConfig.Config.BackendDevices = advancedConfig.GetBackendDevice()
 
 		if agentConfig.Config.UseNativeHashcat {
-			Logger.Debug("Using native Hashcat")
+			shared.Logger.Debug("Using native Hashcat")
 			// Find the Hashcat binary path
 			binPath, err := exec.LookPath("hashcat")
 			if err != nil {
-				Logger.Error("Error finding hashcat binary: ", err)
+				shared.Logger.Error("Error finding hashcat binary: ", err)
 			}
 			viper.Set("hashcat_path", binPath)
 			_ = viper.WriteConfig()
 		} else {
-			Logger.Debug("Using server-provided Hashcat binary")
+			shared.Logger.Debug("Using server-provided Hashcat binary")
 		}
 		return agentConfig, nil
 	}
 
-	Logger.Error("bad response: %v", result)
+	shared.Logger.Error("bad response: %v", result)
 	return agentConfig, errors.New("bad response: " + httpRes.Status)
 }
 
@@ -108,10 +107,10 @@ func GetAgentConfiguration() (AgentConfiguration, error) {
 // object with the agent ID, hostname, client signature, operating system, and devices.
 // Finally, it sends the agent update request to the CipherSwarm API and handles the response.
 func UpdateAgentMetadata() {
-	Logger.Info("Updating agent metadata with the CipherSwarm API")
+	shared.Logger.Info("Updating agent metadata with the CipherSwarm API")
 	info, err := host.Info()
 	if err != nil {
-		Logger.Error("Error getting info info: ", err)
+		shared.Logger.Error("Error getting info info: ", err)
 	}
 
 	// client_signature represents the signature of the client, which includes the CipherSwarm Agent version, operating system,
@@ -120,7 +119,7 @@ func UpdateAgentMetadata() {
 
 	devices, err := arch.GetDevices()
 	if err != nil {
-		Logger.Error("Error getting devices: ", err)
+		shared.Logger.Error("Error getting devices: ", err)
 	}
 
 	agentPlatform = info.OS
@@ -128,13 +127,13 @@ func UpdateAgentMetadata() {
 
 	result, httpRes, err := apiClient.AgentsAPI.UpdateAgent(Context, shared.SharedState.AgentID).AgentUpdate(agentUpdate).Execute()
 	if err != nil {
-		Logger.Error("Error updating agent metadata", "error", err)
+		shared.Logger.Error("Error updating agent metadata", "error", err)
 	}
 
 	if httpRes.StatusCode == http.StatusOK {
 		DisplayAgentMetadataUpdated(result)
 	} else {
-		Logger.Error("bad response: %v", result)
+		shared.Logger.Error("bad response: %v", result)
 	}
 }
 
@@ -142,21 +141,21 @@ func UpdateAgentMetadata() {
 // It retrieves the current version of the cracker, checks for updates from the CipherSwarm API,
 // downloads and extracts the updated cracker, and updates the configuration file.
 func UpdateCracker() {
-	Logger.Info("Checking for updated cracker")
+	shared.Logger.Info("Checking for updated cracker")
 	currentVersion, err := GetCurrentHashcatVersion()
 	if err != nil {
-		Logger.Error("Error getting current hashcat version", "error", err)
+		shared.Logger.Error("Error getting current hashcat version", "error", err)
 	}
 
 	result, httpRes, err := apiClient.CrackersAPI.CheckForCrackerUpdate(Context).
 		OperatingSystem(agentPlatform).Version(currentVersion).Execute()
 	if err != nil {
-		Logger.Error("Error connecting to the CipherSwarm API", err)
+		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return
 	}
 
 	if httpRes.StatusCode == http.StatusNoContent {
-		Logger.Debug("No new cracker available")
+		shared.Logger.Debug("No new cracker available")
 		return
 	}
 
@@ -168,12 +167,12 @@ func UpdateCracker() {
 			// This is to prevent the file from being corrupted if the download is interrupted
 			tempDir, err := os.MkdirTemp("", "cipherswarm-*")
 			if err != nil {
-				Logger.Error("Error creating temporary directory: ", "error", err)
+				shared.Logger.Error("Error creating temporary directory: ", "error", err)
 			}
 			defer func(path string) {
 				err := os.RemoveAll(path)
 				if err != nil {
-					Logger.Error("Error removing temporary directory: ", "error", err)
+					shared.Logger.Error("Error removing temporary directory: ", "error", err)
 				}
 			}(tempDir)
 
@@ -181,12 +180,12 @@ func UpdateCracker() {
 
 			err = downloadFile(result.GetDownloadUrl(), tempArchivePath, "")
 			if err != nil {
-				Logger.Error("Error downloading cracker: ", "error", err)
+				shared.Logger.Error("Error downloading cracker: ", "error", err)
 			}
 			// Move the file to the correct location in the crackers directory
 			newArchivePath, err := moveArchiveFile(tempArchivePath)
 			if err != nil {
-				Logger.Error("Error moving file: ", "error", err)
+				shared.Logger.Error("Error moving file: ", "error", err)
 				return // Don't continue if we can't move the file
 			}
 
@@ -195,28 +194,28 @@ func UpdateCracker() {
 			// We should also implement 7z extraction in Go, for now we'll use the 7z command
 			hashcatDirectory, err := extractHashcatArchive(newArchivePath)
 			if err != nil {
-				Logger.Error("Error extracting file: ", err)
+				shared.Logger.Error("Error extracting file: ", err)
 				return // Don't continue if we can't extract the file
 			}
 
 			// Check if the new hashcat directory exists
-			hashcatExists, _ := afero.Exists(AppFs, hashcatDirectory)
+			hashcatExists := fileutil.IsDir(hashcatDirectory)
 			if !hashcatExists {
-				Logger.Error("New hashcat directory does not exist", "path", hashcatDirectory)
+				shared.Logger.Error("New hashcat directory does not exist", "path", hashcatDirectory)
 				return
 			}
 
 			// Check to make sure there's a hashcat binary in the new directory
 			hashcatBinaryPath := path.Join(hashcatDirectory, result.GetExecName())
-			hashcatBinaryExists, _ := afero.Exists(AppFs, hashcatBinaryPath)
+			hashcatBinaryExists := fileutil.IsExist(hashcatBinaryPath)
 			if !hashcatBinaryExists {
-				Logger.Error("New hashcat binary does not exist", "path", hashcatBinaryPath)
+				shared.Logger.Error("New hashcat binary does not exist", "path", hashcatBinaryPath)
 				return
 			}
 
 			err = os.Remove(newArchivePath)
 			if err != nil {
-				Logger.Error("Error removing 7z file", "error", err)
+				shared.Logger.Error("Error removing 7z file", "error", err)
 			}
 
 			// Update the config file with the new hashcat path
@@ -226,10 +225,10 @@ func UpdateCracker() {
 			)
 			_ = viper.WriteConfig()
 		} else {
-			Logger.Debug("No new cracker available", "latest_version", result.GetLatestVersion())
+			shared.Logger.Debug("No new cracker available", "latest_version", result.GetLatestVersion())
 		}
 	} else {
-		Logger.Error("Error checking for updated cracker", "CrackerUpdate", result)
+		shared.Logger.Error("Error checking for updated cracker", "CrackerUpdate", result)
 	}
 }
 
@@ -257,7 +256,7 @@ func GetNewTask() (*cipherswarm.Task, error) {
 func GetAttackParameters(attackID int64) (*cipherswarm.Attack, error) {
 	result, httpRes, err := apiClient.AttacksAPI.ShowAttack(Context, attackID).Execute()
 	if err != nil {
-		Logger.Error("Error connecting to the CipherSwarm API", err)
+		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return nil, err
 	}
 
@@ -315,7 +314,7 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 func GetLastBenchmarkDate() (time.Time, error) {
 	result, httpRes, err := apiClient.AgentsAPI.LastBenchmarkAgent(Context, shared.SharedState.AgentID).Execute()
 	if err != nil {
-		Logger.Error("Error connecting to the CipherSwarm API", err)
+		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return time.Time{}, err
 	}
 
@@ -335,7 +334,7 @@ func UpdateBenchmarks() {
 
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
 	if err != nil {
-		Logger.Error("Failed to create benchmark session", "error", err)
+		shared.Logger.Error("Failed to create benchmark session", "error", err)
 		return
 	}
 
@@ -347,7 +346,7 @@ func UpdateBenchmarks() {
 	DisplayBenchmarksComplete(benchmarkResult)
 	err = SendBenchmarkResults(benchmarkResult)
 	if err != nil {
-		Logger.Error("Failed to send benchmark results", "error", err)
+		shared.Logger.Error("Failed to send benchmark results", "error", err)
 		return
 	}
 }
@@ -360,32 +359,32 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 	DisplayDownloadFileStart(attack)
 
 	// Download the hashlist
-	hashlistPath := path.Join(viper.GetString("hashlist_path"), strconv.FormatInt(attack.GetHashListId(), 10)+".txt")
-	Logger.Debug("Downloading hashlist", "url", attack.GetHashListUrl(), "path", hashlistPath)
+	hashlistPath := path.Join(shared.SharedState.HashlistPath, strconv.FormatInt(attack.GetHashListId(), 10)+".txt")
+	shared.Logger.Debug("Downloading hashlist", "url", attack.GetHashListUrl(), "path", hashlistPath)
 	err := downloadFile(attack.GetHashListUrl(), hashlistPath, attack.GetHashListChecksum())
 	if err != nil {
-		Logger.Error("Error downloading hashlist", "error", err)
+		shared.Logger.Error("Error downloading hashlist", "error", err)
 		return err
 	}
 
 	// Download the wordlists
 	for _, wordlist := range attack.WordLists {
-		wordlistPath := path.Join(viper.GetString("file_path"), wordlist.FileName)
-		Logger.Debug("Downloading wordlist", "url", wordlist.GetDownloadUrl(), "path", wordlistPath)
+		wordlistPath := path.Join(shared.SharedState.FilePath, wordlist.FileName)
+		shared.Logger.Debug("Downloading wordlist", "url", wordlist.GetDownloadUrl(), "path", wordlistPath)
 		err := downloadFile(wordlist.GetDownloadUrl(), wordlistPath, wordlist.GetChecksum())
 		if err != nil {
-			Logger.Error("Error downloading wordlist", "error", err)
+			shared.Logger.Error("Error downloading wordlist", "error", err)
 			return err
 		}
 	}
 
 	// Download the rulelists
 	for _, rulelist := range attack.RuleLists {
-		rulelistPath := path.Join(viper.GetString("file_path"), rulelist.FileName)
-		Logger.Debug("Downloading rulelist", "url", rulelist.GetDownloadUrl(), "path", rulelistPath)
+		rulelistPath := path.Join(shared.SharedState.FilePath, rulelist.FileName)
+		shared.Logger.Debug("Downloading rulelist", "url", rulelist.GetDownloadUrl(), "path", rulelistPath)
 		err := downloadFile(rulelist.GetDownloadUrl(), rulelistPath, rulelist.GetChecksum())
 		if err != nil {
-			Logger.Error("Error downloading rulelist", "error", err)
+			shared.Logger.Error("Error downloading rulelist", "error", err)
 			return err
 		}
 	}
@@ -406,35 +405,30 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 // Returns:
 //   - error: An error if any occurred during the download or verification process, or nil if successful.
 func downloadFile(url string, path string, checksum string) error {
-	if _, err := os.Stat(path); err == nil {
+	if fileutil.IsExist(path) {
 		if checksum != "" {
-			// MD5 hash the file and compare it to the checksum
-			// If the checksums match, the file is already downloaded
-			plainTextByte, err := os.ReadFile(path)
+			fileChecksum, err := cryptor.Md5File(path)
 			if err != nil {
 				return err
 			}
-			// Check the checksum
-			md5sum := md5.Sum(plainTextByte) //nolint:gosec
-			// base64 encoded md5 hash
-			fileChecksum := base64.StdEncoding.EncodeToString(md5sum[:])
 			if fileChecksum == checksum {
-				Logger.Debug("Download already exists", "path", path)
+				shared.Logger.Debug("Download already exists", "path", path)
 				return nil
 			}
-			Logger.Debug("Checksums do not match", "path", path)
+			shared.Logger.Debug("Checksums do not match", "path", path)
 			err = os.Remove(path)
 			if err != nil {
 				return err
 			}
 			return nil
 		}
-		Logger.Debug("Download already exists", "path", path)
+		shared.Logger.Debug("Download already exists", "path", path)
 		return nil
 	}
 	DisplayDownloadFile(url, path)
 	_, err := req.SetTimeout(5*time.Second).
 		SetCommonHeader("Accept", "application/json").
+		SetCommonBearerAuthToken(shared.SharedState.APIToken).
 		R().
 		SetOutputFile(path).
 		SetDownloadCallbackWithInterval(func(info req.DownloadInfo) {
@@ -460,21 +454,21 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	// Get rid of the old hashcat backup directory
 	err := os.RemoveAll(hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
-		Logger.Error("Error removing old hashcat directory: ", "error", err)
+		shared.Logger.Error("Error removing old hashcat directory: ", "error", err)
 		return "", err // Don't continue if we can't remove the old directory
 	}
 
 	// Move the old hashcat directory to a backup location
 	err = os.Rename(hashcatDirectory, hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
-		Logger.Error("Error moving old hashcat directory: ", "error", err)
+		shared.Logger.Error("Error moving old hashcat directory: ", "error", err)
 		return "", err // Don't continue if we can't move the old directory
 	}
 
 	// Extract the new hashcat directory using the 7z command
 	err = arch.Extract7z(newArchivePath, shared.SharedState.CrackersPath)
 	if err != nil {
-		Logger.Error("Error extracting file: ", "error", err)
+		shared.Logger.Error("Error extracting file: ", "error", err)
 		return "", err // Don't continue if we can't extract the file
 	}
 	return hashcatDirectory, err
@@ -488,10 +482,10 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 	newArchivePath := path.Join(shared.SharedState.CrackersPath, "hashcat.7z")
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
-		Logger.Error("Error moving file: ", err)
+		shared.Logger.Error("Error moving file: ", err)
 		return "", err
 	}
-	Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
+	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
 	return newArchivePath, err
 }
 
@@ -501,14 +495,14 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 func SendHeartBeat() {
 	httpRes, err := apiClient.AgentsAPI.HeartbeatAgent(Context, shared.SharedState.AgentID).Execute()
 	if err != nil {
-		Logger.Error("Error sending heartbeat", "error", err)
+		shared.Logger.Error("Error sending heartbeat", "error", err)
 		return
 	}
 
 	if httpRes.StatusCode == http.StatusNoContent {
-		Logger.Debug("Heartbeat sent")
+		shared.Logger.Debug("Heartbeat sent")
 	} else {
-		Logger.Error("Error sending heartbeat", "response", httpRes)
+		shared.Logger.Error("Error sending heartbeat", "response", httpRes)
 	}
 }
 
@@ -524,8 +518,8 @@ func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
 	// TODO: Need to unify the AttackParameters and HashcatParams structs
 	jobParams := hashcat.Params{
 		AttackMode:         GetAttackMode(attack),
-		HashType:           uint(attack.HashMode),
-		HashFile:           path.Join(viper.GetString("hashlist_path"), strconv.Itoa(int(attack.GetHashListId()))+".txt"),
+		HashType:           attack.HashMode,
+		HashFile:           path.Join(shared.SharedState.HashlistPath, strconv.Itoa(int(attack.GetHashListId()))+".txt"),
 		Mask:               attack.GetMask(),
 		MaskIncrement:      attack.GetIncrementMode(),
 		MaskIncrementMin:   uint(attack.GetIncrementMinimum()),
@@ -543,14 +537,14 @@ func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
 
 	sess, err := hashcat.NewHashcatSession("attack", jobParams)
 	if err != nil {
-		Logger.Error("Failed to create attack session", "error", err)
+		shared.Logger.Error("Failed to create attack session", "error", err)
 		return
 	}
 
 	if AcceptTask(task) {
 		DisplayRunTaskAccepted(task)
 	} else {
-		Logger.Error("Failed to accept task", "task_id", task.GetId())
+		shared.Logger.Error("Failed to accept task", "task_id", task.GetId())
 		return
 	}
 	RunAttackTask(sess, task)
@@ -576,7 +570,7 @@ func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
 		update.Time = time.Now()
 	}
 
-	Logger.Debug("Sending status update", "status", update)
+	shared.Logger.Debug("Sending status update", "status", update)
 
 	var deviceStatuses []cipherswarm.DeviceStatus
 	for _, device := range update.Devices {
@@ -592,12 +586,12 @@ func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
 
 	guess := *cipherswarm.NewHashcatGuess(
 		update.Guess.GuessBase,
-		int64(update.Guess.GuessBaseCount),
-		int64(update.Guess.GuessBaseOffset),
+		update.Guess.GuessBaseCount,
+		update.Guess.GuessBaseOffset,
 		update.Guess.GuessModPercent,
 		update.Guess.GuessMod,
-		int64(update.Guess.GuessModCount),
-		int64(update.Guess.GuessModOffset),
+		update.Guess.GuessModCount,
+		update.Guess.GuessModOffset,
 		update.Guess.GuessModPercent,
 		update.Guess.GuessMode)
 
@@ -619,14 +613,14 @@ func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
 
 	httpRes, err := apiClient.TasksAPI.SubmitStatus(Context, task.GetId()).TaskStatus(taskStatus).Execute()
 	if err != nil {
-		Logger.Error("Error sending status update", "error", err)
+		shared.Logger.Error("Error sending status update", "error", err)
 		return
 	}
 	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
 	if httpRes.StatusCode == http.StatusNoContent {
-		Logger.Debug("Status update sent successfully")
+		shared.Logger.Debug("Status update sent successfully")
 	} else {
-		Logger.Error("Error sending status update", "response", httpRes)
+		shared.Logger.Error("Error sending status update", "response", httpRes)
 	}
 }
 
@@ -635,19 +629,19 @@ func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
 func AcceptTask(task *cipherswarm.Task) bool {
 	httpRes, err := apiClient.TasksAPI.AcceptTask(Context, task.GetId()).Execute()
 	if err != nil {
-		Logger.Error("Error accepting task", "error", err)
+		shared.Logger.Error("Error accepting task", "error", err)
 		return false
 	}
 
 	if httpRes.StatusCode == http.StatusNoContent {
-		Logger.Debug("Task accepted")
+		shared.Logger.Debug("Task accepted")
 		return true
 	} else {
 		if httpRes.StatusCode == http.StatusUnprocessableEntity {
-			Logger.Error("Task already completed", "task_id", task.GetId(), "status", httpRes)
+			shared.Logger.Error("Task already completed", "task_id", task.GetId(), "status", httpRes)
 			return false
 		}
-		Logger.Error("Error accepting task", "response", httpRes)
+		shared.Logger.Error("Error accepting task", "response", httpRes)
 		return false
 	}
 }
@@ -658,7 +652,7 @@ func AcceptTask(task *cipherswarm.Task) bool {
 func MarkTaskExhausted(task *cipherswarm.Task) {
 	_, err := apiClient.TasksAPI.ExhaustedTask(Context, task.GetId()).Execute()
 	if err != nil {
-		Logger.Error("Error notifying server", "error", err)
+		shared.Logger.Error("Error notifying server", "error", err)
 	}
 }
 
@@ -673,16 +667,16 @@ func SendCrackedHash(hash hashcat.Result, task *cipherswarm.Task) {
 	httpRes, err := apiClient.TasksAPI.SubmitCrack(Context, task.GetId()).
 		HashcatResult(result).Execute()
 	if err != nil {
-		Logger.Error("Error sending cracked hash", "error", err)
+		shared.Logger.Error("Error sending cracked hash", "error", err)
 		return
 	}
 
 	if httpRes.StatusCode == http.StatusOK || httpRes.StatusCode == http.StatusNoContent {
-		Logger.Debug("Cracked hash sent")
+		shared.Logger.Debug("Cracked hash sent")
 		if httpRes.StatusCode == http.StatusNoContent {
-			Logger.Info("Hashlist completed", "hash", hash.Hash)
+			shared.Logger.Info("Hashlist completed", "hash", hash.Hash)
 		}
 	} else {
-		Logger.Error("Error sending cracked hash", "response", httpRes)
+		shared.Logger.Error("Error sending cracked hash", "response", httpRes)
 	}
 }
