@@ -63,21 +63,21 @@ func init() {
 
 func setupSharedState() {
 	// Set the API URL and token
-	shared.SharedState.APIURL = viper.GetString("api_url")
-	shared.SharedState.APIToken = viper.GetString("api_token")
+	shared.State.URL = viper.GetString("api_url")
+	shared.State.APIToken = viper.GetString("api_token")
 
-	dataRoot := viper.GetString("data_path")                                    // Get the data path from the configuration
-	shared.SharedState.DataPath = dataRoot                                      // Set the data path in the shared state
-	shared.SharedState.PidFile = path.Join(dataRoot, "lock.pid")                // Set the default PID file path
-	shared.SharedState.HashcatPidFile = path.Join(dataRoot, "hashcat.pid")      // Set the default hashcat PID file path
-	shared.SharedState.CrackersPath = path.Join(dataRoot, "crackers")           // Set the crackers path in the shared state
-	shared.SharedState.FilePath = path.Join(dataRoot, "files")                  // Set the file path in the shared state
-	shared.SharedState.HashlistPath = path.Join(dataRoot, "hashlists")          // Set the hashlist path in the shared state
-	shared.SharedState.ZapsPath = path.Join(dataRoot, "zaps")                   // Set the zaps path in the shared state
-	shared.SharedState.PreprocessorsPath = path.Join(dataRoot, "preprocessors") // Set the preprocessors path in the shared state
-	shared.SharedState.ToolsPath = path.Join(dataRoot, "tools")                 // Set the tools path in the shared state
-	shared.SharedState.OutPath = path.Join(dataRoot, "output")                  // Set the output path in the shared state
-	shared.SharedState.Debug = enableDebug                                      // Set the debug flag in the shared state
+	dataRoot := viper.GetString("data_path")                              // Get the data path from the configuration
+	shared.State.DataPath = dataRoot                                      // Set the data path in the shared state
+	shared.State.PidFile = path.Join(dataRoot, "lock.pid")                // Set the default PID file path
+	shared.State.HashcatPidFile = path.Join(dataRoot, "hashcat.pid")      // Set the default hashcat PID file path
+	shared.State.CrackersPath = path.Join(dataRoot, "crackers")           // Set the crackers path in the shared state
+	shared.State.FilePath = path.Join(dataRoot, "files")                  // Set the file path in the shared state
+	shared.State.HashlistPath = path.Join(dataRoot, "hashlists")          // Set the hashlist path in the shared state
+	shared.State.ZapsPath = path.Join(dataRoot, "zaps")                   // Set the zaps path in the shared state
+	shared.State.PreprocessorsPath = path.Join(dataRoot, "preprocessors") // Set the preprocessors path in the shared state
+	shared.State.ToolsPath = path.Join(dataRoot, "tools")                 // Set the tools path in the shared state
+	shared.State.OutPath = path.Join(dataRoot, "output")                  // Set the output path in the shared state
+	shared.State.Debug = enableDebug                                      // Set the debug flag in the shared state
 }
 
 // initConfig initializes the configuration for the CipherSwarmAgent.
@@ -139,7 +139,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	// This will allow us to clean up the PID file when the agent is stopped
 	// We'll also use this to clean up any dangling hashcat processes
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
-	if shared.SharedState.Debug {
+	if shared.State.Debug {
 		shared.Logger.SetLevel(log.DebugLevel)
 	} else {
 		shared.Logger.SetLevel(log.InfoLevel)
@@ -149,9 +149,9 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 	lib.DisplayStartup()
 
-	lockFound := lib.CheckForExistingClient(shared.SharedState.PidFile)
+	lockFound := lib.CheckForExistingClient(shared.State.PidFile)
 	if lockFound {
-		shared.Logger.Fatal("Aborting agent start, lock file found", "path", shared.SharedState.PidFile)
+		shared.Logger.Fatal("Aborting agent start, lock file found", "path", shared.State.PidFile)
 	}
 
 	err := lib.CreateDataDirs() // Create the data directories
@@ -172,7 +172,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 		if err != nil {
 			shared.Logger.Fatal("Failed to remove PID file", "error", err)
 		}
-	}(shared.SharedState.PidFile)
+	}(shared.State.PidFile)
 
 	// Connect to the CipherSwarm API URL and authenticate
 	// Right now, we're just logging the result of the authentication.
@@ -199,7 +199,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	shared.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
-	processFound := lib.CheckForExistingClient(shared.SharedState.HashcatPidFile)
+	processFound := lib.CheckForExistingClient(shared.State.HashcatPidFile)
 	if err != nil {
 		shared.Logger.Fatal("Error checking for dangling hashcat processes", "error", err)
 	}
@@ -284,7 +284,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 }
 
 func initLogger() {
-	if shared.SharedState.Debug {
+	if shared.State.Debug {
 		shared.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug
 		shared.Logger.SetReportCaller(true)    // Report the caller for debugging
 	} else {
@@ -314,12 +314,12 @@ func benchmarkUpdateCheck() {
 
 // setupAPI initializes the API configuration and context for the CipherSwarm Agent.
 func setupAPI() {
-	lib.APIConfiguration.Debug = shared.SharedState.Debug
+	lib.APIConfiguration.Debug = shared.State.Debug
 	lib.APIConfiguration.UserAgent = "CipherSwarm Agent/" + lib.AgentVersion
 	lib.APIConfiguration.Servers = cipherswarm.ServerConfigurations{
 		{
-			URL: shared.SharedState.APIURL,
+			URL: shared.State.URL,
 		},
 	}
-	lib.Context = context.WithValue(context.Background(), cipherswarm.ContextAccessToken, shared.SharedState.APIToken)
+	lib.Context = context.WithValue(context.Background(), cipherswarm.ContextAccessToken, shared.State.APIToken)
 }

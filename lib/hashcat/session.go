@@ -169,18 +169,27 @@ func (sess *Session) Kill() error {
 //goland:noinspection GoUnhandledErrorResult
 func (sess *Session) Cleanup() {
 	if sess.outFile != nil {
-		fileutil.RemoveFile(sess.outFile.Name())
+		err := fileutil.RemoveFile(sess.outFile.Name())
+		if err != nil {
+			shared.Logger.Error("couldn't remove outfile", "file", sess.outFile.Name(), "error", err)
+		}
 		sess.outFile = nil
 	}
 
 	for _, f := range sess.charsetFiles {
 		if f != nil {
-			fileutil.RemoveFile(f.Name())
+			err := fileutil.RemoveFile(f.Name())
+			if err != nil {
+				shared.Logger.Error("couldn't remove charset file", "file", f.Name(), "error", err)
+			}
 		}
 	}
 
 	if sess.shardedCharsetFile != nil {
-		fileutil.RemoveFile(sess.shardedCharsetFile.Name())
+		err := fileutil.RemoveFile(sess.shardedCharsetFile.Name())
+		if err != nil {
+			shared.Logger.Error("couldn't remove sharded charset file", "file", sess.shardedCharsetFile.Name(), "error", err)
+		}
 	}
 }
 

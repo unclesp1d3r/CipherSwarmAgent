@@ -36,9 +36,9 @@ func GetAttackMode(a *cipherswarm.Attack) uint8 {
 
 // GetWordlistFilenames returns a slice of filenames extracted from the given Attack's WordLists.
 func GetWordlistFilenames(a *cipherswarm.Attack) []string {
-	var filenames []string
-	for _, wordlist := range a.WordLists {
-		filenames = append(filenames, wordlist.GetFileName())
+	filenames := make([]string, len(a.WordLists))
+	for i, wordlist := range a.WordLists {
+		filenames[i] = wordlist.GetFileName()
 	}
 	return filenames
 }
@@ -46,9 +46,9 @@ func GetWordlistFilenames(a *cipherswarm.Attack) []string {
 // GetRulelistFilenames returns a slice of filenames extracted from the RuleLists
 // of the given Attack object.
 func GetRulelistFilenames(a *cipherswarm.Attack) []string {
-	var filenames []string
-	for _, rulelist := range a.RuleLists {
-		filenames = append(filenames, rulelist.GetFileName())
+	filenames := make([]string, len(a.RuleLists))
+	for i, ruleList := range a.RuleLists {
+		filenames[i] = ruleList.GetFileName()
 	}
 	return filenames
 }

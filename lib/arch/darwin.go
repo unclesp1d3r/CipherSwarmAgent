@@ -45,10 +45,6 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 	return strutil.Trim(strutil.BytesToString(out)), nil
 }
 
-func GetPlatform() string {
-	return "darwin"
-}
-
 // Extract7z extracts the contents of a 7z archive file to the specified destination directory.
 // It uses the "7z" command-line tool to perform the extraction.
 // srcFile is the path to the 7z archive file.

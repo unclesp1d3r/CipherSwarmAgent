@@ -78,9 +78,9 @@ func DisplayJobStatus(update hashcat.Status) {
 	shared.Logger.Debug("Job status update", "status", update)
 }
 
-// DisplayJobResult displays the results of a job session
+// DisplayAgentMetadataUpdated displays the results of a job session
 func DisplayAgentMetadataUpdated(result *cipherswarm.Agent) {
-	shared.Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", shared.SharedState.AgentID)
+	shared.Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", shared.State.AgentID)
 	shared.Logger.Debug("Agent metadata", "metadata", result)
 }
 

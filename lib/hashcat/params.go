@@ -16,8 +16,8 @@ type Params struct {
 
 	Mask               string   `json:"mask"`                 // Mask to use for mask attack
 	MaskIncrement      bool     `json:"mask_increment"`       // Whether to use mask increment
-	MaskIncrementMin   uint     `json:"mask_increment_min"`   // Min mask length for increment
-	MaskIncrementMax   uint     `json:"mask_increment_max"`   // Max mask length for increment
+	MaskIncrementMin   int32    `json:"mask_increment_min"`   // Min mask length for increment
+	MaskIncrementMax   int32    `json:"mask_increment_max"`   // Max mask length for increment
 	MaskShardedCharset string   `json:"mask_sharded_charset"` // Internal use: for sharding charsets
 	MaskCustomCharsets []string `json:"mask_custom_charsets"` // Custom charsets for mask attack
 
@@ -158,7 +158,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 
 	wordlists := make([]string, len(params.WordlistFilenames))
 	for i, list := range params.WordlistFilenames {
-		wordlists[i] = filepath.Join(shared.SharedState.FilePath, filepath.Clean(list))
+		wordlists[i] = filepath.Join(shared.State.FilePath, filepath.Clean(list))
 		if !fileutil.IsExist(wordlists[i]) {
 			err = fmt.Errorf("provided wordlist %q couldn't be opened on filesystem", wordlists[i])
 			return
@@ -167,7 +167,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 
 	rules := make([]string, len(params.RulesFilenames))
 	for i, rule := range params.RulesFilenames {
-		rules[i] = filepath.Join(shared.SharedState.FilePath, filepath.Clean(rule))
+		rules[i] = filepath.Join(shared.State.FilePath, filepath.Clean(rule))
 		if !fileutil.IsExist(rules[i]) {
 			err = fmt.Errorf("provided rules file %q couldn't be opened on filesystem", wordlists[i])
 			return

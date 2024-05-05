@@ -25,7 +25,7 @@ func GetCurrentHashcatVersion() (string, error) {
 
 		// Check if the hashcat binary exists in the crackers directory
 		fallbackPath := path.Join(
-			shared.SharedState.CrackersPath,
+			shared.State.CrackersPath,
 			"hashcat",
 			arch.GetDefaultHashcatBinaryName(),
 		)
@@ -51,9 +51,6 @@ func GetCurrentHashcatVersion() (string, error) {
 }
 
 // GetPlatform returns the platform of the current system.
-func GetPlatform() string {
-	return arch.GetPlatform()
-}
 
 // CheckForExistingClient checks if the specified PID file exists.
 // It returns true if the file exists, and false otherwise.
@@ -65,7 +62,7 @@ func CheckForExistingClient(pidFilePath string) bool {
 // CreateLockFile creates a lock file at the specified path using the configured PID file path.
 // It returns the created file and any error encountered during the process.
 func CreateLockFile() error {
-	lockFilePath := shared.SharedState.PidFile
+	lockFilePath := shared.State.PidFile
 
 	isCreated := fileutil.CreateFile(lockFilePath)
 	if !isCreated {
@@ -79,13 +76,13 @@ func CreateLockFile() error {
 // Returns an error if there was a problem creating the directories.
 func CreateDataDirs() error {
 	dataDirs := []string{
-		shared.SharedState.FilePath,
-		shared.SharedState.CrackersPath,
-		shared.SharedState.HashlistPath,
-		shared.SharedState.ZapsPath,
-		shared.SharedState.PreprocessorsPath,
-		shared.SharedState.ToolsPath,
-		shared.SharedState.OutPath,
+		shared.State.FilePath,
+		shared.State.CrackersPath,
+		shared.State.HashlistPath,
+		shared.State.ZapsPath,
+		shared.State.PreprocessorsPath,
+		shared.State.ToolsPath,
+		shared.State.OutPath,
 	}
 	for _, dir := range dataDirs {
 		if dir == "" {

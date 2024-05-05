@@ -1,25 +1,39 @@
 package hashcat
 
-// Borrowed from PhatCrack, a password cracking tool
+/*
+MIT License
+
+# Copyright (c) 2022-2023 Lachlan Davidson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 import (
 	"fmt"
+	"github.com/duke-git/lancet/fileutil"
+	"github.com/spf13/viper"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"os/exec"
-	"strconv"
-
-	"github.com/duke-git/lancet/fileutil"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
-
-	"github.com/spf13/viper"
 )
 
-type uintIf interface {
-	uint | uint8 | uint16 | uint32 | uint64
-}
-
-func fmtUint[T uintIf](x T) string {
-	return strconv.FormatUint(uint64(x), 10)
-}
+// Borrowed from PhatCrack project (github.com/lachlan2k/phatcrack) and modified
 
 func NewHashcatSession(id string, params Params) (*Session, error) {
 	var err error
@@ -31,12 +45,15 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 
 	defer func() {
 		if outFile != nil {
-			fileutil.RemoveFile(outFile.Name())
+			err := fileutil.RemoveFile(outFile.Name())
+			if err != nil {
+				return
+			}
 		}
 	}()
 
 	binaryPath := viper.GetString("hashcat_path")
-	outFile, err = os.CreateTemp(shared.SharedState.OutPath, id)
+	outFile, err = os.CreateTemp(shared.State.OutPath, id)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't make a temp file to store output: %w", err)
 	}
@@ -47,7 +64,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 
 	charsetFiles = []*os.File{}
 	for i, charset := range params.MaskCustomCharsets {
-		charsetFile, err := os.CreateTemp(shared.SharedState.OutPath, "charset*")
+		charsetFile, err := os.CreateTemp(shared.State.OutPath, "charset*")
 		if err != nil {
 			return nil, fmt.Errorf("couldn't make a temp file to store charset")
 		}
@@ -61,7 +78,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}
 
 	if params.MaskShardedCharset != "" {
-		shardedCharsetFile, err = os.CreateTemp(shared.SharedState.OutPath, "charset*")
+		shardedCharsetFile, err = os.CreateTemp(shared.State.OutPath, "charset*")
 		if err != nil {
 			return nil, fmt.Errorf("couldn't make a temp file to store charset")
 		}

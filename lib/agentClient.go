@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/duke-git/lancet/convertor"
 	"net/http"
 	"os"
 	"os/exec"
@@ -48,7 +49,7 @@ func AuthenticateAgent() error {
 
 	if httpRes.StatusCode == http.StatusOK {
 		agentID := resp.GetAgentId()
-		shared.SharedState.AgentID = agentID
+		shared.State.AgentID = agentID
 
 		if !resp.GetAuthenticated() {
 			shared.Logger.Error("Error authenticating with the CipherSwarm API", "response", httpRes.Status)
@@ -123,9 +124,9 @@ func UpdateAgentMetadata() {
 	}
 
 	agentPlatform = info.OS
-	agentUpdate := *cipherswarm.NewAgentUpdate(shared.SharedState.AgentID, info.Hostname, clientSignature, info.OS, devices)
+	agentUpdate := *cipherswarm.NewAgentUpdate(shared.State.AgentID, info.Hostname, clientSignature, info.OS, devices)
 
-	result, httpRes, err := apiClient.AgentsAPI.UpdateAgent(Context, shared.SharedState.AgentID).AgentUpdate(agentUpdate).Execute()
+	result, httpRes, err := apiClient.AgentsAPI.UpdateAgent(Context, shared.State.AgentID).AgentUpdate(agentUpdate).Execute()
 	if err != nil {
 		shared.Logger.Error("Error updating agent metadata", "error", err)
 	}
@@ -221,7 +222,7 @@ func UpdateCracker() {
 			// Update the config file with the new hashcat path
 			viper.Set(
 				"hashcat_path",
-				path.Join(shared.SharedState.CrackersPath, "hashcat", result.GetExecName()),
+				path.Join(shared.State.CrackersPath, "hashcat", result.GetExecName()),
 			)
 			_ = viper.WriteConfig()
 		} else {
@@ -297,7 +298,7 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 		benchmark := cipherswarm.NewHashcatBenchmark(int32(hashType), runtimeMs, float32(speedHs), int32(device))
 		results = append(results, *benchmark)
 	}
-	httpRes, err := apiClient.AgentsAPI.SubmitBenchmarkAgent(Context, shared.SharedState.AgentID).
+	httpRes, err := apiClient.AgentsAPI.SubmitBenchmarkAgent(Context, shared.State.AgentID).
 		HashcatBenchmark(results).Execute()
 	if err != nil {
 		return err
@@ -312,7 +313,7 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 // GetLastBenchmarkDate retrieves the last benchmark date from the CipherSwarm API.
 // It returns the last benchmark date as a time.Time value and an error if any.
 func GetLastBenchmarkDate() (time.Time, error) {
-	result, httpRes, err := apiClient.AgentsAPI.LastBenchmarkAgent(Context, shared.SharedState.AgentID).Execute()
+	result, httpRes, err := apiClient.AgentsAPI.LastBenchmarkAgent(Context, shared.State.AgentID).Execute()
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return time.Time{}, err
@@ -359,7 +360,7 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 	DisplayDownloadFileStart(attack)
 
 	// Download the hashlist
-	hashlistPath := path.Join(shared.SharedState.HashlistPath, strconv.FormatInt(attack.GetHashListId(), 10)+".txt")
+	hashlistPath := path.Join(shared.State.HashlistPath, strconv.FormatInt(attack.GetHashListId(), 10)+".txt")
 	shared.Logger.Debug("Downloading hashlist", "url", attack.GetHashListUrl(), "path", hashlistPath)
 	err := downloadFile(attack.GetHashListUrl(), hashlistPath, attack.GetHashListChecksum())
 	if err != nil {
@@ -369,7 +370,7 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 
 	// Download the wordlists
 	for _, wordlist := range attack.WordLists {
-		wordlistPath := path.Join(shared.SharedState.FilePath, wordlist.FileName)
+		wordlistPath := path.Join(shared.State.FilePath, wordlist.FileName)
 		shared.Logger.Debug("Downloading wordlist", "url", wordlist.GetDownloadUrl(), "path", wordlistPath)
 		err := downloadFile(wordlist.GetDownloadUrl(), wordlistPath, wordlist.GetChecksum())
 		if err != nil {
@@ -380,7 +381,7 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 
 	// Download the rulelists
 	for _, rulelist := range attack.RuleLists {
-		rulelistPath := path.Join(shared.SharedState.FilePath, rulelist.FileName)
+		rulelistPath := path.Join(shared.State.FilePath, rulelist.FileName)
 		shared.Logger.Debug("Downloading rulelist", "url", rulelist.GetDownloadUrl(), "path", rulelistPath)
 		err := downloadFile(rulelist.GetDownloadUrl(), rulelistPath, rulelist.GetChecksum())
 		if err != nil {
@@ -428,7 +429,7 @@ func downloadFile(url string, path string, checksum string) error {
 	DisplayDownloadFile(url, path)
 	_, err := req.SetTimeout(5*time.Second).
 		SetCommonHeader("Accept", "application/json").
-		SetCommonBearerAuthToken(shared.SharedState.APIToken).
+		SetCommonBearerAuthToken(shared.State.APIToken).
 		R().
 		SetOutputFile(path).
 		SetDownloadCallbackWithInterval(func(info req.DownloadInfo) {
@@ -449,7 +450,7 @@ func downloadFile(url string, path string, checksum string) error {
 // and then extracts the new hashcat directory using the 7z command.
 // It returns the path of the extracted hashcat directory and any error encountered during the process.
 func extractHashcatArchive(newArchivePath string) (string, error) {
-	hashcatDirectory := path.Join(shared.SharedState.CrackersPath, "hashcat")
+	hashcatDirectory := path.Join(shared.State.CrackersPath, "hashcat")
 	hashcatBackupDirectory := hashcatDirectory + "_old"
 	// Get rid of the old hashcat backup directory
 	err := os.RemoveAll(hashcatBackupDirectory)
@@ -466,7 +467,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	}
 
 	// Extract the new hashcat directory using the 7z command
-	err = arch.Extract7z(newArchivePath, shared.SharedState.CrackersPath)
+	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
 	if err != nil {
 		shared.Logger.Error("Error extracting file: ", "error", err)
 		return "", err // Don't continue if we can't extract the file
@@ -479,7 +480,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 // The function renames the file using the os.Rename function and logs any errors encountered.
 // It also logs the old and new paths of the file after the move operation.
 func moveArchiveFile(tempArchivePath string) (string, error) {
-	newArchivePath := path.Join(shared.SharedState.CrackersPath, "hashcat.7z")
+	newArchivePath := path.Join(shared.State.CrackersPath, "hashcat.7z")
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
 		shared.Logger.Error("Error moving file: ", err)
@@ -493,7 +494,7 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 // It makes an HTTP request to the agent API's HeartbeatAgent endpoint
 // and logs the result.
 func SendHeartBeat() {
-	httpRes, err := apiClient.AgentsAPI.HeartbeatAgent(Context, shared.SharedState.AgentID).Execute()
+	httpRes, err := apiClient.AgentsAPI.HeartbeatAgent(Context, shared.State.AgentID).Execute()
 	if err != nil {
 		shared.Logger.Error("Error sending heartbeat", "error", err)
 		return
@@ -519,11 +520,11 @@ func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
 	jobParams := hashcat.Params{
 		AttackMode:         GetAttackMode(attack),
 		HashType:           attack.HashMode,
-		HashFile:           path.Join(shared.SharedState.HashlistPath, strconv.Itoa(int(attack.GetHashListId()))+".txt"),
+		HashFile:           path.Join(shared.State.HashlistPath, convertor.ToString(attack.GetHashListId())+".txt"),
 		Mask:               attack.GetMask(),
 		MaskIncrement:      attack.GetIncrementMode(),
-		MaskIncrementMin:   uint(attack.GetIncrementMinimum()),
-		MaskIncrementMax:   uint(attack.GetIncrementMaximum()),
+		MaskIncrementMin:   attack.GetIncrementMinimum(),
+		MaskIncrementMax:   attack.GetIncrementMaximum(),
 		MaskShardedCharset: "",
 		MaskCustomCharsets: nil,
 		WordlistFilenames:  GetWordlistFilenames(attack),
@@ -572,8 +573,8 @@ func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
 
 	shared.Logger.Debug("Sending status update", "status", update)
 
-	var deviceStatuses []cipherswarm.DeviceStatus
-	for _, device := range update.Devices {
+	deviceStatuses := make([]cipherswarm.DeviceStatus, len(update.Devices))
+	for i, device := range update.Devices {
 		deviceStatus := *cipherswarm.NewDeviceStatus(
 			device.DeviceID,
 			device.DeviceName,
@@ -581,7 +582,7 @@ func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
 			device.Speed,
 			device.Util,
 			device.Temp)
-		deviceStatuses = append(deviceStatuses, deviceStatus)
+		deviceStatuses[i] = deviceStatus
 	}
 
 	guess := *cipherswarm.NewHashcatGuess(
