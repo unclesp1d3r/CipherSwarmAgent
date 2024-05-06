@@ -8,7 +8,7 @@ require (
 	github.com/imroc/req/v3 v3.43.3
 	github.com/manifoldco/promptui v0.9.0
 	github.com/muesli/go-app-paths v0.2.2
-	github.com/shirou/gopsutil/v3 v3.24.3
+	github.com/shirou/gopsutil/v3 v3.24.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.11.0
 	github.com/spf13/cobra v1.8.0
