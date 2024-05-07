@@ -14,17 +14,18 @@ cryptographic computations across the CipherSwarm network.
 
 ## Features
 
--   **Command-Line Interface**: Utilizes the Cobra library for easy configuration and operation through command-line
-    commands.
--   **Efficient Task Management**: Streamlines the distribution and execution of hash cracking tasks across distributed
-    systems.
--   **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks with
-    ease.
--   **Secure Communication**: Ensures secure and reliable communication with the CipherSwarm server for task distribution
-    and result submission.
+- **Command-Line Interface**: Utilizes the Cobra library for easy configuration and operation through command-line
+  commands.
+- **Efficient Task Management**: Streamlines the distribution and execution of hash cracking tasks across distributed
+  systems.
+- **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks with
+  ease.
+- **Secure Communication**: Ensures secure and reliable communication with the CipherSwarm server for task distribution
+  and result submission.
 
 > [!CAUTION]
-> This project is currently under active development and is not yet ready for production use. Please use it with caution. Do not trust anything until v1.0.0 is released, since the API may change at any time.
+> This project is currently under active development and is not yet ready for production use. Please use it with
+> caution. Do not trust anything until v1.0.0 is released, since the API may change at any time.
 
 ## Getting Started
 
@@ -32,8 +33,8 @@ Follow these instructions to set up and run the CipherSwarm Agent in your enviro
 
 ### Prerequisites
 
--   Go 1.22 or higher
--   Git (for cloning the repository)
+- Go 1.22 or higher
+- Git (for cloning the repository)
 
 ### Installation
 
@@ -81,5 +82,5 @@ This project is licensed under the Apache License, Version 2.0 - see the [LICENS
 
 ## Acknowledgments
 
--   The CipherSwarm Team and community for their support and inspiration.
--   The creators and maintainers of the Cobra library and GoReleaser for their fantastic tools.
+- The CipherSwarm Team and community for their support and inspiration.
+- The creators and maintainers of the Cobra library and GoReleaser for their fantastic tools.
