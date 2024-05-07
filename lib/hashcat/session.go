@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
 	"github.com/duke-git/lancet/convertor"
 	"github.com/duke-git/lancet/fileutil"
@@ -52,7 +53,7 @@ func (sess *Session) Start() error {
 		return fmt.Errorf("couldn't start hashcat: %w", err)
 	}
 
-	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true})
+	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true, Logger: shared.Logger.StandardLog()})
 	if err != nil {
 		err = sess.Kill()
 		if err != nil {

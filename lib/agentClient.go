@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/duke-git/lancet/convertor"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"time"
+
+	"github.com/duke-git/lancet/convertor"
 
 	"github.com/duke-git/lancet/cryptor"
 	"github.com/duke-git/lancet/fileutil"
@@ -373,10 +374,19 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 		}
 	}
 
-	err := downloadFile(attack.GetHashListUrl(), hashlistPath, attack.GetHashListChecksum())
+	result, httpRes, err := apiClient.AttacksAPI.HashListAttack(Context, attack.GetId()).Execute()
 	if err != nil {
-		shared.Logger.Error("Error downloading hashlist", "error", err)
+		shared.Logger.Error("Error downloading hashlist from the CipherSwarm API", "error", err)
 		return err
+	}
+
+	if httpRes.StatusCode == http.StatusOK {
+		// Move the file to the correct location in the hashlist directory
+		err = os.Rename(result.Name(), hashlistPath)
+		if err != nil {
+			shared.Logger.Error("Error moving file", "error", err)
+			return err
+		}
 	}
 
 	// Download the wordlists
@@ -389,7 +399,6 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 			return err
 		}
 	}
-
 	// Download the rulelists
 	for _, rulelist := range attack.RuleLists {
 		rulelistPath := path.Join(shared.State.FilePath, rulelist.FileName)
@@ -684,7 +693,7 @@ func SendCrackedHash(hash hashcat.Result, task *cipherswarm.Task) {
 	httpRes, err := apiClient.TasksAPI.SubmitCrack(Context, task.GetId()).
 		HashcatResult(result).Execute()
 	if err != nil {
-		shared.Logger.Error("Error sending cracked hash", "error", err)
+		shared.Logger.Error("Error sending cracked hash", "error", err, "hash", hash.Hash)
 		return
 	}
 

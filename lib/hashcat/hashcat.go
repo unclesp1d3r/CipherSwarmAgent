@@ -26,12 +26,13 @@ SOFTWARE.
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+
 	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/strutil"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
-	"os"
-	"os/exec"
 )
 
 // Borrowed from PhatCrack project (github.com/lachlan2k/phatcrack) and modified

@@ -2,9 +2,10 @@ package lib
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/duke-git/lancet/mathutil"
 	"github.com/dustin/go-humanize"
-	"time"
 
 	"github.com/duke-git/lancet/strutil"
 	"github.com/imroc/req/v3"

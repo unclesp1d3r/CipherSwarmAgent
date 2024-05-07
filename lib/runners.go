@@ -2,8 +2,9 @@ package lib
 
 import (
 	"encoding/json"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"strings"
+
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
 	"github.com/duke-git/lancet/validator"
 	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
