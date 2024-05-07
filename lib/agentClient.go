@@ -362,6 +362,17 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 	// Download the hashlist
 	hashlistPath := path.Join(shared.State.HashlistPath, strconv.FormatInt(attack.GetHashListId(), 10)+".txt")
 	shared.Logger.Debug("Downloading hashlist", "url", attack.GetHashListUrl(), "path", hashlistPath)
+
+	// We should always download the hashlist, even if it already exists
+	// This is because the hashlist may have been updated on the server
+	if fileutil.IsExist(hashlistPath) {
+		err := os.Remove(hashlistPath)
+		if err != nil {
+			shared.Logger.Error("Error removing old hashlist", "error", err)
+			return err
+		}
+	}
+
 	err := downloadFile(attack.GetHashListUrl(), hashlistPath, attack.GetHashListChecksum())
 	if err != nil {
 		shared.Logger.Error("Error downloading hashlist", "error", err)
@@ -423,7 +434,7 @@ func downloadFile(url string, path string, checksum string) error {
 			}
 			return nil
 		}
-		shared.Logger.Debug("Download already exists", "path", path)
+		shared.Logger.Info("Download already exists", "path", path)
 		return nil
 	}
 	DisplayDownloadFile(url, path)
@@ -518,22 +529,26 @@ func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
 
 	// TODO: Need to unify the AttackParameters and HashcatParams structs
 	jobParams := hashcat.Params{
-		AttackMode:         GetAttackMode(attack),
-		HashType:           attack.HashMode,
-		HashFile:           path.Join(shared.State.HashlistPath, convertor.ToString(attack.GetHashListId())+".txt"),
-		Mask:               attack.GetMask(),
-		MaskIncrement:      attack.GetIncrementMode(),
-		MaskIncrementMin:   attack.GetIncrementMinimum(),
-		MaskIncrementMax:   attack.GetIncrementMaximum(),
-		MaskShardedCharset: "",
-		MaskCustomCharsets: nil,
-		WordlistFilenames:  GetWordlistFilenames(attack),
-		RulesFilenames:     GetRulelistFilenames(attack),
-		AdditionalArgs:     arch.GetAdditionalHashcatArgs(),
-		OptimizedKernels:   attack.Optimized,
-		SlowCandidates:     attack.SlowCandidateGenerators,
-		Skip:               task.GetSkip(),
-		Limit:              task.GetLimit(),
+		AttackMode:       GetAttackMode(attack),
+		HashType:         attack.HashMode,
+		HashFile:         path.Join(shared.State.HashlistPath, convertor.ToString(attack.GetHashListId())+".txt"),
+		Mask:             attack.GetMask(),
+		MaskIncrement:    attack.GetIncrementMode(),
+		MaskIncrementMin: attack.GetIncrementMinimum(),
+		MaskIncrementMax: attack.GetIncrementMaximum(),
+		MaskCustomCharsets: []string{
+			attack.GetCustomCharset1(),
+			attack.GetCustomCharset2(),
+			attack.GetCustomCharset3(),
+			attack.GetCustomCharset4(),
+		},
+		WordlistFilenames: GetWordlistFilenames(attack),
+		RulesFilenames:    GetRulelistFilenames(attack),
+		AdditionalArgs:    arch.GetAdditionalHashcatArgs(),
+		OptimizedKernels:  attack.Optimized,
+		SlowCandidates:    attack.SlowCandidateGenerators,
+		Skip:              task.GetSkip(),
+		Limit:             task.GetLimit(),
 	}
 
 	sess, err := hashcat.NewHashcatSession("attack", jobParams)
@@ -549,6 +564,7 @@ func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
 		return
 	}
 	RunAttackTask(sess, task)
+	sess.Cleanup()
 
 	DisplayRunTaskCompleted()
 }

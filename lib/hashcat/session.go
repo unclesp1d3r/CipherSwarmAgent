@@ -165,31 +165,36 @@ func (sess *Session) Kill() error {
 
 // Cleanup removes any temporary files associated with the session.
 // It deletes the hash file, output file, charset files, and sharded charset file (if present).
-//
-//goland:noinspection GoUnhandledErrorResult
 func (sess *Session) Cleanup() {
 	if sess.outFile != nil {
-		err := fileutil.RemoveFile(sess.outFile.Name())
-		if err != nil {
-			shared.Logger.Error("couldn't remove outfile", "file", sess.outFile.Name(), "error", err)
+		if fileutil.IsExist(sess.outFile.Name()) {
+			err := fileutil.RemoveFile(sess.outFile.Name())
+			if err != nil {
+				shared.Logger.Error("couldn't remove outfile", "file", sess.outFile.Name(), "error", err)
+			}
 		}
 		sess.outFile = nil
 	}
 
 	for _, f := range sess.charsetFiles {
 		if f != nil {
-			err := fileutil.RemoveFile(f.Name())
-			if err != nil {
-				shared.Logger.Error("couldn't remove charset file", "file", f.Name(), "error", err)
+			if fileutil.IsExist(f.Name()) {
+				err := fileutil.RemoveFile(f.Name())
+				if err != nil {
+					shared.Logger.Error("couldn't remove charset file", "file", f.Name(), "error", err)
+				}
 			}
 		}
 	}
 
-	if sess.shardedCharsetFile != nil {
-		err := fileutil.RemoveFile(sess.shardedCharsetFile.Name())
-		if err != nil {
-			shared.Logger.Error("couldn't remove sharded charset file", "file", sess.shardedCharsetFile.Name(), "error", err)
+	if sess.hashFile != nil {
+		if fileutil.IsExist(sess.hashFile.Name()) {
+			err := fileutil.RemoveFile(sess.hashFile.Name())
+			if err != nil {
+				shared.Logger.Error("couldn't remove hash file", "file", sess.hashFile.Name(), "error", err)
+			}
 		}
+		sess.hashFile = nil
 	}
 }
 

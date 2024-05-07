@@ -18,7 +18,6 @@ type Params struct {
 	MaskIncrement      bool     `json:"mask_increment"`       // Whether to use mask increment
 	MaskIncrementMin   int32    `json:"mask_increment_min"`   // Min mask length for increment
 	MaskIncrementMax   int32    `json:"mask_increment_max"`   // Max mask length for increment
-	MaskShardedCharset string   `json:"mask_sharded_charset"` // Internal use: for sharding charsets
 	MaskCustomCharsets []string `json:"mask_custom_charsets"` // Custom charsets for mask attack
 
 	WordlistFilenames []string `json:"wordlist_filenames"` // Wordlists to use for dictionary and combinator attacks
@@ -73,9 +72,6 @@ func (params Params) Validate() error {
 
 func (params Params) maskArgs() ([]string, error) {
 	maxCharsets := 4
-	if params.MaskShardedCharset != "" {
-		maxCharsets = 3
-	}
 	if len(params.MaskCustomCharsets) > maxCharsets {
 		return nil, fmt.Errorf("too many custom charsets supplied (%d), the max is %d", len(params.MaskCustomCharsets), maxCharsets)
 	}
@@ -85,11 +81,6 @@ func (params Params) maskArgs() ([]string, error) {
 	for i, charset := range params.MaskCustomCharsets {
 		// Hashcat accepts parameters --custom-charset1 to --custom-charset4
 		args = append(args, fmt.Sprintf("--custom-charset%d", i+1), charset)
-	}
-
-	// 4 is the "magic" charset used when sharding attacks
-	if params.MaskShardedCharset != "" {
-		args = append(args, "--custom-charset4", params.MaskShardedCharset)
 	}
 
 	if params.MaskIncrement {

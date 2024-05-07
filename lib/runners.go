@@ -58,7 +58,6 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 		waitChan <- 1
 	}()
 	<-waitChan
-	sess.Cleanup()
 	return benchmarkResult, false
 }
 
@@ -112,6 +111,5 @@ func RunAttackTask(sess *hashcat.Session, task *cipherswarm.Task) {
 		}
 		waitChan <- 1
 	}()
-	sess.Cleanup()
 	<-waitChan
 }

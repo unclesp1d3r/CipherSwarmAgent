@@ -27,6 +27,7 @@ SOFTWARE.
 import (
 	"fmt"
 	"github.com/duke-git/lancet/fileutil"
+	"github.com/duke-git/lancet/strutil"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
@@ -64,35 +65,19 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 
 	charsetFiles = []*os.File{}
 	for i, charset := range params.MaskCustomCharsets {
-		charsetFile, err := os.CreateTemp(shared.State.OutPath, "charset*")
-		if err != nil {
-			return nil, fmt.Errorf("couldn't make a temp file to store charset")
-		}
-		_, err = charsetFile.Write([]byte(charset))
-		if err != nil {
-			return nil, err
-		}
+		if !strutil.IsBlank(charset) {
+			charsetFile, err := os.CreateTemp(shared.State.OutPath, "charset*")
+			if err != nil {
+				return nil, fmt.Errorf("couldn't make a temp file to store charset")
+			}
+			_, err = charsetFile.Write([]byte(charset))
+			if err != nil {
+				return nil, err
+			}
 
-		params.MaskCustomCharsets[i] = charsetFile.Name()
-		charsetFiles = append(charsetFiles, charsetFile)
-	}
-
-	if params.MaskShardedCharset != "" {
-		shardedCharsetFile, err = os.CreateTemp(shared.State.OutPath, "charset*")
-		if err != nil {
-			return nil, fmt.Errorf("couldn't make a temp file to store charset")
+			params.MaskCustomCharsets[i] = charsetFile.Name()
+			charsetFiles = append(charsetFiles, charsetFile)
 		}
-		err = outFile.Chmod(0o600)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = shardedCharsetFile.Write([]byte(params.MaskShardedCharset))
-		if err != nil {
-			return nil, err
-		}
-
-		params.MaskShardedCharset = shardedCharsetFile.Name()
 	}
 
 	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())

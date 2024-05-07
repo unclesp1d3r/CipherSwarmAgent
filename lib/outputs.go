@@ -1,6 +1,9 @@
 package lib
 
 import (
+	"fmt"
+	"github.com/duke-git/lancet/mathutil"
+	"github.com/dustin/go-humanize"
 	"time"
 
 	"github.com/duke-git/lancet/strutil"
@@ -24,12 +27,14 @@ func DisplayAuthenticated() {
 
 // DisplayNewTask displays a message when a new task is available
 func DisplayNewTask(task *cipherswarm.Task) {
-	shared.Logger.Info("New task available", "task", task)
+	shared.Logger.Debug("New task available", "task", task)
+	shared.Logger.Info("New task available", "task_id", task.GetId())
 }
 
 // DisplayNewAttack displays a message when a new attack is started
 func DisplayNewAttack(attack *cipherswarm.Attack) {
-	shared.Logger.Info("Attack parameters", "attack", attack)
+	shared.Logger.Debug("Attack parameters", "attack", attack)
+	shared.Logger.Info("New attack started", "attack_id", attack.GetId(), "attack_type", attack.GetAttackMode())
 }
 
 // DisplayInactive displays a message when the agent is inactive and sleeping
@@ -76,6 +81,18 @@ func DisplayJobError(stdErrLine string) {
 // DisplayJobStatus displays a status update from a job session
 func DisplayJobStatus(update hashcat.Status) {
 	shared.Logger.Debug("Job status update", "status", update)
+	relativeProgress := mathutil.Percent(float64(update.Progress[0]), float64(update.Progress[1]), 2)
+
+	var speedSum int64
+	for _, device := range update.Devices {
+		speedSum += device.Speed
+	}
+
+	progressText := fmt.Sprintf("%.2f%%", relativeProgress)
+	speedText := humanize.SI(float64(speedSum), "H/s")
+	hashesText := fmt.Sprintf("%v", len(update.RecoveredHashes))
+
+	shared.Logger.Info("Progress update", "progress", progressText, "speed", speedText, "cracked_hashes", hashesText)
 }
 
 // DisplayAgentMetadataUpdated displays the results of a job session
