@@ -1,8 +1,9 @@
 package shared
 
 import (
-	"github.com/charmbracelet/log"
 	"os"
+
+	"github.com/charmbracelet/log"
 )
 
 var State = agentState{}
