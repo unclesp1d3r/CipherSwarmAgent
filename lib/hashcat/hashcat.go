@@ -1,24 +1,42 @@
 package hashcat
 
-// Borrowed from PhatCrack, a password cracking tool
+/*
+MIT License
+
+# Copyright (c) 2022-2023 Lachlan Davidson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 import (
 	"fmt"
+	"github.com/duke-git/lancet/fileutil"
+	"github.com/duke-git/lancet/strutil"
+	"github.com/spf13/viper"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"os"
 	"os/exec"
-	"strconv"
-
-	"github.com/spf13/viper"
 )
 
-type uintIf interface {
-	uint | uint8 | uint16 | uint32 | uint64
-}
+// Borrowed from PhatCrack project (github.com/lachlan2k/phatcrack) and modified
 
-func fmtUint[T uintIf](x T) string {
-	return strconv.FormatUint(uint64(x), 10)
-}
-
-func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error) {
+func NewHashcatSession(id string, params Params) (*Session, error) {
 	var err error
 
 	var hashFile *os.File
@@ -27,83 +45,54 @@ func NewHashcatSession(id string, params HashcatParams) (*HashcatSession, error)
 	var charsetFiles []*os.File
 
 	defer func() {
-		if err == nil {
-			return
-		}
-		// We returned because of an error, clean up temp files
-		if hashFile != nil {
-			os.Remove(hashFile.Name())
-		}
 		if outFile != nil {
-			os.Remove(outFile.Name())
-		}
-		if shardedCharsetFile != nil {
-			os.Remove(shardedCharsetFile.Name())
-		}
-		for _, f := range charsetFiles {
-			if f != nil {
-				os.Remove(f.Name())
+			err := fileutil.RemoveFile(outFile.Name())
+			if err != nil {
+				return
 			}
 		}
 	}()
 
 	binaryPath := viper.GetString("hashcat_path")
-	outPath := viper.GetString("out_path")
-	outFile, err = os.CreateTemp(outPath, id)
+	outFile, err = os.CreateTemp(shared.State.OutPath, id)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't make a temp file to store output: %v", err)
+		return nil, fmt.Errorf("couldn't make a temp file to store output: %w", err)
 	}
-	err = outFile.Chmod(0600)
+	err = outFile.Chmod(0o600)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't set permissions on output file: %v", err)
+		return nil, fmt.Errorf("couldn't set permissions on output file: %w", err)
 	}
 
 	charsetFiles = []*os.File{}
 	for i, charset := range params.MaskCustomCharsets {
-		charsetFile, err := os.CreateTemp(outPath, "charset*")
-		if err != nil {
-			return nil, fmt.Errorf("couldn't make a temp file to store charset")
-		}
-		_, err = charsetFile.Write([]byte(charset))
-		if err != nil {
-			return nil, err
-		}
+		if !strutil.IsBlank(charset) {
+			charsetFile, err := os.CreateTemp(shared.State.OutPath, "charset*")
+			if err != nil {
+				return nil, fmt.Errorf("couldn't make a temp file to store charset")
+			}
+			_, err = charsetFile.Write([]byte(charset))
+			if err != nil {
+				return nil, err
+			}
 
-		params.MaskCustomCharsets[i] = charsetFile.Name()
-		charsetFiles = append(charsetFiles, charsetFile)
+			params.MaskCustomCharsets[i] = charsetFile.Name()
+			charsetFiles = append(charsetFiles, charsetFile)
+		}
 	}
 
-	if params.MaskShardedCharset != "" {
-		shardedCharsetFile, err = os.CreateTemp(outPath, "charset*")
-		if err != nil {
-			return nil, fmt.Errorf("couldn't make a temp file to store charset")
-		}
-		err = outFile.Chmod(0600)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = shardedCharsetFile.Write([]byte(params.MaskShardedCharset))
-		if err != nil {
-			return nil, err
-		}
-
-		params.MaskShardedCharset = shardedCharsetFile.Name()
-	}
-
-	args, err := params.ToCmdArgs(id, params.HashFile, outFile.Name())
+	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	return &HashcatSession{
+	return &Session{
 		proc:               exec.Command(binaryPath, args...),
 		hashFile:           hashFile,
 		outFile:            outFile,
 		charsetFiles:       charsetFiles,
 		shardedCharsetFile: shardedCharsetFile,
-		CrackedHashes:      make(chan HashcatResult, 5),
-		StatusUpdates:      make(chan HashcatStatus, 5),
+		CrackedHashes:      make(chan Result, 5),
+		StatusUpdates:      make(chan Status, 5),
 		StderrMessages:     make(chan string, 5),
 		StdoutLines:        make(chan string, 5),
 		DoneChan:           make(chan error),

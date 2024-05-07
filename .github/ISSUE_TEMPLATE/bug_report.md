@@ -25,8 +25,8 @@ If applicable, add screenshots to help explain your problem.
 
 **System (please complete the following information):**
 
--   OS: [e.g. Linux, macOS]
--   Hashcat version: [e.g. 6.1.1]
+- OS: [e.g. Linux, macOS]
+- Hashcat version: [e.g. 6.1.1]
 
 **Additional context**
 Add any other context about the problem here.
