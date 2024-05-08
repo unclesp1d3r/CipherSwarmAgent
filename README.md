@@ -1,10 +1,10 @@
 ![GitHub](https://img.shields.io/github/license/unclesp1d3r/CipherSwarmAgent)
 ![GitHub issues](https://img.shields.io/github/issues/unclesp1d3r/CipherSwarmAgent)
-![GitHub Repo stars](https://img.shields.io/github/stars/unclesp1d3r/CipherSwarmAgent?style=social)
 ![GitHub last commit](https://img.shields.io/github/last-commit/unclesp1d3r/CipherSwarmAgent)
 ![Maintenance](https://img.shields.io/maintenance/yes/2024)
-[![LoC](https://tokei.rs/b1/github/unclesp1d3r/CipherSwarmAgent?category=code)](https://github.com/unclesp1d3r/CipherSwarmAgent)
+[![Maintainability](https://api.codeclimate.com/v1/badges/9c76ebe483ef3b1eff8d/maintainability)](https://codeclimate.com/github/unclesp1d3r/CipherSwarmAgent/maintainability)
 [![wakatime](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent.svg)](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent)
+[![Go Report Card](https://goreportcard.com/badge/github.com/unclesp1d3r/cipherswarmagent)](https://goreportcard.com/report/github.com/unclesp1d3r/cipherswarmagent)
 
 # CipherSwarm Agent
 
@@ -14,14 +14,14 @@ cryptographic computations across the CipherSwarm network.
 
 ## Features
 
-- **Command-Line Interface**: Utilizes the Cobra library for easy configuration and operation through command-line
-  commands.
-- **Efficient Task Management**: Streamlines the distribution and execution of hash cracking tasks across distributed
-  systems.
-- **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks with
-  ease.
-- **Secure Communication**: Ensures secure and reliable communication with the CipherSwarm server for task distribution
-  and result submission.
+-   **Command-Line Interface**: Utilizes the Cobra library for easy configuration and operation through command-line
+    commands.
+-   **Efficient Task Management**: Streamlines the distribution and execution of hash cracking tasks across distributed
+    systems.
+-   **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks with
+    ease.
+-   **Secure Communication**: Ensures secure and reliable communication with the CipherSwarm server for task distribution
+    and result submission.
 
 > [!CAUTION]
 > This project is currently under active development and is not yet ready for production use. Please use it with
@@ -33,8 +33,10 @@ Follow these instructions to set up and run the CipherSwarm Agent in your enviro
 
 ### Prerequisites
 
-- Go 1.22 or higher
-- Git (for cloning the repository)
+-   Go 1.22 or higher
+-   Git (for cloning the repository)
+-   Docker (optional, for running the agent in a container)
+-   A [CipherSwarm](https://github.com/unclesp1d3r/CipherSwarm) server to connect to (e.g., a local or remote instance)
 
 ### Installation
 
@@ -53,13 +55,12 @@ go build -o cipherswarm-agent
 
 ### Configuration
 
-Use the `init` command to set up the agent's configuration:
+The easiest way to configure the agent is by passing the required parameters as environment variables. The following are the available configuration options:
 
-```bash
-./cipherswarm-agent init
-```
+-   API_TOKEN: The API token for the CipherSwarm server. This token is provided when the agent is added in the CipherSwarm server.
+-   API_URL: The URL of the CipherSwarm server. This is the URL where the CipherSwarm server is running, e.g., <https://cipherswarm.example.com:3000>.
 
-Follow the prompts to configure the agent, including setting up the server URL and agent credentials or settings.
+The agent will automatically create a configuration file in the same directory as the agent (`cipherswarmagent.yaml`) with the provided configuration options, along with default options that can be modified as needed.
 
 ### Running the Agent
 
@@ -70,6 +71,18 @@ To start the agent, simply run:
 ```
 
 This will activate the agent, connecting it to the CipherSwarm network to begin receiving and processing tasks.
+
+### Docker
+
+The easiest way to run the CipherSwarm Agent is by using Docker. To build the Docker image, run:
+
+```bash
+docker pull ghcr.io/unclesp1d3r/cipherswarmagent:latest
+
+docker run -d -e API_TOKEN=your_api_token -e API_URL=https://cipherswarm.example.com:3000 unclesp1d3r/cipherswarm-agent
+```
+
+This will start the agent in a Docker container, connecting it to the CipherSwarm network, with hashcat and other dependencies pre-installed.
 
 ## Contributing
 
@@ -82,5 +95,6 @@ This project is licensed under the Apache License, Version 2.0 - see the [LICENS
 
 ## Acknowledgments
 
-- The CipherSwarm Team and community for their support and inspiration.
-- The creators and maintainers of the Cobra library and GoReleaser for their fantastic tools.
+-   The CipherSwarm Team and community for their support and inspiration.
+-   The creators and maintainers of the Cobra library and GoReleaser for their fantastic tools.
+-   The developers and contributors to the [PhatCrack](https://github.com/lachlan2k/phatcrack) project, which gave us hints and ideas for this project.
