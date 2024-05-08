@@ -42,17 +42,22 @@ var (
 // If the authentication fails, it returns an error.
 // The function returns an error if there is an error connecting to the API or if the response status is not OK.
 func AuthenticateAgent() error {
-	resp, httpRes, err := apiClient.ClientAPI.Authenticate(Context).Execute()
+	result, httpRes, err := apiClient.ClientAPI.Authenticate(Context).Execute()
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return err
 	}
 
+	if result == nil {
+		shared.Logger.Error("Error authenticating with the CipherSwarm API", "response", httpRes.Status)
+		return errors.New("failed to authenticate with the CipherSwarm API")
+	}
+
 	if httpRes.StatusCode == http.StatusOK {
-		agentID := resp.GetAgentId()
+		agentID := result.GetAgentId()
 		shared.State.AgentID = agentID
 
-		if !resp.GetAuthenticated() {
+		if !result.GetAuthenticated() {
 			shared.Logger.Error("Error authenticating with the CipherSwarm API", "response", httpRes.Status)
 			return errors.New("failed to authenticate with the CipherSwarm API")
 		}
@@ -61,7 +66,7 @@ func AuthenticateAgent() error {
 
 	}
 
-	shared.Logger.Error("bad response: %v", resp)
+	shared.Logger.Error("bad response: %v", result)
 	return errors.New("bad response: " + httpRes.Status)
 }
 
@@ -73,6 +78,11 @@ func GetAgentConfiguration() (AgentConfiguration, error) {
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return agentConfig, err
+	}
+
+	if result == nil {
+		shared.Logger.Error("Error getting agent configuration", "response", httpRes)
+		return agentConfig, errors.New("failed to get agent configuration")
 	}
 
 	if httpRes.StatusCode == http.StatusOK {
@@ -109,10 +119,10 @@ func GetAgentConfiguration() (AgentConfiguration, error) {
 // object with the agent ID, hostname, client signature, operating system, and devices.
 // Finally, it sends the agent update request to the CipherSwarm API and handles the response.
 func UpdateAgentMetadata() {
-	shared.Logger.Info("Updating agent metadata with the CipherSwarm API")
 	info, err := host.Info()
 	if err != nil {
 		shared.Logger.Error("Error getting info info: ", err)
+		return
 	}
 
 	// client_signature represents the signature of the client, which includes the CipherSwarm Agent version, operating system,
@@ -130,6 +140,11 @@ func UpdateAgentMetadata() {
 	result, httpRes, err := apiClient.AgentsAPI.UpdateAgent(Context, shared.State.AgentID).AgentUpdate(agentUpdate).Execute()
 	if err != nil {
 		shared.Logger.Error("Error updating agent metadata", "error", err)
+	}
+
+	if result == nil {
+		shared.Logger.Error("Error updating agent metadata", "response", httpRes)
+		return
 	}
 
 	if httpRes.StatusCode == http.StatusOK {
@@ -153,6 +168,11 @@ func UpdateCracker() {
 		OperatingSystem(agentPlatform).Version(currentVersion).Execute()
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
+		return
+	}
+
+	if result == nil {
+		shared.Logger.Error("Error checking for updated cracker", "response", httpRes)
 		return
 	}
 
@@ -242,10 +262,12 @@ func GetNewTask() (*cipherswarm.Task, error) {
 		return nil, err
 	}
 	if httpRes.StatusCode == http.StatusNoContent {
+		// No new task available
 		return nil, nil
 	}
 
 	if httpRes.StatusCode == http.StatusOK {
+		// New task available
 		return result, nil
 	}
 
@@ -260,6 +282,11 @@ func GetAttackParameters(attackID int64) (*cipherswarm.Attack, error) {
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return nil, err
+	}
+
+	if result == nil {
+		shared.Logger.Error("Error getting attack parameters", "response", httpRes)
+		return nil, errors.New("failed to get attack parameters")
 	}
 
 	if httpRes.StatusCode == http.StatusOK {
@@ -279,19 +306,19 @@ func GetAttackParameters(attackID int64) (*cipherswarm.Attack, error) {
 func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 	var results []cipherswarm.HashcatBenchmark
 	for _, result := range benchmarkResults {
-		hashType, err := strconv.Atoi(result.HashType)
+		hashType, err := convertor.ToInt(result.HashType)
 		if err != nil {
 			continue
 		}
-		runtimeMs, err := strconv.ParseInt(result.RuntimeMs, 10, 64)
+		runtimeMs, err := convertor.ToInt(result.RuntimeMs)
 		if err != nil {
 			continue
 		}
-		speedHs, err := strconv.ParseFloat(result.SpeedHs, 32)
+		speedHs, err := convertor.ToFloat(result.SpeedHs)
 		if err != nil {
 			continue
 		}
-		device, err := strconv.Atoi(result.Device)
+		device, err := convertor.ToInt(result.Device)
 		if err != nil {
 			continue
 		}
@@ -318,6 +345,11 @@ func GetLastBenchmarkDate() (time.Time, error) {
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return time.Time{}, err
+	}
+
+	if result == nil {
+		shared.Logger.Error("Error getting last benchmark date", "response", httpRes)
+		return time.Time{}, errors.New("failed to get last benchmark date")
 	}
 
 	if httpRes.StatusCode == http.StatusOK {
@@ -380,6 +412,11 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 		return err
 	}
 
+	if result == nil {
+		shared.Logger.Error("Error downloading hashlist", "response", httpRes)
+		return errors.New("failed to download hashlist")
+	}
+
 	if httpRes.StatusCode == http.StatusOK {
 		// Move the file to the correct location in the hashlist directory
 		err = os.Rename(result.Name(), hashlistPath)
@@ -411,103 +448,6 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 	}
 
 	return nil
-}
-
-// downloadFile downloads a file from the specified URL and saves it to the given path.
-// If a checksum is provided, it verifies the downloaded file against the checksum.
-// If the file already exists and the checksum matches, it returns without downloading again.
-// If the file already exists but the checksum does not match, it deletes the existing file and downloads a new one.
-// It displays the progress of the download and completion status.
-// Parameters:
-//   - url: The URL of the file to download.
-//   - path: The path where the downloaded file will be saved.
-//   - checksum: The checksum to verify the downloaded file against (optional).
-//
-// Returns:
-//   - error: An error if any occurred during the download or verification process, or nil if successful.
-func downloadFile(url string, path string, checksum string) error {
-	if fileutil.IsExist(path) {
-		if checksum != "" {
-			fileChecksum, err := cryptor.Md5File(path)
-			if err != nil {
-				return err
-			}
-			if fileChecksum == checksum {
-				shared.Logger.Debug("Download already exists", "path", path)
-				return nil
-			}
-			shared.Logger.Debug("Checksums do not match", "path", path)
-			err = os.Remove(path)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-		shared.Logger.Info("Download already exists", "path", path)
-		return nil
-	}
-	DisplayDownloadFile(url, path)
-	_, err := req.SetTimeout(5*time.Second).
-		SetCommonHeader("Accept", "application/json").
-		SetCommonBearerAuthToken(shared.State.APIToken).
-		R().
-		SetOutputFile(path).
-		SetDownloadCallbackWithInterval(func(info req.DownloadInfo) {
-			if info.Response.Response != nil {
-				DisplayDownloadFileStatusUpdate(info)
-			}
-		}, 1*time.Second).
-		Get(url)
-	if err != nil {
-		return err
-	}
-	DisplayDownloadFileComplete(url, path)
-	return nil
-}
-
-// extractHashcatArchive extracts a hashcat archive to the specified location.
-// It removes the old hashcat backup directory, moves the old hashcat directory to a backup location,
-// and then extracts the new hashcat directory using the 7z command.
-// It returns the path of the extracted hashcat directory and any error encountered during the process.
-func extractHashcatArchive(newArchivePath string) (string, error) {
-	hashcatDirectory := path.Join(shared.State.CrackersPath, "hashcat")
-	hashcatBackupDirectory := hashcatDirectory + "_old"
-	// Get rid of the old hashcat backup directory
-	err := os.RemoveAll(hashcatBackupDirectory)
-	if err != nil && !os.IsNotExist(err) {
-		shared.Logger.Error("Error removing old hashcat directory: ", "error", err)
-		return "", err // Don't continue if we can't remove the old directory
-	}
-
-	// Move the old hashcat directory to a backup location
-	err = os.Rename(hashcatDirectory, hashcatBackupDirectory)
-	if err != nil && !os.IsNotExist(err) {
-		shared.Logger.Error("Error moving old hashcat directory: ", "error", err)
-		return "", err // Don't continue if we can't move the old directory
-	}
-
-	// Extract the new hashcat directory using the 7z command
-	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
-	if err != nil {
-		shared.Logger.Error("Error extracting file: ", "error", err)
-		return "", err // Don't continue if we can't extract the file
-	}
-	return hashcatDirectory, err
-}
-
-// moveArchiveFile moves the archive file from the temporary path to a new path.
-// It takes the temporary archive path as input and returns the new archive path and an error (if any).
-// The function renames the file using the os.Rename function and logs any errors encountered.
-// It also logs the old and new paths of the file after the move operation.
-func moveArchiveFile(tempArchivePath string) (string, error) {
-	newArchivePath := path.Join(shared.State.CrackersPath, "hashcat.7z")
-	err := os.Rename(tempArchivePath, newArchivePath)
-	if err != nil {
-		shared.Logger.Error("Error moving file: ", err)
-		return "", err
-	}
-	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
-	return newArchivePath, err
 }
 
 // SendHeartBeat sends a heartbeat to the agent API.
@@ -705,4 +645,102 @@ func SendCrackedHash(hash hashcat.Result, task *cipherswarm.Task) {
 	} else {
 		shared.Logger.Error("Error sending cracked hash", "response", httpRes)
 	}
+
+}
+
+// downloadFile downloads a file from the specified URL and saves it to the given path.
+// If a checksum is provided, it verifies the downloaded file against the checksum.
+// If the file already exists and the checksum matches, it returns without downloading again.
+// If the file already exists but the checksum does not match, it deletes the existing file and downloads a new one.
+// It displays the progress of the download and completion status.
+// Parameters:
+//   - url: The URL of the file to download.
+//   - path: The path where the downloaded file will be saved.
+//   - checksum: The checksum to verify the downloaded file against (optional).
+//
+// Returns:
+//   - error: An error if any occurred during the download or verification process, or nil if successful.
+func downloadFile(url string, path string, checksum string) error {
+	if fileutil.IsExist(path) {
+		if checksum != "" {
+			fileChecksum, err := cryptor.Md5File(path)
+			if err != nil {
+				return err
+			}
+			if fileChecksum == checksum {
+				shared.Logger.Debug("Download already exists", "path", path)
+				return nil
+			}
+			shared.Logger.Debug("Checksums do not match", "path", path)
+			err = os.Remove(path)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+		shared.Logger.Info("Download already exists", "path", path)
+		return nil
+	}
+	DisplayDownloadFile(url, path)
+	_, err := req.SetTimeout(5*time.Second).
+		SetCommonHeader("Accept", "application/json").
+		SetCommonBearerAuthToken(shared.State.APIToken).
+		R().
+		SetOutputFile(path).
+		SetDownloadCallbackWithInterval(func(info req.DownloadInfo) {
+			if info.Response.Response != nil {
+				DisplayDownloadFileStatusUpdate(info)
+			}
+		}, 1*time.Second).
+		Get(url)
+	if err != nil {
+		return err
+	}
+	DisplayDownloadFileComplete(url, path)
+	return nil
+}
+
+// extractHashcatArchive extracts a hashcat archive to the specified location.
+// It removes the old hashcat backup directory, moves the old hashcat directory to a backup location,
+// and then extracts the new hashcat directory using the 7z command.
+// It returns the path of the extracted hashcat directory and any error encountered during the process.
+func extractHashcatArchive(newArchivePath string) (string, error) {
+	hashcatDirectory := path.Join(shared.State.CrackersPath, "hashcat")
+	hashcatBackupDirectory := hashcatDirectory + "_old"
+	// Get rid of the old hashcat backup directory
+	err := os.RemoveAll(hashcatBackupDirectory)
+	if err != nil && !os.IsNotExist(err) {
+		shared.Logger.Error("Error removing old hashcat directory: ", "error", err)
+		return "", err // Don't continue if we can't remove the old directory
+	}
+
+	// Move the old hashcat directory to a backup location
+	err = os.Rename(hashcatDirectory, hashcatBackupDirectory)
+	if err != nil && !os.IsNotExist(err) {
+		shared.Logger.Error("Error moving old hashcat directory: ", "error", err)
+		return "", err // Don't continue if we can't move the old directory
+	}
+
+	// Extract the new hashcat directory using the 7z command
+	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
+	if err != nil {
+		shared.Logger.Error("Error extracting file: ", "error", err)
+		return "", err // Don't continue if we can't extract the file
+	}
+	return hashcatDirectory, err
+}
+
+// moveArchiveFile moves the archive file from the temporary path to a new path.
+// It takes the temporary archive path as input and returns the new archive path and an error (if any).
+// The function renames the file using the os.Rename function and logs any errors encountered.
+// It also logs the old and new paths of the file after the move operation.
+func moveArchiveFile(tempArchivePath string) (string, error) {
+	newArchivePath := path.Join(shared.State.CrackersPath, "hashcat.7z")
+	err := os.Rename(tempArchivePath, newArchivePath)
+	if err != nil {
+		shared.Logger.Error("Error moving file: ", err)
+		return "", err
+	}
+	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
+	return newArchivePath, err
 }

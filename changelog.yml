@@ -1,0 +1,720 @@
+- semver: 0.1.3
+  date: 2024-05-06T21:57:17-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: ed89fbc29b751b28e9b52f9e61c13f0d65bc316a
+      note: Moved to the updated API for hashlist download
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Moved to the updated API for hashlist download
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+- semver: 0.1.2
+  date: 2024-05-07T00:09:06Z
+  packager: unclesp1d3r
+  changes:
+    - commit: cc89a8ec3ecb2c668af8ec248865be368df35548
+      note: |-
+        9 add better status output when job is running (#18)
+
+        * Overdue cleanup and restructuring
+
+        - Switched from using viper for shared state to a proper object.
+        - Extracted all display methods to make it easier to customize them later
+        - Removed the package name from the various hashcat objects
+        - Removed the weird dangling lock file cleanup code.
+
+        * Updated all documentation comments
+
+        * Bug fixes and cleanup
+
+        - Removed excessive afero dependency
+        - Fixed a bug that broke the debug mode
+        - Fixed a bug that made the attack resource files not download
+        - Split out the heartbeat goroutine, so it should always send a heart beat once a minute even when the tasks are long running.
+
+        * Minor cleanup to satisfy golangci-lint
+
+        * Resolved #9
+
+        - Cleaned up the custom charset masks
+        - Ensure hashlist is downloaded each time
+        - Added a meaningful status message with progress
+
+        ---------
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: 9 add better status output when job is running (#18)
+        body: |-
+            * Overdue cleanup and restructuring
+
+            - Switched from using viper for shared state to a proper object.
+            - Extracted all display methods to make it easier to customize them later
+            - Removed the package name from the various hashcat objects
+            - Removed the weird dangling lock file cleanup code.
+
+            * Updated all documentation comments
+
+            * Bug fixes and cleanup
+
+            - Removed excessive afero dependency
+            - Fixed a bug that broke the debug mode
+            - Fixed a bug that made the attack resource files not download
+            - Split out the heartbeat goroutine, so it should always send a heart beat once a minute even when the tasks are long running.
+
+            * Minor cleanup to satisfy golangci-lint
+
+            * Resolved #9
+
+            - Cleaned up the custom charset masks
+            - Ensure hashlist is downloaded each time
+            - Added a meaningful status message with progress
+
+            ---------
+        footer: []
+        major: false
+        minor: false
+        patch: false
+- semver: 0.1.1
+  date: 2024-05-01T21:32:43-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: 6398d52117666c478e0f2967aff0074818ab9c9d
+      note: Updated goreleaser to also automatically release docker
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated goreleaser to also automatically release docker
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 98583ad0d66cd83715be06db5ccbfe65c60a70c8
+      note: Updated goreleaser to also automatically release docker
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated goreleaser to also automatically release docker
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 686a3b66b47263d681d8c425bea18a29583c8481
+      note: Updated goreleaser to also automatically release docker
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated goreleaser to also automatically release docker
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 0653c80d07ba600ed31f77194399b172af08a743
+      note: 'Fixed issue #11'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: 'Fixed issue #11'
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 8f7b438fd6fae7e4cbaaf2475464e5f48b5093ac
+      note: |-
+        Bump golangci/golangci-lint-action from 4 to 5 (#10)
+
+        Bumps [golangci/golangci-lint-action](https://github.com/golangci/golangci-lint-action) from 4 to 5.
+        - [Release notes](https://github.com/golangci/golangci-lint-action/releases)
+        - [Commits](https://github.com/golangci/golangci-lint-action/compare/v4...v5)
+
+        ---
+        updated-dependencies:
+        - dependency-name: golangci/golangci-lint-action
+          dependency-type: direct:production
+          update-type: version-update:semver-major
+        ...
+        Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+        Co-authored-by: UncleSp1d3r <unclespider@protonmail.com>
+      author:
+        name: dependabot[bot]
+        email: 49699333+dependabot[bot]@users.noreply.github.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump golangci/golangci-lint-action from 4 to 5 (#10)
+        body: |-
+            Bumps [golangci/golangci-lint-action](https://github.com/golangci/golangci-lint-action) from 4 to 5.
+            - [Release notes](https://github.com/golangci/golangci-lint-action/releases)
+            - [Commits](https://github.com/golangci/golangci-lint-action/compare/v4...v5)
+
+            ---
+            updated-dependencies:
+            - dependency-name: golangci/golangci-lint-action
+              dependency-type: direct:production
+              update-type: version-update:semver-major
+            ...
+            Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+            Co-authored-by: UncleSp1d3r <unclespider@protonmail.com>
+        footer: []
+        major: false
+        minor: false
+        patch: false
+- semver: 0.1.0
+  date: 2024-04-30T18:49:53-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: 5cdbf29922725611ae08e047806ff029ca3cea0b
+      note: Updated to support API v0.1.11
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated to support API v0.1.11
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 72df76d29e33f79c69e7bbda1c3c5576e5117fd5
+      note: |-
+        Bump actions/checkout from 3 to 4 (#8)
+
+        Bumps [actions/checkout](https://github.com/actions/checkout) from 3 to 4.
+        - [Release notes](https://github.com/actions/checkout/releases)
+        - [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)
+        - [Commits](https://github.com/actions/checkout/compare/v3...v4)
+
+        ---
+        updated-dependencies:
+        - dependency-name: actions/checkout
+          dependency-type: direct:production
+          update-type: version-update:semver-major
+        ...
+        Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+      author:
+        name: dependabot[bot]
+        email: 49699333+dependabot[bot]@users.noreply.github.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump actions/checkout from 3 to 4 (#8)
+        body: |-
+            Bumps [actions/checkout](https://github.com/actions/checkout) from 3 to 4.
+            - [Release notes](https://github.com/actions/checkout/releases)
+            - [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)
+            - [Commits](https://github.com/actions/checkout/compare/v3...v4)
+
+            ---
+            updated-dependencies:
+            - dependency-name: actions/checkout
+              dependency-type: direct:production
+              update-type: version-update:semver-major
+            ...
+            Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 8098036d8a15951180ca5aa149154f28ac69efcd
+      note: |-
+        6 rebuild to use cipherswarm agent go api (#7)
+
+        * Updated to support new official CLI 0.1.10
+
+        * Updated to support new official CLI 0.1.10
+
+        * Updated to support new official CLI 0.1.10
+
+        * Updated codeclimate config
+
+        * Fixed some golangci-lint issues
+
+        * Fixed some golangci-lint issues
+
+        * Fixed some golangci-lint issues
+
+        * Fixed some golangci-lint issues
+
+        * Fixed some golangci-lint issues
+
+        * Fixed some golangci-lint issues
+
+        ---------
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: 6 rebuild to use cipherswarm agent go api (#7)
+        body: |-
+            * Updated to support new official CLI 0.1.10
+
+            * Updated to support new official CLI 0.1.10
+
+            * Updated to support new official CLI 0.1.10
+
+            * Updated codeclimate config
+
+            * Fixed some golangci-lint issues
+
+            * Fixed some golangci-lint issues
+
+            * Fixed some golangci-lint issues
+
+            * Fixed some golangci-lint issues
+
+            * Fixed some golangci-lint issues
+
+            * Fixed some golangci-lint issues
+
+            ---------
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: b09fa257f5baef7188dbf3e4c566d0c37f928d51
+      note: Removed Windows support and created the option to dockerize
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Removed Windows support and created the option to dockerize
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: fed1213971a9bf17356de975a9c64fa6dac1a9ab
+      note: Removed unused gomod
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Removed unused gomod
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 811b9278f62707b2f64c7c3158d2ea921602c88e
+      note: Bump golang.org/x/net from 0.22.0 to 0.23.0 (#5)
+      author:
+        name: UncleSp1d3r
+        email: kmelton@mac.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump golang.org/x/net from 0.22.0 to 0.23.0 (#5)
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 28ef53affa14d191f9fe37977b83940f7df6b148
+      note: |-
+        Bump golang.org/x/net from 0.22.0 to 0.23.0
+
+        Bumps [golang.org/x/net](https://github.com/golang/net) from 0.22.0 to 0.23.0.
+        - [Commits](https://github.com/golang/net/compare/v0.22.0...v0.23.0)
+
+        ---
+        updated-dependencies:
+        - dependency-name: golang.org/x/net
+          dependency-type: indirect
+        ...
+      author:
+        name: dependabot[bot]
+        email: 49699333+dependabot[bot]@users.noreply.github.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump golang.org/x/net from 0.22.0 to 0.23.0
+        body: |-
+            Bumps [golang.org/x/net](https://github.com/golang/net) from 0.22.0 to 0.23.0.
+            - [Commits](https://github.com/golang/net/compare/v0.22.0...v0.23.0)
+
+            ---
+            updated-dependencies:
+            - dependency-name: golang.org/x/net
+              dependency-type: indirect
+            ...
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 2a851988f5b20e3380af28efbda40818dd5b2489
+      note: Removed broken CodeQL
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Removed broken CodeQL
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 77d2001883cee2c22e41a02cdc29d900de013b26
+      note: Fixed bugs preventing Linux from building
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Fixed bugs preventing Linux from building
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 869270281ff25014fd5aa6b0f4c87a46f097eb1a
+      note: Fixed bugs preventing Linux from building
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Fixed bugs preventing Linux from building
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: d82f9885189904f8b87e697f25d74a7bfee2ceb2
+      note: Minor fix to match API change
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Minor fix to match API change
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: b16bab65dd7af6250a77fad874818618eba2ea6c
+      note: Bump github.com/quic-go/quic-go from 0.41.0 to 0.42.0 (#4)
+      author:
+        name: UncleSp1d3r
+        email: kmelton@mac.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump github.com/quic-go/quic-go from 0.41.0 to 0.42.0 (#4)
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 825b3f0963c44601ac855e208a62d02d9a3beffb
+      note: |-
+        Bump github.com/quic-go/quic-go from 0.41.0 to 0.42.0
+
+        Bumps [github.com/quic-go/quic-go](https://github.com/quic-go/quic-go) from 0.41.0 to 0.42.0.
+        - [Release notes](https://github.com/quic-go/quic-go/releases)
+        - [Changelog](https://github.com/quic-go/quic-go/blob/master/Changelog.md)
+        - [Commits](https://github.com/quic-go/quic-go/compare/v0.41.0...v0.42.0)
+
+        ---
+        updated-dependencies:
+        - dependency-name: github.com/quic-go/quic-go
+          dependency-type: indirect
+        ...
+      author:
+        name: dependabot[bot]
+        email: 49699333+dependabot[bot]@users.noreply.github.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump github.com/quic-go/quic-go from 0.41.0 to 0.42.0
+        body: |-
+            Bumps [github.com/quic-go/quic-go](https://github.com/quic-go/quic-go) from 0.41.0 to 0.42.0.
+            - [Release notes](https://github.com/quic-go/quic-go/releases)
+            - [Changelog](https://github.com/quic-go/quic-go/blob/master/Changelog.md)
+            - [Commits](https://github.com/quic-go/quic-go/compare/v0.41.0...v0.42.0)
+
+            ---
+            updated-dependencies:
+            - dependency-name: github.com/quic-go/quic-go
+              dependency-type: indirect
+            ...
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 27a602ae150f0c921b17b4b83e0f18bc34062c9e
+      note: Fixed issue with go.mod go version
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Fixed issue with go.mod go version
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: b8f3a15d2923f6b6f76ae6f144103f80a025b2cb
+      note: Create codeql.yml
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Create codeql.yml
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 10498ee02b523eff8b89d204fa36e1a4ca8a05ab
+      note: Create go.yml
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Create go.yml
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 308a4561722c1b3f43a60e26913a37b9eb898948
+      note: Minor cleanup and bumped go.mod
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Minor cleanup and bumped go.mod
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: c1058dc85c6d3c88c90c46b8418e442f56029608
+      note: Basic attacks work now. Still much to do
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Basic attacks work now. Still much to do
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 25c8a86486738e5efd0fc7bb8947dad68839cbcb
+      note: Added agent update functionality
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Added agent update functionality
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: fc760e2fe1ab90d35caa23921e485734655d648b
+      note: Implemented initial agent setup
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Implemented initial agent setup
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 44adf35fb23d3d7985dd945c54e8abbd5932eab2
+      note: |-
+        Added initial support for detecting devices
+
+        Still need to test and fix on Windows and Linux
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Added initial support for detecting devices
+        body: Still need to test and fix on Windows and Linux
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 766714ae14e232f6bf1cc86c00cbee39c1be80af
+      note: |-
+        Completed agent startup functions
+
+        It doesn’t yet support the agent loop functions, but it is usable for testing the development of the API.
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Completed agent startup functions
+        body: It doesn’t yet support the agent loop functions, but it is usable for testing the development of the API.
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 9d88bc887eeab0cf84915bc3d93de22845c27d2e
+      note: Initial Commit
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Initial Commit
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
