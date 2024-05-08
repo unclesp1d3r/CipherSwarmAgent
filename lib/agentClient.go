@@ -156,6 +156,11 @@ func UpdateCracker() {
 		return
 	}
 
+	if result == nil {
+		shared.Logger.Error("Error checking for updated cracker", "response", httpRes)
+		return
+	}
+
 	if httpRes.StatusCode == http.StatusNoContent {
 		shared.Logger.Debug("No new cracker available")
 		return

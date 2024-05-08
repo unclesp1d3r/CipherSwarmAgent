@@ -35,6 +35,7 @@ archives:
     files:
       - LICENSE
       - README.md
+      - CHANGELOG.md
 
 changelog:
   sort: asc
@@ -43,6 +44,15 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "Bug fixes"
+      regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Others
+      order: 999
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
 release:
@@ -55,6 +65,26 @@ source:
   enabled: true
 universal_binaries:
   - replace: true
+nfpms:
+  - id: cipherswarm-agent
+    package_name: "{{.ProjectName}}"
+    vendor: "unclesp1d3r"
+    homepage: "https://unclesp1d3r.github.io"
+    maintainer: "unclesp1d3r <unclespider@protonmail.com>"
+    license: Apache 2.0
+    formats:
+      - apk
+      - deb
+      - rpm
+      - termux.deb
+      - archlinux
+    dependencies:
+      - 7zip
+    recommends:
+      - hashcat
+    priority: extra
+    changelog: changelog.yml
+
 dockers:
   - image_templates:
       - "ghcr.io/unclesp1d3r/cipherswarmagent:{{ .Tag }}"
@@ -70,6 +100,7 @@ dockers:
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source = 'https://github.com/unclesp1d3r/CipherSwarmAgent'"
       - "--build-arg=branch=latest"
       - "--platform=linux/amd64"
   - image_templates:
@@ -86,6 +117,7 @@ dockers:
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source = 'https://github.com/unclesp1d3r/CipherSwarmAgent'"
       - "--build-arg=branch=pocl"
       - "--platform=linux/amd64"
 milestones:
