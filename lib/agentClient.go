@@ -314,7 +314,7 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 		benchmark := components.HashcatBenchmark{
 			HashType:  hashType,
 			Runtime:   runtimeMs,
-			HashSpeed: float32(speedHs), // This value should be pretty small, so we'll use float32
+			HashSpeed: speedHs,
 			Device:    device,
 		}
 
