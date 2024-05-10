@@ -13,12 +13,11 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
-	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
-
 	"github.com/charmbracelet/log"
 	gap "github.com/muesli/go-app-paths"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
 )
 
 var (
@@ -184,7 +183,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	lib.DisplayAuthenticated()
 
 	// Get the configuration
-	lib.Configuration, err = lib.GetAgentConfiguration()
+	err = lib.GetAgentConfiguration()
 	if err != nil {
 		shared.Logger.Fatal("Failed to get agent configuration from the CipherSwarm API", "error", err)
 	}
@@ -248,7 +247,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 				// Process the task
 				// - Get the attack parameters
-				attack, err := lib.GetAttackParameters(task.GetAttackId())
+				attack, err := lib.GetAttackParameters(task.GetAttackID())
 				if err != nil {
 					shared.Logger.Error("Failed to get attack parameters", "error", err)
 				}
@@ -314,12 +313,6 @@ func benchmarkUpdateCheck() {
 
 // setupAPI initializes the API configuration and context for the CipherSwarm Agent.
 func setupAPI() {
-	lib.APIConfiguration.Debug = shared.State.Debug
-	lib.APIConfiguration.UserAgent = "CipherSwarm Agent/" + lib.AgentVersion
-	lib.APIConfiguration.Servers = cipherswarm.ServerConfigurations{
-		{
-			URL: shared.State.URL,
-		},
-	}
-	lib.Context = context.WithValue(context.Background(), cipherswarm.ContextAccessToken, shared.State.APIToken)
+	lib.SdkClient = sdk.New(sdk.WithServerURL(shared.State.URL), sdk.WithSecurity(shared.State.APIToken))
+	lib.Context = context.Background()
 }

@@ -10,15 +10,15 @@ import (
 )
 
 type Params struct {
-	AttackMode uint8  `json:"attack_mode"` // Attack mode to use
-	HashType   int32  `json:"hash_type"`   // Hash type to crack
+	AttackMode int64  `json:"attack_mode"` // Attack mode to use
+	HashType   int64  `json:"hash_type"`   // Hash type to crack
 	HashFile   string `json:"hash_file"`   // Path to the file containing the hashes to crack
 
-	Mask               string   `json:"mask"`                 // Mask to use for mask attack
-	MaskIncrement      bool     `json:"mask_increment"`       // Whether to use mask increment
-	MaskIncrementMin   int32    `json:"mask_increment_min"`   // Min mask length for increment
-	MaskIncrementMax   int32    `json:"mask_increment_max"`   // Max mask length for increment
-	MaskCustomCharsets []string `json:"mask_custom_charsets"` // Custom charsets for mask attack
+	Mask               string   `json:"mask,omitempty"`           // Mask to use for mask attack
+	MaskIncrement      bool     `json:"mask_increment,omitempty"` // Whether to use mask increment
+	MaskIncrementMin   int64    `json:"mask_increment_min"`       // Min mask length for increment
+	MaskIncrementMax   int64    `json:"mask_increment_max"`       // Max mask length for increment
+	MaskCustomCharsets []string `json:"mask_custom_charsets"`     // Custom charsets for mask attack
 
 	WordlistFilenames []string `json:"wordlist_filenames"` // Wordlists to use for dictionary and combinator attacks
 	RulesFilenames    []string `json:"rules_filenames"`    // Rules to use for dictionary attack
@@ -26,8 +26,8 @@ type Params struct {
 	OptimizedKernels  bool     `json:"optimized_kernels"`  // Whether to use optimized kernels
 	SlowCandidates    bool     `json:"slow_candidates"`    // Whether to use slow candidates
 
-	Skip  int64 `json:"skip"`  // Keyspace offset to start at
-	Limit int64 `json:"limit"` // Maximum keyspace to process
+	Skip  int64 `json:"skip,omitempty"`  // Keyspace offset to start at
+	Limit int64 `json:"limit,omitempty"` // Maximum keyspace to process
 }
 
 // Validate checks if the parameters for the attack mode are valid.

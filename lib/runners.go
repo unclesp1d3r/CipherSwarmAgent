@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
 	"github.com/duke-git/lancet/validator"
-	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
@@ -66,7 +67,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 // It starts the session, monitors the status updates, and sends the updates and results to the appropriate handlers.
 // If an error occurs during the session start, it logs the error and returns.
 // Once the session is done, it cleans up the session resources and waits for the completion of the goroutine.
-func RunAttackTask(sess *hashcat.Session, task *cipherswarm.Task) {
+func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
 		shared.Logger.Error("Failed to start benchmark session", "error", err)

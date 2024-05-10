@@ -56,7 +56,6 @@ func GetCurrentHashcatVersion() (string, error) {
 // It returns true if the file exists, and false otherwise.
 func CheckForExistingClient(pidFilePath string) bool {
 	return fileutil.IsExist(pidFilePath)
-
 }
 
 // CreateLockFile creates a lock file at the specified path using the configured PID file path.
