@@ -25,9 +25,7 @@ type agentState struct {
 	APIToken          string // APIToken is the token used to authenticate with the CipherSwarm API.
 }
 
-var (
-	Logger = log.NewWithOptions(os.Stderr, log.Options{
-		Prefix: "cipherswarm-agent",
-		Level:  log.InfoLevel,
-	})
-)
+var Logger = log.NewWithOptions(os.Stderr, log.Options{
+	Prefix: "cipherswarm-agent",
+	Level:  log.InfoLevel,
+})

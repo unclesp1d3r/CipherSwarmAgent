@@ -114,7 +114,6 @@ func (sess *Session) Start() error {
 				continue
 			}
 			if !sess.SkipStatusUpdates {
-
 				if validator.IsJSON(line) {
 					var status Status
 					err := json.Unmarshal([]byte(line), &status)
