@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+
 	"github.com/duke-git/lancet/mathutil"
 	"github.com/dustin/go-humanize"
 
 	"github.com/duke-git/lancet/strutil"
 	"github.com/imroc/req/v3"
-	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
@@ -27,15 +29,15 @@ func DisplayAuthenticated() {
 }
 
 // DisplayNewTask displays a message when a new task is available
-func DisplayNewTask(task *cipherswarm.Task) {
+func DisplayNewTask(task *components.Task) {
 	shared.Logger.Debug("New task available", "task", task)
-	shared.Logger.Info("New task available", "task_id", task.GetId())
+	shared.Logger.Info("New task available", "task_id", task.GetID())
 }
 
 // DisplayNewAttack displays a message when a new attack is started
-func DisplayNewAttack(attack *cipherswarm.Attack) {
+func DisplayNewAttack(attack *components.Attack) {
 	shared.Logger.Debug("Attack parameters", "attack", attack)
-	shared.Logger.Info("New attack started", "attack_id", attack.GetId(), "attack_type", attack.GetAttackMode())
+	shared.Logger.Info("New attack started", "attack_id", attack.GetID(), "attack_type", attack.GetAttackMode())
 }
 
 // DisplayInactive displays a message when the agent is inactive and sleeping
@@ -97,16 +99,16 @@ func DisplayJobStatus(update hashcat.Status) {
 }
 
 // DisplayAgentMetadataUpdated displays the results of a job session
-func DisplayAgentMetadataUpdated(result *cipherswarm.Agent) {
+func DisplayAgentMetadataUpdated(result *operations.UpdateAgentResponse) {
 	shared.Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", shared.State.AgentID)
 	shared.Logger.Debug("Agent metadata", "metadata", result)
 }
 
 // DisplayNewCrackerAvailable displays information about a new cracker available.
 // It logs the latest version and the download URL of the new cracker.
-func DisplayNewCrackerAvailable(result *cipherswarm.CrackerUpdate) {
+func DisplayNewCrackerAvailable(result *components.CrackerUpdate) {
 	shared.Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
-	shared.Logger.Info("Download URL", "url", result.GetDownloadUrl())
+	shared.Logger.Info("Download URL", "url", result.GetDownloadURL())
 }
 
 // DisplayBenchmarkStarting displays a message indicating that benchmarking is starting.
@@ -121,8 +123,8 @@ func DisplayBenchmarksComplete(benchmarkResult []BenchmarkResult) {
 }
 
 // DisplayDownloadFileStart displays a log message indicating the start of file downloading for an attack.
-func DisplayDownloadFileStart(attack *cipherswarm.Attack) {
-	shared.Logger.Info("Downloading files for attack", "attack_id", attack.GetId())
+func DisplayDownloadFileStart(attack *components.Attack) {
+	shared.Logger.Info("Downloading files for attack", "attack_id", attack.GetID())
 }
 
 // DisplayDownloadFileComplete displays a message indicating that a file has been downloaded.
@@ -148,11 +150,11 @@ func DisplayRunTaskCompleted() {
 }
 
 // DisplayRunTaskAccepted displays a log message indicating that a task has been accepted.
-func DisplayRunTaskAccepted(task *cipherswarm.Task) {
-	shared.Logger.Info("Task accepted", "task_id", task.GetId())
+func DisplayRunTaskAccepted(task *components.Task) {
+	shared.Logger.Info("Task accepted", "task_id", task.GetID())
 }
 
 // DisplayRunTaskStarting displays a log message indicating that a task is starting.
-func DisplayRunTaskStarting(task *cipherswarm.Task) {
-	shared.Logger.Info("Running task", "task_id", task.GetId())
+func DisplayRunTaskStarting(task *components.Task) {
+	shared.Logger.Info("Running task", "task_id", task.GetID())
 }

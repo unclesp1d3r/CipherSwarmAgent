@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,28 +13,26 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/convertor"
-
 	"github.com/duke-git/lancet/cryptor"
 	"github.com/duke-git/lancet/fileutil"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
-
-	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-
+	"github.com/duke-git/lancet/v2/pointer"
 	"github.com/imroc/req/v3"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/spf13/viper"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
-	"github.com/unclesp1d3r/cipherswarm-agent-go-api"
+	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
 )
 
 var (
 	// agentPlatform represents the platform on which the agent is running.
-	agentPlatform    = ""                                          // agentPlatform represents the platform on which the agent is running.
-	Configuration    AgentConfiguration                            // AgentConfiguration represents the configuration of the agent.
-	Context          context.Context                               // Context represents the context of the agent.
-	APIConfiguration cipherswarm.Configuration                     // APIConfiguration represents the configuration of the API.
-	apiClient        = cipherswarm.NewAPIClient(&APIConfiguration) // apiClient represents the API client.
+	agentPlatform = ""               // agentPlatform represents the platform on which the agent is running.
+	Configuration agentConfiguration // agentConfiguration represents the configuration of the agent.
+	Context       context.Context    // Context represents the context of the agent.
+	SdkClient     *sdk.CipherSwarmAgentSDK
 )
 
 // AuthenticateAgent authenticates the agent with the CipherSwarm API.
@@ -42,74 +41,73 @@ var (
 // If the authentication fails, it returns an error.
 // The function returns an error if there is an error connecting to the API or if the response status is not OK.
 func AuthenticateAgent() error {
-	result, httpRes, err := apiClient.ClientAPI.Authenticate(Context).Execute()
+	response, err := SdkClient.Client.Authenticate(Context)
+	// result, httpRes, err := apiClient.ClientAPI.Authenticate(Context).Execute()
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return err
 	}
 
-	if result == nil {
-		shared.Logger.Error("Error authenticating with the CipherSwarm API", "response", httpRes.Status)
+	if response == nil {
+		shared.Logger.Error("Error authenticating with the CipherSwarm API")
+		return errors.New("failed to authenticate with the CipherSwarm API")
+
+	}
+
+	if !response.AuthenticationResult.Authenticated {
+		shared.Logger.Error("Failed to authenticate with the CipherSwarm API")
 		return errors.New("failed to authenticate with the CipherSwarm API")
 	}
 
-	if httpRes.StatusCode == http.StatusOK {
-		agentID := result.GetAgentId()
-		shared.State.AgentID = agentID
-
-		if !result.GetAuthenticated() {
-			shared.Logger.Error("Error authenticating with the CipherSwarm API", "response", httpRes.Status)
-			return errors.New("failed to authenticate with the CipherSwarm API")
-		}
-		shared.Logger.Info("Agent authenticated with the CipherSwarm API", "agent_id", agentID)
-		return nil
-
-	}
-
-	shared.Logger.Error("bad response: %v", result)
-	return errors.New("bad response: " + httpRes.Status)
+	shared.State.AgentID = response.AuthenticationResult.AgentID
+	return nil
 }
 
-// GetAgentConfiguration retrieves the agent configuration from the CipherSwarm API.
-// It returns an AgentConfiguration struct and an error if there was a problem connecting to the API or if the response was not successful.
-func GetAgentConfiguration() (AgentConfiguration, error) {
-	agentConfig := AgentConfiguration{}
-	result, httpRes, err := apiClient.ClientAPI.Configuration(Context).Execute()
+func GetAgentConfiguration() error {
+	agentConfig := agentConfiguration{}
+	response, err := SdkClient.Client.Configuration(Context)
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
-		return agentConfig, err
+		return err
 	}
 
-	if result == nil {
-		shared.Logger.Error("Error getting agent configuration", "response", httpRes)
-		return agentConfig, errors.New("failed to get agent configuration")
+	if response == nil || response.AgentConfiguration == nil {
+		shared.Logger.Error("Error getting agent configuration")
+		return errors.New("failed to get agent configuration")
 	}
 
-	if httpRes.StatusCode == http.StatusOK {
-		agentConfig.APIVersion = result.GetApiVersion()
+	config := response.AgentConfiguration
 
-		advancedConfig := result.GetConfig()
-		agentConfig.Config.UseNativeHashcat = advancedConfig.GetUseNativeHashcat()
-		agentConfig.Config.AgentUpdateInterval = advancedConfig.GetAgentUpdateInterval()
-		agentConfig.Config.BackendDevices = advancedConfig.GetBackendDevice()
+	agentConfig.APIVersion = config.APIVersion
+	if config.Config.UseNativeHashcat != nil {
+		agentConfig.Config.UseNativeHashcat = *config.Config.UseNativeHashcat
+	}
+	if config.Config.AgentUpdateInterval != nil {
+		agentConfig.Config.AgentUpdateInterval = *config.Config.AgentUpdateInterval
+	} else {
+		agentConfig.Config.AgentUpdateInterval = 300
+	}
 
-		if agentConfig.Config.UseNativeHashcat {
-			shared.Logger.Debug("Using native Hashcat")
-			// Find the Hashcat binary path
-			binPath, err := exec.LookPath("hashcat")
-			if err != nil {
-				shared.Logger.Error("Error finding hashcat binary: ", err)
-			}
-			viper.Set("hashcat_path", binPath)
-			_ = viper.WriteConfig()
-		} else {
-			shared.Logger.Debug("Using server-provided Hashcat binary")
+	if config.Config.BackendDevice != nil {
+		agentConfig.Config.BackendDevices = *config.Config.BackendDevice
+	}
+
+	if agentConfig.Config.UseNativeHashcat {
+		shared.Logger.Debug("Using native Hashcat")
+		// Find the Hashcat binary path
+		binPath, err := exec.LookPath("hashcat")
+		if err != nil {
+			shared.Logger.Error("Error finding hashcat binary: ", err)
 		}
-		return agentConfig, nil
+		viper.Set("hashcat_path", binPath)
+		_ = viper.WriteConfig()
+	} else {
+		shared.Logger.Debug("Using server-provided Hashcat binary")
 	}
 
-	shared.Logger.Error("bad response: %v", result)
-	return agentConfig, errors.New("bad response: " + httpRes.Status)
+	Configuration = agentConfig
+
+	return nil
 }
 
 // UpdateAgentMetadata updates the agent metadata with the CipherSwarm API.
@@ -135,22 +133,22 @@ func UpdateAgentMetadata() {
 	}
 
 	agentPlatform = info.OS
-	agentUpdate := *cipherswarm.NewAgentUpdate(shared.State.AgentID, info.Hostname, clientSignature, info.OS, devices)
-
-	result, httpRes, err := apiClient.AgentsAPI.UpdateAgent(Context, shared.State.AgentID).AgentUpdate(agentUpdate).Execute()
+	agentUpdate := &components.AgentUpdate{
+		ID:              shared.State.AgentID,
+		Name:            info.Hostname,
+		ClientSignature: clientSignature,
+		OperatingSystem: info.OS,
+		Devices:         devices,
+	}
+	response, err := SdkClient.Agents.UpdateAgent(Context, shared.State.AgentID, agentUpdate)
 	if err != nil {
 		shared.Logger.Error("Error updating agent metadata", "error", err)
 	}
 
-	if result == nil {
-		shared.Logger.Error("Error updating agent metadata", "response", httpRes)
-		return
-	}
-
-	if httpRes.StatusCode == http.StatusOK {
-		DisplayAgentMetadataUpdated(result)
+	if response.Agent != nil {
+		DisplayAgentMetadataUpdated(response)
 	} else {
-		shared.Logger.Error("bad response: %v", result)
+		shared.Logger.Error("bad response: %v", response.RawResponse.Status)
 	}
 }
 
@@ -164,26 +162,21 @@ func UpdateCracker() {
 		shared.Logger.Error("Error getting current hashcat version", "error", err)
 	}
 
-	result, httpRes, err := apiClient.CrackersAPI.CheckForCrackerUpdate(Context).
-		OperatingSystem(agentPlatform).Version(currentVersion).Execute()
+	response, err := SdkClient.Crackers.CheckForCrackerUpdate(Context, &agentPlatform, &currentVersion)
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return
 	}
 
-	if result == nil {
-		shared.Logger.Error("Error checking for updated cracker", "response", httpRes)
-		return
-	}
-
-	if httpRes.StatusCode == http.StatusNoContent {
+	if response.StatusCode == http.StatusNoContent {
 		shared.Logger.Debug("No new cracker available")
 		return
 	}
 
-	if httpRes.StatusCode == http.StatusOK {
-		if result.GetAvailable() {
-			DisplayNewCrackerAvailable(result)
+	if response.StatusCode == http.StatusOK {
+		update := response.GetCrackerUpdate()
+		if update.GetAvailable() {
+			DisplayNewCrackerAvailable(update)
 
 			// Get the file to a temporary location and then move it to the correct location
 			// This is to prevent the file from being corrupted if the download is interrupted
@@ -200,7 +193,7 @@ func UpdateCracker() {
 
 			tempArchivePath := path.Join(tempDir, "hashcat.7z")
 
-			err = downloadFile(result.GetDownloadUrl(), tempArchivePath, "")
+			err = downloadFile(*update.GetDownloadURL(), tempArchivePath, "")
 			if err != nil {
 				shared.Logger.Error("Error downloading cracker: ", "error", err)
 			}
@@ -228,7 +221,7 @@ func UpdateCracker() {
 			}
 
 			// Check to make sure there's a hashcat binary in the new directory
-			hashcatBinaryPath := path.Join(hashcatDirectory, result.GetExecName())
+			hashcatBinaryPath := path.Join(hashcatDirectory, *update.GetExecName())
 			hashcatBinaryExists := fileutil.IsExist(hashcatBinaryPath)
 			if !hashcatBinaryExists {
 				shared.Logger.Error("New hashcat binary does not exist", "path", hashcatBinaryPath)
@@ -243,56 +236,51 @@ func UpdateCracker() {
 			// Update the config file with the new hashcat path
 			viper.Set(
 				"hashcat_path",
-				path.Join(shared.State.CrackersPath, "hashcat", result.GetExecName()),
+				path.Join(shared.State.CrackersPath, "hashcat", *update.GetExecName()),
 			)
 			_ = viper.WriteConfig()
 		} else {
-			shared.Logger.Debug("No new cracker available", "latest_version", result.GetLatestVersion())
+			shared.Logger.Debug("No new cracker available", "latest_version", update.GetLatestVersion())
 		}
 	} else {
-		shared.Logger.Error("Error checking for updated cracker", "CrackerUpdate", result)
+		shared.Logger.Error("Error checking for updated cracker", "CrackerUpdate", response.RawResponse.Status)
 	}
 }
 
 // GetNewTask retrieves a new task from the API.
 // It returns the new task if successful, or an error if there was a problem.
-func GetNewTask() (*cipherswarm.Task, error) {
-	result, httpRes, err := apiClient.TasksAPI.NewTask(Context).Execute()
+func GetNewTask() (*components.Task, error) {
+	response, err := SdkClient.Tasks.NewTask(Context)
 	if err != nil {
 		return nil, err
 	}
-	if httpRes.StatusCode == http.StatusNoContent {
+	if response.StatusCode == http.StatusNoContent {
 		// No new task available
 		return nil, nil
 	}
 
-	if httpRes.StatusCode == http.StatusOK {
+	if response.StatusCode == http.StatusOK {
 		// New task available
-		return result, nil
+		return response.Task, nil
 	}
 
-	return nil, errors.New("bad response: " + httpRes.Status)
+	return nil, errors.New("bad response: " + response.RawResponse.Status)
 }
 
 // GetAttackParameters retrieves the attack parameters for the specified attack ID.
 // It makes a request to the CipherSwarm API and returns the attack details if the request is successful.
 // If there is an error connecting to the API or if the response is not successful, an error is returned.
-func GetAttackParameters(attackID int64) (*cipherswarm.Attack, error) {
-	result, httpRes, err := apiClient.AttacksAPI.ShowAttack(Context, attackID).Execute()
+func GetAttackParameters(attackID int64) (*components.Attack, error) {
+	response, err := SdkClient.Attacks.ShowAttack(Context, attackID)
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return nil, err
 	}
 
-	if result == nil {
-		shared.Logger.Error("Error getting attack parameters", "response", httpRes)
-		return nil, errors.New("failed to get attack parameters")
+	if response.StatusCode == http.StatusOK {
+		return response.Attack, nil
 	}
-
-	if httpRes.StatusCode == http.StatusOK {
-		return result, nil
-	}
-	return nil, errors.New("bad response: " + httpRes.Status)
+	return nil, errors.New("bad response: " + response.RawResponse.Status)
 }
 
 // SendBenchmarkResults sends benchmark results to the server.
@@ -304,7 +292,7 @@ func GetAttackParameters(attackID int64) (*cipherswarm.Attack, error) {
 // If the request is successful and the server responds with a status code of 204 (No Content),
 // the function returns nil. Otherwise, it returns an error with a descriptive message.
 func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
-	var results []cipherswarm.HashcatBenchmark
+	var results []components.HashcatBenchmark
 	for _, result := range benchmarkResults {
 		hashType, err := convertor.ToInt(result.HashType)
 		if err != nil {
@@ -323,40 +311,39 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 			continue
 		}
 
-		benchmark := cipherswarm.NewHashcatBenchmark(int32(hashType), runtimeMs, float32(speedHs), int32(device))
-		results = append(results, *benchmark)
+		benchmark := components.HashcatBenchmark{
+			HashType:  hashType,
+			Runtime:   runtimeMs,
+			HashSpeed: float32(speedHs), // This value should be pretty small, so we'll use float32
+			Device:    device,
+		}
+
+		results = append(results, benchmark)
 	}
-	httpRes, err := apiClient.AgentsAPI.SubmitBenchmarkAgent(Context, shared.State.AgentID).
-		HashcatBenchmark(results).Execute()
+	res, err := SdkClient.Agents.SubmitBenchmarkAgent(Context, shared.State.AgentID, results)
 	if err != nil {
 		return err
 	}
 
-	if httpRes.StatusCode == http.StatusNoContent {
+	if res.StatusCode == http.StatusNoContent {
 		return nil
 	}
-	return errors.New("bad response: " + httpRes.Status)
+	return errors.New("bad response: " + res.RawResponse.Status)
 }
 
 // GetLastBenchmarkDate retrieves the last benchmark date from the CipherSwarm API.
 // It returns the last benchmark date as a time.Time value and an error if any.
 func GetLastBenchmarkDate() (time.Time, error) {
-	result, httpRes, err := apiClient.AgentsAPI.LastBenchmarkAgent(Context, shared.State.AgentID).Execute()
+	response, err := SdkClient.Agents.LastBenchmarkAgent(Context, shared.State.AgentID)
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return time.Time{}, err
 	}
-
-	if result == nil {
-		shared.Logger.Error("Error getting last benchmark date", "response", httpRes)
-		return time.Time{}, errors.New("failed to get last benchmark date")
+	if response.StatusCode == http.StatusOK {
+		return response.AgentLastBenchmark.LastBenchmarkDate, nil
 	}
 
-	if httpRes.StatusCode == http.StatusOK {
-		return result.GetLastBenchmarkDate(), nil
-	}
-
-	return time.Time{}, errors.New("bad response: " + httpRes.Status)
+	return time.Time{}, errors.New("bad response: " + response.RawResponse.Status)
 }
 
 // UpdateBenchmarks updates the benchmarks for the agent.
@@ -389,12 +376,12 @@ func UpdateBenchmarks() {
 // It downloads the hashlist, wordlists, and rulelists required for the attack.
 // The downloaded files are saved to the specified file paths.
 // If any error occurs during the download process, the function returns the error.
-func DownloadFiles(attack *cipherswarm.Attack) error {
+func DownloadFiles(attack *components.Attack) error {
 	DisplayDownloadFileStart(attack)
 
 	// Download the hashlist
-	hashlistPath := path.Join(shared.State.HashlistPath, strconv.FormatInt(attack.GetHashListId(), 10)+".txt")
-	shared.Logger.Debug("Downloading hashlist", "url", attack.GetHashListUrl(), "path", hashlistPath)
+	hashlistPath := path.Join(shared.State.HashlistPath, strconv.FormatInt(attack.GetHashListID(), 10)+".txt")
+	shared.Logger.Debug("Downloading hashlist", "url", attack.GetHashListURL(), "path", hashlistPath)
 
 	// We should always download the hashlist, even if it already exists
 	// This is because the hashlist may have been updated on the server
@@ -406,31 +393,36 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 		}
 	}
 
-	result, httpRes, err := apiClient.AttacksAPI.HashListAttack(Context, attack.GetId()).Execute()
+	response, err := SdkClient.Attacks.HashListAttack(Context, attack.HashListID)
 	if err != nil {
 		shared.Logger.Error("Error downloading hashlist from the CipherSwarm API", "error", err)
 		return err
 	}
 
-	if result == nil {
-		shared.Logger.Error("Error downloading hashlist", "response", httpRes)
-		return errors.New("failed to download hashlist")
-	}
-
-	if httpRes.StatusCode == http.StatusOK {
-		// Move the file to the correct location in the hashlist directory
-		err = os.Rename(result.Name(), hashlistPath)
-		if err != nil {
-			shared.Logger.Error("Error moving file", "error", err)
-			return err
+	if response.StatusCode == http.StatusOK {
+		if response.Stream != nil {
+			f, err := os.Create(hashlistPath)
+			if err != nil {
+				shared.Logger.Error("Error creating hashlist file", "error", err)
+				return err
+			}
+			defer f.Close()
+			_, err = io.Copy(f, response.Stream)
+			if err != nil {
+				shared.Logger.Error("Error writing hashlist file", "error", err)
+				return err
+			}
 		}
+	} else {
+		shared.Logger.Error("Error downloading hashlist", "response", response.RawResponse.Status)
+		return errors.New("failed to download hashlist")
 	}
 
 	// Download the wordlists
 	for _, wordlist := range attack.WordLists {
 		wordlistPath := path.Join(shared.State.FilePath, wordlist.FileName)
-		shared.Logger.Debug("Downloading wordlist", "url", wordlist.GetDownloadUrl(), "path", wordlistPath)
-		err := downloadFile(wordlist.GetDownloadUrl(), wordlistPath, wordlist.GetChecksum())
+		shared.Logger.Debug("Downloading wordlist", "url", wordlist.GetDownloadURL(), "path", wordlistPath)
+		err := downloadFile(wordlist.GetDownloadURL(), wordlistPath, wordlist.GetChecksum())
 		if err != nil {
 			shared.Logger.Error("Error downloading wordlist", "error", err)
 			return err
@@ -439,8 +431,8 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 	// Download the rulelists
 	for _, rulelist := range attack.RuleLists {
 		rulelistPath := path.Join(shared.State.FilePath, rulelist.FileName)
-		shared.Logger.Debug("Downloading rulelist", "url", rulelist.GetDownloadUrl(), "path", rulelistPath)
-		err := downloadFile(rulelist.GetDownloadUrl(), rulelistPath, rulelist.GetChecksum())
+		shared.Logger.Debug("Downloading rulelist", "url", rulelist.GetDownloadURL(), "path", rulelistPath)
+		err := downloadFile(rulelist.GetDownloadURL(), rulelistPath, rulelist.GetChecksum())
 		if err != nil {
 			shared.Logger.Error("Error downloading rulelist", "error", err)
 			return err
@@ -454,16 +446,10 @@ func DownloadFiles(attack *cipherswarm.Attack) error {
 // It makes an HTTP request to the agent API's HeartbeatAgent endpoint
 // and logs the result.
 func SendHeartBeat() {
-	httpRes, err := apiClient.AgentsAPI.HeartbeatAgent(Context, shared.State.AgentID).Execute()
+	_, err := SdkClient.Agents.HeartbeatAgent(Context, shared.State.AgentID)
 	if err != nil {
 		shared.Logger.Error("Error sending heartbeat", "error", err)
 		return
-	}
-
-	if httpRes.StatusCode == http.StatusNoContent {
-		shared.Logger.Debug("Heartbeat sent")
-	} else {
-		shared.Logger.Error("Error sending heartbeat", "response", httpRes)
 	}
 }
 
@@ -472,32 +458,32 @@ func SendHeartBeat() {
 // If the task is accepted, it displays a message indicating that the task has been accepted.
 // After the attack task is completed, it displays a message indicating that the task has been completed.
 // If any error occurs during the process, it logs the error and returns.
-func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
+func RunTask(task *components.Task, attack *components.Attack) {
 	DisplayRunTaskStarting(task)
 	// Create the hashcat session
 
 	// TODO: Need to unify the AttackParameters and HashcatParams structs
 	jobParams := hashcat.Params{
-		AttackMode:       GetAttackMode(attack),
-		HashType:         attack.HashMode,
-		HashFile:         path.Join(shared.State.HashlistPath, convertor.ToString(attack.GetHashListId())+".txt"),
-		Mask:             attack.GetMask(),
-		MaskIncrement:    attack.GetIncrementMode(),
+		AttackMode:       pointer.Unwrap(attack.AttackModeHashcat),
+		HashType:         pointer.Unwrap(attack.HashMode),
+		HashFile:         path.Join(shared.State.HashlistPath, convertor.ToString(attack.GetHashListID())+".txt"),
+		Mask:             pointer.UnwarpOr(attack.GetMask(), ""),
+		MaskIncrement:    pointer.UnwarpOr(attack.GetIncrementMode(), false),
 		MaskIncrementMin: attack.GetIncrementMinimum(),
 		MaskIncrementMax: attack.GetIncrementMaximum(),
 		MaskCustomCharsets: []string{
-			attack.GetCustomCharset1(),
-			attack.GetCustomCharset2(),
-			attack.GetCustomCharset3(),
-			attack.GetCustomCharset4(),
+			pointer.UnwarpOr(attack.GetCustomCharset1(), ""),
+			pointer.UnwarpOr(attack.GetCustomCharset2(), ""),
+			pointer.UnwarpOr(attack.GetCustomCharset3(), ""),
+			pointer.UnwarpOr(attack.GetCustomCharset4(), ""),
 		},
-		WordlistFilenames: GetWordlistFilenames(attack),
-		RulesFilenames:    GetRulelistFilenames(attack),
+		WordlistFilenames: getWordlistFilenames(attack),
+		RulesFilenames:    getRulelistFilenames(attack),
 		AdditionalArgs:    arch.GetAdditionalHashcatArgs(),
-		OptimizedKernels:  attack.Optimized,
-		SlowCandidates:    attack.SlowCandidateGenerators,
-		Skip:              task.GetSkip(),
-		Limit:             task.GetLimit(),
+		OptimizedKernels:  *attack.Optimized,
+		SlowCandidates:    *attack.SlowCandidateGenerators,
+		Skip:              pointer.UnwarpOr(task.GetSkip(), 0),
+		Limit:             pointer.UnwarpOr(task.GetLimit(), 0),
 	}
 
 	sess, err := hashcat.NewHashcatSession("attack", jobParams)
@@ -509,7 +495,7 @@ func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
 	if AcceptTask(task) {
 		DisplayRunTaskAccepted(task)
 	} else {
-		shared.Logger.Error("Failed to accept task", "task_id", task.GetId())
+		shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
 		return
 	}
 	RunAttackTask(sess, task)
@@ -527,9 +513,11 @@ func RunTask(task *cipherswarm.Task, attack *cipherswarm.Attack) {
 // Finally, it submits the task status to the server using the apiClient.TasksAPI.SubmitStatus method.
 // If there is an error during the submission, an error message is logged and the function returns.
 // If the submission is successful, a debug message is logged.
-func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
+func SendStatusUpdate(update hashcat.Status, task *components.Task) {
 	// TODO: Implement receiving a result code when sending this status update
 	// Depending on the code, we should stop the job or pause it
+
+	// TODO: We should just use the components.TaskStatus struct instead of hashcat.Status
 
 	// Hashcat doesn't seem to update the time consistently, so we'll set it here
 	if update.Time.IsZero() {
@@ -538,85 +526,78 @@ func SendStatusUpdate(update hashcat.Status, task *cipherswarm.Task) {
 
 	shared.Logger.Debug("Sending status update", "status", update)
 
-	deviceStatuses := make([]cipherswarm.DeviceStatus, len(update.Devices))
+	deviceStatuses := make([]components.DeviceStatus, len(update.Devices))
 	for i, device := range update.Devices {
-		deviceStatus := *cipherswarm.NewDeviceStatus(
-			device.DeviceID,
-			device.DeviceName,
-			device.DeviceType,
-			device.Speed,
-			device.Util,
-			device.Temp)
+		deviceStatus := components.DeviceStatus{
+			DeviceID:    device.DeviceID,
+			DeviceName:  device.DeviceName,
+			DeviceType:  parseStringToDeviceType(device.DeviceType),
+			Speed:       device.Speed,
+			Utilization: device.Util,
+			Temperature: device.Temp,
+		}
 		deviceStatuses[i] = deviceStatus
 	}
 
-	guess := *cipherswarm.NewHashcatGuess(
-		update.Guess.GuessBase,
-		update.Guess.GuessBaseCount,
-		update.Guess.GuessBaseOffset,
-		update.Guess.GuessModPercent,
-		update.Guess.GuessMod,
-		update.Guess.GuessModCount,
-		update.Guess.GuessModOffset,
-		update.Guess.GuessModPercent,
-		update.Guess.GuessMode)
+	taskStatus := components.TaskStatus{
+		OriginalLine: update.OriginalLine,
+		Time:         update.Time,
+		Session:      update.Session,
+		HashcatGuess: components.HashcatGuess{
+			GuessBase:           update.Guess.GuessBase,
+			GuessBaseCount:      update.Guess.GuessBaseCount,
+			GuessBaseOffset:     update.Guess.GuessBaseOffset,
+			GuessBasePercentage: update.Guess.GuessModPercent,
+			GuessMod:            update.Guess.GuessMod,
+			GuessModCount:       update.Guess.GuessModCount,
+			GuessModOffset:      update.Guess.GuessModOffset,
+			GuessModPercentage:  update.Guess.GuessModPercent,
+			GuessMode:           update.Guess.GuessMode,
+		},
+		Status:          update.Status,
+		Target:          update.Target,
+		Progress:        update.Progress,
+		RestorePoint:    update.RestorePoint,
+		RecoveredHashes: update.RecoveredHashes,
+		RecoveredSalts:  update.RecoveredSalts,
+		Rejected:        update.Rejected,
+		DeviceStatuses:  deviceStatuses,
+		TimeStart:       time.Unix(update.TimeStart, 0),
+		EstimatedStop:   time.Unix(update.EstimatedStop, 0),
+	}
 
-	taskStatus := *cipherswarm.NewTaskStatus(
-		update.OriginalLine,
-		update.Time,
-		update.Session,
-		guess,
-		update.Status,
-		update.Target,
-		update.Progress,
-		update.RestorePoint,
-		update.RecoveredHashes,
-		update.RecoveredSalts,
-		update.Rejected,
-		deviceStatuses,
-		time.Unix(update.TimeStart, 0),
-		time.Unix(update.EstimatedStop, 0))
-
-	httpRes, err := apiClient.TasksAPI.SubmitStatus(Context, task.GetId()).TaskStatus(taskStatus).Execute()
+	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
+	_, err := SdkClient.Tasks.SubmitStatus(Context, task.GetID(), taskStatus)
 	if err != nil {
 		shared.Logger.Error("Error sending status update", "error", err)
 		return
-	}
-	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
-	if httpRes.StatusCode == http.StatusNoContent {
-		shared.Logger.Debug("Status update sent successfully")
-	} else {
-		shared.Logger.Error("Error sending status update", "response", httpRes)
 	}
 }
 
 // AcceptTask accepts a task and returns a boolean indicating whether the task was accepted successfully.
 // It sends an HTTP request to the API server to accept the task and handles the response accordingly.
-func AcceptTask(task *cipherswarm.Task) bool {
-	httpRes, err := apiClient.TasksAPI.AcceptTask(Context, task.GetId()).Execute()
+func AcceptTask(task *components.Task) bool {
+	response, err := SdkClient.Tasks.AcceptTask(Context, task.GetID())
 	if err != nil {
+		if response.StatusCode == http.StatusUnprocessableEntity {
+			// Not really an error, just means the task is already completed
+			shared.Logger.Error("Task already completed", "task_id", task.GetID(), "status", response.RawResponse.Status)
+			return false
+		}
+
 		shared.Logger.Error("Error accepting task", "error", err)
 		return false
 	}
 
-	if httpRes.StatusCode == http.StatusNoContent {
-		shared.Logger.Debug("Task accepted")
-		return true
-	} else {
-		if httpRes.StatusCode == http.StatusUnprocessableEntity {
-			shared.Logger.Error("Task already completed", "task_id", task.GetId(), "status", httpRes)
-			return false
-		}
-		shared.Logger.Error("Error accepting task", "response", httpRes)
-		return false
-	}
+	shared.Logger.Debug("Task accepted")
+	return true
 }
 
 // MarkTaskExhausted marks a task as exhausted by notifying the server.
 // It takes a pointer to a cipherswarm.Task as input.
 // If an error occurs while notifying the server, it logs the error using the Logger.
-func MarkTaskExhausted(task *cipherswarm.Task) {
-	_, err := apiClient.TasksAPI.ExhaustedTask(Context, task.GetId()).Execute()
+func MarkTaskExhausted(task *components.Task) {
+	_, err := SdkClient.Tasks.ExhaustedTask(Context, task.GetID())
 	if err != nil {
 		shared.Logger.Error("Error notifying server", "error", err)
 	}
@@ -627,25 +608,23 @@ func MarkTaskExhausted(task *cipherswarm.Task) {
 // and a pointer to a `cipherswarm.Task` object.
 // It submits the crack result to the server using the API client,
 // and logs any errors or successful responses.
-func SendCrackedHash(hash hashcat.Result, task *cipherswarm.Task) {
-	result := *cipherswarm.NewHashcatResult(hash.Timestamp, hash.Hash, hash.Plaintext)
+func SendCrackedHash(hash hashcat.Result, task *components.Task) {
+	hashcatResult := &components.HashcatResult{
+		Timestamp: hash.Timestamp,
+		Hash:      hash.Hash,
+		PlainText: hash.Plaintext,
+	}
 
-	httpRes, err := apiClient.TasksAPI.SubmitCrack(Context, task.GetId()).
-		HashcatResult(result).Execute()
+	response, err := SdkClient.Tasks.SubmitCrack(Context, task.GetID(), hashcatResult)
 	if err != nil {
 		shared.Logger.Error("Error sending cracked hash", "error", err, "hash", hash.Hash)
 		return
 	}
 
-	if httpRes.StatusCode == http.StatusOK || httpRes.StatusCode == http.StatusNoContent {
-		shared.Logger.Debug("Cracked hash sent")
-		if httpRes.StatusCode == http.StatusNoContent {
-			shared.Logger.Info("Hashlist completed", "hash", hash.Hash)
-		}
-	} else {
-		shared.Logger.Error("Error sending cracked hash", "response", httpRes)
+	shared.Logger.Debug("Cracked hash sent")
+	if response.StatusCode == http.StatusNoContent {
+		shared.Logger.Info("Hashlist completed", "hash", hash.Hash)
 	}
-
 }
 
 // downloadFile downloads a file from the specified URL and saves it to the given path.
