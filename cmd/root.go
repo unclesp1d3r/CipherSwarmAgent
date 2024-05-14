@@ -54,10 +54,11 @@ func init() {
 	cwd, err := os.Getwd()
 	cobra.CheckErr(err)
 
-	viper.SetDefault("data_path", path.Join(cwd, "data"))         // Set the default data path
-	viper.SetDefault("gpu_temp_threshold", 80)                    // Set the default GPU temperature threshold
-	viper.SetDefault("benchmark_update_frequency", 168*time.Hour) // Set the default benchmark age in hours (7 days)
-	viper.SetDefault("always_use_native_hashcat", false)          // Set the default to not always use native hashcat
+	viper.SetDefault("data_path", path.Join(cwd, "data"))               // Set the default data path
+	viper.SetDefault("gpu_temp_threshold", 80)                          // Set the default GPU temperature threshold
+	viper.SetDefault("benchmark_update_frequency", 168*time.Hour)       // Set the default benchmark age in hours (7 days)
+	viper.SetDefault("always_use_native_hashcat", false)                // Set the default to not always use native hashcat
+	viper.SetDefault("sleep_on_failure", time.Duration(60*time.Second)) // Set the default sleep time on failure
 }
 
 func setupSharedState() {
@@ -241,6 +242,8 @@ func startAgent(cmd *cobra.Command, args []string) {
 			task, err := lib.GetNewTask()
 			if err != nil {
 				shared.Logger.Error("Failed to get new task", "error", err)
+				time.Sleep(viper.GetDuration("sleep_on_failure"))
+				continue
 			}
 			if task != nil {
 				lib.DisplayNewTask(task)
@@ -250,6 +253,8 @@ func startAgent(cmd *cobra.Command, args []string) {
 				attack, err := lib.GetAttackParameters(task.GetAttackID())
 				if err != nil {
 					shared.Logger.Error("Failed to get attack parameters", "error", err)
+					time.Sleep(viper.GetDuration("sleep_on_failure"))
+					continue
 				}
 				lib.DisplayNewAttack(attack)
 
@@ -257,6 +262,8 @@ func startAgent(cmd *cobra.Command, args []string) {
 				err = lib.DownloadFiles(attack)
 				if err != nil {
 					shared.Logger.Error("Failed to download files", "error", err)
+					time.Sleep(viper.GetDuration("sleep_on_failure"))
+					continue
 				}
 
 				// - Run the job
