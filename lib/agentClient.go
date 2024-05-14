@@ -16,6 +16,7 @@ import (
 	"github.com/duke-git/lancet/cryptor"
 	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/v2/pointer"
+	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/imroc/req/v3"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/spf13/viper"
@@ -382,7 +383,6 @@ func DownloadFiles(attack *components.Attack) error {
 	// Download the hashlist
 	hashlistPath := path.Join(shared.State.HashlistPath, strconv.FormatInt(attack.GetHashListID(), 10)+".txt")
 	shared.Logger.Debug("Downloading hashlist", "url", attack.GetHashListURL(), "path", hashlistPath)
-
 	// We should always download the hashlist, even if it already exists
 	// This is because the hashlist may have been updated on the server
 	if fileutil.IsExist(hashlistPath) {
@@ -393,7 +393,7 @@ func DownloadFiles(attack *components.Attack) error {
 		}
 	}
 
-	response, err := SdkClient.Attacks.HashListAttack(Context, attack.HashListID)
+	response, err := SdkClient.Attacks.HashListAttack(Context, attack.ID)
 	if err != nil {
 		shared.Logger.Error("Error downloading hashlist from the CipherSwarm API", "error", err)
 		return err
@@ -615,6 +615,8 @@ func SendCrackedHash(hash hashcat.Result, task *components.Task) {
 		PlainText: hash.Plaintext,
 	}
 
+	shared.Logger.Info("Cracked hash", "hash", hash.Hash, "plaintext", hash.Plaintext)
+
 	response, err := SdkClient.Tasks.SubmitCrack(Context, task.GetID(), hashcatResult)
 	if err != nil {
 		shared.Logger.Error("Error sending cracked hash", "error", err, "hash", hash.Hash)
@@ -641,7 +643,7 @@ func SendCrackedHash(hash hashcat.Result, task *components.Task) {
 //   - error: An error if any occurred during the download or verification process, or nil if successful.
 func downloadFile(url string, path string, checksum string) error {
 	if fileutil.IsExist(path) {
-		if checksum != "" {
+		if strutil.IsNotBlank(checksum) {
 			fileChecksum, err := cryptor.Md5File(path)
 			if err != nil {
 				return err
@@ -650,15 +652,12 @@ func downloadFile(url string, path string, checksum string) error {
 				shared.Logger.Debug("Download already exists", "path", path)
 				return nil
 			}
-			shared.Logger.Debug("Checksums do not match", "path", path)
+			shared.Logger.Warn("Checksums do not match", "path", path)
 			err = os.Remove(path)
 			if err != nil {
 				return err
 			}
-			return nil
 		}
-		shared.Logger.Info("Download already exists", "path", path)
-		return nil
 	}
 	DisplayDownloadFile(url, path)
 	_, err := req.SetTimeout(5*time.Second).
