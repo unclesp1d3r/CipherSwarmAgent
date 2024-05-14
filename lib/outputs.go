@@ -37,7 +37,7 @@ func DisplayNewTask(task *components.Task) {
 // DisplayNewAttack displays a message when a new attack is started
 func DisplayNewAttack(attack *components.Attack) {
 	shared.Logger.Debug("Attack parameters", "attack", attack)
-	shared.Logger.Info("New attack started", "attack_id", attack.GetID(), "attack_type", attack.GetAttackMode())
+	shared.Logger.Info("New attack started", "attack_id", attack.GetID(), "attack_type", *attack.GetAttackMode())
 }
 
 // DisplayInactive displays a message when the agent is inactive and sleeping
@@ -130,7 +130,7 @@ func DisplayDownloadFileStart(attack *components.Attack) {
 // DisplayDownloadFileComplete displays a message indicating that a file has been downloaded.
 // It logs the URL and path of the downloaded file.
 func DisplayDownloadFileComplete(url string, path string) {
-	shared.Logger.Debug("Downloaded file", "url", url, "path", path)
+	shared.Logger.Info("Downloaded file", "url", url, "path", path)
 }
 
 // DisplayDownloadFileStatusUpdate displays the download file status update.
