@@ -86,8 +86,19 @@ This will start the agent in a Docker container, connecting it to the CipherSwar
 
 ## Contributing
 
-We welcome contributions! To contribute to the CipherSwarm Go Agent, please fork the repository, create a feature
-branch, push your changes, and submit a pull request.
+We welcome contributions! To contribute to the CipherSwarm Go Agent, please fork the repository, create a feature branch, push your changes, and submit a pull request.
+
+### Conventional Commits
+
+Going forward, we will be using [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for our commit messages. This will help us automate the release process and generate changelogs. Please follow the commit message format below:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
 
 ## License
 
