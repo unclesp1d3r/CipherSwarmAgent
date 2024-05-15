@@ -6,14 +6,19 @@ info:
 options:
   commits:
     sort_by: Type
-    # filters:
-    #   Type:
-    #     - feat
-    #     - fix
-    #     - perf
-    #     - refactor
-    #     - Merge
-    #     - Bump
+    filters:
+      Type:
+        - feat
+        - fix
+        - perf
+        - refactor
+        - docs
+        - style
+        - test
+        - chore
+        - Bump
+        - Merge
+        - Added
   commit_groups:
     title_maps:
       feat: Features
