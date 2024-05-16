@@ -1,3 +1,167 @@
+- semver: 0.1.8
+  date: 2024-05-15T21:33:41-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: 56cc86c3771eb8c2406b71defe21a99833eb93ff
+      note: |-
+        fix!(release): Add signing for darwin binaries
+
+        I realized that all previous published binaries for darwin generate an error when you try to launch them since they’re not signed.
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: 'fix!(release): Add signing for darwin binaries'
+        body: I realized that all previous published binaries for darwin generate an error when you try to launch them since they’re not signed.
+        footer: []
+        major: false
+        minor: false
+        patch: false
+- semver: 0.1.7
+  date: 2024-05-15T20:35:16-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: 3aff100a6b94e9efb4a752cf3eccb292b51a2836
+      note: 'style: Add gitlint to enforce conventional commits'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: style
+        scope: ""
+        description: Add gitlint to enforce conventional commits
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: true
+    - commit: dccc518a156cf6d09181ac022ab13a39234f7bac
+      note: 'ci: Add SBOM to goreleaser config'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: ci
+        scope: ""
+        description: Add SBOM to goreleaser config
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 9767b11eda1b17b146b4cebfa9d4ab287d9283c5
+      note: 'docs: Updated changelog'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: docs
+        scope: ""
+        description: Updated changelog
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: true
+    - commit: f3c6155f2546f47c242f78dc2942932661a6a99f
+      note: 'revert: Remove non-working git-chglog action'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: revert
+        scope: ""
+        description: Remove non-working git-chglog action
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: f5e68965da7e2b46da838eafa6b1380f6214d308
+      note: 'ci: Fix git-chglog missing config_dir'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: ci
+        scope: ""
+        description: Fix git-chglog missing config_dir
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: f1a1f4f158454a1921066ecfec64fd46373a6108
+      note: 'refactor: Update to latest Agent SDK v0.1.9'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: refactor
+        scope: ""
+        description: Update to latest Agent SDK v0.1.9
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: true
+    - commit: 89e8234a675bb6c44414b4bdb7fdb101b2da0103
+      note: 'chore: Add changelog action'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Add changelog action
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 64728fa73801e66c623574154a23e627ca2df638
+      note: 'docs: Add note about Conventional Commits'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: docs
+        scope: ""
+        description: Add note about Conventional Commits
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: true
 - semver: 0.1.6
   date: 2024-05-13T21:57:06-04:00
   packager: unclesp1d3r
