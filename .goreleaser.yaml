@@ -126,3 +126,5 @@ milestones:
       name: CipherSwarmAgent
     close: true
     fail_on_error: false
+sboms:
+  - artifacts: archive

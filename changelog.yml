@@ -1,3 +1,288 @@
+- semver: 0.1.6
+  date: 2024-05-13T21:57:06-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: e1b9d037ee316bd68f4ae57060a9035e320d7478
+      note: feat Cleaned up change log generator
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: feat Cleaned up change log generator
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 8fb990d36f4420d8119ac511de109a2b2897ce50
+      note: 'feat: Added improved changelog support'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: feat
+        scope: ""
+        description: Added improved changelog support
+        body: ""
+        footer: []
+        major: false
+        minor: true
+        patch: false
+    - commit: 544b85e710214f4ff2b152b54960313b86565381
+      note: Added message for when a hash is cracked
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Added message for when a hash is cracked
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: e6eb15d7719d4c868619896e7703244b058d222e
+      note: Fixed huge bug preventing hashlist download
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Fixed huge bug preventing hashlist download
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: e0a5e247060ea219da39ae94abfc0f45d93fe509
+      note: Bumped the Agent SDK version to 0.1.7
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bumped the Agent SDK version to 0.1.7
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: f2a4b2d1fdd7505ac179479e7413dc21cdaac602
+      note: Added better error handling for failed steps
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Added better error handling for failed steps
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: e08172049a86759d4fb656d65413ae6abe9f163d
+      note: |-
+        Updated to SDK v0.1.6
+
+        - HashSpeed in the hashcat benchmarks is now a double, so it should handle absurdly fast benchmarks
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated to SDK v0.1.6
+        body: '- HashSpeed in the hashcat benchmarks is now a double, so it should handle absurdly fast benchmarks'
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 340163c4df14b8b65f68560cc907ae4ad503a463
+      note: |-
+        Updated to SDK v0.1.6
+
+        - HashSpeed in the hashcat benchmarks is now a double, so it should handle absurdly fast benchmarks
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated to SDK v0.1.6
+        body: '- HashSpeed in the hashcat benchmarks is now a double, so it should handle absurdly fast benchmarks'
+        footer: []
+        major: false
+        minor: false
+        patch: false
+- semver: 0.1.5
+  date: 2024-05-09T22:44:00-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: 89a83be9a9a7e8061c242805300927a9c042d00e
+      note: Bumped version number
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bumped version number
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: fc276af1087c544ef79ded1dfbe9b917367c19cf
+      note: Moved to an API generated with SpeakEasy (#21)
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Moved to an API generated with SpeakEasy (#21)
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 1878a54386768d8cff209014ee6be6ed81281aa8
+      note: |-
+        Improvements to the README
+
+        - Better explainations to how to use docker and how to configure the app
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Improvements to the README
+        body: '- Better explainations to how to use docker and how to configure the app'
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 2afdb7fd6db9b471d4c7aa69bad465e41cc8ebdb
+      note: |-
+        Bump golangci/golangci-lint-action from 5 to 6 (#19)
+
+        Bumps [golangci/golangci-lint-action](https://github.com/golangci/golangci-lint-action) from 5 to 6.
+        - [Release notes](https://github.com/golangci/golangci-lint-action/releases)
+        - [Commits](https://github.com/golangci/golangci-lint-action/compare/v5...v6)
+
+        ---
+        updated-dependencies:
+        - dependency-name: golangci/golangci-lint-action
+          dependency-type: direct:production
+          update-type: version-update:semver-major
+        ...
+        Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+        Co-authored-by: UncleSp1d3r <unclespider@protonmail.com>
+      author:
+        name: dependabot[bot]
+        email: 49699333+dependabot[bot]@users.noreply.github.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump golangci/golangci-lint-action from 5 to 6 (#19)
+        body: |-
+            Bumps [golangci/golangci-lint-action](https://github.com/golangci/golangci-lint-action) from 5 to 6.
+            - [Release notes](https://github.com/golangci/golangci-lint-action/releases)
+            - [Commits](https://github.com/golangci/golangci-lint-action/compare/v5...v6)
+
+            ---
+            updated-dependencies:
+            - dependency-name: golangci/golangci-lint-action
+              dependency-type: direct:production
+              update-type: version-update:semver-major
+            ...
+            Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+            Co-authored-by: UncleSp1d3r <unclespider@protonmail.com>
+        footer: []
+        major: false
+        minor: false
+        patch: false
+- semver: 0.1.4
+  date: 2024-05-07T20:11:43-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: 7985957487921fc7477b0947d1439b252ab71093
+      note: Added additional error checking on requests
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Added additional error checking on requests
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 92a79af20f80bea693a1a68fba236be75131f700
+      note: Added changelog and updated goreleaser functionality
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Added changelog and updated goreleaser functionality
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
 - semver: 0.1.3
   date: 2024-05-06T21:57:17-04:00
   packager: unclesp1d3r

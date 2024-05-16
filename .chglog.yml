@@ -1,8 +1,8 @@
 conventional-commits: true
-exclude-merge-commits: false
 deb:
-  distribution: []
-  urgency: ""
+    distribution: []
+    urgency: ""
 debug: false
-owner: "unclesp1d3r"
-package-name: "cipherswarm-agent"
+exclude-merge-commits: false
+owner: unclesp1d3r
+package-name: cipherswarm-agent
