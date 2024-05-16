@@ -1,4 +1,16 @@
 
+<a name="v0.1.8"></a>
+## [v0.1.8](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.7...v0.1.8)
+
+> 2024-05-15
+
+
+<a name="v0.1.7"></a>
+## [v0.1.7](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.6...v0.1.7)
+
+> 2024-05-15
+
+
 <a name="v0.1.6"></a>
 ## [v0.1.6](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.5...v0.1.6)
 
