@@ -5,7 +5,7 @@ go 1.22
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/duke-git/lancet v1.4.3
-	github.com/duke-git/lancet/v2 v2.3.0
+	github.com/duke-git/lancet/v2 v2.3.1
 	github.com/dustin/go-humanize v1.0.1
 	github.com/hpcloud/tail v1.0.0
 	github.com/imroc/req/v3 v3.43.4
@@ -35,7 +35,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
-	github.com/lufia/plan9stats v0.0.0-20240408141607-282e7b5d6b74 // indirect
+	github.com/lufia/plan9stats v0.0.0-20240513124658-fba389f38bae // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
