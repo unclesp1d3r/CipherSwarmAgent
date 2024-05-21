@@ -8,7 +8,7 @@ require (
 	github.com/duke-git/lancet/v2 v2.3.1
 	github.com/dustin/go-humanize v1.0.1
 	github.com/hpcloud/tail v1.0.0
-	github.com/imroc/req/v3 v3.43.4
+	github.com/imroc/req/v3 v3.43.5
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/shirou/gopsutil/v3 v3.24.4
 	github.com/sirupsen/logrus v1.9.3
