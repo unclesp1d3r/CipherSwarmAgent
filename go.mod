@@ -14,7 +14,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
-	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.1.9
+	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.1.10
 )
 
 require (
