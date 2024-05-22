@@ -66,7 +66,7 @@ func AuthenticateAgent() error {
 
 func GetAgentConfiguration() error {
 	agentConfig := agentConfiguration{}
-	response, err := SdkClient.Client.Configuration(Context)
+	response, err := SdkClient.Client.GetConfiguration(Context)
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return err
@@ -251,7 +251,7 @@ func UpdateCracker() {
 // GetNewTask retrieves a new task from the API.
 // It returns the new task if successful, or an error if there was a problem.
 func GetNewTask() (*components.Task, error) {
-	response, err := SdkClient.Tasks.NewTask(Context)
+	response, err := SdkClient.Tasks.GetNewTask(Context)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,7 @@ func GetNewTask() (*components.Task, error) {
 // It makes a request to the CipherSwarm API and returns the attack details if the request is successful.
 // If there is an error connecting to the API or if the response is not successful, an error is returned.
 func GetAttackParameters(attackID int64) (*components.Attack, error) {
-	response, err := SdkClient.Attacks.ShowAttack(Context, attackID)
+	response, err := SdkClient.Attacks.GetAttack(Context, attackID)
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return nil, err
@@ -321,7 +321,7 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 
 		results = append(results, benchmark)
 	}
-	res, err := SdkClient.Agents.SubmitBenchmarkAgent(Context, shared.State.AgentID, results)
+	res, err := SdkClient.Agents.SubmitBenchmark(Context, shared.State.AgentID, results)
 	if err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 // GetLastBenchmarkDate retrieves the last benchmark date from the CipherSwarm API.
 // It returns the last benchmark date as a time.Time value and an error if any.
 func GetLastBenchmarkDate() (time.Time, error) {
-	response, err := SdkClient.Agents.LastBenchmarkAgent(Context, shared.State.AgentID)
+	response, err := SdkClient.Agents.GetAgentLastBenchmarkDate(Context, shared.State.AgentID)
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return time.Time{}, err
@@ -393,7 +393,7 @@ func DownloadFiles(attack *components.Attack) error {
 		}
 	}
 
-	response, err := SdkClient.Attacks.HashListAttack(Context, attack.ID)
+	response, err := SdkClient.Attacks.GetHashList(Context, attack.ID)
 	if err != nil {
 		shared.Logger.Error("Error downloading hashlist from the CipherSwarm API", "error", err)
 		return err
@@ -446,7 +446,7 @@ func DownloadFiles(attack *components.Attack) error {
 // It makes an HTTP request to the agent API's HeartbeatAgent endpoint
 // and logs the result.
 func SendHeartBeat() {
-	_, err := SdkClient.Agents.HeartbeatAgent(Context, shared.State.AgentID)
+	_, err := SdkClient.Agents.SendHeartbeat(Context, shared.State.AgentID)
 	if err != nil {
 		shared.Logger.Error("Error sending heartbeat", "error", err)
 		return
@@ -567,7 +567,7 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task) {
 	}
 
 	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
-	_, err := SdkClient.Tasks.SubmitStatus(Context, task.GetID(), taskStatus)
+	_, err := SdkClient.Tasks.SendStatus(Context, task.GetID(), taskStatus)
 	if err != nil {
 		shared.Logger.Error("Error sending status update", "error", err)
 		return
@@ -577,7 +577,7 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task) {
 // AcceptTask accepts a task and returns a boolean indicating whether the task was accepted successfully.
 // It sends an HTTP request to the API server to accept the task and handles the response accordingly.
 func AcceptTask(task *components.Task) bool {
-	response, err := SdkClient.Tasks.AcceptTask(Context, task.GetID())
+	response, err := SdkClient.Tasks.SetTaskAccepted(Context, task.GetID())
 	if err != nil {
 		if response.StatusCode == http.StatusUnprocessableEntity {
 			// Not really an error, just means the task is already completed
@@ -597,7 +597,7 @@ func AcceptTask(task *components.Task) bool {
 // It takes a pointer to a cipherswarm.Task as input.
 // If an error occurs while notifying the server, it logs the error using the Logger.
 func MarkTaskExhausted(task *components.Task) {
-	_, err := SdkClient.Tasks.ExhaustedTask(Context, task.GetID())
+	_, err := SdkClient.Tasks.SetTaskExhausted(Context, task.GetID())
 	if err != nil {
 		shared.Logger.Error("Error notifying server", "error", err)
 	}
@@ -617,7 +617,7 @@ func SendCrackedHash(hash hashcat.Result, task *components.Task) {
 
 	shared.Logger.Info("Cracked hash", "hash", hash.Hash, "plaintext", hash.Plaintext)
 
-	response, err := SdkClient.Tasks.SubmitCrack(Context, task.GetID(), hashcatResult)
+	response, err := SdkClient.Tasks.SendCrack(Context, task.GetID(), hashcatResult)
 	if err != nil {
 		shared.Logger.Error("Error sending cracked hash", "error", err, "hash", hash.Hash)
 		return

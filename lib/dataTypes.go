@@ -13,23 +13,21 @@ type agentConfiguration struct {
 	APIVersion int64 `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
 }
 
-// GetAttackMode returns the attack mode code based on the given Attack object.
-// The attack mode code is used to identify the type of attack being performed.
-// It maps the attack mode string to a corresponding uint8 value.
-// If the attack mode is not recognized, it returns 0.
-
-func parseStringToDeviceType(deviceType string) components.TheTypeOfTheDevice {
+// parseStringToDeviceType converts a string representation of a device type to its corresponding components.DeviceType value.
+// It takes a deviceType string as input and returns the corresponding components.DeviceType value.
+// If the deviceType string is not recognized, it defaults to components.DeviceTypeCPU.
+func parseStringToDeviceType(deviceType string) components.DeviceType {
 	switch deviceType {
 	case "CPU":
-		return components.TheTypeOfTheDeviceCPU
+		return components.DeviceTypeCPU
 	case "GPU":
-		return components.TheTypeOfTheDeviceGpu
+		return components.DeviceTypeGpu
 	// case "fpga":
 	// 	return components.DeviceTypeFPGA
 	// case "asic":
 	// 	return components.DeviceTypeASIC
 	default:
-		return components.TheTypeOfTheDeviceCPU
+		return components.DeviceTypeCPU
 	}
 }
 
