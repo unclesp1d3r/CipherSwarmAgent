@@ -1,4 +1,23 @@
 
+<a name="v0.1.9"></a>
+## [v0.1.9](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.8...v0.1.9)
+
+> 2024-05-21
+
+### Chores
+
+* Bumped versions on dependencies
+
+### Code Refactoring
+
+* Move to v0.2.0 of the SDK
+
+### Documentation
+
+* Update change log
+* Updated change logs
+
+
 <a name="v0.1.8"></a>
 ## [v0.1.8](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.7...v0.1.8)
 
