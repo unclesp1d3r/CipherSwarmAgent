@@ -1,6 +1,165 @@
+- semver: 0.1.9
+  date: 2024-05-21T20:09:08-04:00
+  packager: UncleSp1d3r
+  changes:
+    - commit: 62a47886f89d3878ef2546d22274814c8a98e3f9
+      note: 'chore: Updated Changelog'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated Changelog
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 55a78c4ba0301946e8f4fa2162fa7689d1cf70b9
+      note: |-
+        refactor: Move to v0.2.0 of the SDK
+
+        Version 0.2.0 introduced major breaking changes.
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: kmelton@mac.com
+      conventional_commit:
+        category: refactor
+        scope: ""
+        description: Move to v0.2.0 of the SDK
+        body: Version 0.2.0 introduced major breaking changes.
+        footer: []
+        major: false
+        minor: false
+        patch: true
+    - commit: f3a65611cc35df79cfbe1d8f475c2496ab18331d
+      note: |-
+        Bump github.com/imroc/req/v3 from 3.43.4 to 3.43.5 (#26)
+
+        ---
+        updated-dependencies:
+        - dependency-name: github.com/imroc/req/v3
+          dependency-type: direct:production
+          update-type: version-update:semver-patch
+        ...
+        Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+      author:
+        name: dependabot[bot]
+        email: 49699333+dependabot[bot]@users.noreply.github.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump github.com/imroc/req/v3 from 3.43.4 to 3.43.5 (#26)
+        body: |-
+            ---
+            updated-dependencies:
+            - dependency-name: github.com/imroc/req/v3
+              dependency-type: direct:production
+              update-type: version-update:semver-patch
+            ...
+            Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 2e40ce8829d5ef0d70bed85f194034c2def3d6c3
+      note: Bump github.com/unclesp1d3r/cipherswarm-agent-sdk-go from 0.1.9 to 0.1.10 (#25)
+      author:
+        name: dependabot[bot]
+        email: 49699333+dependabot[bot]@users.noreply.github.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump github.com/unclesp1d3r/cipherswarm-agent-sdk-go from 0.1.9 to 0.1.10 (#25)
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: e5d1fc6b5496b920d07d78603418207bb8c72b94
+      note: Bump nuuday/github-changelog-action from 1.0.0 to 1.0.1 (#24)
+      author:
+        name: dependabot[bot]
+        email: 49699333+dependabot[bot]@users.noreply.github.com
+      committer:
+        name: GitHub
+        email: noreply@github.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bump nuuday/github-changelog-action from 1.0.0 to 1.0.1 (#24)
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 2455659030a9a9d8bea86c5c151bbf37fb82234d
+      note: 'chore: Bumped versions on dependencies'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Bumped versions on dependencies
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 158419484dc274d34cf7562be6856f868a7984b7
+      note: 'docs: Update change log'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: docs
+        scope: ""
+        description: Update change log
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: true
+    - commit: 7ffe1bf5eb421cc9b62925069ca7c64c3129088d
+      note: 'docs: Updated change logs'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: docs
+        scope: ""
+        description: Updated change logs
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: true
 - semver: 0.1.8
   date: 2024-05-15T21:33:41-04:00
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: 56cc86c3771eb8c2406b71defe21a99833eb93ff
       note: |-
@@ -24,7 +183,7 @@
         patch: false
 - semver: 0.1.7
   date: 2024-05-15T20:35:16-04:00
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: 3aff100a6b94e9efb4a752cf3eccb292b51a2836
       note: 'style: Add gitlint to enforce conventional commits'
@@ -164,7 +323,7 @@
         patch: true
 - semver: 0.1.6
   date: 2024-05-13T21:57:06-04:00
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: e1b9d037ee316bd68f4ae57060a9035e320d7478
       note: feat Cleaned up change log generator
@@ -310,7 +469,7 @@
         patch: false
 - semver: 0.1.5
   date: 2024-05-09T22:44:00-04:00
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: 89a83be9a9a7e8061c242805300927a9c042d00e
       note: Bumped version number
@@ -411,7 +570,7 @@
         patch: false
 - semver: 0.1.4
   date: 2024-05-07T20:11:43-04:00
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: 7985957487921fc7477b0947d1439b252ab71093
       note: Added additional error checking on requests
@@ -449,7 +608,7 @@
         patch: false
 - semver: 0.1.3
   date: 2024-05-06T21:57:17-04:00
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: ed89fbc29b751b28e9b52f9e61c13f0d65bc316a
       note: Moved to the updated API for hashlist download
@@ -470,7 +629,7 @@
         patch: false
 - semver: 0.1.2
   date: 2024-05-07T00:09:06Z
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: cc89a8ec3ecb2c668af8ec248865be368df35548
       note: |-
@@ -543,7 +702,7 @@
         patch: false
 - semver: 0.1.1
   date: 2024-05-01T21:32:43-04:00
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: 6398d52117666c478e0f2967aff0074818ab9c9d
       note: Updated goreleaser to also automatically release docker
@@ -658,7 +817,7 @@
         patch: false
 - semver: 0.1.0
   date: 2024-04-30T18:49:53-04:00
-  packager: unclesp1d3r
+  packager: UncleSp1d3r
   changes:
     - commit: 5cdbf29922725611ae08e047806ff029ca3cea0b
       note: Updated to support API v0.1.11

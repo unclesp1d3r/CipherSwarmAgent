@@ -6,6 +6,7 @@
 
 ### Chores
 
+* Updated Changelog
 * Bumped versions on dependencies
 
 ### Code Refactoring
