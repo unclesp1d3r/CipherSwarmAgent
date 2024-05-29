@@ -2,6 +2,10 @@ package lib
 
 import (
 	"errors"
+	"github.com/duke-git/lancet/convertor"
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/shirou/gopsutil/v3/process"
+	"os"
 	"path"
 
 	"github.com/duke-git/lancet/fileutil"
@@ -50,12 +54,40 @@ func GetCurrentHashcatVersion() (string, error) {
 	return hashcatVersion, nil
 }
 
-// GetPlatform returns the platform of the current system.
-
-// CheckForExistingClient checks if the specified PID file exists.
-// It returns true if the file exists, and false otherwise.
+// CheckForExistingClient checks if there is an existing client running by checking the PID file.
+// It reads the PID file and checks if the process with the specified PID is running.
+// If the PID file does not exist, it returns false.
+// If the PID file exists and the process is running, it returns true.
+// If the PID file exists and the process is not running, it returns false.
+// If there is an error reading the PID file or checking if the process is running, it returns true.
 func CheckForExistingClient(pidFilePath string) bool {
-	return fileutil.IsExist(pidFilePath)
+	if fileutil.IsExist(pidFilePath) {
+		pidString, err := fileutil.ReadFileToString(pidFilePath)
+		if err != nil {
+			shared.Logger.Error("Error reading PID file", "path", pidFilePath)
+			return true
+		}
+
+		pidValue, err := convertor.ToInt(strutil.Trim(pidString))
+		if err != nil {
+			shared.Logger.Error("Error converting PID to integer", "pid", pidString)
+			return true
+		}
+
+		pidRunning, err := process.PidExists(int32(pidValue))
+		if err != nil {
+			shared.Logger.Error("Error checking if process is running", "pid", pidValue)
+			return true
+		}
+
+		shared.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
+		if !pidRunning {
+			shared.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
+		}
+		return pidRunning
+	} else {
+		return false
+	}
 }
 
 // CreateLockFile creates a lock file at the specified path using the configured PID file path.
@@ -63,9 +95,12 @@ func CheckForExistingClient(pidFilePath string) bool {
 func CreateLockFile() error {
 	lockFilePath := shared.State.PidFile
 
-	isCreated := fileutil.CreateFile(lockFilePath)
-	if !isCreated {
-		return errors.New("failed to create lock file")
+	pidValue := os.Getpid()
+	pidString := convertor.ToString(pidValue)
+	err := fileutil.WriteStringToFile(lockFilePath, pidString, false)
+	if err != nil {
+		shared.Logger.Error("Error writing PID to file", "path", lockFilePath)
+		return err
 	}
 	return nil
 }
