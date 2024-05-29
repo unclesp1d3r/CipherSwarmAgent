@@ -1,6 +1,6 @@
 /* Borrowed from github.com/s77rt/hashcat.launcher */
 
-package subprocess
+package utils
 
 import (
 	"bufio"
