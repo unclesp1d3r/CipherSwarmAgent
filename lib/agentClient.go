@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strconv"
+	"sync"
 	"time"
 
 	"github.com/duke-git/lancet/convertor"
@@ -17,12 +17,13 @@ import (
 	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/v2/pointer"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/imroc/req/v3"
+	"github.com/hashicorp/go-getter"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
 	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
@@ -380,8 +381,47 @@ func UpdateBenchmarks() {
 func DownloadFiles(attack *components.Attack) error {
 	DisplayDownloadFileStart(attack)
 
+	err := downloadHashList(attack)
+	if err != nil {
+		return err
+	}
+
+	wg := sync.WaitGroup{}
+	errChan := make(chan error, 2)
+
+	downloader := func(resource components.AttackResourceFile) {
+		wg.Add(1)
+		defer wg.Done()
+		filePath := path.Join(shared.State.FilePath, resource.FileName)
+		shared.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
+
+		err := downloadFile(resource.GetDownloadURL(), filePath, resource.GetChecksum())
+		if err != nil {
+			shared.Logger.Error("Error downloading attack resource", "error", err)
+		}
+		errChan <- err
+	}
+
+	// Download the wordlists
+	for _, wordlist := range attack.WordLists {
+		go downloader(wordlist)
+	}
+	// Download the rulelists
+	for _, rulelist := range attack.RuleLists {
+		go downloader(rulelist)
+	}
+	wg.Wait()
+	err = <-errChan
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func downloadHashList(attack *components.Attack) error {
 	// Download the hashlist
-	hashlistPath := path.Join(shared.State.HashlistPath, strconv.FormatInt(attack.GetHashListID(), 10)+".txt")
+	hashlistPath := path.Join(shared.State.HashlistPath, convertor.ToString(attack.GetHashListID())+".txt")
 	shared.Logger.Debug("Downloading hashlist", "url", attack.GetHashListURL(), "path", hashlistPath)
 	// We should always download the hashlist, even if it already exists
 	// This is because the hashlist may have been updated on the server
@@ -417,28 +457,6 @@ func DownloadFiles(attack *components.Attack) error {
 		shared.Logger.Error("Error downloading hashlist", "response", response.RawResponse.Status)
 		return errors.New("failed to download hashlist")
 	}
-
-	// Download the wordlists
-	for _, wordlist := range attack.WordLists {
-		wordlistPath := path.Join(shared.State.FilePath, wordlist.FileName)
-		shared.Logger.Debug("Downloading wordlist", "url", wordlist.GetDownloadURL(), "path", wordlistPath)
-		err := downloadFile(wordlist.GetDownloadURL(), wordlistPath, wordlist.GetChecksum())
-		if err != nil {
-			shared.Logger.Error("Error downloading wordlist", "error", err)
-			return err
-		}
-	}
-	// Download the rulelists
-	for _, rulelist := range attack.RuleLists {
-		rulelistPath := path.Join(shared.State.FilePath, rulelist.FileName)
-		shared.Logger.Debug("Downloading rulelist", "url", rulelist.GetDownloadURL(), "path", rulelistPath)
-		err := downloadFile(rulelist.GetDownloadURL(), rulelistPath, rulelist.GetChecksum())
-		if err != nil {
-			shared.Logger.Error("Error downloading rulelist", "error", err)
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -660,18 +678,20 @@ func downloadFile(url string, path string, checksum string) error {
 		}
 	}
 	DisplayDownloadFile(url, path)
-	_, err := req.SetTimeout(5*time.Second).
-		SetCommonHeader("Accept", "application/json").
-		SetCommonBearerAuthToken(shared.State.APIToken).
-		R().
-		SetOutputFile(path).
-		SetDownloadCallbackWithInterval(func(info req.DownloadInfo) {
-			if info.Response.Response != nil {
-				DisplayDownloadFileStatusUpdate(info)
-			}
-		}, 1*time.Second).
-		Get(url)
-	if err != nil {
+
+	client := &getter.Client{
+		Ctx:  context.Background(),
+		Dst:  path,
+		Src:  url,
+		Mode: getter.ClientModeFile,
+	}
+
+	_ = client.Configure(
+		getter.WithProgress(utils.DefaultProgressBar),
+		getter.WithUmask(os.FileMode(0o022)),
+	)
+
+	if err := client.Get(); err != nil {
 		return err
 	}
 	DisplayDownloadFileComplete(url, path)
