@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/fileutil"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
@@ -253,6 +254,8 @@ func startAgent(cmd *cobra.Command, args []string) {
 				attack, err := lib.GetAttackParameters(task.GetAttackID())
 				if err != nil {
 					shared.Logger.Error("Failed to get attack parameters", "error", err)
+					lib.SendAgentError(err.Error(), nil, components.SeverityMajor)
+
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
 					continue
 				}
@@ -262,6 +265,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 				err = lib.DownloadFiles(attack)
 				if err != nil {
 					shared.Logger.Error("Failed to download files", "error", err)
+					lib.SendAgentError(err.Error(), nil, components.SeverityMajor)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
 					continue
 				}
@@ -286,6 +290,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 	sig := <-signChan // Wait for a signal to shut down the agent
 	shared.Logger.Debug("Received signal", "signal", sig)
+	lib.SendAgentError("Received signal to terminate. Shutting down", nil, components.SeverityLow)
 	lib.DisplayShuttingDown()
 }
 

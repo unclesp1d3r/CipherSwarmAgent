@@ -100,6 +100,7 @@ func GetAgentConfiguration() error {
 		binPath, err := exec.LookPath("hashcat")
 		if err != nil {
 			shared.Logger.Error("Error finding hashcat binary: ", err)
+			SendAgentError(err.Error(), nil, components.SeverityCritical)
 		}
 		viper.Set("hashcat_path", binPath)
 		_ = viper.WriteConfig()
@@ -122,6 +123,7 @@ func UpdateAgentMetadata() {
 	info, err := host.Info()
 	if err != nil {
 		shared.Logger.Error("Error getting info info: ", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return
 	}
 
@@ -132,6 +134,7 @@ func UpdateAgentMetadata() {
 	devices, err := arch.GetDevices()
 	if err != nil {
 		shared.Logger.Error("Error getting devices: ", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 	}
 
 	agentPlatform = info.OS
@@ -145,6 +148,7 @@ func UpdateAgentMetadata() {
 	response, err := SdkClient.Agents.UpdateAgent(Context, shared.State.AgentID, agentUpdate)
 	if err != nil {
 		shared.Logger.Error("Error updating agent metadata", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 	}
 
 	if response.Agent != nil {
@@ -185,11 +189,13 @@ func UpdateCracker() {
 			tempDir, err := os.MkdirTemp("", "cipherswarm-*")
 			if err != nil {
 				shared.Logger.Error("Error creating temporary directory: ", "error", err)
+				SendAgentError(err.Error(), nil, components.SeverityCritical)
 			}
 			defer func(path string) {
 				err := os.RemoveAll(path)
 				if err != nil {
 					shared.Logger.Error("Error removing temporary directory: ", "error", err)
+					SendAgentError(err.Error(), nil, components.SeverityCritical)
 				}
 			}(tempDir)
 
@@ -198,11 +204,13 @@ func UpdateCracker() {
 			err = downloadFile(*update.GetDownloadURL(), tempArchivePath, "")
 			if err != nil {
 				shared.Logger.Error("Error downloading cracker: ", "error", err)
+				SendAgentError(err.Error(), nil, components.SeverityCritical)
 			}
 			// Move the file to the correct location in the crackers directory
 			newArchivePath, err := moveArchiveFile(tempArchivePath)
 			if err != nil {
 				shared.Logger.Error("Error moving file: ", "error", err)
+				SendAgentError(err.Error(), nil, components.SeverityCritical)
 				return // Don't continue if we can't move the file
 			}
 
@@ -212,6 +220,7 @@ func UpdateCracker() {
 			hashcatDirectory, err := extractHashcatArchive(newArchivePath)
 			if err != nil {
 				shared.Logger.Error("Error extracting file: ", err)
+				SendAgentError(err.Error(), nil, components.SeverityCritical)
 				return // Don't continue if we can't extract the file
 			}
 
@@ -233,6 +242,7 @@ func UpdateCracker() {
 			err = os.Remove(newArchivePath)
 			if err != nil {
 				shared.Logger.Error("Error removing 7z file", "error", err)
+				SendAgentError(err.Error(), nil, components.SeverityWarning)
 			}
 
 			// Update the config file with the new hashcat path
@@ -254,6 +264,7 @@ func UpdateCracker() {
 func GetNewTask() (*components.Task, error) {
 	response, err := SdkClient.Tasks.GetNewTask(Context)
 	if err != nil {
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return nil, err
 	}
 	if response.StatusCode == http.StatusNoContent {
@@ -358,6 +369,7 @@ func UpdateBenchmarks() {
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
 	if err != nil {
 		shared.Logger.Error("Failed to create benchmark session", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityMajor)
 		return
 	}
 
@@ -370,6 +382,7 @@ func UpdateBenchmarks() {
 	err = SendBenchmarkResults(benchmarkResult)
 	if err != nil {
 		shared.Logger.Error("Failed to send benchmark results", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityMajor)
 		return
 	}
 }
@@ -398,6 +411,7 @@ func DownloadFiles(attack *components.Attack) error {
 		err := downloadFile(resource.GetDownloadURL(), filePath, resource.GetChecksum())
 		if err != nil {
 			shared.Logger.Error("Error downloading attack resource", "error", err)
+			SendAgentError(err.Error(), nil, components.SeverityCritical)
 		}
 		errChan <- err
 	}
@@ -429,6 +443,7 @@ func downloadHashList(attack *components.Attack) error {
 		err := os.Remove(hashlistPath)
 		if err != nil {
 			shared.Logger.Error("Error removing old hashlist", "error", err)
+			SendAgentError(err.Error(), nil, components.SeverityCritical)
 			return err
 		}
 	}
@@ -436,6 +451,7 @@ func downloadHashList(attack *components.Attack) error {
 	response, err := SdkClient.Attacks.GetHashList(Context, attack.ID)
 	if err != nil {
 		shared.Logger.Error("Error downloading hashlist from the CipherSwarm API", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return err
 	}
 
@@ -444,12 +460,14 @@ func downloadHashList(attack *components.Attack) error {
 			f, err := os.Create(hashlistPath)
 			if err != nil {
 				shared.Logger.Error("Error creating hashlist file", "error", err)
+				SendAgentError(err.Error(), nil, components.SeverityCritical)
 				return err
 			}
 			defer f.Close()
 			_, err = io.Copy(f, response.Stream)
 			if err != nil {
 				shared.Logger.Error("Error writing hashlist file", "error", err)
+				SendAgentError(err.Error(), nil, components.SeverityCritical)
 				return err
 			}
 		}
@@ -467,6 +485,7 @@ func SendHeartBeat() {
 	_, err := SdkClient.Agents.SendHeartbeat(Context, shared.State.AgentID)
 	if err != nil {
 		shared.Logger.Error("Error sending heartbeat", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return
 	}
 }
@@ -507,6 +526,7 @@ func RunTask(task *components.Task, attack *components.Attack) {
 	sess, err := hashcat.NewHashcatSession("attack", jobParams)
 	if err != nil {
 		shared.Logger.Error("Failed to create attack session", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return
 	}
 
@@ -588,8 +608,35 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task) {
 	_, err := SdkClient.Tasks.SendStatus(Context, task.GetID(), taskStatus)
 	if err != nil {
 		shared.Logger.Error("Error sending status update", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return
 	}
+}
+
+// SendAgentError sends an agent error to the server.
+// It takes the stdErrLine string, task pointer, and severity as input parameters.
+// It creates an AgentError object with the provided parameters and submits it to the server using the SdkClient.
+// If there is an error while submitting the agent error, it logs the error using the shared.Logger.
+func SendAgentError(stdErrLine string, task *components.Task, severity components.Severity) {
+	var taskID *int64
+	if task == nil {
+		taskID = nil
+	} else {
+		taskID = &task.ID
+	}
+
+	var agentError *components.AgentError = &components.AgentError{
+		Message:  stdErrLine,
+		Metadata: &components.Metadata{},
+		Severity: severity,
+		AgentID:  shared.State.AgentID,
+		TaskID:   taskID,
+	}
+	_, err := SdkClient.Agents.SubmitErrorAgent(Context, shared.State.AgentID, agentError)
+	if err != nil {
+		shared.Logger.Error("Error sending job error", "error", err)
+	}
+
 }
 
 // AcceptTask accepts a task and returns a boolean indicating whether the task was accepted successfully.
@@ -600,10 +647,12 @@ func AcceptTask(task *components.Task) bool {
 		if response.StatusCode == http.StatusUnprocessableEntity {
 			// Not really an error, just means the task is already completed
 			shared.Logger.Error("Task already completed", "task_id", task.GetID(), "status", response.RawResponse.Status)
+			SendAgentError(err.Error(), nil, components.SeverityLow)
 			return false
 		}
 
 		shared.Logger.Error("Error accepting task", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityMajor)
 		return false
 	}
 
@@ -618,6 +667,7 @@ func MarkTaskExhausted(task *components.Task) {
 	_, err := SdkClient.Tasks.SetTaskExhausted(Context, task.GetID())
 	if err != nil {
 		shared.Logger.Error("Error notifying server", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityMajor)
 	}
 }
 
@@ -638,6 +688,7 @@ func SendCrackedHash(hash hashcat.Result, task *components.Task) {
 	response, err := SdkClient.Tasks.SendCrack(Context, task.GetID(), hashcatResult)
 	if err != nil {
 		shared.Logger.Error("Error sending cracked hash", "error", err, "hash", hash.Hash)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return
 	}
 
@@ -671,8 +722,10 @@ func downloadFile(url string, path string, checksum string) error {
 				return nil
 			}
 			shared.Logger.Warn("Checksums do not match", "path", path)
+			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, components.SeverityLow)
 			err = os.Remove(path)
 			if err != nil {
+				SendAgentError(err.Error(), nil, components.SeverityMajor)
 				return err
 			}
 		}
@@ -709,6 +762,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	err := os.RemoveAll(hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
 		shared.Logger.Error("Error removing old hashcat directory: ", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return "", err // Don't continue if we can't remove the old directory
 	}
 
@@ -716,6 +770,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	err = os.Rename(hashcatDirectory, hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
 		shared.Logger.Error("Error moving old hashcat directory: ", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return "", err // Don't continue if we can't move the old directory
 	}
 
@@ -723,6 +778,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
 	if err != nil {
 		shared.Logger.Error("Error extracting file: ", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return "", err // Don't continue if we can't extract the file
 	}
 	return hashcatDirectory, err
