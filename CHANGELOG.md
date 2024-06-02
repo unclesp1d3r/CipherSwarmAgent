@@ -1,4 +1,10 @@
 
+<a name="v0.1.12"></a>
+## [v0.1.12](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.11...v0.1.12)
+
+> 0001-01-01
+
+
 <a name="v0.1.11"></a>
 ## [v0.1.11](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.10...v0.1.11)
 
@@ -7,10 +13,6 @@
 ### Bug Fixes
 
 * Fixed failure on dangling lock
-
-### Chores
-
-* Updated changelog
 
 ### Features
 
@@ -23,11 +25,6 @@
 
 > 2024-05-28
 
-### Chores
-
-* Updated changelog
-* Update changelog
-
 ### Features
 
 * Add parallel file downloads
@@ -38,19 +35,9 @@
 
 > 2024-05-21
 
-### Chores
-
-* Updated Changelog
-* Bumped versions on dependencies
-
 ### Code Refactoring
 
 * Move to v0.2.0 of the SDK
-
-### Documentation
-
-* Update change log
-* Updated change logs
 
 
 <a name="v0.1.8"></a>
@@ -69,26 +56,9 @@
 * Add SBOM to goreleaser config
 * Fix git-chglog missing config_dir
 
-### Chores
-
-* Add changelog action
-
 ### Code Refactoring
 
 * Update to latest Agent SDK v0.1.9
-
-### Documentation
-
-* Updated changelog
-* Add note about Conventional Commits
-
-### Revert
-
-* Remove non-working git-chglog action
-
-### Style Changes
-
-* Add gitlint to enforce conventional commits
 
 
 <a name="v0.1.6"></a>
