@@ -1,4 +1,18 @@
 
+<a name="v0.1.10"></a>
+## [v0.1.10](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.9...v0.1.10)
+
+> 2024-05-28
+
+### Chores
+
+* Update changelog
+
+### Features
+
+* Add parallel file downloads
+
+
 <a name="v0.1.9"></a>
 ## [v0.1.9](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.8...v0.1.9)
 
