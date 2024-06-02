@@ -625,9 +625,17 @@ func SendAgentError(stdErrLine string, task *components.Task, severity component
 		taskID = &task.ID
 	}
 
+	metadata := &components.Metadata{
+		ErrorDate: time.Now(),
+		Other: map[string]any{
+			"platform": agentPlatform,
+			"version":  AgentVersion,
+		},
+	}
+
 	var agentError *components.AgentError = &components.AgentError{
 		Message:  stdErrLine,
-		Metadata: &components.Metadata{},
+		Metadata: metadata,
 		Severity: severity,
 		AgentID:  shared.State.AgentID,
 		TaskID:   taskID,
