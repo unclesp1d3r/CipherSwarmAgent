@@ -45,6 +45,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 				}
 
 			case stdErrLine := <-sess.StderrMessages:
+				SendAgentError(err.Error(), nil, components.SeverityWarning)
 				DisplayBenchmarkError(stdErrLine)
 			case statusUpdate := <-sess.StatusUpdates:
 				shared.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
@@ -53,6 +54,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 			case err := <-sess.DoneChan:
 				if err != nil {
 					shared.Logger.Error("Benchmark session failed", "error", err)
+					SendAgentError(err.Error(), nil, components.SeverityFatal)
 				}
 				break procLoop
 			}
@@ -70,7 +72,8 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
-		shared.Logger.Error("Failed to start benchmark session", "error", err)
+		shared.Logger.Error("Failed to start attack session", "error", err)
+		SendAgentError(err.Error(), task, components.SeverityFatal)
 		return
 	}
 	waitChan := make(chan int)
@@ -91,6 +94,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 				}
 			case stdErrLine := <-sess.StderrMessages:
 				DisplayJobError(stdErrLine)
+				SendAgentError(stdErrLine, task, components.SeverityMinor)
 			case statusUpdate := <-sess.StatusUpdates:
 				DisplayJobStatus(statusUpdate)
 				SendStatusUpdate(statusUpdate, task)
@@ -101,6 +105,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 				if err != nil {
 					if err.Error() != "exit status 1" {
 						// Something went wrong and we failed.
+						SendAgentError(err.Error(), task, components.SeverityFatal)
 						DisplayJobFailed(err)
 					} else {
 						// Exit status 1 means we exhausted the task. Mark it as such.

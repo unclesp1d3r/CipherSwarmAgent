@@ -1,4 +1,23 @@
 
+<a name="v0.1.11"></a>
+## [v0.1.11](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.10...v0.1.11)
+
+> 2024-06-01
+
+### Bug Fixes
+
+* Fixed failure on dangling lock
+
+### Chores
+
+* Updated changelog
+
+### Features
+
+* Add support for the agent error API
+* Add parallel file downloads
+
+
 <a name="v0.1.10"></a>
 ## [v0.1.10](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.9...v0.1.10)
 
@@ -6,6 +25,7 @@
 
 ### Chores
 
+* Updated changelog
 * Update changelog
 
 ### Features
