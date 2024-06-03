@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/charmbracelet/log v0.4.0
-	github.com/cheggaaa/pb v1.0.29
+	github.com/cheggaaa/pb v2.0.7+incompatible
 	github.com/duke-git/lancet v1.4.3
 	github.com/duke-git/lancet/v2 v2.3.1
 	github.com/dustin/go-humanize v1.0.1
@@ -61,6 +61,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20240513124658-fba389f38bae // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -110,8 +111,14 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
 	google.golang.org/grpc v1.64.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
+	gopkg.in/VividCortex/ewma.v1 v1.1.1 // indirect
+	gopkg.in/cheggaaa/pb.v2 v2.0.7 // indirect
+	gopkg.in/fatih/color.v1 v1.7.0 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	gopkg.in/mattn/go-colorable.v0 v0.1.0 // indirect
+	gopkg.in/mattn/go-isatty.v0 v0.0.4 // indirect
+	gopkg.in/mattn/go-runewidth.v0 v0.0.4 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
