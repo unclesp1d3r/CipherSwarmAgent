@@ -2,21 +2,24 @@ package lib
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	uri "net/url"
 	"os"
 	"os/exec"
 	"path"
-	"sync"
 	"time"
 
 	"github.com/duke-git/lancet/convertor"
 	"github.com/duke-git/lancet/cryptor"
 	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/v2/pointer"
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/duke-git/lancet/v2/validator"
 	"github.com/hashicorp/go-getter"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/spf13/viper"
@@ -264,6 +267,7 @@ func UpdateCracker() {
 func GetNewTask() (*components.Task, error) {
 	response, err := SdkClient.Tasks.GetNewTask(Context)
 	if err != nil {
+		shared.Logger.Error("Error connecting to the CipherSwarm API", "error", err)
 		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return nil, err
 	}
@@ -342,21 +346,6 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 		return nil
 	}
 	return errors.New("bad response: " + res.RawResponse.Status)
-}
-
-// GetLastBenchmarkDate retrieves the last benchmark date from the CipherSwarm API.
-// It returns the last benchmark date as a time.Time value and an error if any.
-func GetLastBenchmarkDate() (time.Time, error) {
-	response, err := SdkClient.Agents.GetAgentLastBenchmarkDate(Context, shared.State.AgentID)
-	if err != nil {
-		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
-		return time.Time{}, err
-	}
-	if response.StatusCode == http.StatusOK {
-		return response.AgentLastBenchmark.LastBenchmarkDate, nil
-	}
-
-	return time.Time{}, errors.New("bad response: " + response.RawResponse.Status)
 }
 
 // UpdateBenchmarks updates the benchmarks for the agent.
@@ -481,13 +470,42 @@ func downloadHashList(attack *components.Attack) error {
 // SendHeartBeat sends a heartbeat to the agent API.
 // It makes an HTTP request to the agent API's HeartbeatAgent endpoint
 // and logs the result.
-func SendHeartBeat() {
-	_, err := SdkClient.Agents.SendHeartbeat(Context, shared.State.AgentID)
+func SendHeartBeat() *components.AgentHeartbeatResponseState {
+	resp, err := SdkClient.Agents.SendHeartbeat(Context, shared.State.AgentID)
 	if err != nil {
 		shared.Logger.Error("Error sending heartbeat", "error", err)
 		SendAgentError(err.Error(), nil, components.SeverityCritical)
-		return
+		return nil
 	}
+
+	// All good, nothing to see here
+	// We are not being asked to change anything
+	if resp.StatusCode == http.StatusNoContent {
+		shared.Logger.Debug("Heartbeat sent")
+		return nil
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		shared.Logger.Debug("Heartbeat sent")
+		stateResponse := resp.GetAgentHeartbeatResponse()
+
+		state := stateResponse.GetState()
+		switch state {
+		case components.AgentHeartbeatResponseStatePending:
+			shared.Logger.Debug("Agent is pending")
+		case components.AgentHeartbeatResponseStateStopped:
+			shared.Logger.Debug("Agent is stopped")
+			shared.Logger.Warn("Server has stopped the agent")
+		case components.AgentHeartbeatResponseStateError:
+			shared.Logger.Debug("Agent is in error state")
+		default:
+			shared.Logger.Debug("Unknown agent state")
+		}
+
+		return &state
+	}
+
+	return nil
 }
 
 // RunTask executes a task using the provided attack parameters.
@@ -644,7 +662,6 @@ func SendAgentError(stdErrLine string, task *components.Task, severity component
 	if err != nil {
 		shared.Logger.Error("Error sending job error", "error", err)
 	}
-
 }
 
 // AcceptTask accepts a task and returns a boolean indicating whether the task was accepted successfully.
@@ -652,6 +669,7 @@ func SendAgentError(stdErrLine string, task *components.Task, severity component
 func AcceptTask(task *components.Task) bool {
 	response, err := SdkClient.Tasks.SetTaskAccepted(Context, task.GetID())
 	if err != nil {
+		shared.Logger.Error("Error accepting task", "error", err)
 		if response.StatusCode == http.StatusUnprocessableEntity {
 			// Not really an error, just means the task is already completed
 			shared.Logger.Error("Task already completed", "task_id", task.GetID(), "status", response.RawResponse.Status)
@@ -673,6 +691,14 @@ func AcceptTask(task *components.Task) bool {
 // If an error occurs while notifying the server, it logs the error using the Logger.
 func MarkTaskExhausted(task *components.Task) {
 	_, err := SdkClient.Tasks.SetTaskExhausted(Context, task.GetID())
+	if err != nil {
+		shared.Logger.Error("Error notifying server", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityMajor)
+	}
+}
+
+func AbandonTask(task *components.Task) {
+	_, err := SdkClient.Tasks.SetTaskAbandoned(Context, task.GetID())
 	if err != nil {
 		shared.Logger.Error("Error notifying server", "error", err)
 		SendAgentError(err.Error(), nil, components.SeverityMajor)
