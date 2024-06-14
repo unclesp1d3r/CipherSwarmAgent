@@ -1,4 +1,20 @@
 
+<a name="v0.2.2"></a>
+## [v0.2.2](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.1...v0.2.2)
+
+> 2024-06-14
+
+
+<a name="v0.2.1"></a>
+## [v0.2.1](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.0...v0.2.1)
+
+> 2024-06-14
+
+### Bug Fixes
+
+* Handle failure of getting agent config
+
+
 <a name="v0.2.0"></a>
 ## [v0.2.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.11...v0.2.0)
 
