@@ -2,21 +2,24 @@ package lib
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	uri "net/url"
 	"os"
 	"os/exec"
 	"path"
-	"sync"
 	"time"
 
 	"github.com/duke-git/lancet/convertor"
 	"github.com/duke-git/lancet/cryptor"
 	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/v2/pointer"
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/duke-git/lancet/v2/validator"
 	"github.com/hashicorp/go-getter"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/spf13/viper"
@@ -264,6 +267,7 @@ func UpdateCracker() {
 func GetNewTask() (*components.Task, error) {
 	response, err := SdkClient.Tasks.GetNewTask(Context)
 	if err != nil {
+		shared.Logger.Error("Error connecting to the CipherSwarm API", "error", err)
 		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return nil, err
 	}
@@ -344,21 +348,6 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 	return errors.New("bad response: " + res.RawResponse.Status)
 }
 
-// GetLastBenchmarkDate retrieves the last benchmark date from the CipherSwarm API.
-// It returns the last benchmark date as a time.Time value and an error if any.
-func GetLastBenchmarkDate() (time.Time, error) {
-	response, err := SdkClient.Agents.GetAgentLastBenchmarkDate(Context, shared.State.AgentID)
-	if err != nil {
-		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
-		return time.Time{}, err
-	}
-	if response.StatusCode == http.StatusOK {
-		return response.AgentLastBenchmark.LastBenchmarkDate, nil
-	}
-
-	return time.Time{}, errors.New("bad response: " + response.RawResponse.Status)
-}
-
 // UpdateBenchmarks updates the benchmarks for the agent.
 func UpdateBenchmarks() {
 	jobParams := hashcat.Params{
@@ -399,35 +388,24 @@ func DownloadFiles(attack *components.Attack) error {
 		return err
 	}
 
-	wg := sync.WaitGroup{}
-	errChan := make(chan error, 2)
-
-	downloader := func(resource components.AttackResourceFile) {
-		wg.Add(1)
-		defer wg.Done()
+	// Download all resource files
+	for _, resource := range slice.Merge(attack.WordLists, attack.RuleLists) {
 		filePath := path.Join(shared.State.FilePath, resource.FileName)
 		shared.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
 
-		err := downloadFile(resource.GetDownloadURL(), filePath, resource.GetChecksum())
+		err := downloadFile(resource.GetDownloadURL(), filePath, base64ToHex(resource.GetChecksum()))
 		if err != nil {
 			shared.Logger.Error("Error downloading attack resource", "error", err)
 			SendAgentError(err.Error(), nil, components.SeverityCritical)
+			return err
 		}
-		errChan <- err
-	}
-
-	// Download the wordlists
-	for _, wordlist := range attack.WordLists {
-		go downloader(wordlist)
-	}
-	// Download the rulelists
-	for _, rulelist := range attack.RuleLists {
-		go downloader(rulelist)
-	}
-	wg.Wait()
-	err = <-errChan
-	if err != nil {
-		return err
+		downloadSize, _ := fileutil.FileSize(filePath)
+		if downloadSize == 0 {
+			shared.Logger.Error("Downloaded file is empty", "path", filePath)
+			SendAgentError("Downloaded file is empty", nil, components.SeverityCritical)
+			return errors.New("downloaded file is empty")
+		}
+		shared.Logger.Debug("Downloaded resource file", "path", filePath)
 	}
 
 	return nil
@@ -470,6 +448,7 @@ func downloadHashList(attack *components.Attack) error {
 				SendAgentError(err.Error(), nil, components.SeverityCritical)
 				return err
 			}
+			shared.Logger.Debug("Downloaded hashlist", "path", hashlistPath)
 		}
 	} else {
 		shared.Logger.Error("Error downloading hashlist", "response", response.RawResponse.Status)
@@ -481,13 +460,42 @@ func downloadHashList(attack *components.Attack) error {
 // SendHeartBeat sends a heartbeat to the agent API.
 // It makes an HTTP request to the agent API's HeartbeatAgent endpoint
 // and logs the result.
-func SendHeartBeat() {
-	_, err := SdkClient.Agents.SendHeartbeat(Context, shared.State.AgentID)
+func SendHeartBeat() *components.AgentHeartbeatResponseState {
+	resp, err := SdkClient.Agents.SendHeartbeat(Context, shared.State.AgentID)
 	if err != nil {
 		shared.Logger.Error("Error sending heartbeat", "error", err)
 		SendAgentError(err.Error(), nil, components.SeverityCritical)
-		return
+		return nil
 	}
+
+	// All good, nothing to see here
+	// We are not being asked to change anything
+	if resp.StatusCode == http.StatusNoContent {
+		shared.Logger.Debug("Heartbeat sent")
+		return nil
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		shared.Logger.Debug("Heartbeat sent")
+		stateResponse := resp.GetAgentHeartbeatResponse()
+
+		state := stateResponse.GetState()
+		switch state {
+		case components.AgentHeartbeatResponseStatePending:
+			shared.Logger.Debug("Agent is pending")
+		case components.AgentHeartbeatResponseStateStopped:
+			shared.Logger.Debug("Agent is stopped")
+			shared.Logger.Warn("Server has stopped the agent")
+		case components.AgentHeartbeatResponseStateError:
+			shared.Logger.Debug("Agent is in error state")
+		default:
+			shared.Logger.Debug("Unknown agent state")
+		}
+
+		return &state
+	}
+
+	return nil
 }
 
 // RunTask executes a task using the provided attack parameters.
@@ -644,7 +652,6 @@ func SendAgentError(stdErrLine string, task *components.Task, severity component
 	if err != nil {
 		shared.Logger.Error("Error sending job error", "error", err)
 	}
-
 }
 
 // AcceptTask accepts a task and returns a boolean indicating whether the task was accepted successfully.
@@ -652,6 +659,7 @@ func SendAgentError(stdErrLine string, task *components.Task, severity component
 func AcceptTask(task *components.Task) bool {
 	response, err := SdkClient.Tasks.SetTaskAccepted(Context, task.GetID())
 	if err != nil {
+		shared.Logger.Error("Error accepting task", "error", err)
 		if response.StatusCode == http.StatusUnprocessableEntity {
 			// Not really an error, just means the task is already completed
 			shared.Logger.Error("Task already completed", "task_id", task.GetID(), "status", response.RawResponse.Status)
@@ -673,6 +681,22 @@ func AcceptTask(task *components.Task) bool {
 // If an error occurs while notifying the server, it logs the error using the Logger.
 func MarkTaskExhausted(task *components.Task) {
 	_, err := SdkClient.Tasks.SetTaskExhausted(Context, task.GetID())
+	if err != nil {
+		shared.Logger.Error("Error notifying server", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityMajor)
+	}
+}
+
+func SendAgentShutdown() {
+	_, err := SdkClient.Agents.SetAgentShutdown(Context, shared.State.AgentID)
+	if err != nil {
+		shared.Logger.Error("Error sending agent shutdown", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
+	}
+}
+
+func AbandonTask(task *components.Task) {
+	_, err := SdkClient.Tasks.SetTaskAbandoned(Context, task.GetID())
 	if err != nil {
 		shared.Logger.Error("Error notifying server", "error", err)
 		SendAgentError(err.Error(), nil, components.SeverityMajor)
@@ -719,6 +743,11 @@ func SendCrackedHash(hash hashcat.Result, task *components.Task) {
 // Returns:
 //   - error: An error if any occurred during the download or verification process, or nil if successful.
 func downloadFile(url string, path string, checksum string) error {
+	if !validator.IsUrl(url) {
+		shared.Logger.Error("Invalid URL", "url", url)
+		return errors.New("invalid URL")
+	}
+
 	if fileutil.IsExist(path) {
 		if strutil.IsNotBlank(checksum) {
 			fileChecksum, err := cryptor.Md5File(path)
@@ -726,10 +755,10 @@ func downloadFile(url string, path string, checksum string) error {
 				return err
 			}
 			if fileChecksum == checksum {
-				shared.Logger.Debug("Download already exists", "path", path)
+				shared.Logger.Info("Download already exists", "path", path)
 				return nil
 			}
-			shared.Logger.Warn("Checksums do not match", "path", path)
+			shared.Logger.Warn("Checksums do not match", "path", path, "url_checksum", checksum, "file_checksum", fileChecksum)
 			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, components.SeverityLow)
 			err = os.Remove(path)
 			if err != nil {
@@ -739,12 +768,30 @@ func downloadFile(url string, path string, checksum string) error {
 		}
 	}
 	DisplayDownloadFile(url, path)
+	cwd, err := os.Getwd()
+	if err != nil {
+		shared.Logger.Error("Error getting current working directory: ", "error", err)
+	}
+
+	if strutil.IsNotBlank(checksum) {
+		urlA, err := uri.Parse(url)
+		if err != nil {
+			shared.Logger.Error("Error parsing URL: ", "error", err)
+			return err
+		}
+		values := urlA.Query()
+		values.Add("checksum", checksum)
+		urlA.RawQuery = values.Encode()
+		url = urlA.String()
+	}
 
 	client := &getter.Client{
-		Ctx:  context.Background(),
-		Dst:  path,
-		Src:  url,
-		Mode: getter.ClientModeFile,
+		Ctx:      context.Background(),
+		Dst:      path,
+		Src:      url,
+		Pwd:      cwd,
+		Insecure: true,
+		Mode:     getter.ClientModeFile,
 	}
 
 	_ = client.Configure(
@@ -753,6 +800,7 @@ func downloadFile(url string, path string, checksum string) error {
 	)
 
 	if err := client.Get(); err != nil {
+		shared.Logger.Debug("Error downloading file: ", "error", err)
 		return err
 	}
 	DisplayDownloadFileComplete(url, path)
@@ -805,4 +853,13 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 	}
 	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
 	return newArchivePath, err
+}
+
+func base64ToHex(base64 string) string {
+	if strutil.IsBlank(base64) {
+		return ""
+	}
+	str := cryptor.Base64StdDecode(base64)
+	hx := hex.EncodeToString([]byte(str))
+	return hx
 }
