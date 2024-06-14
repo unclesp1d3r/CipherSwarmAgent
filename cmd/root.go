@@ -57,7 +57,6 @@ func init() {
 
 	viper.SetDefault("data_path", path.Join(cwd, "data"))               // Set the default data path
 	viper.SetDefault("gpu_temp_threshold", 80)                          // Set the default GPU temperature threshold
-	viper.SetDefault("benchmark_update_frequency", 168*time.Hour)       // Set the default benchmark age in hours (7 days)
 	viper.SetDefault("always_use_native_hashcat", false)                // Set the default to not always use native hashcat
 	viper.SetDefault("sleep_on_failure", time.Duration(60*time.Second)) // Set the default sleep time on failure
 }
@@ -185,15 +184,8 @@ func startAgent(cmd *cobra.Command, args []string) {
 	lib.DisplayAuthenticated()
 
 	// Get the configuration
-	err = lib.GetAgentConfiguration()
-	if err != nil {
-		shared.Logger.Fatal("Failed to get agent configuration from the CipherSwarm API", "error", err)
-	}
-
 	// Override the configuration with the always_use_native_hashcat setting
-	if viper.GetBool("always_use_native_hashcat") {
-		lib.Configuration.Config.UseNativeHashcat = true
-	}
+	err = fetchAgentConfig()
 
 	// Update the agent metadata with the CipherSwarm API
 	lib.UpdateAgentMetadata()
@@ -212,8 +204,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	// This will send a heartbeat to the CipherSwarm API every 60 seconds
 	go func() {
 		for {
-			shared.Logger.Debug("Sending heartbeat")
-			lib.SendHeartBeat()
+			heartbeat(signChan)
 			time.Sleep(60 * time.Second)
 		}
 	}()
@@ -221,22 +212,25 @@ func startAgent(cmd *cobra.Command, args []string) {
 	// Start the agent loop
 	go func() {
 		for {
-			// The agent loop will:
-			// - Check if any files are no longer needed and delete them
-			// - Check for a new version of hashcat
-			//   - If a new version of hashcat is available, download and install it
-			// - Request a new job from the CipherSwarm API
+			heartbeat(signChan)
 
-			if !lib.Configuration.Config.UseNativeHashcat {
-				lib.UpdateCracker() // Should we update the cracker on every loop? It doesn't change often
+			if shared.State.Reload {
+				lib.SendAgentError("Reloading config and performing new benchmark", nil, components.SeverityLow)
+				shared.State.CurrentActivity = shared.CurrentActivityStarting
+				shared.Logger.Info("Reloading agent")
+				fetchAgentConfig()
+				shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
+				lib.UpdateBenchmarks()
+				shared.State.CurrentActivity = shared.CurrentActivityStarting
+				shared.State.Reload = false
+				heartbeat(signChan)
 			}
-
-			// - Check for an updated version of the agent
-			//   - If an updated version is available, download and install it
-
-			// - Check if we need to update the agent benchmarks
-			//   - If we need to update the benchmarks, run the benchmarks and upload the results to the CipherSwarm API
-			benchmarkUpdateCheck()
+			if !lib.Configuration.Config.UseNativeHashcat {
+				shared.State.CurrentActivity = shared.CurrentActivityUpdating
+				lib.UpdateCracker() // Should we update the cracker on every loop? It doesn't change often
+				shared.State.CurrentActivity = shared.CurrentActivityStarting
+				heartbeat(signChan)
+			}
 
 			// - Request a new job from the CipherSwarm API
 			//   - If a job is available, download the job and start processing it
@@ -247,6 +241,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 				continue
 			}
 			if task != nil {
+				shared.State.CurrentActivity = shared.CurrentActivityCracking
 				lib.DisplayNewTask(task)
 
 				// Process the task
@@ -254,8 +249,8 @@ func startAgent(cmd *cobra.Command, args []string) {
 				attack, err := lib.GetAttackParameters(task.GetAttackID())
 				if err != nil {
 					shared.Logger.Error("Failed to get attack parameters", "error", err)
-					lib.SendAgentError(err.Error(), nil, components.SeverityMajor)
-
+					lib.SendAgentError(err.Error(), task, components.SeverityFatal)
+					lib.AbandonTask(task)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
 					continue
 				}
@@ -265,23 +260,17 @@ func startAgent(cmd *cobra.Command, args []string) {
 				err = lib.DownloadFiles(attack)
 				if err != nil {
 					shared.Logger.Error("Failed to download files", "error", err)
-					lib.SendAgentError(err.Error(), nil, components.SeverityMajor)
+					lib.SendAgentError(err.Error(), task, components.SeverityFatal)
+					lib.AbandonTask(task)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
-					continue
+				} else {
+					lib.RunTask(task, attack)
 				}
-
-				// - Run the job
-				lib.RunTask(task, attack)
-				// - Upload the results
-				// - Update the CipherSwarm API with the status of the job
-
-				// For the job processing, we'll set up hashcat and run it in a separate goroutine
-				// We'll track the hashcat process and update the CipherSwarm API with the status of the job
-				// Once the job is complete, we'll upload the results to the CipherSwarm API
-				// We'll also track the resource usage of the machine and the temperature of the GPUs and update the CipherSwarm API with the data
+				shared.State.CurrentActivity = shared.CurrentActivityWaiting
 			} else {
 				shared.Logger.Info("No new task available")
 			}
+			heartbeat(signChan)
 			sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
 			lib.DisplayInactive(sleepTime)
 			time.Sleep(sleepTime)
@@ -291,7 +280,41 @@ func startAgent(cmd *cobra.Command, args []string) {
 	sig := <-signChan // Wait for a signal to shut down the agent
 	shared.Logger.Debug("Received signal", "signal", sig)
 	lib.SendAgentError("Received signal to terminate. Shutting down", nil, components.SeverityLow)
+	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
+}
+
+func heartbeat(signChan chan os.Signal) {
+	shared.Logger.Debug("Sending heartbeat")
+	state := lib.SendHeartBeat()
+	if state != nil {
+		shared.Logger.Debug("Received heartbeat response", "state", state)
+		switch *state {
+		case components.AgentHeartbeatResponseStatePending:
+			if shared.State.CurrentActivity != shared.CurrentActivityBenchmarking {
+				shared.Logger.Info("Agent is pending, performing reload")
+				shared.State.Reload = true
+			}
+		case components.AgentHeartbeatResponseStateStopped:
+			shared.Logger.Info("Agent is stopped, shutting down")
+			lib.SendAgentError("Agent is stopped, shutting down", nil, components.SeverityMajor)
+			signChan <- syscall.SIGTERM
+		case components.AgentHeartbeatResponseStateError:
+			shared.Logger.Info("Agent is in error state, stopping processing")
+		}
+	}
+}
+
+func fetchAgentConfig() error {
+	err := lib.GetAgentConfiguration()
+	if err != nil {
+		shared.Logger.Fatal("Failed to get agent configuration from the CipherSwarm API", "error", err)
+	}
+
+	if viper.GetBool("always_use_native_hashcat") {
+		lib.Configuration.Config.UseNativeHashcat = true
+	}
+	return err
 }
 
 func initLogger() {
@@ -300,26 +323,6 @@ func initLogger() {
 		shared.Logger.SetReportCaller(true)    // Report the caller for debugging
 	} else {
 		shared.Logger.SetLevel(log.InfoLevel)
-	}
-}
-
-func benchmarkUpdateCheck() {
-	benchmarkFrequency := viper.GetDuration("benchmark_update_frequency")
-	oldestUpdate := time.Now().Add(-benchmarkFrequency)
-	lastBenchmarkDate, err := lib.GetLastBenchmarkDate()
-	if err != nil {
-		shared.Logger.Error("Failed to get last benchmark date", "error", err)
-		return
-	}
-	shared.Logger.Debug("Got benchmark age", "benchmark_age", time.Since(lastBenchmarkDate).String())
-
-	if lastBenchmarkDate.Before(oldestUpdate) {
-		shared.Logger.Info("Benchmarks out of date", "benchmark_age", time.Since(lastBenchmarkDate).String(),
-			"maximum_age", oldestUpdate.String())
-		lib.UpdateBenchmarks()
-		shared.Logger.Info("Updated benchmarks")
-	} else {
-		shared.Logger.Info("Benchmarks up to date")
 	}
 }
 
