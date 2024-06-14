@@ -2,11 +2,12 @@ package lib
 
 import (
 	"errors"
+	"os"
+	"path"
+
 	"github.com/duke-git/lancet/convertor"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/shirou/gopsutil/v3/process"
-	"os"
-	"path"
 
 	"github.com/duke-git/lancet/fileutil"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
