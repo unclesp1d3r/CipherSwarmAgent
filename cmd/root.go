@@ -280,6 +280,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	sig := <-signChan // Wait for a signal to shut down the agent
 	shared.Logger.Debug("Received signal", "signal", sig)
 	lib.SendAgentError("Received signal to terminate. Shutting down", nil, components.SeverityLow)
+	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
 }
 
