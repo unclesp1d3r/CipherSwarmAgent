@@ -218,7 +218,11 @@ func startAgent(cmd *cobra.Command, args []string) {
 				lib.SendAgentError("Reloading config and performing new benchmark", nil, components.SeverityLow)
 				shared.State.CurrentActivity = shared.CurrentActivityStarting
 				shared.Logger.Info("Reloading agent")
-				fetchAgentConfig()
+				err = fetchAgentConfig()
+				if err != nil {
+					shared.Logger.Error("Failed to fetch agent configuration", "error", err)
+					lib.SendAgentError("Failed to fetch agent configuration", nil, components.SeverityFatal)
+				}
 				shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
 				lib.UpdateBenchmarks()
 				shared.State.CurrentActivity = shared.CurrentActivityStarting
