@@ -1,8 +1,18 @@
 
-<a name="v0.1.12"></a>
-## [v0.1.12](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.11...v0.1.12)
+<a name="v0.2.0"></a>
+## [v0.2.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.11...v0.2.0)
 
-> 0001-01-01
+> 2024-06-14
+
+### Bug Fixes
+
+* Download files are now compare checksums correctly
+
+### Features
+
+* Agent now tells server its offline when shutting down
+* Add bidirectional status
+* Added error metadata
 
 
 <a name="v0.1.11"></a>
