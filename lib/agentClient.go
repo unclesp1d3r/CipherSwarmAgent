@@ -388,35 +388,24 @@ func DownloadFiles(attack *components.Attack) error {
 		return err
 	}
 
-	wg := sync.WaitGroup{}
-	errChan := make(chan error, 2)
-
-	downloader := func(resource components.AttackResourceFile) {
-		wg.Add(1)
-		defer wg.Done()
+	// Download all resource files
+	for _, resource := range slice.Merge(attack.WordLists, attack.RuleLists) {
 		filePath := path.Join(shared.State.FilePath, resource.FileName)
 		shared.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
 
-		err := downloadFile(resource.GetDownloadURL(), filePath, resource.GetChecksum())
+		err := downloadFile(resource.GetDownloadURL(), filePath, base64ToHex(resource.GetChecksum()))
 		if err != nil {
 			shared.Logger.Error("Error downloading attack resource", "error", err)
 			SendAgentError(err.Error(), nil, components.SeverityCritical)
+			return err
 		}
-		errChan <- err
-	}
-
-	// Download the wordlists
-	for _, wordlist := range attack.WordLists {
-		go downloader(wordlist)
-	}
-	// Download the rulelists
-	for _, rulelist := range attack.RuleLists {
-		go downloader(rulelist)
-	}
-	wg.Wait()
-	err = <-errChan
-	if err != nil {
-		return err
+		downloadSize, _ := fileutil.FileSize(filePath)
+		if downloadSize == 0 {
+			shared.Logger.Error("Downloaded file is empty", "path", filePath)
+			SendAgentError("Downloaded file is empty", nil, components.SeverityCritical)
+			return errors.New("downloaded file is empty")
+		}
+		shared.Logger.Debug("Downloaded resource file", "path", filePath)
 	}
 
 	return nil
@@ -459,6 +448,7 @@ func downloadHashList(attack *components.Attack) error {
 				SendAgentError(err.Error(), nil, components.SeverityCritical)
 				return err
 			}
+			shared.Logger.Debug("Downloaded hashlist", "path", hashlistPath)
 		}
 	} else {
 		shared.Logger.Error("Error downloading hashlist", "response", response.RawResponse.Status)
@@ -697,6 +687,14 @@ func MarkTaskExhausted(task *components.Task) {
 	}
 }
 
+func SendAgentShutdown() {
+	_, err := SdkClient.Agents.SetAgentShutdown(Context, shared.State.AgentID)
+	if err != nil {
+		shared.Logger.Error("Error sending agent shutdown", "error", err)
+		SendAgentError(err.Error(), nil, components.SeverityCritical)
+	}
+}
+
 func AbandonTask(task *components.Task) {
 	_, err := SdkClient.Tasks.SetTaskAbandoned(Context, task.GetID())
 	if err != nil {
@@ -745,6 +743,11 @@ func SendCrackedHash(hash hashcat.Result, task *components.Task) {
 // Returns:
 //   - error: An error if any occurred during the download or verification process, or nil if successful.
 func downloadFile(url string, path string, checksum string) error {
+	if !validator.IsUrl(url) {
+		shared.Logger.Error("Invalid URL", "url", url)
+		return errors.New("invalid URL")
+	}
+
 	if fileutil.IsExist(path) {
 		if strutil.IsNotBlank(checksum) {
 			fileChecksum, err := cryptor.Md5File(path)
@@ -752,10 +755,10 @@ func downloadFile(url string, path string, checksum string) error {
 				return err
 			}
 			if fileChecksum == checksum {
-				shared.Logger.Debug("Download already exists", "path", path)
+				shared.Logger.Info("Download already exists", "path", path)
 				return nil
 			}
-			shared.Logger.Warn("Checksums do not match", "path", path)
+			shared.Logger.Warn("Checksums do not match", "path", path, "url_checksum", checksum, "file_checksum", fileChecksum)
 			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, components.SeverityLow)
 			err = os.Remove(path)
 			if err != nil {
@@ -765,12 +768,30 @@ func downloadFile(url string, path string, checksum string) error {
 		}
 	}
 	DisplayDownloadFile(url, path)
+	cwd, err := os.Getwd()
+	if err != nil {
+		shared.Logger.Error("Error getting current working directory: ", "error", err)
+	}
+
+	if strutil.IsNotBlank(checksum) {
+		urlA, err := uri.Parse(url)
+		if err != nil {
+			shared.Logger.Error("Error parsing URL: ", "error", err)
+			return err
+		}
+		values := urlA.Query()
+		values.Add("checksum", checksum)
+		urlA.RawQuery = values.Encode()
+		url = urlA.String()
+	}
 
 	client := &getter.Client{
-		Ctx:  context.Background(),
-		Dst:  path,
-		Src:  url,
-		Mode: getter.ClientModeFile,
+		Ctx:      context.Background(),
+		Dst:      path,
+		Src:      url,
+		Pwd:      cwd,
+		Insecure: true,
+		Mode:     getter.ClientModeFile,
 	}
 
 	_ = client.Configure(
@@ -779,6 +800,7 @@ func downloadFile(url string, path string, checksum string) error {
 	)
 
 	if err := client.Get(); err != nil {
+		shared.Logger.Debug("Error downloading file: ", "error", err)
 		return err
 	}
 	DisplayDownloadFileComplete(url, path)
@@ -831,4 +853,13 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 	}
 	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
 	return newArchivePath, err
+}
+
+func base64ToHex(base64 string) string {
+	if strutil.IsBlank(base64) {
+		return ""
+	}
+	str := cryptor.Base64StdDecode(base64)
+	hx := hex.EncodeToString([]byte(str))
+	return hx
 }
