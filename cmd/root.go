@@ -215,7 +215,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 			heartbeat(signChan)
 
 			if shared.State.Reload {
-				lib.SendAgentError("Reloading config and performing new benchmark", nil, components.SeverityLow)
+				lib.SendAgentError("Reloading config and performing new benchmark", nil, components.SeverityInfo)
 				shared.State.CurrentActivity = shared.CurrentActivityStarting
 				shared.Logger.Info("Reloading agent")
 				err = fetchAgentConfig()
@@ -283,7 +283,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 	sig := <-signChan // Wait for a signal to shut down the agent
 	shared.Logger.Debug("Received signal", "signal", sig)
-	lib.SendAgentError("Received signal to terminate. Shutting down", nil, components.SeverityLow)
+	lib.SendAgentError("Received signal to terminate. Shutting down", nil, components.SeverityInfo)
 	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
 }
