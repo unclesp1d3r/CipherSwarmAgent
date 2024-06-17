@@ -663,7 +663,7 @@ func AcceptTask(task *components.Task) bool {
 		if response.StatusCode == http.StatusUnprocessableEntity {
 			// Not really an error, just means the task is already completed
 			shared.Logger.Error("Task already completed", "task_id", task.GetID(), "status", response.RawResponse.Status)
-			SendAgentError(err.Error(), nil, components.SeverityLow)
+			SendAgentError(err.Error(), nil, components.SeverityInfo)
 			return false
 		}
 
@@ -759,7 +759,7 @@ func downloadFile(url string, path string, checksum string) error {
 				return nil
 			}
 			shared.Logger.Warn("Checksums do not match", "path", path, "url_checksum", checksum, "file_checksum", fileChecksum)
-			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, components.SeverityLow)
+			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, components.SeverityInfo)
 			err = os.Remove(path)
 			if err != nil {
 				SendAgentError(err.Error(), nil, components.SeverityMajor)
