@@ -45,7 +45,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 				}
 
 			case stdErrLine := <-sess.StderrMessages:
-				SendAgentError(err.Error(), nil, components.SeverityWarning)
+				SendAgentError(stdErrLine, nil, components.SeverityWarning)
 				DisplayBenchmarkError(stdErrLine)
 			case statusUpdate := <-sess.StatusUpdates:
 				shared.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
