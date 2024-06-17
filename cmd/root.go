@@ -59,6 +59,7 @@ func init() {
 	viper.SetDefault("gpu_temp_threshold", 80)                          // Set the default GPU temperature threshold
 	viper.SetDefault("always_use_native_hashcat", false)                // Set the default to not always use native hashcat
 	viper.SetDefault("sleep_on_failure", time.Duration(60*time.Second)) // Set the default sleep time on failure
+	viper.SetDefault("always_trust_files", false)                       // Set the default to not always trust files
 }
 
 func setupSharedState() {
@@ -78,6 +79,7 @@ func setupSharedState() {
 	shared.State.ToolsPath = path.Join(dataRoot, "tools")                 // Set the tools path in the shared state
 	shared.State.OutPath = path.Join(dataRoot, "output")                  // Set the output path in the shared state
 	shared.State.Debug = enableDebug                                      // Set the debug flag in the shared state
+	shared.State.AlwaysTrustFiles = viper.GetBool("always_trust_files")   // Set the always trust files flag in the shared state
 }
 
 // initConfig initializes the configuration for the CipherSwarmAgent.
@@ -215,7 +217,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 			heartbeat(signChan)
 
 			if shared.State.Reload {
-				lib.SendAgentError("Reloading config and performing new benchmark", nil, components.SeverityLow)
+				lib.SendAgentError("Reloading config and performing new benchmark", nil, components.SeverityInfo)
 				shared.State.CurrentActivity = shared.CurrentActivityStarting
 				shared.Logger.Info("Reloading agent")
 				err = fetchAgentConfig()
@@ -283,7 +285,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 	sig := <-signChan // Wait for a signal to shut down the agent
 	shared.Logger.Debug("Received signal", "signal", sig)
-	lib.SendAgentError("Received signal to terminate. Shutting down", nil, components.SeverityLow)
+	lib.SendAgentError("Received signal to terminate. Shutting down", nil, components.SeverityInfo)
 	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
 }
