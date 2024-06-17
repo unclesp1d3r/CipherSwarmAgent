@@ -25,6 +25,7 @@ type agentState struct {
 	APIToken          string   // APIToken is the token used to authenticate with the CipherSwarm API.
 	Reload            bool     // Reload specifies whether the agent should reload its configuration.
 	CurrentActivity   Activity // CurrentActivity is the current activity of the agent.
+	AlwaysTrustFiles  bool     // AlwaysTrustFiles specifies whether the agent should trust all files in the files directory and not check checksums.
 }
 
 type Activity string

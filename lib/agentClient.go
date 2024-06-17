@@ -392,8 +392,14 @@ func DownloadFiles(attack *components.Attack) error {
 	for _, resource := range slice.Merge(attack.WordLists, attack.RuleLists) {
 		filePath := path.Join(shared.State.FilePath, resource.FileName)
 		shared.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
-
-		err := downloadFile(resource.GetDownloadURL(), filePath, base64ToHex(resource.GetChecksum()))
+		checksum := ""
+		if shared.State.AlwaysTrustFiles {
+			shared.Logger.Debug("Skipping checksum verification")
+		} else {
+			// Check the checksum of the file
+			checksum = base64ToHex(resource.GetChecksum())
+		}
+		err := downloadFile(resource.GetDownloadURL(), filePath, checksum)
 		if err != nil {
 			shared.Logger.Error("Error downloading attack resource", "error", err)
 			SendAgentError(err.Error(), nil, components.SeverityCritical)
