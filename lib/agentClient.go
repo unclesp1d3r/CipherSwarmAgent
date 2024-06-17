@@ -392,8 +392,14 @@ func DownloadFiles(attack *components.Attack) error {
 	for _, resource := range slice.Merge(attack.WordLists, attack.RuleLists) {
 		filePath := path.Join(shared.State.FilePath, resource.FileName)
 		shared.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
-
-		err := downloadFile(resource.GetDownloadURL(), filePath, base64ToHex(resource.GetChecksum()))
+		checksum := ""
+		if shared.State.AlwaysTrustFiles {
+			shared.Logger.Debug("Skipping checksum verification")
+		} else {
+			// Check the checksum of the file
+			checksum = base64ToHex(resource.GetChecksum())
+		}
+		err := downloadFile(resource.GetDownloadURL(), filePath, checksum)
 		if err != nil {
 			shared.Logger.Error("Error downloading attack resource", "error", err)
 			SendAgentError(err.Error(), nil, components.SeverityCritical)
@@ -663,7 +669,7 @@ func AcceptTask(task *components.Task) bool {
 		if response.StatusCode == http.StatusUnprocessableEntity {
 			// Not really an error, just means the task is already completed
 			shared.Logger.Error("Task already completed", "task_id", task.GetID(), "status", response.RawResponse.Status)
-			SendAgentError(err.Error(), nil, components.SeverityLow)
+			SendAgentError(err.Error(), nil, components.SeverityInfo)
 			return false
 		}
 
@@ -759,7 +765,7 @@ func downloadFile(url string, path string, checksum string) error {
 				return nil
 			}
 			shared.Logger.Warn("Checksums do not match", "path", path, "url_checksum", checksum, "file_checksum", fileChecksum)
-			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, components.SeverityLow)
+			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, components.SeverityInfo)
 			err = os.Remove(path)
 			if err != nil {
 				SendAgentError(err.Error(), nil, components.SeverityMajor)

@@ -26,6 +26,7 @@ WORKDIR /
 ENV API_URL=http://localhost:3000/api/v1/client/
 ENV API_TOKEN=1234567890
 ENV ALWAYS_USE_NATIVE_HASHCAT=true
+ENV HASHCAT_PATH="/usr/local/bin/hashcat"
 
 COPY --from=build-stage /cipherswarmagent /cipherswarmagent
 

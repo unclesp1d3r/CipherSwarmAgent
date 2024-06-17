@@ -1,4 +1,19 @@
 
+<a name="v0.2.3"></a>
+## [v0.2.3](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.2...v0.2.3)
+
+> 2024-06-16
+
+### Bug Fixes
+
+* Updated to support v0.4.1 of CipherSwarm SDK
+* Docker now finds hashcat correctly
+
+### Features
+
+* Added the ability to override checking checksums
+
+
 <a name="v0.2.2"></a>
 ## [v0.2.2](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.1...v0.2.2)
 
