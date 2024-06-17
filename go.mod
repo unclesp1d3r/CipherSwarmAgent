@@ -14,9 +14,9 @@ require (
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.4.0
+	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.4.2
 )
 
 require (
