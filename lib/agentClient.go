@@ -97,6 +97,9 @@ func GetAgentConfiguration() error {
 		agentConfig.Config.BackendDevices = *config.Config.BackendDevice
 	}
 
+	// TODO: Check if the OpenCL devices are set
+	// This has not been implemented in the API yet.
+
 	if agentConfig.Config.UseNativeHashcat {
 		shared.Logger.Debug("Using native Hashcat")
 		// Find the Hashcat binary path
@@ -112,6 +115,8 @@ func GetAgentConfiguration() error {
 	}
 
 	Configuration = agentConfig
+
+	shared.Logger.Debug("Agent configuration", "config", Configuration)
 
 	return nil
 }
@@ -148,6 +153,7 @@ func UpdateAgentMetadata() {
 		OperatingSystem: info.OS,
 		Devices:         devices,
 	}
+	shared.Logger.Debug("Updating agent metadata", "agent_id", shared.State.AgentID, "hostname", info.Hostname, "client_signature", clientSignature, "os", info.OS, "devices", devices)
 	response, err := SdkClient.Agents.UpdateAgent(Context, shared.State.AgentID, agentUpdate)
 	if err != nil {
 		shared.Logger.Error("Error updating agent metadata", "error", err)
@@ -353,6 +359,8 @@ func UpdateBenchmarks() {
 	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackBenchmark,
 		AdditionalArgs: arch.GetAdditionalHashcatArgs(),
+		BackendDevices: Configuration.Config.BackendDevices,
+		OpenCLDevices:  Configuration.Config.OpenCLDevices,
 	}
 
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
@@ -361,6 +369,7 @@ func UpdateBenchmarks() {
 		SendAgentError(err.Error(), nil, components.SeverityMajor)
 		return
 	}
+	shared.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
 
 	DisplayBenchmarkStarting()
 	benchmarkResult, done := RunBenchmarkTask(sess)
@@ -455,6 +464,12 @@ func downloadHashList(attack *components.Attack) error {
 				return err
 			}
 			shared.Logger.Debug("Downloaded hashlist", "path", hashlistPath)
+			hashSize, _ := fileutil.FileSize(hashlistPath)
+			if hashSize == 0 {
+				shared.Logger.Error("Downloaded hashlist is empty", "path", hashlistPath)
+				SendAgentError("Downloaded hashlist is empty", nil, components.SeverityCritical)
+				return errors.New("downloaded hashlist is empty, probably completed task")
+			}
 		}
 	} else {
 		shared.Logger.Error("Error downloading hashlist", "response", response.RawResponse.Status)
@@ -535,6 +550,8 @@ func RunTask(task *components.Task, attack *components.Attack) {
 		SlowCandidates:    *attack.SlowCandidateGenerators,
 		Skip:              pointer.UnwarpOr(task.GetSkip(), 0),
 		Limit:             pointer.UnwarpOr(task.GetLimit(), 0),
+		BackendDevices:    Configuration.Config.BackendDevices,
+		OpenCLDevices:     Configuration.Config.OpenCLDevices,
 	}
 
 	sess, err := hashcat.NewHashcatSession("attack", jobParams)

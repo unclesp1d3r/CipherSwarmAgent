@@ -6,6 +6,7 @@ import (
 
 	"github.com/duke-git/lancet/convertor"
 	"github.com/duke-git/lancet/fileutil"
+	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
@@ -28,6 +29,9 @@ type Params struct {
 
 	Skip  int64 `json:"skip,omitempty"`  // Keyspace offset to start at
 	Limit int64 `json:"limit,omitempty"` // Maximum keyspace to process
+
+	BackendDevices string `json:"backend_devices,omitempty"` // Devices to use for the backend, comma-separated
+	OpenCLDevices  string `json:"opencl_devices,omitempty"`  // OpenCL devices to use, comma-separated
 }
 
 // Validate checks if the parameters for the attack mode are valid.
@@ -80,7 +84,9 @@ func (params Params) maskArgs() ([]string, error) {
 
 	for i, charset := range params.MaskCustomCharsets {
 		// Hashcat accepts parameters --custom-charset1 to --custom-charset4
-		args = append(args, fmt.Sprintf("--custom-charset%d", i+1), charset)
+		if strutil.IsNotBlank(charset) {
+			args = append(args, fmt.Sprintf("--custom-charset%d", i+1), charset)
+		}
 	}
 
 	if params.MaskIncrement {
@@ -113,6 +119,13 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 			"--machine-readable",
 			"--benchmark",
 		)
+		if strutil.IsNotBlank(params.BackendDevices) {
+			args = append(args, "--backend-devices", params.BackendDevices)
+		}
+
+		if strutil.IsNotBlank(params.OpenCLDevices) {
+			args = append(args, "--opencl-device-types", params.OpenCLDevices)
+		}
 		return
 	}
 	args = append(
@@ -194,6 +207,14 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 			return nil, err
 		}
 		args = append(args, maskArgs...)
+	}
+
+	if strutil.IsNotBlank(params.BackendDevices) {
+		args = append(args, "--backend-devices", params.BackendDevices)
+	}
+
+	if strutil.IsNotBlank(params.OpenCLDevices) {
+		args = append(args, "--opencl-device-types", params.OpenCLDevices)
 	}
 
 	return

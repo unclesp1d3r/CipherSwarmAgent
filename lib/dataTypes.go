@@ -9,6 +9,7 @@ type agentConfiguration struct {
 		UseNativeHashcat    bool   `json:"use_native_hashcat" yaml:"use_native_hashcat"`               // UseNativeHashcat specifies whether to use the native Hashcat implementation.
 		AgentUpdateInterval int64  `json:"agent_update_interval" yaml:"agent_update_interval"`         // AgentUpdateInterval specifies the interval in seconds at which the agent should check in with the server.
 		BackendDevices      string `json:"backend_devices,omitempty" yaml:"backend_devices,omitempty"` // BackendDevices specifies the devices to use for the backend.
+		OpenCLDevices       string `json:"opencl_devices,omitempty" yaml:"opencl_devices,omitempty"`   // OpenCLDevices specifies the OpenCL devices to use.
 	} `json:"config" yaml:"config"`
 	APIVersion int64 `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
 }
@@ -51,8 +52,9 @@ func getRulelistFilenames(a *components.Attack) []string {
 }
 
 type BenchmarkResult struct {
-	Device    string `json:"device,omitempty"`     // Device is the name of the device used for the benchmark.
-	HashType  string `json:"hash_type,omitempty"`  // HashType is the type of hash used for the benchmark.
-	RuntimeMs string `json:"runtime,omitempty"`    // RuntimeMs is the runtime of the benchmark in milliseconds.
-	SpeedHs   string `json:"hash_speed,omitempty"` // SpeedHs is the hash speed in hashes per second.
+	Device     string `json:"device,omitempty"`     // Device is the name of the device used for the benchmark.
+	HashType   string `json:"hash_type,omitempty"`  // HashType is the type of hash used for the benchmark.
+	RuntimeMs  string `json:"runtime,omitempty"`    // RuntimeMs is the runtime of the benchmark in milliseconds.
+	HashTimeMs string `json:"hash_time,omitempty"`  // HashTimeMs is the time taken to hash in milliseconds.
+	SpeedHs    string `json:"hash_speed,omitempty"` // SpeedHs is the hash speed in hashes per second.
 }
