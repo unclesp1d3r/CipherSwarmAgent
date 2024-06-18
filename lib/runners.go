@@ -35,10 +35,11 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 					shared.Logger.Debug("Unknown benchmark line", "line", stdOutLine)
 				} else {
 					result := BenchmarkResult{
-						Device:    fields[0],
-						HashType:  fields[1],
-						RuntimeMs: fields[3],
-						SpeedHs:   fields[4],
+						Device:     fields[0],
+						HashType:   fields[1],
+						RuntimeMs:  fields[3],
+						HashTimeMs: fields[4],
+						SpeedHs:    fields[5],
 					}
 					DisplayBenchmark(result)
 					benchmarkResult = append(benchmarkResult, result)

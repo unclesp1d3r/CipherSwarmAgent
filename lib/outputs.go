@@ -93,7 +93,7 @@ func DisplayJobStatus(update hashcat.Status) {
 
 	progressText := fmt.Sprintf("%.2f%%", relativeProgress)
 	speedText := humanize.SI(float64(speedSum), "H/s")
-	hashesText := fmt.Sprintf("%v", len(update.RecoveredHashes))
+	hashesText := fmt.Sprintf("%v of %v", update.RecoveredHashes[0], update.RecoveredHashes[1])
 
 	shared.Logger.Info("Progress update", "progress", progressText, "speed", speedText, "cracked_hashes", hashesText)
 }
