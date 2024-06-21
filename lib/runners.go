@@ -90,7 +90,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 						shared.Logger.Error("Failed to parse status update", "error", err)
 					} else {
 						DisplayJobStatus(update)
-						SendStatusUpdate(update, task)
+						SendStatusUpdate(update, task, sess)
 					}
 				}
 			case stdErrLine := <-sess.StderrMessages:
@@ -98,7 +98,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 				SendAgentError(stdErrLine, task, components.SeverityMinor)
 			case statusUpdate := <-sess.StatusUpdates:
 				DisplayJobStatus(statusUpdate)
-				SendStatusUpdate(statusUpdate, task)
+				SendStatusUpdate(statusUpdate, task, sess)
 			case crackedHash := <-sess.CrackedHashes:
 				DisplayJobCrackedHash(crackedHash)
 				SendCrackedHash(crackedHash, task)
