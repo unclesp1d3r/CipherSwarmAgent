@@ -1,4 +1,14 @@
 
+<a name="v0.2.6"></a>
+## [v0.2.6](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.5...v0.2.6)
+
+> 2024-06-21
+
+### Bug Fixes
+
+* Correctly handle when a running task is deleted
+
+
 <a name="v0.2.5"></a>
 ## [v0.2.5](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.4...v0.2.5)
 
