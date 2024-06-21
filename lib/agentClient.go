@@ -24,6 +24,7 @@ import (
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
@@ -449,7 +450,7 @@ func downloadHashList(attack *components.Attack) error {
 	}
 
 	if response.StatusCode == http.StatusOK {
-		if response.Stream != nil {
+		if response.ResponseStream != nil {
 			f, err := os.Create(hashlistPath)
 			if err != nil {
 				shared.Logger.Error("Error creating hashlist file", "error", err)
@@ -457,7 +458,7 @@ func downloadHashList(attack *components.Attack) error {
 				return err
 			}
 			defer f.Close()
-			_, err = io.Copy(f, response.Stream)
+			_, err = io.Copy(f, response.ResponseStream)
 			if err != nil {
 				shared.Logger.Error("Error writing hashlist file", "error", err)
 				SendAgentError(err.Error(), nil, components.SeverityCritical)
@@ -582,7 +583,7 @@ func RunTask(task *components.Task, attack *components.Attack) {
 // Finally, it submits the task status to the server using the apiClient.TasksAPI.SubmitStatus method.
 // If there is an error during the submission, an error message is logged and the function returns.
 // If the submission is successful, a debug message is logged.
-func SendStatusUpdate(update hashcat.Status, task *components.Task) {
+func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashcat.Session) {
 	// TODO: Implement receiving a result code when sending this status update
 	// Depending on the code, we should stop the job or pause it
 
@@ -640,6 +641,17 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task) {
 	if err != nil {
 		shared.Logger.Error("Error sending status update", "error", err)
 		SendAgentError(err.Error(), nil, components.SeverityCritical)
+		var e *sdkerrors.SDKError
+		if errors.As(err, &e) {
+			if e.StatusCode == http.StatusNotFound {
+				shared.Logger.Error("Task not found", "task_id", task.GetID())
+				// Going to kill the task here
+				shared.Logger.Error("Killing task", "task_id", task.GetID())
+				sess.Kill()
+				sess.Cleanup()
+			}
+		}
+
 		return
 	}
 }
