@@ -1,4 +1,14 @@
 
+<a name="v0.2.7"></a>
+## [v0.2.7](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.6...v0.2.7)
+
+> 2024-07-01
+
+### Code Refactoring
+
+* Moved utility code out of agentClient.go
+
+
 <a name="v0.2.6"></a>
 ## [v0.2.6](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.5...v0.2.6)
 
