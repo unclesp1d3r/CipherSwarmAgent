@@ -1,4 +1,14 @@
 
+<a name="v0.2.8"></a>
+## [v0.2.8](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.7...v0.2.8)
+
+> 2024-07-10
+
+### Bug Fixes
+
+* Added more checking for null tasks or attacks
+
+
 <a name="v0.2.7"></a>
 ## [v0.2.7](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.6...v0.2.7)
 
