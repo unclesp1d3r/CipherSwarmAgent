@@ -114,12 +114,13 @@ func GetAgentConfiguration() error {
 	return nil
 }
 
-// UpdateAgentMetadata updates the agent metadata with the CipherSwarm API.
+// UpdateAgentMetadata updates the metadata of the agent.
 // It retrieves the host information, including the operating system and kernel architecture,
-// and constructs a client signature that represents the CipherSwarm Agent version, operating system,
-// and kernel architecture. It then retrieves the devices information and creates an agent update
-// object with the agent ID, hostname, client signature, operating system, and devices.
-// Finally, it sends the agent update request to the CipherSwarm API and handles the response.
+// and constructs a client signature based on the CipherSwarm Agent version, operating system, and kernel architecture.
+// It then retrieves the devices information and creates an AgentUpdate object with the agent ID, hostname, client signature,
+// operating system, and devices. The agent metadata is updated by calling the UpdateAgent method of the SdkClient.
+// If there is an error during the process, it logs the error and sends an agent error message.
+// If the agent metadata is successfully updated, it displays the updated agent metadata.
 func UpdateAgentMetadata() {
 	info, err := host.Info()
 	if err != nil {
@@ -161,8 +162,8 @@ func UpdateAgentMetadata() {
 }
 
 // UpdateCracker checks for an updated version of the cracker and performs the necessary updates.
-// It retrieves the current version of the cracker, checks for updates from the CipherSwarm API,
-// downloads and extracts the updated cracker, and updates the configuration file.
+// It connects to the CipherSwarm API to check for updates, downloads the updated cracker if available,
+// moves the file to the correct location, extracts the file, and updates the config file with the new hashcat path.
 func UpdateCracker() {
 	shared.Logger.Info("Checking for updated cracker")
 	currentVersion, err := getCurrentHashcatVersion()
@@ -261,8 +262,9 @@ func UpdateCracker() {
 	}
 }
 
-// GetNewTask retrieves a new task from the API.
-// It returns the new task if successful, or an error if there was a problem.
+// GetNewTask retrieves a new task from the CipherSwarm API.
+// It returns the new task if available, or nil if no new task is available.
+// If there is an error connecting to the API, it logs the error and returns the error.
 func GetNewTask() (*components.Task, error) {
 	response, err := SdkClient.Tasks.GetNewTask(Context)
 	if err != nil {
@@ -284,8 +286,8 @@ func GetNewTask() (*components.Task, error) {
 }
 
 // GetAttackParameters retrieves the attack parameters for the specified attack ID.
-// It makes a request to the CipherSwarm API and returns the attack details if the request is successful.
-// If there is an error connecting to the API or if the response is not successful, an error is returned.
+// It makes a request to the CipherSwarm API using the SdkClient and returns the attack parameters if the request is successful.
+// If there is an error connecting to the API or if the response status is not OK, an error is returned.
 func GetAttackParameters(attackID int64) (*components.Attack, error) {
 	response, err := SdkClient.Attacks.GetAttack(Context, attackID)
 	if err != nil {
@@ -299,14 +301,13 @@ func GetAttackParameters(attackID int64) (*components.Attack, error) {
 	return nil, errors.New("bad response: " + response.RawResponse.Status)
 }
 
-// SendBenchmarkResults sends benchmark results to the server.
-// It takes a slice of benchmark results as input and returns an error if any.
-// Each benchmark result contains information about the hash type, runtime in milliseconds,
-// speed in hashes per second, and the device used for benchmarking.
-// The function converts the benchmark results into a format compatible with the server's API,
-// and submits them using an HTTP request.
-// If the request is successful and the server responds with a status code of 204 (No Content),
-// the function returns nil. Otherwise, it returns an error with a descriptive message.
+// SendBenchmarkResults sends benchmark results to the SDK client.
+// It takes a slice of BenchmarkResult as input and returns an error if any.
+// The function iterates over the benchmark results and converts the necessary fields to their respective types.
+// Then, it creates a HashcatBenchmark object and appends it to the results slice.
+// Finally, it submits the benchmark results to the SDK client using the SdkClient.Agents.SubmitBenchmark method.
+// If the submission is successful (HTTP status code 204), it returns nil.
+// Otherwise, it returns an error with the corresponding status message.
 func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 	var results []components.HashcatBenchmark
 	for _, result := range benchmarkResults {
@@ -348,6 +349,8 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 }
 
 // UpdateBenchmarks updates the benchmarks for the agent.
+// It creates a new hashcat session for benchmarking and sends the benchmark results.
+// If any error occurs during the process, it logs the error and sends an agent error.
 func UpdateBenchmarks() {
 	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackBenchmark,
@@ -419,9 +422,12 @@ func DownloadFiles(attack *components.Attack) error {
 	return nil
 }
 
-// SendHeartBeat sends a heartbeat to the agent API.
-// It makes an HTTP request to the agent API's HeartbeatAgent endpoint
-// and logs the result.
+// SendHeartBeat sends a heartbeat to the server and returns the agent heartbeat response state.
+// If an error occurs while sending the heartbeat, it logs the error and sends an agent error.
+// If the response status code is http.StatusNoContent, it logs that the heartbeat was sent and returns nil.
+// If the response status code is http.StatusOK, it logs that the heartbeat was sent and checks the agent heartbeat response state.
+// It logs the corresponding agent state based on the response state and returns a pointer to the response state.
+// If the response status code is neither http.StatusNoContent nor http.StatusOK, it returns nil.
 func SendHeartBeat() *components.AgentHeartbeatResponseState {
 	resp, err := SdkClient.Agents.SendHeartbeat(Context, shared.State.AgentID)
 	if err != nil {
@@ -601,9 +607,22 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 }
 
 // SendAgentError sends an agent error to the server.
-// It takes the stdErrLine string, task pointer, and severity as input parameters.
-// It creates an AgentError object with the provided parameters and submits it to the server using the SdkClient.
-// If there is an error while submitting the agent error, it logs the error using the shared.Logger.
+// It takes the following parameters:
+// - stdErrLine: a string representing the error message.
+// - task: a pointer to a Task object representing the task associated with the error.
+// - severity: a Severity object representing the severity of the error.
+//
+// If the task parameter is nil, the taskID will be set to nil.
+// Otherwise, the taskID will be set to the ID of the task.
+//
+// The function creates a Metadata object with the current error date and additional metadata,
+// such as the agent platform and version.
+//
+// It then creates an AgentError object with the error message, metadata, severity, agent ID,
+// and task ID.
+//
+// Finally, it submits the agent error to the server using the SdkClient.Agents.SubmitErrorAgent method.
+// If there is an error during the submission, it logs the error using the shared.Logger.Error method.
 func SendAgentError(stdErrLine string, task *components.Task, severity components.Severity) {
 	var taskID *int64
 	if task == nil {
@@ -634,8 +653,17 @@ func SendAgentError(stdErrLine string, task *components.Task, severity component
 }
 
 // AcceptTask accepts a task and returns a boolean indicating whether the task was accepted successfully.
-// It sends an HTTP request to the API server to accept the task and handles the response accordingly.
+// If the task is nil, it logs an error message and returns false.
+// If there is an error accepting the task, it logs the error message and returns false.
+// If the task is already completed, it logs a message and returns false.
+// If there is a major error accepting the task, it logs the error message and returns false.
+// Otherwise, it logs a debug message and returns true.
 func AcceptTask(task *components.Task) bool {
+	if task == nil {
+		shared.Logger.Error("Task is nil")
+		return false
+	}
+
 	response, err := SdkClient.Tasks.SetTaskAccepted(Context, task.GetID())
 	if err != nil {
 		shared.Logger.Error("Error accepting task", "error", err)
@@ -655,10 +683,15 @@ func AcceptTask(task *components.Task) bool {
 	return true
 }
 
-// MarkTaskExhausted marks a task as exhausted by notifying the server.
-// It takes a pointer to a cipherswarm.Task as input.
-// If an error occurs while notifying the server, it logs the error using the Logger.
+// MarkTaskExhausted marks a task as exhausted.
+// If the task is nil, it logs an error and returns.
+// Otherwise, it notifies the server that the task is exhausted.
+// If there is an error notifying the server, it logs the error and sends an agent error.
 func MarkTaskExhausted(task *components.Task) {
+	if task == nil {
+		shared.Logger.Error("Task is nil")
+		return
+	}
 	_, err := SdkClient.Tasks.SetTaskExhausted(Context, task.GetID())
 	if err != nil {
 		shared.Logger.Error("Error notifying server", "error", err)
@@ -666,6 +699,9 @@ func MarkTaskExhausted(task *components.Task) {
 	}
 }
 
+// SendAgentShutdown sends a request to shut down the agent.
+// It calls the SetAgentShutdown method of the SdkClient to set the agent's shutdown state.
+// If an error occurs during the shutdown process, it logs the error and sends an agent error message.
 func SendAgentShutdown() {
 	_, err := SdkClient.Agents.SetAgentShutdown(Context, shared.State.AgentID)
 	if err != nil {
@@ -674,7 +710,16 @@ func SendAgentShutdown() {
 	}
 }
 
+// AbandonTask abandons the given task.
+// If the task is nil, it logs an error and returns.
+// Otherwise, it notifies the server that the task has been abandoned.
+// If there is an error notifying the server, it logs the error and sends an agent error.
 func AbandonTask(task *components.Task) {
+	if task == nil {
+		shared.Logger.Error("Task is nil")
+		return
+	}
+
 	_, err := SdkClient.Tasks.SetTaskAbandoned(Context, task.GetID())
 	if err != nil {
 		shared.Logger.Error("Error notifying server", "error", err)
@@ -684,14 +729,20 @@ func AbandonTask(task *components.Task) {
 
 // SendCrackedHash sends a cracked hash to the server.
 // It takes a `hashcat.Result` object representing the cracked hash,
-// and a pointer to a `cipherswarm.Task` object.
-// It submits the crack result to the server using the API client,
-// and logs any errors or successful responses.
+// and a pointer to a `components.Task` object representing the task.
+// It logs the cracked hash and plaintext, and sends the cracked hash to the server.
+// If there is an error sending the cracked hash, it logs the error and sends an agent error.
+// If the response status code is `http.StatusNoContent`, it logs that the hashlist is completed.
 func SendCrackedHash(hash hashcat.Result, task *components.Task) {
 	hashcatResult := &components.HashcatResult{
 		Timestamp: hash.Timestamp,
 		Hash:      hash.Hash,
 		PlainText: hash.Plaintext,
+	}
+
+	if task == nil {
+		shared.Logger.Error("Task is nil")
+		return
 	}
 
 	shared.Logger.Info("Cracked hash", "hash", hash.Hash, "plaintext", hash.Plaintext)

@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"github.com/duke-git/lancet/cryptor"
-	"github.com/duke-git/lancet/v2/validator"
-	"github.com/hashicorp/go-getter"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
 	"io"
 	"net/http"
 	url2 "net/url"
 	"os"
 	"path"
+
+	"github.com/duke-git/lancet/cryptor"
+	"github.com/duke-git/lancet/v2/validator"
+	"github.com/hashicorp/go-getter"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
 
 	"github.com/duke-git/lancet/convertor"
 	"github.com/duke-git/lancet/v2/strutil"
@@ -26,12 +27,6 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 )
 
-// getCurrentHashcatVersion retrieves the current version of Hashcat.
-// It checks if the Hashcat directory exists and then uses the arch.GetHashcatVersion
-// function to get the version from the specified path.
-// If the Hashcat directory does not exist, it returns "0.0.0" and an error.
-// If there is an error retrieving the version, it also returns "0.0.0" and the error.
-// Otherwise, it returns the Hashcat version and no error.
 func getCurrentHashcatVersion() (string, error) {
 	// Check where the hashcat binary should be
 	hashcatExists := fileutil.IsExist(viper.GetString("hashcat_path"))
@@ -146,6 +141,11 @@ func CreateDataDirs() error {
 }
 
 func downloadHashList(attack *components.Attack) error {
+	if attack == nil {
+		shared.Logger.Error("Attack is nil")
+		return errors.New("attack is nil")
+	}
+
 	// Download the hashlist
 	hashlistPath := path.Join(shared.State.HashlistPath, convertor.ToString(attack.GetHashListID())+".txt")
 	shared.Logger.Debug("Downloading hashlist", "url", attack.GetHashListURL(), "path", hashlistPath)
@@ -197,18 +197,6 @@ func downloadHashList(attack *components.Attack) error {
 	return nil
 }
 
-// downloadFile downloads a file from the specified URL and saves it to the given path.
-// If a checksum is provided, it verifies the downloaded file against the checksum.
-// If the file already exists and the checksum matches, it returns without downloading again.
-// If the file already exists but the checksum does not match, it deletes the existing file and downloads a new one.
-// It displays the progress of the download and completion status.
-// Parameters:
-//   - url: The URL of the file to download.
-//   - path: The path where the downloaded file will be saved.
-//   - checksum: The checksum to verify the downloaded file against (optional).
-//
-// Returns:
-//   - error: An error if any occurred during the download or verification process, or nil if successful.
 func downloadFile(url string, path string, checksum string) error {
 	if !validator.IsUrl(url) {
 		shared.Logger.Error("Invalid URL", "url", url)
@@ -274,10 +262,6 @@ func downloadFile(url string, path string, checksum string) error {
 	return nil
 }
 
-// extractHashcatArchive extracts a hashcat archive to the specified location.
-// It removes the old hashcat backup directory, moves the old hashcat directory to a backup location,
-// and then extracts the new hashcat directory using the 7z command.
-// It returns the path of the extracted hashcat directory and any error encountered during the process.
 func extractHashcatArchive(newArchivePath string) (string, error) {
 	hashcatDirectory := path.Join(shared.State.CrackersPath, "hashcat")
 	hashcatBackupDirectory := hashcatDirectory + "_old"
@@ -307,10 +291,6 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	return hashcatDirectory, err
 }
 
-// moveArchiveFile moves the archive file from the temporary path to a new path.
-// It takes the temporary archive path as input and returns the new archive path and an error (if any).
-// The function renames the file using the os.Rename function and logs any errors encountered.
-// It also logs the old and new paths of the file after the move operation.
 func moveArchiveFile(tempArchivePath string) (string, error) {
 	newArchivePath := path.Join(shared.State.CrackersPath, "hashcat.7z")
 	err := os.Rename(tempArchivePath, newArchivePath)

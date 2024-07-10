@@ -74,6 +74,11 @@ func (params Params) Validate() error {
 	return nil
 }
 
+// maskArgs returns the command line arguments for the mask attack mode in Hashcat.
+// It generates the arguments based on the provided Params struct.
+// The function checks the number of custom charsets and returns an error if it exceeds the maximum allowed.
+// It also handles the mask increment option and its corresponding minimum and maximum values.
+// The returned arguments can be used directly in the command line when invoking Hashcat.
 func (params Params) maskArgs() ([]string, error) {
 	maxCharsets := 4
 	if len(params.MaskCustomCharsets) > maxCharsets {
