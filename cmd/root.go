@@ -62,6 +62,11 @@ func init() {
 	viper.SetDefault("always_trust_files", false)                       // Set the default to not always trust files
 }
 
+// setupSharedState initializes the shared state of the application.
+// It sets the API URL, token, data paths, file paths, and other configuration options in the shared state.
+// The shared state is used to store global variables and settings that are accessed by multiple parts of the application.
+// This function reads the configuration values from the viper instance and assigns them to the corresponding fields in the shared state.
+// It also sets default values for some paths and flags.
 func setupSharedState() {
 	// Set the API URL and token
 	shared.State.URL = viper.GetString("api_url")
@@ -253,13 +258,14 @@ func startAgent(cmd *cobra.Command, args []string) {
 				// Process the task
 				// - Get the attack parameters
 				attack, err := lib.GetAttackParameters(task.GetAttackID())
-				if err != nil {
+				if err != nil || attack == nil {
 					shared.Logger.Error("Failed to get attack parameters", "error", err)
 					lib.SendAgentError(err.Error(), task, components.SeverityFatal)
 					lib.AbandonTask(task)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
 					continue
 				}
+
 				lib.DisplayNewAttack(attack)
 
 				// - Download the files
@@ -269,6 +275,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 					lib.SendAgentError(err.Error(), task, components.SeverityFatal)
 					lib.AbandonTask(task)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
+					continue
 				} else {
 					lib.RunTask(task, attack)
 				}
@@ -290,6 +297,13 @@ func startAgent(cmd *cobra.Command, args []string) {
 	lib.DisplayShuttingDown()
 }
 
+// heartbeat sends a heartbeat signal and handles the response.
+// It logs the heartbeat status and performs certain actions based on the response state.
+// If the response state is "Pending" and the current activity is not benchmarking,
+// it sets the reload flag to true.
+// If the response state is "Stopped", it logs the status, sends an agent error,
+// and sends a termination signal to the signChan channel.
+// If the response state is "Error", it logs the status and stops processing.
 func heartbeat(signChan chan os.Signal) {
 	shared.Logger.Debug("Sending heartbeat")
 	state := lib.SendHeartBeat()
@@ -311,6 +325,10 @@ func heartbeat(signChan chan os.Signal) {
 	}
 }
 
+// fetchAgentConfig fetches the agent configuration from the CipherSwarm API.
+// If the configuration retrieval fails, it logs a fatal error.
+// If the "always_use_native_hashcat" flag is set to true in the configuration,
+// it enables the use of native Hashcat.
 func fetchAgentConfig() error {
 	err := lib.GetAgentConfiguration()
 	if err != nil {
@@ -323,6 +341,9 @@ func fetchAgentConfig() error {
 	return err
 }
 
+// initLogger initializes the logger based on the debug flag in the shared state.
+// If the debug flag is set, the logger level is set to debug and the caller is reported for debugging.
+// Otherwise, the logger level is set to info.
 func initLogger() {
 	if shared.State.Debug {
 		shared.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug

@@ -37,6 +37,15 @@ import (
 
 // Borrowed from PhatCrack project (github.com/lachlan2k/phatcrack) and modified
 
+// NewHashcatSession creates a new Hashcat session with the specified ID and parameters.
+// It returns a pointer to the created Session and an error, if any.
+// The Session represents a running Hashcat session and provides channels for receiving cracked hashes,
+// status updates, stderr messages, and stdout lines.
+// The function takes an ID string and a Params struct as input.
+// The ID is used to identify the session, and the Params struct contains the parameters for the Hashcat session.
+// The function creates temporary files for storing the output and custom charsets, and sets the necessary permissions.
+// It then constructs the command arguments based on the provided parameters and returns the initialized Session.
+// If any error occurs during the creation of the session, an error is returned.
 func NewHashcatSession(id string, params Params) (*Session, error) {
 	var err error
 

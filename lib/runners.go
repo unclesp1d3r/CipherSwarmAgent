@@ -13,10 +13,10 @@ import (
 )
 
 // RunBenchmarkTask runs a benchmark session using the provided hashcat session.
-// It starts the session, reads the output lines from stdout, and processes them to extract benchmark results.
-// Any errors encountered during the benchmark session are logged and returned.
-// The benchmark results are returned as a slice of BenchmarkResult structs.
-// The second return value indicates whether the benchmark session was successful or not.
+// It starts the session, reads the output from stdout and stderr, and handles various events.
+// The benchmark results are collected and returned as a slice of BenchmarkResult structs.
+// If there is an error starting the session, the function returns an empty slice and a boolean value of true.
+// If the benchmark session completes successfully, the function returns the benchmark results and a boolean value of false.
 func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 	err := sess.Start()
 	if err != nil {
@@ -66,10 +66,22 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 	return benchmarkResult, false
 }
 
-// RunAttackTask executes an attack task using the provided hashcat session and task.
-// It starts the session, monitors the status updates, and sends the updates and results to the appropriate handlers.
-// If an error occurs during the session start, it logs the error and returns.
-// Once the session is done, it cleans up the session resources and waits for the completion of the goroutine.
+// RunAttackTask starts an attack session using the provided hashcat session and task.
+// It continuously monitors the session for status updates, cracked hashes, and errors,
+// and sends corresponding updates and notifications.
+// If the session fails to start, a fatal agent error is sent and the function returns.
+// If the session completes successfully, the task is marked as exhausted.
+// If the session fails with a non-fatal error, a minor agent error is sent and the function returns.
+//
+// Parameters:
+// - sess: The hashcat session to run the attack.
+// - task: The task to be executed.
+//
+// Example usage:
+//
+//	sess := hashcat.NewSession()
+//	task := components.NewTask()
+//	RunAttackTask(sess, task)
 func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
