@@ -1,4 +1,21 @@
 
+<a name="v0.3.0"></a>
+## [v0.3.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.8...v0.3.0)
+
+> 2024-07-12
+
+### Bug Fixes
+
+* Fixed issue with always_use_native_hashcat on server messing up the client
+* Removed exessive output in standard debugging
+* Files directory can be set separate of the data dir
+* Replaced tail library with one still maintained
+
+### Features
+
+* Add support for zaps
+
+
 <a name="v0.2.8"></a>
 ## [v0.2.8](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.7...v0.2.8)
 

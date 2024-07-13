@@ -100,9 +100,12 @@ func GetAgentConfiguration() error {
 		if err != nil {
 			shared.Logger.Error("Error finding hashcat binary: ", err)
 			SendAgentError(err.Error(), nil, components.SeverityCritical)
+			return err
+		} else {
+			shared.Logger.Info("Found Hashcat binary", "path", binPath)
+			viper.Set("hashcat_path", binPath)
+			_ = viper.WriteConfig()
 		}
-		viper.Set("hashcat_path", binPath)
-		_ = viper.WriteConfig()
 	} else {
 		shared.Logger.Debug("Using server-provided Hashcat binary")
 	}
@@ -439,25 +442,36 @@ func SendHeartBeat() *components.AgentHeartbeatResponseState {
 	// All good, nothing to see here
 	// We are not being asked to change anything
 	if resp.StatusCode == http.StatusNoContent {
-		shared.Logger.Debug("Heartbeat sent")
+		if shared.State.ExtraDebugging {
+			shared.Logger.Debug("Heartbeat sent")
+		}
 		return nil
 	}
 
 	if resp.StatusCode == http.StatusOK {
-		shared.Logger.Debug("Heartbeat sent")
+		if shared.State.ExtraDebugging {
+			shared.Logger.Debug("Heartbeat sent")
+		}
 		stateResponse := resp.GetAgentHeartbeatResponse()
+		if stateResponse == nil {
+			return nil
+		}
 
 		state := stateResponse.GetState()
 		switch state {
 		case components.AgentHeartbeatResponseStatePending:
-			shared.Logger.Debug("Agent is pending")
+			if shared.State.ExtraDebugging {
+				shared.Logger.Debug("Agent is pending")
+			}
 		case components.AgentHeartbeatResponseStateStopped:
 			shared.Logger.Debug("Agent is stopped")
 			shared.Logger.Warn("Server has stopped the agent")
 		case components.AgentHeartbeatResponseStateError:
 			shared.Logger.Debug("Agent is in error state")
 		default:
-			shared.Logger.Debug("Unknown agent state")
+			if shared.State.ExtraDebugging {
+				shared.Logger.Debug("Unknown agent state")
+			}
 		}
 
 		return &state
@@ -539,8 +553,9 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	if update.Time.IsZero() {
 		update.Time = time.Now()
 	}
-
-	shared.Logger.Debug("Sending status update", "status", update)
+	if shared.State.ExtraDebugging {
+		shared.Logger.Debug("Sending status update", "status", update)
+	}
 
 	deviceStatuses := make([]components.DeviceStatus, len(update.Devices))
 	for i, device := range update.Devices {

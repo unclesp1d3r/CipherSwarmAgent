@@ -61,7 +61,7 @@ func init() {
 	viper.SetDefault("sleep_on_failure", time.Duration(60*time.Second))              // Set the default sleep time on failure
 	viper.SetDefault("always_trust_files", false)                                    // Set the default to not always trust files
 	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files")) // Set the default files path in the data directory if not set
-
+	viper.SetDefault("extra_debugging", false)                                       // Set the default to not enable extra debugging
 }
 
 // setupSharedState initializes the shared state of the application.
@@ -87,6 +87,8 @@ func setupSharedState() {
 	shared.State.OutPath = path.Join(dataRoot, "output")                  // Set the output path in the shared state
 	shared.State.Debug = enableDebug                                      // Set the debug flag in the shared state
 	shared.State.AlwaysTrustFiles = viper.GetBool("always_trust_files")   // Set the always trust files flag in the shared state
+	shared.State.ExtraDebugging = viper.GetBool("extra_debugging")        // Set the extra debugging flag in the shared state
+	shared.State.StatusTimer = 3                                          // Set the status timer in the shared state to 3 seconds
 }
 
 // initConfig initializes the configuration for the CipherSwarmAgent.
@@ -310,10 +312,14 @@ func startAgent(cmd *cobra.Command, args []string) {
 // and sends a termination signal to the signChan channel.
 // If the response state is "Error", it logs the status and stops processing.
 func heartbeat(signChan chan os.Signal) {
-	shared.Logger.Debug("Sending heartbeat")
+	if shared.State.ExtraDebugging {
+		shared.Logger.Debug("Sending heartbeat")
+	}
 	state := lib.SendHeartBeat()
 	if state != nil {
-		shared.Logger.Debug("Received heartbeat response", "state", state)
+		if shared.State.ExtraDebugging {
+			shared.Logger.Debug("Received heartbeat response", "state", state)
+		}
 		switch *state {
 		case components.AgentHeartbeatResponseStatePending:
 			if shared.State.CurrentActivity != shared.CurrentActivityBenchmarking {
