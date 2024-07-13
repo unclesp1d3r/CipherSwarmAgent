@@ -9,9 +9,9 @@ require (
 	github.com/duke-git/lancet/v2 v2.3.1
 	github.com/dustin/go-humanize v1.0.1
 	github.com/hashicorp/go-getter v1.7.5
-	github.com/hpcloud/tail v1.0.0
 	github.com/imroc/req/v3 v3.43.7
 	github.com/muesli/go-app-paths v0.2.2
+	github.com/nxadm/tail v1.4.11
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
@@ -110,7 +110,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240709173604-40e1e62336c5 // indirect
 	google.golang.org/grpc v1.65.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
-	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

@@ -16,7 +16,7 @@ import (
 	"github.com/duke-git/lancet/convertor"
 	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/validator"
-	"github.com/hpcloud/tail"
+	"github.com/nxadm/tail"
 )
 
 type Session struct {
