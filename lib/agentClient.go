@@ -100,9 +100,12 @@ func GetAgentConfiguration() error {
 		if err != nil {
 			shared.Logger.Error("Error finding hashcat binary: ", err)
 			SendAgentError(err.Error(), nil, components.SeverityCritical)
+			return err
+		} else {
+			shared.Logger.Info("Found Hashcat binary", "path", binPath)
+			viper.Set("hashcat_path", binPath)
+			_ = viper.WriteConfig()
 		}
-		viper.Set("hashcat_path", binPath)
-		_ = viper.WriteConfig()
 	} else {
 		shared.Logger.Debug("Using server-provided Hashcat binary")
 	}
