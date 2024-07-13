@@ -88,6 +88,7 @@ func setupSharedState() {
 	shared.State.Debug = enableDebug                                      // Set the debug flag in the shared state
 	shared.State.AlwaysTrustFiles = viper.GetBool("always_trust_files")   // Set the always trust files flag in the shared state
 	shared.State.ExtraDebugging = viper.GetBool("extra_debugging")        // Set the extra debugging flag in the shared state
+	shared.State.StatusTimer = 3                                          // Set the status timer in the shared state to 3 seconds
 }
 
 // initConfig initializes the configuration for the CipherSwarmAgent.
