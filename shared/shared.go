@@ -26,6 +26,8 @@ type agentState struct {
 	Reload            bool     // Reload specifies whether the agent should reload its configuration.
 	CurrentActivity   Activity // CurrentActivity is the current activity of the agent.
 	AlwaysTrustFiles  bool     // AlwaysTrustFiles specifies whether the agent should trust all files in the files directory and not check checksums.
+	ExtraDebugging    bool     // ExtraDebugging specifies whether the agent should show extra debugging information.
+	StatusTimer       int      // StatusTimer is the interval in seconds between status updates.
 }
 
 type Activity string

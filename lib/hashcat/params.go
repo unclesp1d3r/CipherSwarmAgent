@@ -141,8 +141,10 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		"--outfile", outFile,
 		"--status",
 		"--status-json",
-		"--status-timer", "3",
+		"--status-timer", convertor.ToString(shared.State.StatusTimer),
 		"--potfile-disable",
+		"--outfile-check-timer", convertor.ToString(shared.State.StatusTimer),
+		"--outfile-check-dir", shared.State.ZapsPath,
 		"-a", convertor.ToString(params.AttackMode),
 		"-m", convertor.ToString(params.HashType),
 	)
