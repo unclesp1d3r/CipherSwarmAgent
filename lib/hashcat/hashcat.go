@@ -29,7 +29,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/strutil"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
@@ -53,15 +52,6 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	var outFile *os.File
 	var shardedCharsetFile *os.File
 	var charsetFiles []*os.File
-
-	defer func() {
-		if outFile != nil {
-			err := fileutil.RemoveFile(outFile.Name())
-			if err != nil {
-				return
-			}
-		}
-	}()
 
 	binaryPath := viper.GetString("hashcat_path")
 	outFile, err = os.CreateTemp(shared.State.OutPath, id)
