@@ -55,11 +55,13 @@ func init() {
 	cwd, err := os.Getwd()
 	cobra.CheckErr(err)
 
-	viper.SetDefault("data_path", path.Join(cwd, "data"))               // Set the default data path
-	viper.SetDefault("gpu_temp_threshold", 80)                          // Set the default GPU temperature threshold
-	viper.SetDefault("always_use_native_hashcat", false)                // Set the default to not always use native hashcat
-	viper.SetDefault("sleep_on_failure", time.Duration(60*time.Second)) // Set the default sleep time on failure
-	viper.SetDefault("always_trust_files", false)                       // Set the default to not always trust files
+	viper.SetDefault("data_path", path.Join(cwd, "data"))                            // Set the default data path
+	viper.SetDefault("gpu_temp_threshold", 80)                                       // Set the default GPU temperature threshold
+	viper.SetDefault("always_use_native_hashcat", false)                             // Set the default to not always use native hashcat
+	viper.SetDefault("sleep_on_failure", time.Duration(60*time.Second))              // Set the default sleep time on failure
+	viper.SetDefault("always_trust_files", false)                                    // Set the default to not always trust files
+	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files")) // Set the default files path in the data directory if not set
+
 }
 
 // setupSharedState initializes the shared state of the application.
@@ -77,7 +79,7 @@ func setupSharedState() {
 	shared.State.PidFile = path.Join(dataRoot, "lock.pid")                // Set the default PID file path
 	shared.State.HashcatPidFile = path.Join(dataRoot, "hashcat.pid")      // Set the default hashcat PID file path
 	shared.State.CrackersPath = path.Join(dataRoot, "crackers")           // Set the crackers path in the shared state
-	shared.State.FilePath = path.Join(dataRoot, "files")                  // Set the file path in the shared state
+	shared.State.FilePath = viper.GetString("files_path")                 // Set the file path in the shared state
 	shared.State.HashlistPath = path.Join(dataRoot, "hashlists")          // Set the hashlist path in the shared state
 	shared.State.ZapsPath = path.Join(dataRoot, "zaps")                   // Set the zaps path in the shared state
 	shared.State.PreprocessorsPath = path.Join(dataRoot, "preprocessors") // Set the preprocessors path in the shared state
@@ -95,14 +97,17 @@ func setupSharedState() {
 func initConfig() {
 	home, err := os.UserConfigDir()
 	cobra.CheckErr(err) // Check for errors
+
+	cwd, err := os.Getwd()   // Get the current working directory
+	cobra.CheckErr(err)      // Check for errors
+	viper.AddConfigPath(cwd) // Add the current working directory to the configuration path
+
 	configDirs, err := scope.ConfigDirs()
 	cobra.CheckErr(err)              // Check for errors
-	cwd, err := os.Getwd()           // Get the current working directory
-	cobra.CheckErr(err)              // Check for errors
-	viper.AddConfigPath(cwd)         // Add the current working directory to the configuration path
 	for _, dir := range configDirs { // Add the config directories to the configuration path
-		viper.AddConfigPath(dir)
+		shared.Logger.Info("Adding config path", "path", dir)
 	}
+
 	viper.AddConfigPath(home)               // Add the home directory to the configuration path
 	viper.SetConfigType("yaml")             // Set the configuration type to YAML
 	viper.SetConfigName("cipherswarmagent") // Set the configuration name
