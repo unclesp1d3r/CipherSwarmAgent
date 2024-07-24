@@ -1,6 +1,16 @@
 
-<a name="v0.3.0"></a>
-## [v0.3.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.8...v0.3.0)
+<a name="v0.3.1"></a>
+## [v0.3.1](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.3...v0.3.1)
+
+> 2024-07-23
+
+### Bug Fixes
+
+* Tasks are accepted before the downloads start
+
+
+<a name="v0.3"></a>
+## [v0.3](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.8...v0.3)
 
 > 2024-07-12
 
