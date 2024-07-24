@@ -275,6 +275,13 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 				lib.DisplayNewAttack(attack)
 
+				// - Accept the task
+				if lib.AcceptTask(task) {
+					lib.DisplayRunTaskAccepted(task)
+				} else {
+					shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
+					return
+				}
 				// - Download the files
 				err = lib.DownloadFiles(attack)
 				if err != nil {
