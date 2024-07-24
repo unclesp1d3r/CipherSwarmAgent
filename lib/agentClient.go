@@ -522,12 +522,6 @@ func RunTask(task *components.Task, attack *components.Attack) {
 		return
 	}
 
-	if AcceptTask(task) {
-		DisplayRunTaskAccepted(task)
-	} else {
-		shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
-		return
-	}
 	RunAttackTask(sess, task)
 	sess.Cleanup()
 

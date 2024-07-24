@@ -1,3 +1,3 @@
 package lib
 
-const AgentVersion = "0.3.0"
+const AgentVersion = "0.3.1"
