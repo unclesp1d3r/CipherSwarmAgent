@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -518,12 +519,12 @@ func RunTask(task *components.Task, attack *components.Attack) {
 	sess, err := hashcat.NewHashcatSession("attack", jobParams)
 	if err != nil {
 		shared.Logger.Error("Failed to create attack session", "error", err)
-		SendAgentError(err.Error(), nil, components.SeverityCritical)
+		SendAgentError(err.Error(), task, components.SeverityCritical)
 		return
 	}
 
 	RunAttackTask(sess, task)
-	sess.Cleanup()
+	defer sess.Cleanup()
 
 	DisplayRunTaskCompleted()
 }
@@ -538,11 +539,6 @@ func RunTask(task *components.Task, attack *components.Attack) {
 // If there is an error during the submission, an error message is logged and the function returns.
 // If the submission is successful, a debug message is logged.
 func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashcat.Session) {
-	// TODO: Implement receiving a result code when sending this status update
-	// Depending on the code, we should stop the job or pause it
-
-	// TODO: We should just use the components.TaskStatus struct instead of hashcat.Status
-
 	// Hashcat doesn't seem to update the time consistently, so we'll set it here
 	if update.Time.IsZero() {
 		update.Time = time.Now()
@@ -592,12 +588,32 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	}
 
 	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
-	_, err := SdkClient.Tasks.SendStatus(Context, task.GetID(), taskStatus)
+	resp, err := SdkClient.Tasks.SendStatus(Context, task.GetID(), taskStatus)
 	if err != nil {
+		// There's a few responses are are error-like:
+		// 401	Unauthorized
+		// 404	Task not found
+		// 410	status received successfully, but task paused
+		// 422	malformed status data
+
 		shared.Logger.Error("Error sending status update", "error", err)
-		SendAgentError(err.Error(), nil, components.SeverityCritical)
+		SendAgentError(err.Error(), task, components.SeverityCritical)
 		var e *sdkerrors.SDKError
 		if errors.As(err, &e) {
+			if e.StatusCode == http.StatusUnauthorized {
+				shared.Logger.Error("Unauthorized")
+				// Going to kill the task here
+				shared.Logger.Error("Killing task", "task_id", task.GetID())
+				err = sess.Kill()
+				if err != nil {
+					shared.Logger.Error("Error killing task", "error", err)
+					SendAgentError(err.Error(), task, components.SeverityFatal)
+				}
+				sess.Cleanup()
+				shared.Logger.Fatal("The agent is unauthorized. Exiting.")
+				return
+			}
+
 			if e.StatusCode == http.StatusNotFound {
 				shared.Logger.Error("Task not found", "task_id", task.GetID())
 				// Going to kill the task here
@@ -605,13 +621,95 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 				err = sess.Kill()
 				if err != nil {
 					shared.Logger.Error("Error killing task", "error", err)
-					SendAgentError(err.Error(), nil, components.SeverityCritical)
+					SendAgentError(err.Error(), task, components.SeverityCritical)
 				}
 				sess.Cleanup()
+				return
+			}
+
+			if e.StatusCode == http.StatusGone {
+				shared.Logger.Error("Task paused", "task_id", task.GetID())
+				// Going to pause the task here
+				shared.Logger.Error("Pausing task", "task_id", task.GetID())
+				// TODO: Implement pausing the task
+				// err = sess.Pause()
+				err = sess.Kill()
+				if err != nil {
+					shared.Logger.Error("Error pausing task", "error", err)
+					SendAgentError(err.Error(), task, components.SeverityCritical)
+				}
+
+				return
+			}
+
+			if e.StatusCode == http.StatusUnprocessableEntity {
+				shared.Logger.Error("Malformed status data", "task_id", task.GetID())
+				SendAgentError("Malformed status data", task, components.SeverityMajor)
+				return
 			}
 		}
 
 		return
+	}
+
+	// There's a few possible responses that aren't actually errors:
+	// 202	status received successfully, but stale
+	// 204	status received successfully
+
+	if resp.StatusCode == http.StatusNoContent {
+		// Everything is fine. We'll just keep going
+		if shared.State.ExtraDebugging {
+			shared.Logger.Debug("Status update sent")
+		}
+
+		return
+	}
+
+	if resp.StatusCode == http.StatusAccepted {
+		// The status was sent successfully, but there's new zaps we need to download
+		shared.Logger.Debug("Status update sent, but stale")
+
+		GetZaps(task)
+		return
+	}
+}
+
+// GetZaps retrieves the Zaps for a given task.
+// It takes a pointer to a `components.Task` as a parameter.
+// If the task is nil, it logs an error and returns.
+// Otherwise, it calls the `GetTaskZaps` method of the `SdkClient` to get the Zaps for the task.
+// If there is an error, it logs the error.
+// If the response stream is not nil, it creates a zap file named after the task ID and writes the response stream to it.
+// If there is an error creating the zap file, it logs the error, sends an agent error, and returns.
+// Finally, it closes the zap file.
+func GetZaps(task *components.Task) {
+	if task == nil {
+		shared.Logger.Error("Task is nil")
+		return
+	}
+
+	DisplayJobGetZap(task)
+
+	res, err := SdkClient.Tasks.GetTaskZaps(Context, task.GetID())
+	if err != nil {
+		shared.Logger.Error(err)
+	}
+	if res.ResponseStream != nil {
+		// Create a zap file named for the task ID and write the response stream to it
+		zapFilePath := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
+		if fileutil.IsExist(zapFilePath) {
+			shared.Logger.Debug("Zap file already exists", "path", zapFilePath)
+			fileutil.RemoveFile(zapFilePath)
+		}
+
+		outFile, err := os.Create(zapFilePath)
+		if err != nil {
+			shared.Logger.Error("Error creating zap file", "error", err)
+			SendAgentError(err.Error(), task, components.SeverityCritical)
+			return
+		}
+		defer outFile.Close()
+		_, err = io.Copy(outFile, res.ResponseStream)
 	}
 }
 
@@ -761,6 +859,17 @@ func SendCrackedHash(hash hashcat.Result, task *components.Task) {
 		shared.Logger.Error("Error sending cracked hash", "error", err, "hash", hash.Hash)
 		SendAgentError(err.Error(), nil, components.SeverityCritical)
 		return
+	}
+
+	if shared.State.WriteZapsToFile {
+		// Write the cracked hash to a file
+		hashOut := fmt.Sprintf("%s:%s\n", hash.Hash, hash.Plaintext)
+		hashFile := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.GetID()))
+		err := fileutil.WriteStringToFile(hashFile, hashOut, true)
+		if err != nil {
+			shared.Logger.Error("Error writing cracked hash to file", "error", err)
+			SendAgentError(err.Error(), nil, components.SeverityCritical)
+		}
 	}
 
 	shared.Logger.Debug("Cracked hash sent")

@@ -57,8 +57,24 @@ go build -o cipherswarm-agent
 
 The easiest way to configure the agent is by passing the required parameters as environment variables. The following are the available configuration options:
 
--   API_TOKEN: The API token for the CipherSwarm server. This token is provided when the agent is added in the CipherSwarm server.
--   API_URL: The URL of the CipherSwarm server. This is the URL where the CipherSwarm server is running, e.g., <https://cipherswarm.example.com:3000>.
+-   `API_TOKEN`: The API token for the CipherSwarm server. This token is provided when the agent is added in the CipherSwarm server.
+-   `API_URL`: The URL of the CipherSwarm server. This is the URL where the CipherSwarm server is running, e.g., <https://cipherswarm.example.com:3000>.
+
+Optional configuration options include:
+
+-   `DATA_PATH`: The path to the directory where the agent will store data, such as task files and results. By default, this is set to "data" in the current directory.
+-   `GPU_TEMP_THRESHOLD`: The temperature threshold for the GPU in degrees Celsius. If the GPU temperature exceeds this threshold, the agent will pause task execution until the temperature drops below the threshold. By default, this is set to 80 degrees Celsius.
+-   `ALWAYS_USE_NATIVE_HASHCAT`: If set to true, the agent will always use the native hashcat binary on the local system for task execution, even if a custom binary is provided in the web interface. By default, this is set to false.
+-   `SLEEP_ON_FAILURE`: A duration to sleep after a task failure. By default, this is set to 60 seconds.
+-   `FILES_PATH`: The path to the directory where the agent will store task files. By default, this is set to "files" in the data directory. These files include wordlists, rules, and masks. They can get pretty big, so make sure you have enough space.
+-   `EXTRA_DEBUGGING`: If set to true, the agent will print additional debugging information to the console. By default, this is set to false.
+-   `STATUS_TIMER`: The interval in seconds at which the agent will send status updates to the server. By default, this is set to 3 seconds. This can be increased to reduce the load on the server, but it will also reduce the responsiveness of the agent.
+
+Optional configuration options for using the ZAP feature with a shared directory:
+
+-   `WRITE_ZAPS_TO_FILE`: If set to true, the agent will write the zap output to a file in the zaps directory. By default, this is set to false. This is useful for debugging and sharing zap output with other clients via a shared directory. The server will still prompt the agent to download the zap output files, but this can be useful if you want to share the zap output with other clients.
+-   `ZAP_PATH`: The path to the directory where the agent will store the zap output files. By default, this is set to "zap" in the data directory. These files contain successful cracks and setting this is sometimes used to allow multiple clients to share cracks with each other via a shared directory, rather than the server.
+-   `RETAIN_ZAPS_ON_COMPLETION`: If set to true, the agent will retain the zap files after a task is completed. Otherwise, the contents of the zaps path is deleted on completion of each task. By default, this is set to false.
 
 The agent will automatically create a configuration file in the same directory as the agent (`cipherswarmagent.yaml`) with the provided configuration options, along with default options that can be modified as needed.
 
