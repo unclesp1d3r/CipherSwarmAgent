@@ -1,4 +1,14 @@
 
+<a name="v0.4.0"></a>
+## [v0.4.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.3.1...v0.4.0)
+
+> 2024-07-29
+
+### Features
+
+* Added support for bidirectional status on status updates
+
+
 <a name="v0.3.1"></a>
 ## [v0.3.1](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.3...v0.3.1)
 
