@@ -176,6 +176,14 @@ func (sess *Session) Cleanup() {
 		sess.outFile = nil
 	}
 
+	if !shared.State.RetainZapsOnCompletion {
+		// Probably shouldn't remove the directory too, but it's fine for now
+		err := os.RemoveAll(shared.State.ZapsPath)
+		if err != nil {
+			shared.Logger.Error("couldn't remove zaps directory", "error", err)
+		}
+	}
+
 	for _, f := range sess.charsetFiles {
 		if f != nil {
 			if fileutil.IsExist(f.Name()) {

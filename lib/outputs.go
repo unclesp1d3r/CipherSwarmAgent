@@ -98,6 +98,10 @@ func DisplayJobStatus(update hashcat.Status) {
 	shared.Logger.Info("Progress update", "progress", progressText, "speed", speedText, "cracked_hashes", hashesText)
 }
 
+func DisplayJobGetZap(task *components.Task) {
+	shared.Logger.Info("New hashes available, updating job", "task_id", task.GetID())
+}
+
 // DisplayAgentMetadataUpdated displays the results of a job session
 func DisplayAgentMetadataUpdated(result *operations.UpdateAgentResponse) {
 	shared.Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", shared.State.AgentID)
