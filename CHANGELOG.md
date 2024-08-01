@@ -1,4 +1,14 @@
 
+<a name="v0.4.1"></a>
+## [v0.4.1](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.4.0...v0.4.1)
+
+> 2024-07-31
+
+### Bug Fixes
+
+* Automatic benchmark now performs all hash types
+
+
 <a name="v0.4.0"></a>
 ## [v0.4.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.3.1...v0.4.0)
 
