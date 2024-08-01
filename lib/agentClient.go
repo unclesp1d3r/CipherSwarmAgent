@@ -41,7 +41,6 @@ var (
 // The function returns an error if there is an error connecting to the API or if the response status is not OK.
 func AuthenticateAgent() error {
 	response, err := SdkClient.Client.Authenticate(Context)
-	// result, httpRes, err := apiClient.ClientAPI.Authenticate(Context).Execute()
 	if err != nil {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", err)
 		return err
@@ -357,10 +356,11 @@ func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 // If any error occurs during the process, it logs the error and sends an agent error.
 func UpdateBenchmarks() {
 	jobParams := hashcat.Params{
-		AttackMode:     hashcat.AttackBenchmark,
-		AdditionalArgs: arch.GetAdditionalHashcatArgs(),
-		BackendDevices: Configuration.Config.BackendDevices,
-		OpenCLDevices:  Configuration.Config.OpenCLDevices,
+		AttackMode:                hashcat.AttackBenchmark,
+		AdditionalArgs:            arch.GetAdditionalHashcatArgs(),
+		BackendDevices:            Configuration.Config.BackendDevices,
+		OpenCLDevices:             Configuration.Config.OpenCLDevices,
+		EnableAdditionalHashTypes: shared.State.EnableAdditionalHashTypes,
 	}
 
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
@@ -398,7 +398,7 @@ func DownloadFiles(attack *components.Attack) error {
 	}
 
 	// Download all resource files
-	for _, resource := range slice.Merge(attack.WordLists, attack.RuleLists) {
+	for _, resource := range slice.Concat(attack.WordLists, attack.RuleLists) {
 		filePath := path.Join(shared.State.FilePath, resource.FileName)
 		shared.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
 		checksum := ""
@@ -699,7 +699,11 @@ func GetZaps(task *components.Task) {
 		zapFilePath := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
 		if fileutil.IsExist(zapFilePath) {
 			shared.Logger.Debug("Zap file already exists", "path", zapFilePath)
-			fileutil.RemoveFile(zapFilePath)
+			err = fileutil.RemoveFile(zapFilePath)
+			if err != nil {
+				shared.Logger.Error("Error removing existing zap file", "error", err)
+				SendAgentError(err.Error(), task, components.SeverityCritical)
+			}
 		}
 
 		outFile, err := os.Create(zapFilePath)
@@ -710,6 +714,10 @@ func GetZaps(task *components.Task) {
 		}
 		defer outFile.Close()
 		_, err = io.Copy(outFile, res.ResponseStream)
+		if err != nil {
+			shared.Logger.Error("Error writing zap file", "error", err)
+			SendAgentError(err.Error(), task, components.SeverityCritical)
+		}
 	}
 }
 

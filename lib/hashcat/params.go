@@ -32,6 +32,8 @@ type Params struct {
 
 	BackendDevices string `json:"backend_devices,omitempty"` // Devices to use for the backend, comma-separated
 	OpenCLDevices  string `json:"opencl_devices,omitempty"`  // OpenCL devices to use, comma-separated
+
+	EnableAdditionalHashTypes bool `json:"enable_additional_hash_types"` // Whether to enable additional hash types when benchmarking
 }
 
 // Validate checks if the parameters for the attack mode are valid.
@@ -131,6 +133,11 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		if strutil.IsNotBlank(params.OpenCLDevices) {
 			args = append(args, "--opencl-device-types", params.OpenCLDevices)
 		}
+
+		if params.EnableAdditionalHashTypes {
+			args = append(args, "--benchmark-all")
+		}
+
 		return
 	}
 	args = append(

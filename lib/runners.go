@@ -8,6 +8,7 @@ import (
 
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
+	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/duke-git/lancet/validator"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
@@ -46,8 +47,11 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 				}
 
 			case stdErrLine := <-sess.StderrMessages:
-				SendAgentError(stdErrLine, nil, components.SeverityWarning)
 				DisplayBenchmarkError(stdErrLine)
+				// Ignore empty lines
+				if strutil.IsNotBlank(stdErrLine) {
+					SendAgentError(stdErrLine, nil, components.SeverityWarning)
+				}
 			case statusUpdate := <-sess.StatusUpdates:
 				shared.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
 			case crackedHash := <-sess.CrackedHashes:
@@ -107,7 +111,9 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 				}
 			case stdErrLine := <-sess.StderrMessages:
 				DisplayJobError(stdErrLine)
-				SendAgentError(stdErrLine, task, components.SeverityMinor)
+				if strutil.IsNotBlank(stdErrLine) {
+					SendAgentError(stdErrLine, task, components.SeverityMinor)
+				}
 			case statusUpdate := <-sess.StatusUpdates:
 				DisplayJobStatus(statusUpdate)
 				SendStatusUpdate(statusUpdate, task, sess)
