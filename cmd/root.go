@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/fileutil"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
@@ -237,13 +237,13 @@ func startAgent(cmd *cobra.Command, args []string) {
 			heartbeat(signChan)
 
 			if shared.State.Reload {
-				lib.SendAgentError("Reloading config and performing new benchmark", nil, components.SeverityInfo)
+				lib.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
 				shared.State.CurrentActivity = shared.CurrentActivityStarting
 				shared.Logger.Info("Reloading agent")
 				err = fetchAgentConfig()
 				if err != nil {
 					shared.Logger.Error("Failed to fetch agent configuration", "error", err)
-					lib.SendAgentError("Failed to fetch agent configuration", nil, components.SeverityFatal)
+					lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
 				}
 				shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
 				lib.UpdateBenchmarks()
@@ -275,7 +275,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 				attack, err := lib.GetAttackParameters(task.GetAttackID())
 				if err != nil || attack == nil {
 					shared.Logger.Error("Failed to get attack parameters", "error", err)
-					lib.SendAgentError(err.Error(), task, components.SeverityFatal)
+					lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 					lib.AbandonTask(task)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
 					continue
@@ -294,7 +294,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 				err = lib.DownloadFiles(attack)
 				if err != nil {
 					shared.Logger.Error("Failed to download files", "error", err)
-					lib.SendAgentError(err.Error(), task, components.SeverityFatal)
+					lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 					lib.AbandonTask(task)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
 					continue
@@ -314,7 +314,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 	sig := <-signChan // Wait for a signal to shut down the agent
 	shared.Logger.Debug("Received signal", "signal", sig)
-	lib.SendAgentError("Received signal to terminate. Shutting down", nil, components.SeverityInfo)
+	lib.SendAgentError("Received signal to terminate. Shutting down", nil, operations.SeverityInfo)
 	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
 }
@@ -336,16 +336,16 @@ func heartbeat(signChan chan os.Signal) {
 			shared.Logger.Debug("Received heartbeat response", "state", state)
 		}
 		switch *state {
-		case components.AgentHeartbeatResponseStatePending:
+		case operations.StatePending:
 			if shared.State.CurrentActivity != shared.CurrentActivityBenchmarking {
 				shared.Logger.Info("Agent is pending, performing reload")
 				shared.State.Reload = true
 			}
-		case components.AgentHeartbeatResponseStateStopped:
+		case operations.StateStopped:
 			shared.Logger.Info("Agent is stopped, shutting down")
-			lib.SendAgentError("Agent is stopped, shutting down", nil, components.SeverityMajor)
+			lib.SendAgentError("Agent is stopped, shutting down", nil, operations.SeverityMajor)
 			signChan <- syscall.SIGTERM
-		case components.AgentHeartbeatResponseStateError:
+		case operations.StateError:
 			shared.Logger.Info("Agent is in error state, stopping processing")
 		}
 	}

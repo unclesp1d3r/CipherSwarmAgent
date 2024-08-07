@@ -14,6 +14,7 @@ import (
 	"github.com/duke-git/lancet/v2/validator"
 	"github.com/hashicorp/go-getter"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
 
 	"github.com/duke-git/lancet/convertor"
@@ -155,7 +156,7 @@ func downloadHashList(attack *components.Attack) error {
 		err := os.Remove(hashlistPath)
 		if err != nil {
 			shared.Logger.Error("Error removing old hashlist", "error", err)
-			SendAgentError(err.Error(), nil, components.SeverityCritical)
+			SendAgentError(err.Error(), nil, operations.SeverityCritical)
 			return err
 		}
 	}
@@ -163,7 +164,7 @@ func downloadHashList(attack *components.Attack) error {
 	response, err := SdkClient.Attacks.GetHashList(Context, attack.ID)
 	if err != nil {
 		shared.Logger.Error("Error downloading hashlist from the CipherSwarm API", "error", err)
-		SendAgentError(err.Error(), nil, components.SeverityCritical)
+		SendAgentError(err.Error(), nil, operations.SeverityCritical)
 		return err
 	}
 
@@ -172,21 +173,21 @@ func downloadHashList(attack *components.Attack) error {
 			f, err := os.Create(hashlistPath)
 			if err != nil {
 				shared.Logger.Error("Error creating hashlist file", "error", err)
-				SendAgentError(err.Error(), nil, components.SeverityCritical)
+				SendAgentError(err.Error(), nil, operations.SeverityCritical)
 				return err
 			}
 			defer f.Close()
 			_, err = io.Copy(f, response.ResponseStream)
 			if err != nil {
 				shared.Logger.Error("Error writing hashlist file", "error", err)
-				SendAgentError(err.Error(), nil, components.SeverityCritical)
+				SendAgentError(err.Error(), nil, operations.SeverityCritical)
 				return err
 			}
 			shared.Logger.Debug("Downloaded hashlist", "path", hashlistPath)
 			hashSize, _ := fileutil.FileSize(hashlistPath)
 			if hashSize == 0 {
 				shared.Logger.Error("Downloaded hashlist is empty", "path", hashlistPath)
-				SendAgentError("Downloaded hashlist is empty", nil, components.SeverityCritical)
+				SendAgentError("Downloaded hashlist is empty", nil, operations.SeverityCritical)
 				return errors.New("downloaded hashlist is empty, probably completed task")
 			}
 		}
@@ -214,10 +215,10 @@ func downloadFile(url string, path string, checksum string) error {
 				return nil
 			}
 			shared.Logger.Warn("Checksums do not match", "path", path, "url_checksum", checksum, "file_checksum", fileChecksum)
-			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, components.SeverityInfo)
+			SendAgentError("Resource "+path+" exists, but checksums do not match", nil, operations.SeverityInfo)
 			err = os.Remove(path)
 			if err != nil {
-				SendAgentError(err.Error(), nil, components.SeverityMajor)
+				SendAgentError(err.Error(), nil, operations.SeverityMajor)
 				return err
 			}
 		}
@@ -269,7 +270,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	err := os.RemoveAll(hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
 		shared.Logger.Error("Error removing old hashcat directory: ", "error", err)
-		SendAgentError(err.Error(), nil, components.SeverityCritical)
+		SendAgentError(err.Error(), nil, operations.SeverityCritical)
 		return "", err // Don't continue if we can't remove the old directory
 	}
 
@@ -277,7 +278,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	err = os.Rename(hashcatDirectory, hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
 		shared.Logger.Error("Error moving old hashcat directory: ", "error", err)
-		SendAgentError(err.Error(), nil, components.SeverityCritical)
+		SendAgentError(err.Error(), nil, operations.SeverityCritical)
 		return "", err // Don't continue if we can't move the old directory
 	}
 
@@ -285,7 +286,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
 	if err != nil {
 		shared.Logger.Error("Error extracting file: ", "error", err)
-		SendAgentError(err.Error(), nil, components.SeverityCritical)
+		SendAgentError(err.Error(), nil, operations.SeverityCritical)
 		return "", err // Don't continue if we can't extract the file
 	}
 	return hashcatDirectory, err
