@@ -15,7 +15,7 @@
         scope: ""
         description: Merge branch 'release/0.3'
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -32,7 +32,7 @@
         scope: ""
         description: Updated changelog and bumped version number
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -53,7 +53,7 @@
         description: Add support for zaps
         body: ""
         footer:
-            - 'Fixed #41'
+          - 'Fixed #41'
         major: false
         minor: true
         patch: false
@@ -70,7 +70,7 @@
         scope: ""
         description: Bumped dependencies
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -93,7 +93,7 @@
         description: Fixed issue with always_use_native_hashcat on server messing up the client
         body: When the server setting was set for the agent, the agent was not finding hashcat, but also not allowing it to be set via config or environment variable.
         footer:
-            - 'Fixes #39'
+          - 'Fixes #39'
         major: false
         minor: false
         patch: true
@@ -114,7 +114,7 @@
         description: Removed exessive output in standard debugging
         body: Fixes
         footer:
-            - 'issue #40'
+          - 'issue #40'
         major: false
         minor: false
         patch: true
@@ -135,7 +135,7 @@
         description: Files directory can be set separate of the data dir
         body: ""
         footer:
-            - 'Fixes #38'
+          - 'Fixes #38'
         major: false
         minor: false
         patch: true
@@ -156,7 +156,7 @@
         description: Replaced tail library with one still maintained
         body: ""
         footer:
-            - 'Resolves #37'
+          - 'Resolves #37'
         major: false
         minor: false
         patch: true
@@ -177,7 +177,7 @@
         scope: ""
         description: Updated changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -194,7 +194,7 @@
         scope: ""
         description: Added more checking for null tasks or attacks
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -211,7 +211,7 @@
         scope: ""
         description: Bumped module versions
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -244,23 +244,23 @@
         scope: deps
         description: Bump google.golang.org/grpc from 1.64.0 to 1.64.1 in the go_modules group (#36)
         body: |-
-            chore(deps): Bump google.golang.org/grpc in the go_modules group
-
-            Bumps the go_modules group with 1
+          chore(deps): Bump google.golang.org/grpc in the go_modules group
+          
+          Bumps the go_modules group with 1
         footer:
-            - |-
-              update: [google.golang.org/grpc](https://github.com/grpc/grpc-go).
-              Updates `google.golang.org/grpc` from 1.64.0 to 1.64.1
-              - [Release notes](https://github.com/grpc/grpc-go/releases)
-              - [Commits](https://github.com/grpc/grpc-go/compare/v1.64.0...v1.64.1)
-
-              ---
-              updated-dependencies:
-              - dependency-name: google.golang.org/grpc
-                dependency-type: indirect
-                dependency-group: go_modules
-              ...
-            - 'Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>'
+          - |-
+            update: [google.golang.org/grpc](https://github.com/grpc/grpc-go).
+            Updates `google.golang.org/grpc` from 1.64.0 to 1.64.1
+            - [Release notes](https://github.com/grpc/grpc-go/releases)
+            - [Commits](https://github.com/grpc/grpc-go/compare/v1.64.0...v1.64.1)
+            
+            ---
+            updated-dependencies:
+            - dependency-name: google.golang.org/grpc
+              dependency-type: indirect
+              dependency-group: go_modules
+            ...
+          - 'Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>'
         major: false
         minor: false
         patch: false
@@ -277,7 +277,7 @@
         scope: deps
         description: Bump github.com/unclesp1d3r/cipherswarm-agent-sdk-go from 0.4.6 to 0.5.0 (#35)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -298,7 +298,7 @@
         scope: ""
         description: Updated Changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -315,7 +315,7 @@
         scope: ""
         description: Moved utility code out of agentClient.go
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -332,7 +332,7 @@
         scope: deps
         description: Bump github.com/hashicorp/go-getter from 1.7.4 to 1.7.5 (#34)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -349,7 +349,7 @@
         scope: deps
         description: Bump github.com/unclesp1d3r/cipherswarm-agent-sdk-go from 0.4.5 to 0.4.6 (#33)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -370,7 +370,7 @@
         scope: ""
         description: Update changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -387,7 +387,7 @@
         scope: ""
         description: Correctly handle when a running task is deleted
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -408,7 +408,7 @@
         scope: ""
         description: Update changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -428,7 +428,7 @@
         scope: ""
         description: Fix incorrect status and benchmark output
         body: The benchmark was incorrectly sending the time in ms to complete a hash instead of the number of hashes per second. Additionally, the cracked count was always 2, which wrong.
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -449,7 +449,7 @@
         scope: ""
         description: Bumped version tag
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -466,7 +466,7 @@
         scope: ""
         description: updated changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -486,7 +486,7 @@
         scope: ""
         description: Added the ability to override checking checksums
         body: This is useful when you set the data directory to be a network share
-        footer: []
+        footer: [ ]
         major: false
         minor: true
         patch: false
@@ -503,7 +503,7 @@
         scope: ""
         description: Updated to support v0.4.1 of CipherSwarm SDK
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -524,7 +524,7 @@
         description: Docker now finds hashcat correctly
         body: Resolves
         footer:
-            - 'issue #32'
+          - 'issue #32'
         major: false
         minor: false
         patch: true
@@ -541,7 +541,7 @@
         scope: ""
         description: Updated changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -558,7 +558,7 @@
         scope: ""
         description: Updated goreleaser config format
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -575,7 +575,7 @@
         scope: ""
         description: Handle failure of getting agent config
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -592,7 +592,7 @@
         scope: ""
         description: updated changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -612,7 +612,7 @@
         scope: ""
         description: Agent now tells server its offline when shutting down
         body: This marks the agent offline and frees up the tasks to be handled by another agent.
-        footer: []
+        footer: [ ]
         major: false
         minor: true
         patch: false
@@ -629,7 +629,7 @@
         scope: ""
         description: Download files are now compare checksums correctly
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -649,7 +649,7 @@
         scope: ""
         description: Add bidirectional status
         body: Benchmarks are now determined by the server on the heartbeat.
-        footer: []
+        footer: [ ]
         major: false
         minor: true
         patch: false
@@ -666,7 +666,7 @@
         scope: ""
         description: Added error metadata
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: true
         patch: false
@@ -683,7 +683,7 @@
         scope: ""
         description: Remove boring stuff from changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -704,7 +704,7 @@
         scope: ""
         description: Merge branch 'release/0.1.11'
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -721,7 +721,7 @@
         scope: ""
         description: Updated changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -741,7 +741,7 @@
         scope: ""
         description: Add support for the agent error API
         body: The agent will now send any errors to the server for collection.
-        footer: []
+        footer: [ ]
         major: false
         minor: true
         patch: false
@@ -774,30 +774,30 @@
         email: unclespider@protonmail.com
       conventional_commit:
         category: |-
-            Merge tag 'vv0.1.10' into develop
-
-            Added support for parallel downloads.
-
-            # -----BEGIN PGP SIGNATURE-----
-            #
-            # iQEzBAABCgAdFiEEbyHRF4WOTI97553P3rZOigyk7T4FAmZb1mYACgkQ3rZOigyk
-            # 7T6PxAf/VDovHLp1qiLecUPE69svq6vS2UB+ZsY7I0YcgmLAXjcKb4ZcmV3egn5c
-            # MSIo3G1Tg0YWRE3t76+x9OUmuZoCp1r2c2n3491M6t8m5D5d3bPNOBLmEquTqmMG
-            # Ad4kCeUFHEWF8jMRHWLXmU/vAUjOqFmH4MI5XL4ugw859twcb2f66XoszLLxGJqp
-            # /Q/DaQZ2snLIIp3pMqUeA7haKJllvzlUPFrv8qnWSI9WaYdqAbpLqzzupSj9u+0p
-            # iWJlRB8jo5CrqO87Qi9dmphHm3g6LH5NjseTog2sNx8rEUH6x2x92jB5KsMJAsjp
-            # PlI4XzMUCbn9b+kdGOF+YnguW8XleA==
-            # =FVuv
-            # -----END PGP SIGNATURE-----
-            # gpg
+          Merge tag 'vv0.1.10' into develop
+          
+          Added support for parallel downloads.
+          
+          # -----BEGIN PGP SIGNATURE-----
+          #
+          # iQEzBAABCgAdFiEEbyHRF4WOTI97553P3rZOigyk7T4FAmZb1mYACgkQ3rZOigyk
+          # 7T6PxAf/VDovHLp1qiLecUPE69svq6vS2UB+ZsY7I0YcgmLAXjcKb4ZcmV3egn5c
+          # MSIo3G1Tg0YWRE3t76+x9OUmuZoCp1r2c2n3491M6t8m5D5d3bPNOBLmEquTqmMG
+          # Ad4kCeUFHEWF8jMRHWLXmU/vAUjOqFmH4MI5XL4ugw859twcb2f66XoszLLxGJqp
+          # /Q/DaQZ2snLIIp3pMqUeA7haKJllvzlUPFrv8qnWSI9WaYdqAbpLqzzupSj9u+0p
+          # iWJlRB8jo5CrqO87Qi9dmphHm3g6LH5NjseTog2sNx8rEUH6x2x92jB5KsMJAsjp
+          # PlI4XzMUCbn9b+kdGOF+YnguW8XleA==
+          # =FVuv
+          # -----END PGP SIGNATURE-----
+          # gpg
         scope: ""
         description: Signature made Sat Jun  1 22:18:14 2024 EDT
         body: '#'
         footer:
-            - |-
-              gpg:                using RSA key 6F21D117858E4C8F7BE79DCFDEB64E8A0CA4ED3E
-              # gpg: Good signature from ""unclespider@protonmail.com" <unclespider@protonmail.com>" [ultimate]
-              # Primary key fingerprint: 6F21 D117 858E 4C8F 7BE7  9DCF DEB6 4E8A 0CA4 ED3E
+          - |-
+            gpg:                using RSA key 6F21D117858E4C8F7BE79DCFDEB64E8A0CA4ED3E
+            # gpg: Good signature from ""unclespider@protonmail.com" <unclespider@protonmail.com>" [ultimate]
+            # Primary key fingerprint: 6F21 D117 858E 4C8F 7BE7  9DCF DEB6 4E8A 0CA4 ED3E
         major: false
         minor: false
         patch: false
@@ -814,7 +814,7 @@
         scope: ""
         description: Merge branch 'release/v0.1.10'
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -834,7 +834,7 @@
         scope: ""
         description: Fixed failure on dangling lock
         body: Fixed the bug where the agent died if there was a dangling lock.pid
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -855,7 +855,7 @@
         scope: ""
         description: Updated changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -875,7 +875,7 @@
         scope: ""
         description: Add parallel file downloads
         body: Replaced  the word and rule file downloads to use go-getter in parallel using go routines
-        footer: []
+        footer: [ ]
         major: false
         minor: true
         patch: false
@@ -892,7 +892,7 @@
         scope: ""
         description: Bump github.com/unclesp1d3r/cipherswarm-agent-sdk-go from 0.2.0 to 0.2.1 (#28)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -909,7 +909,7 @@
         scope: ""
         description: Update changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -930,7 +930,7 @@
         scope: ""
         description: Updated Changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -950,7 +950,7 @@
         scope: ""
         description: Move to v0.2.0 of the SDK
         body: Version 0.2.0 introduced major breaking changes.
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -976,14 +976,14 @@
         scope: ""
         description: Bump github.com/imroc/req/v3 from 3.43.4 to 3.43.5 (#26)
         body: |-
-            ---
-            updated-dependencies:
-            - dependency-name: github.com/imroc/req/v3
-              dependency-type: direct:production
-              update-type: version-update:semver-patch
-            ...
-            Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
-        footer: []
+          ---
+          updated-dependencies:
+          - dependency-name: github.com/imroc/req/v3
+            dependency-type: direct:production
+            update-type: version-update:semver-patch
+          ...
+          Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1000,7 +1000,7 @@
         scope: ""
         description: Bump github.com/unclesp1d3r/cipherswarm-agent-sdk-go from 0.1.9 to 0.1.10 (#25)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1017,7 +1017,7 @@
         scope: ""
         description: Bump nuuday/github-changelog-action from 1.0.0 to 1.0.1 (#24)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1034,7 +1034,7 @@
         scope: ""
         description: Bumped versions on dependencies
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1051,7 +1051,7 @@
         scope: ""
         description: Update change log
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -1068,7 +1068,7 @@
         scope: ""
         description: Updated change logs
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -1092,7 +1092,7 @@
         scope: ""
         description: 'fix!(release): Add signing for darwin binaries'
         body: I realized that all previous published binaries for darwin generate an error when you try to launch them since they’re not signed.
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1113,7 +1113,7 @@
         scope: ""
         description: Add gitlint to enforce conventional commits
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -1130,7 +1130,7 @@
         scope: ""
         description: Add SBOM to goreleaser config
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1147,7 +1147,7 @@
         scope: ""
         description: Updated changelog
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -1164,7 +1164,7 @@
         scope: ""
         description: Remove non-working git-chglog action
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1181,7 +1181,7 @@
         scope: ""
         description: Fix git-chglog missing config_dir
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1198,7 +1198,7 @@
         scope: ""
         description: Update to latest Agent SDK v0.1.9
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -1215,7 +1215,7 @@
         scope: ""
         description: Add changelog action
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1232,7 +1232,7 @@
         scope: ""
         description: Add note about Conventional Commits
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: true
@@ -1253,7 +1253,7 @@
         scope: ""
         description: feat Cleaned up change log generator
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1270,7 +1270,7 @@
         scope: ""
         description: Added improved changelog support
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: true
         patch: false
@@ -1287,7 +1287,7 @@
         scope: ""
         description: Added message for when a hash is cracked
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1304,7 +1304,7 @@
         scope: ""
         description: Fixed huge bug preventing hashlist download
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1321,7 +1321,7 @@
         scope: ""
         description: Bumped the Agent SDK version to 0.1.7
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1338,7 +1338,7 @@
         scope: ""
         description: Added better error handling for failed steps
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1358,7 +1358,7 @@
         scope: ""
         description: Updated to SDK v0.1.6
         body: '- HashSpeed in the hashcat benchmarks is now a double, so it should handle absurdly fast benchmarks'
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1378,7 +1378,7 @@
         scope: ""
         description: Updated to SDK v0.1.6
         body: '- HashSpeed in the hashcat benchmarks is now a double, so it should handle absurdly fast benchmarks'
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1399,7 +1399,7 @@
         scope: ""
         description: Bumped version number
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1416,7 +1416,7 @@
         scope: ""
         description: Moved to an API generated with SpeakEasy (#21)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1436,7 +1436,7 @@
         scope: ""
         description: Improvements to the README
         body: '- Better explainations to how to use docker and how to configure the app'
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1467,19 +1467,19 @@
         scope: ""
         description: Bump golangci/golangci-lint-action from 5 to 6 (#19)
         body: |-
-            Bumps [golangci/golangci-lint-action](https://github.com/golangci/golangci-lint-action) from 5 to 6.
-            - [Release notes](https://github.com/golangci/golangci-lint-action/releases)
-            - [Commits](https://github.com/golangci/golangci-lint-action/compare/v5...v6)
-
-            ---
-            updated-dependencies:
-            - dependency-name: golangci/golangci-lint-action
-              dependency-type: direct:production
-              update-type: version-update:semver-major
-            ...
-            Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
-            Co-authored-by: UncleSp1d3r <unclespider@protonmail.com>
-        footer: []
+          Bumps [golangci/golangci-lint-action](https://github.com/golangci/golangci-lint-action) from 5 to 6.
+          - [Release notes](https://github.com/golangci/golangci-lint-action/releases)
+          - [Commits](https://github.com/golangci/golangci-lint-action/compare/v5...v6)
+          
+          ---
+          updated-dependencies:
+          - dependency-name: golangci/golangci-lint-action
+            dependency-type: direct:production
+            update-type: version-update:semver-major
+          ...
+          Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+          Co-authored-by: UncleSp1d3r <unclespider@protonmail.com>
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1500,7 +1500,7 @@
         scope: ""
         description: Added additional error checking on requests
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1517,7 +1517,7 @@
         scope: ""
         description: Added changelog and updated goreleaser functionality
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1538,7 +1538,7 @@
         scope: ""
         description: Moved to the updated API for hashlist download
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1586,32 +1586,32 @@
         scope: ""
         description: 9 add better status output when job is running (#18)
         body: |-
-            * Overdue cleanup and restructuring
-
-            - Switched from using viper for shared state to a proper object.
-            - Extracted all display methods to make it easier to customize them later
-            - Removed the package name from the various hashcat objects
-            - Removed the weird dangling lock file cleanup code.
-
-            * Updated all documentation comments
-
-            * Bug fixes and cleanup
-
-            - Removed excessive afero dependency
-            - Fixed a bug that broke the debug mode
-            - Fixed a bug that made the attack resource files not download
-            - Split out the heartbeat goroutine, so it should always send a heart beat once a minute even when the tasks are long running.
-
-            * Minor cleanup to satisfy golangci-lint
-
-            * Resolved #9
-
-            - Cleaned up the custom charset masks
-            - Ensure hashlist is downloaded each time
-            - Added a meaningful status message with progress
-
-            ---------
-        footer: []
+          * Overdue cleanup and restructuring
+          
+          - Switched from using viper for shared state to a proper object.
+          - Extracted all display methods to make it easier to customize them later
+          - Removed the package name from the various hashcat objects
+          - Removed the weird dangling lock file cleanup code.
+          
+          * Updated all documentation comments
+          
+          * Bug fixes and cleanup
+          
+          - Removed excessive afero dependency
+          - Fixed a bug that broke the debug mode
+          - Fixed a bug that made the attack resource files not download
+          - Split out the heartbeat goroutine, so it should always send a heart beat once a minute even when the tasks are long running.
+          
+          * Minor cleanup to satisfy golangci-lint
+          
+          * Resolved #9
+          
+          - Cleaned up the custom charset masks
+          - Ensure hashlist is downloaded each time
+          - Added a meaningful status message with progress
+          
+          ---------
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1632,7 +1632,7 @@
         scope: ""
         description: Updated goreleaser to also automatically release docker
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1649,7 +1649,7 @@
         scope: ""
         description: Updated goreleaser to also automatically release docker
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1666,7 +1666,7 @@
         scope: ""
         description: Updated goreleaser to also automatically release docker
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1683,7 +1683,7 @@
         scope: ""
         description: 'Fixed issue #11'
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1714,19 +1714,19 @@
         scope: ""
         description: Bump golangci/golangci-lint-action from 4 to 5 (#10)
         body: |-
-            Bumps [golangci/golangci-lint-action](https://github.com/golangci/golangci-lint-action) from 4 to 5.
-            - [Release notes](https://github.com/golangci/golangci-lint-action/releases)
-            - [Commits](https://github.com/golangci/golangci-lint-action/compare/v4...v5)
-
-            ---
-            updated-dependencies:
-            - dependency-name: golangci/golangci-lint-action
-              dependency-type: direct:production
-              update-type: version-update:semver-major
-            ...
-            Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
-            Co-authored-by: UncleSp1d3r <unclespider@protonmail.com>
-        footer: []
+          Bumps [golangci/golangci-lint-action](https://github.com/golangci/golangci-lint-action) from 4 to 5.
+          - [Release notes](https://github.com/golangci/golangci-lint-action/releases)
+          - [Commits](https://github.com/golangci/golangci-lint-action/compare/v4...v5)
+          
+          ---
+          updated-dependencies:
+          - dependency-name: golangci/golangci-lint-action
+            dependency-type: direct:production
+            update-type: version-update:semver-major
+          ...
+          Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+          Co-authored-by: UncleSp1d3r <unclespider@protonmail.com>
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1747,7 +1747,7 @@
         scope: ""
         description: Updated to support API v0.1.11
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1778,19 +1778,19 @@
         scope: ""
         description: Bump actions/checkout from 3 to 4 (#8)
         body: |-
-            Bumps [actions/checkout](https://github.com/actions/checkout) from 3 to 4.
-            - [Release notes](https://github.com/actions/checkout/releases)
-            - [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)
-            - [Commits](https://github.com/actions/checkout/compare/v3...v4)
-
-            ---
-            updated-dependencies:
-            - dependency-name: actions/checkout
-              dependency-type: direct:production
-              update-type: version-update:semver-major
-            ...
-            Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
-        footer: []
+          Bumps [actions/checkout](https://github.com/actions/checkout) from 3 to 4.
+          - [Release notes](https://github.com/actions/checkout/releases)
+          - [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)
+          - [Commits](https://github.com/actions/checkout/compare/v3...v4)
+          
+          ---
+          updated-dependencies:
+          - dependency-name: actions/checkout
+            dependency-type: direct:production
+            update-type: version-update:semver-major
+          ...
+          Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1830,28 +1830,28 @@
         scope: ""
         description: 6 rebuild to use cipherswarm agent go api (#7)
         body: |-
-            * Updated to support new official CLI 0.1.10
-
-            * Updated to support new official CLI 0.1.10
-
-            * Updated to support new official CLI 0.1.10
-
-            * Updated codeclimate config
-
-            * Fixed some golangci-lint issues
-
-            * Fixed some golangci-lint issues
-
-            * Fixed some golangci-lint issues
-
-            * Fixed some golangci-lint issues
-
-            * Fixed some golangci-lint issues
-
-            * Fixed some golangci-lint issues
-
-            ---------
-        footer: []
+          * Updated to support new official CLI 0.1.10
+          
+          * Updated to support new official CLI 0.1.10
+          
+          * Updated to support new official CLI 0.1.10
+          
+          * Updated codeclimate config
+          
+          * Fixed some golangci-lint issues
+          
+          * Fixed some golangci-lint issues
+          
+          * Fixed some golangci-lint issues
+          
+          * Fixed some golangci-lint issues
+          
+          * Fixed some golangci-lint issues
+          
+          * Fixed some golangci-lint issues
+          
+          ---------
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1868,7 +1868,7 @@
         scope: ""
         description: Removed Windows support and created the option to dockerize
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1885,7 +1885,7 @@
         scope: ""
         description: Removed unused gomod
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1902,7 +1902,7 @@
         scope: ""
         description: Bump golang.org/x/net from 0.22.0 to 0.23.0 (#5)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1929,15 +1929,15 @@
         scope: ""
         description: Bump golang.org/x/net from 0.22.0 to 0.23.0
         body: |-
-            Bumps [golang.org/x/net](https://github.com/golang/net) from 0.22.0 to 0.23.0.
-            - [Commits](https://github.com/golang/net/compare/v0.22.0...v0.23.0)
-
-            ---
-            updated-dependencies:
-            - dependency-name: golang.org/x/net
-              dependency-type: indirect
-            ...
-        footer: []
+          Bumps [golang.org/x/net](https://github.com/golang/net) from 0.22.0 to 0.23.0.
+          - [Commits](https://github.com/golang/net/compare/v0.22.0...v0.23.0)
+          
+          ---
+          updated-dependencies:
+          - dependency-name: golang.org/x/net
+            dependency-type: indirect
+          ...
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1954,7 +1954,7 @@
         scope: ""
         description: Removed broken CodeQL
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1971,7 +1971,7 @@
         scope: ""
         description: Fixed bugs preventing Linux from building
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -1988,7 +1988,7 @@
         scope: ""
         description: Fixed bugs preventing Linux from building
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2005,7 +2005,7 @@
         scope: ""
         description: Minor fix to match API change
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2022,7 +2022,7 @@
         scope: ""
         description: Bump github.com/quic-go/quic-go from 0.41.0 to 0.42.0 (#4)
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2051,17 +2051,17 @@
         scope: ""
         description: Bump github.com/quic-go/quic-go from 0.41.0 to 0.42.0
         body: |-
-            Bumps [github.com/quic-go/quic-go](https://github.com/quic-go/quic-go) from 0.41.0 to 0.42.0.
-            - [Release notes](https://github.com/quic-go/quic-go/releases)
-            - [Changelog](https://github.com/quic-go/quic-go/blob/master/Changelog.md)
-            - [Commits](https://github.com/quic-go/quic-go/compare/v0.41.0...v0.42.0)
-
-            ---
-            updated-dependencies:
-            - dependency-name: github.com/quic-go/quic-go
-              dependency-type: indirect
-            ...
-        footer: []
+          Bumps [github.com/quic-go/quic-go](https://github.com/quic-go/quic-go) from 0.41.0 to 0.42.0.
+          - [Release notes](https://github.com/quic-go/quic-go/releases)
+          - [Changelog](https://github.com/quic-go/quic-go/blob/master/Changelog.md)
+          - [Commits](https://github.com/quic-go/quic-go/compare/v0.41.0...v0.42.0)
+          
+          ---
+          updated-dependencies:
+          - dependency-name: github.com/quic-go/quic-go
+            dependency-type: indirect
+          ...
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2078,7 +2078,7 @@
         scope: ""
         description: Fixed issue with go.mod go version
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2095,7 +2095,7 @@
         scope: ""
         description: Create codeql.yml
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2112,7 +2112,7 @@
         scope: ""
         description: Create go.yml
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2129,7 +2129,7 @@
         scope: ""
         description: Minor cleanup and bumped go.mod
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2146,7 +2146,7 @@
         scope: ""
         description: Basic attacks work now. Still much to do
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2163,7 +2163,7 @@
         scope: ""
         description: Added agent update functionality
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2180,7 +2180,7 @@
         scope: ""
         description: Implemented initial agent setup
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2200,7 +2200,7 @@
         scope: ""
         description: Added initial support for detecting devices
         body: Still need to test and fix on Windows and Linux
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2220,7 +2220,7 @@
         scope: ""
         description: Completed agent startup functions
         body: It doesn’t yet support the agent loop functions, but it is usable for testing the development of the API.
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
@@ -2237,7 +2237,7 @@
         scope: ""
         description: Initial Commit
         body: ""
-        footer: []
+        footer: [ ]
         major: false
         minor: false
         patch: false
