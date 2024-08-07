@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
@@ -50,7 +51,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 				DisplayBenchmarkError(stdErrLine)
 				// Ignore empty lines
 				if strutil.IsNotBlank(stdErrLine) {
-					SendAgentError(stdErrLine, nil, components.SeverityWarning)
+					SendAgentError(stdErrLine, nil, operations.SeverityWarning)
 				}
 			case statusUpdate := <-sess.StatusUpdates:
 				shared.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
@@ -59,7 +60,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 			case err := <-sess.DoneChan:
 				if err != nil {
 					shared.Logger.Error("Benchmark session failed", "error", err)
-					SendAgentError(err.Error(), nil, components.SeverityFatal)
+					SendAgentError(err.Error(), nil, operations.SeverityFatal)
 				}
 				break procLoop
 			}
@@ -90,7 +91,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
 		shared.Logger.Error("Failed to start attack session", "error", err)
-		SendAgentError(err.Error(), task, components.SeverityFatal)
+		SendAgentError(err.Error(), task, operations.SeverityFatal)
 		return
 	}
 	waitChan := make(chan int)
@@ -112,7 +113,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 			case stdErrLine := <-sess.StderrMessages:
 				DisplayJobError(stdErrLine)
 				if strutil.IsNotBlank(stdErrLine) {
-					SendAgentError(stdErrLine, task, components.SeverityMinor)
+					SendAgentError(stdErrLine, task, operations.SeverityMinor)
 				}
 			case statusUpdate := <-sess.StatusUpdates:
 				DisplayJobStatus(statusUpdate)
@@ -124,7 +125,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 				if err != nil {
 					if err.Error() != "exit status 1" {
 						// Something went wrong and we failed.
-						SendAgentError(err.Error(), task, components.SeverityFatal)
+						SendAgentError(err.Error(), task, operations.SeverityFatal)
 						DisplayJobFailed(err)
 					} else {
 						// Exit status 1 means we exhausted the task. Mark it as such.
