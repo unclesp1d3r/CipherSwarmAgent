@@ -1,7 +1,7 @@
 conventional-commits: true
 deb:
-    distribution: []
-    urgency: ""
+  distribution: [ ]
+  urgency: ""
 debug: false
 exclude-merge-commits: false
 owner: unclesp1d3r

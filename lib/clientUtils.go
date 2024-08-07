@@ -176,7 +176,11 @@ func downloadHashList(attack *components.Attack) error {
 				SendAgentError(err.Error(), nil, operations.SeverityCritical)
 				return err
 			}
-			defer f.Close()
+			defer func(f *os.File) {
+				err := f.Close()
+				if err != nil {
+				}
+			}(f)
 			_, err = io.Copy(f, response.ResponseStream)
 			if err != nil {
 				shared.Logger.Error("Error writing hashlist file", "error", err)

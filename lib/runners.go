@@ -107,7 +107,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 						shared.Logger.Error("Failed to parse status update", "error", err)
 					} else {
 						DisplayJobStatus(update)
-						SendStatusUpdate(update, task, sess)
+						sendStatusUpdate(update, task, sess)
 					}
 				}
 			case stdErrLine := <-sess.StderrMessages:
@@ -117,10 +117,10 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 				}
 			case statusUpdate := <-sess.StatusUpdates:
 				DisplayJobStatus(statusUpdate)
-				SendStatusUpdate(statusUpdate, task, sess)
+				sendStatusUpdate(statusUpdate, task, sess)
 			case crackedHash := <-sess.CrackedHashes:
 				DisplayJobCrackedHash(crackedHash)
-				SendCrackedHash(crackedHash, task)
+				sendCrackedHash(crackedHash, task)
 			case err := <-sess.DoneChan:
 				if err != nil {
 					if err.Error() != "exit status 1" {
@@ -130,7 +130,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 					} else {
 						// Exit status 1 means we exhausted the task. Mark it as such.
 						DisplayJobExhausted()
-						MarkTaskExhausted(task)
+						markTaskExhausted(task)
 					}
 				}
 				break procLoop
