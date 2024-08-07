@@ -85,7 +85,7 @@ func GetAgentConfiguration() error {
 		return errors.New("unauthorized")
 	}
 
-	if response == nil || response.Object == nil {
+	if response.Object == nil {
 		shared.Logger.Error("Error getting agent configuration")
 		return errors.New("failed to get agent configuration")
 	}
@@ -320,14 +320,14 @@ func GetAttackParameters(attackID int64) (*components.Attack, error) {
 	return nil, errors.New("bad response: " + response.RawResponse.Status)
 }
 
-// SendBenchmarkResults sends benchmark results to the SDK client.
+// sendBenchmarkResults sends benchmark results to the SDK client.
 // It takes a slice of BenchmarkResult as input and returns an error if any.
 // The function iterates over the benchmark results and converts the necessary fields to their respective types.
 // Then, it creates a HashcatBenchmark object and appends it to the results slice.
 // Finally, it submits the benchmark results to the SDK client using the SdkClient.Agents.SubmitBenchmark method.
 // If the submission is successful (HTTP status code 204), it returns nil.
 // Otherwise, it returns an error with the corresponding status message.
-func SendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
+func sendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
 	var benchmarks []components.HashcatBenchmark
 	for _, result := range benchmarkResults {
 		hashType, err := convertor.ToInt(result.HashType)
@@ -398,7 +398,7 @@ func UpdateBenchmarks() {
 		return
 	}
 	DisplayBenchmarksComplete(benchmarkResult)
-	err = SendBenchmarkResults(benchmarkResult)
+	err = sendBenchmarkResults(benchmarkResult)
 	if err != nil {
 		shared.Logger.Error("Failed to send benchmark results", "error", err)
 		SendAgentError(err.Error(), nil, operations.SeverityMajor)
@@ -517,28 +517,34 @@ func RunTask(task *components.Task, attack *components.Attack) {
 	DisplayRunTaskStarting(task)
 	// Create the hashcat session
 
+	if attack == nil {
+		shared.Logger.Error("Attack is nil")
+		SendAgentError("Attack is nil", task, operations.SeverityCritical)
+		return
+	}
+
 	// TODO: Need to unify the AttackParameters and HashcatParams structs
 	jobParams := hashcat.Params{
-		AttackMode:       pointer.Unwrap(attack.AttackModeHashcat),
-		HashType:         pointer.Unwrap(attack.HashMode),
+		AttackMode:       pointer.UnwrapOr(attack.AttackModeHashcat),
+		HashType:         pointer.UnwrapOr(attack.HashMode),
 		HashFile:         path.Join(shared.State.HashlistPath, convertor.ToString(attack.GetHashListID())+".txt"),
-		Mask:             pointer.UnwarpOr(attack.GetMask(), ""),
-		MaskIncrement:    pointer.UnwarpOr(attack.GetIncrementMode(), false),
+		Mask:             pointer.UnwrapOr(attack.GetMask(), ""),
+		MaskIncrement:    pointer.UnwrapOr(attack.GetIncrementMode(), false),
 		MaskIncrementMin: attack.GetIncrementMinimum(),
 		MaskIncrementMax: attack.GetIncrementMaximum(),
 		MaskCustomCharsets: []string{
-			pointer.UnwarpOr(attack.GetCustomCharset1(), ""),
-			pointer.UnwarpOr(attack.GetCustomCharset2(), ""),
-			pointer.UnwarpOr(attack.GetCustomCharset3(), ""),
-			pointer.UnwarpOr(attack.GetCustomCharset4(), ""),
+			pointer.UnwrapOr(attack.GetCustomCharset1(), ""),
+			pointer.UnwrapOr(attack.GetCustomCharset2(), ""),
+			pointer.UnwrapOr(attack.GetCustomCharset3(), ""),
+			pointer.UnwrapOr(attack.GetCustomCharset4(), ""),
 		},
 		WordlistFilenames: getWordlistFilenames(attack),
 		RulesFilenames:    getRulelistFilenames(attack),
 		AdditionalArgs:    arch.GetAdditionalHashcatArgs(),
 		OptimizedKernels:  *attack.Optimized,
 		SlowCandidates:    *attack.SlowCandidateGenerators,
-		Skip:              pointer.UnwarpOr(task.GetSkip(), 0),
-		Limit:             pointer.UnwarpOr(task.GetLimit(), 0),
+		Skip:              pointer.UnwrapOr(task.GetSkip(), 0),
+		Limit:             pointer.UnwrapOr(task.GetLimit(), 0),
 		BackendDevices:    Configuration.Config.BackendDevices,
 		OpenCLDevices:     Configuration.Config.OpenCLDevices,
 	}
@@ -556,7 +562,7 @@ func RunTask(task *components.Task, attack *components.Attack) {
 	DisplayRunTaskCompleted()
 }
 
-// SendStatusUpdate sends a status update to the server for a given task.
+// sendStatusUpdate sends a status update to the server for a given task.
 // It takes a hashcat.Status object and a pointer to a cipherswarm.Task object as parameters.
 // The function first checks if the update.Time field is zero and sets it to the current time if it is.
 // Then, it creates a list of cipherswarm.DeviceStatus objects based on the update.Devices field.
@@ -565,7 +571,7 @@ func RunTask(task *components.Task, attack *components.Attack) {
 // Finally, it submits the task status to the server using the apiClient.TasksAPI.SubmitStatus method.
 // If there is an error during the submission, an error message is logged and the function returns.
 // If the submission is successful, a debug message is logged.
-func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashcat.Session) {
+func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashcat.Session) {
 	// Hashcat doesn't seem to update the time consistently, so we'll set it here
 	if update.Time.IsZero() {
 		update.Time = time.Now()
@@ -617,7 +623,7 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	// We'll do something with the status update responses at some point. Maybe tell the job to stop or pause.
 	resp, err := SdkClient.Tasks.SendStatus(Context, task.GetID(), taskStatus)
 	if err != nil {
-		// There's a few responses are are error-like:
+		// There's a few responses are error-like:
 		// 401	Unauthorized
 		// 404	Task not found
 		// 410	status received successfully, but task paused
@@ -696,12 +702,12 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 		// The status was sent successfully, but there's new zaps we need to download
 		shared.Logger.Debug("Status update sent, but stale")
 
-		GetZaps(task)
+		getZaps(task)
 		return
 	}
 }
 
-// GetZaps retrieves the Zaps for a given task.
+// getZaps retrieves the Zaps for a given task.
 // It takes a pointer to a `components.Task` as a parameter.
 // If the task is nil, it logs an error and returns.
 // Otherwise, it calls the `GetTaskZaps` method of the `SdkClient` to get the Zaps for the task.
@@ -709,7 +715,7 @@ func SendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 // If the response stream is not nil, it creates a zap file named after the task ID and writes the response stream to it.
 // If there is an error creating the zap file, it logs the error, sends an agent error, and returns.
 // Finally, it closes the zap file.
-func GetZaps(task *components.Task) {
+func getZaps(task *components.Task) {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
 		return
@@ -739,7 +745,13 @@ func GetZaps(task *components.Task) {
 			SendAgentError(err.Error(), task, operations.SeverityCritical)
 			return
 		}
-		defer outFile.Close()
+		defer func(outFile *os.File) {
+			err := outFile.Close()
+			if err != nil {
+				shared.Logger.Error("Error closing zap file", "error", err)
+				SendAgentError(err.Error(), task, operations.SeverityCritical)
+			}
+		}(outFile)
 		_, err = io.Copy(outFile, res.ResponseStream)
 		if err != nil {
 			shared.Logger.Error("Error writing zap file", "error", err)
@@ -781,7 +793,7 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 		},
 	}
 
-	var agentError *operations.SubmitErrorAgentRequestBody = &operations.SubmitErrorAgentRequestBody{
+	var agentError = &operations.SubmitErrorAgentRequestBody{
 		Message:  stdErrLine,
 		Metadata: metadata,
 		Severity: severity,
@@ -825,11 +837,11 @@ func AcceptTask(task *components.Task) bool {
 	return true
 }
 
-// MarkTaskExhausted marks a task as exhausted.
+// markTaskExhausted marks a task as exhausted.
 // If the task is nil, it logs an error and returns.
 // Otherwise, it notifies the server that the task is exhausted.
 // If there is an error notifying the server, it logs the error and sends an agent error.
-func MarkTaskExhausted(task *components.Task) {
+func markTaskExhausted(task *components.Task) {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
 		return
@@ -869,13 +881,13 @@ func AbandonTask(task *components.Task) {
 	}
 }
 
-// SendCrackedHash sends a cracked hash to the server.
+// sendCrackedHash sends a cracked hash to the server.
 // It takes a `hashcat.Result` object representing the cracked hash,
 // and a pointer to a `components.Task` object representing the task.
 // It logs the cracked hash and plaintext, and sends the cracked hash to the server.
 // If there is an error sending the cracked hash, it logs the error and sends an agent error.
 // If the response status code is `http.StatusNoContent`, it logs that the hashlist is completed.
-func SendCrackedHash(hash hashcat.Result, task *components.Task) {
+func sendCrackedHash(hash hashcat.Result, task *components.Task) {
 	hashcatResult := &components.HashcatResult{
 		Timestamp: hash.Timestamp,
 		Hash:      hash.Hash,

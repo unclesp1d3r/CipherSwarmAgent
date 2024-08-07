@@ -58,7 +58,7 @@ func init() {
 	viper.SetDefault("data_path", path.Join(cwd, "data"))                            // Set the default data path
 	viper.SetDefault("gpu_temp_threshold", 80)                                       // Set the default GPU temperature threshold
 	viper.SetDefault("always_use_native_hashcat", false)                             // Set the default to not always use native hashcat
-	viper.SetDefault("sleep_on_failure", time.Duration(60*time.Second))              // Set the default sleep time on failure
+	viper.SetDefault("sleep_on_failure", 60*time.Second)                             // Set the default sleep time on failure
 	viper.SetDefault("always_trust_files", false)                                    // Set the default to not always trust files
 	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files")) // Set the default files path in the data directory if not set
 	viper.SetDefault("extra_debugging", false)                                       // Set the default to not enable extra debugging
