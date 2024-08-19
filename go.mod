@@ -8,7 +8,7 @@ require (
 	github.com/duke-git/lancet v1.4.3
 	github.com/duke-git/lancet/v2 v2.3.2
 	github.com/dustin/go-humanize v1.0.1
-	github.com/hashicorp/go-getter v1.7.5
+	github.com/hashicorp/go-getter v1.7.6
 	github.com/imroc/req/v3 v3.43.7
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/nxadm/tail v1.4.11
