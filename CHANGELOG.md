@@ -1,4 +1,15 @@
 
+<a name="v0.5.0"></a>
+
+## [v0.5.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.4.2...v0.5.0)
+
+> 2024-08-26
+
+### Features
+
+* Added support for mask list files from v0.5.0 of API
+  
+  
 <a name="v0.4.2"></a>
 
 ## [v0.4.2](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.4.1...v0.4.2)
