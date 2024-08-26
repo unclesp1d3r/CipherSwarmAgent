@@ -179,6 +179,7 @@ func downloadHashList(attack *components.Attack) error {
 			defer func(f *os.File) {
 				err := f.Close()
 				if err != nil {
+					shared.Logger.Error("Error closing hashlist file", "error", err)
 				}
 			}(f)
 			_, err = io.Copy(f, response.ResponseStream)
@@ -314,4 +315,11 @@ func base64ToHex(base64 string) string {
 	str := cryptor.Base64StdDecode(base64)
 	hx := hex.EncodeToString([]byte(str))
 	return hx
+}
+
+func resourceNameOrBlank(resource *components.AttackResourceFile) string {
+	if resource == nil {
+		return ""
+	}
+	return resource.FileName
 }
