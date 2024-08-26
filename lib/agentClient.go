@@ -14,7 +14,6 @@ import (
 	"github.com/duke-git/lancet/convertor"
 	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/v2/pointer"
-	"github.com/duke-git/lancet/v2/slice"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
@@ -419,30 +418,52 @@ func DownloadFiles(attack *components.Attack) error {
 	}
 
 	// Download all resource files
-	for _, resource := range slice.Concat(attack.WordLists, attack.RuleLists) {
-		filePath := path.Join(shared.State.FilePath, resource.FileName)
-		shared.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
-		checksum := ""
-		if shared.State.AlwaysTrustFiles {
-			shared.Logger.Debug("Skipping checksum verification")
-		} else {
-			// Check the checksum of the file
-			checksum = base64ToHex(resource.GetChecksum())
-		}
-		err := downloadFile(resource.GetDownloadURL(), filePath, checksum)
-		if err != nil {
-			shared.Logger.Error("Error downloading attack resource", "error", err)
-			SendAgentError(err.Error(), nil, operations.SeverityCritical)
-			return err
-		}
-		downloadSize, _ := fileutil.FileSize(filePath)
-		if downloadSize == 0 {
-			shared.Logger.Error("Downloaded file is empty", "path", filePath)
-			SendAgentError("Downloaded file is empty", nil, operations.SeverityCritical)
-			return errors.New("downloaded file is empty")
-		}
-		shared.Logger.Debug("Downloaded resource file", "path", filePath)
+
+	err = downloadResourceFile(attack.WordList)
+	if err != nil {
+		return err
 	}
+
+	err = downloadResourceFile(attack.RuleList)
+	if err != nil {
+		return err
+	}
+
+	err = downloadResourceFile(attack.MaskList)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func downloadResourceFile(resource *components.AttackResourceFile) error {
+	if resource == nil {
+		return nil
+	}
+
+	filePath := path.Join(shared.State.FilePath, resource.FileName)
+	shared.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
+	checksum := ""
+	if shared.State.AlwaysTrustFiles {
+		shared.Logger.Debug("Skipping checksum verification")
+	} else {
+		// Check the checksum of the file
+		checksum = base64ToHex(resource.GetChecksum())
+	}
+	err := downloadFile(resource.GetDownloadURL(), filePath, checksum)
+	if err != nil {
+		shared.Logger.Error("Error downloading attack resource", "error", err)
+		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+		return err
+	}
+	downloadSize, _ := fileutil.FileSize(filePath)
+	if downloadSize == 0 {
+		shared.Logger.Error("Downloaded file is empty", "path", filePath)
+		SendAgentError("Downloaded file is empty", nil, operations.SeverityCritical)
+		return errors.New("downloaded file is empty")
+	}
+	shared.Logger.Debug("Downloaded resource file", "path", filePath)
 
 	return nil
 }
@@ -538,15 +559,16 @@ func RunTask(task *components.Task, attack *components.Attack) {
 			pointer.UnwrapOr(attack.GetCustomCharset3(), ""),
 			pointer.UnwrapOr(attack.GetCustomCharset4(), ""),
 		},
-		WordlistFilenames: getWordlistFilenames(attack),
-		RulesFilenames:    getRulelistFilenames(attack),
-		AdditionalArgs:    arch.GetAdditionalHashcatArgs(),
-		OptimizedKernels:  *attack.Optimized,
-		SlowCandidates:    *attack.SlowCandidateGenerators,
-		Skip:              pointer.UnwrapOr(task.GetSkip(), 0),
-		Limit:             pointer.UnwrapOr(task.GetLimit(), 0),
-		BackendDevices:    Configuration.Config.BackendDevices,
-		OpenCLDevices:     Configuration.Config.OpenCLDevices,
+		WordListFilename: resourceNameOrBlank(attack.WordList),
+		RuleListFilename: resourceNameOrBlank(attack.RuleList),
+		MaskListFilename: resourceNameOrBlank(attack.MaskList),
+		AdditionalArgs:   arch.GetAdditionalHashcatArgs(),
+		OptimizedKernels: *attack.Optimized,
+		SlowCandidates:   *attack.SlowCandidateGenerators,
+		Skip:             pointer.UnwrapOr(task.GetSkip(), 0),
+		Limit:            pointer.UnwrapOr(task.GetLimit(), 0),
+		BackendDevices:   Configuration.Config.BackendDevices,
+		OpenCLDevices:    Configuration.Config.OpenCLDevices,
 	}
 
 	sess, err := hashcat.NewHashcatSession("attack", jobParams)
@@ -624,37 +646,27 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	resp, err := SdkClient.Tasks.SendStatus(Context, task.GetID(), taskStatus)
 	if err != nil {
 		// There's a few responses are error-like:
-		// 401	Unauthorized
 		// 404	Task not found
 		// 410	status received successfully, but task paused
+
+		// There's a few responses that are errors:
+		// 401	Unauthorized
 		// 422	malformed status data
 
 		shared.Logger.Error("Error sending status update", "error", err)
 		SendAgentError(err.Error(), task, operations.SeverityCritical)
+
 		var e *sdkerrors.SDKError
 		if errors.As(err, &e) {
-			if e.StatusCode == http.StatusUnauthorized {
-				shared.Logger.Error("Unauthorized")
-				// Going to kill the task here
-				shared.Logger.Error("Killing task", "task_id", task.GetID())
-				err = sess.Kill()
-				if err != nil {
-					shared.Logger.Error("Error killing task", "error", err)
-					SendAgentError(err.Error(), task, operations.SeverityFatal)
-				}
-				sess.Cleanup()
-				shared.Logger.Fatal("The agent is unauthorized. Exiting.")
-				return
-			}
-
 			if e.StatusCode == http.StatusNotFound {
 				shared.Logger.Error("Task not found", "task_id", task.GetID())
 				// Going to kill the task here
 				shared.Logger.Error("Killing task", "task_id", task.GetID())
+				shared.Logger.Info("It is possible that multiple errors appear as the task takes some time to kill. This is expected.")
 				err = sess.Kill()
 				if err != nil {
 					shared.Logger.Error("Error killing task", "error", err)
-					SendAgentError(err.Error(), task, operations.SeverityCritical)
+					SendAgentError(err.Error(), nil, operations.SeverityCritical)
 				}
 				sess.Cleanup()
 				return
@@ -674,12 +686,18 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 
 				return
 			}
-
-			if e.StatusCode == http.StatusUnprocessableEntity {
-				shared.Logger.Error("Malformed status data", "task_id", task.GetID())
-				SendAgentError("Malformed status data", task, operations.SeverityMajor)
-				return
+		} else {
+			shared.Logger.Error("Error sending status update, non-SDK error", "error", err)
+			SendAgentError(err.Error(), task, operations.SeverityCritical)
+			// Going to kill the task here
+			shared.Logger.Error("Killing task", "task_id", task.GetID())
+			err = sess.Kill()
+			if err != nil {
+				shared.Logger.Error("Error killing task", "error", err)
+				SendAgentError(err.Error(), task, operations.SeverityCritical)
 			}
+			sess.Cleanup()
+			return
 		}
 
 		return
@@ -803,6 +821,20 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 	_, err := SdkClient.Agents.SubmitErrorAgent(Context, shared.State.AgentID, agentError)
 	if err != nil {
 		shared.Logger.Error("Error sending job error", "error", err)
+
+		var e *sdkerrors.SDKError
+		if errors.As(err, &e) {
+			if e.StatusCode == http.StatusNotFound {
+				// Task not found. This happens when the attack is deleted while a task is running.
+				if taskID != nil {
+					shared.Logger.Error("Task not found", "task_id", taskID)
+				}
+				return
+			}
+		} else {
+			shared.Logger.Error("Error sending job error, non-SDK error", "error", err)
+			return
+		}
 	}
 }
 

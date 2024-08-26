@@ -32,25 +32,6 @@ func parseStringToDeviceType(deviceType string) components.DeviceType {
 	}
 }
 
-// getWordlistFilenames returns a slice of filenames extracted from the given Attack's WordLists.
-func getWordlistFilenames(a *components.Attack) []string {
-	filenames := make([]string, len(a.WordLists))
-	for i, wordlist := range a.WordLists {
-		filenames[i] = wordlist.GetFileName()
-	}
-	return filenames
-}
-
-// getRulelistFilenames returns a slice of filenames extracted from the RuleLists
-// of the given Attack object.
-func getRulelistFilenames(a *components.Attack) []string {
-	filenames := make([]string, len(a.RuleLists))
-	for i, ruleList := range a.RuleLists {
-		filenames[i] = ruleList.GetFileName()
-	}
-	return filenames
-}
-
 type BenchmarkResult struct {
 	Device     string `json:"device,omitempty"`     // Device is the name of the device used for the benchmark.
 	HashType   string `json:"hash_type,omitempty"`  // HashType is the type of hash used for the benchmark.

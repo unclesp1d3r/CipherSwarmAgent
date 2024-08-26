@@ -95,6 +95,12 @@ func DisplayJobStatus(update hashcat.Status) {
 	speedText := humanize.SI(float64(speedSum), "H/s")
 	hashesText := fmt.Sprintf("%v of %v", update.RecoveredHashes[0], update.RecoveredHashes[1])
 
+	if update.Guess.GuessBaseCount > 1 {
+		// progressText = fmt.Sprintf("%.2f%%, iteration %v of %v", update.Guess.GuessBasePercent, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
+		progressText = fmt.Sprintf("%s for iteration %v of %v", progressText, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
+
+	}
+
 	shared.Logger.Info("Progress update", "progress", progressText, "speed", speedText, "cracked_hashes", hashesText)
 }
 

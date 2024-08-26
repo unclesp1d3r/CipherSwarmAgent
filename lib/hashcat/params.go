@@ -11,29 +11,25 @@ import (
 )
 
 type Params struct {
-	AttackMode int64  `json:"attack_mode"` // Attack mode to use
-	HashType   int64  `json:"hash_type"`   // Hash type to crack
-	HashFile   string `json:"hash_file"`   // Path to the file containing the hashes to crack
-
-	Mask               string   `json:"mask,omitempty"`           // Mask to use for mask attack
-	MaskIncrement      bool     `json:"mask_increment,omitempty"` // Whether to use mask increment
-	MaskIncrementMin   int64    `json:"mask_increment_min"`       // Min mask length for increment
-	MaskIncrementMax   int64    `json:"mask_increment_max"`       // Max mask length for increment
-	MaskCustomCharsets []string `json:"mask_custom_charsets"`     // Custom charsets for mask attack
-
-	WordlistFilenames []string `json:"wordlist_filenames"` // Wordlists to use for dictionary and combinator attacks
-	RulesFilenames    []string `json:"rules_filenames"`    // Rules to use for dictionary attack
-	AdditionalArgs    []string `json:"additional_args"`    // Additional arguments to pass to hashcat
-	OptimizedKernels  bool     `json:"optimized_kernels"`  // Whether to use optimized kernels
-	SlowCandidates    bool     `json:"slow_candidates"`    // Whether to use slow candidates
-
-	Skip  int64 `json:"skip,omitempty"`  // Keyspace offset to start at
-	Limit int64 `json:"limit,omitempty"` // Maximum keyspace to process
-
-	BackendDevices string `json:"backend_devices,omitempty"` // Devices to use for the backend, comma-separated
-	OpenCLDevices  string `json:"opencl_devices,omitempty"`  // OpenCL devices to use, comma-separated
-
-	EnableAdditionalHashTypes bool `json:"enable_additional_hash_types"` // Whether to enable additional hash types when benchmarking
+	AttackMode                int64    `json:"attack_mode"`                  // Attack mode to use
+	HashType                  int64    `json:"hash_type"`                    // Hash type to crack
+	HashFile                  string   `json:"hash_file"`                    // Path to the file containing the hashes to crack
+	Mask                      string   `json:"mask,omitempty"`               // Mask to use for mask attack
+	MaskIncrement             bool     `json:"mask_increment,omitempty"`     // Whether to use mask increment
+	MaskIncrementMin          int64    `json:"mask_increment_min"`           // Min mask length for increment
+	MaskIncrementMax          int64    `json:"mask_increment_max"`           // Max mask length for increment
+	MaskCustomCharsets        []string `json:"mask_custom_charsets"`         // Custom charsets for mask attack
+	WordListFilename          string   `json:"wordlist_filename"`            // Wordlist to use for dictionary and hybrid attacks
+	RuleListFilename          string   `json:"rules_filename"`               // Rule list to use for dictionary attack
+	MaskListFilename          string   `json:"mask_list_filename"`           // Mask list to use for mask attack
+	AdditionalArgs            []string `json:"additional_args"`              // Additional arguments to pass to hashcat
+	OptimizedKernels          bool     `json:"optimized_kernels"`            // Whether to use optimized kernels
+	SlowCandidates            bool     `json:"slow_candidates"`              // Whether to use slow candidates
+	Skip                      int64    `json:"skip,omitempty"`               // Keyspace offset to start at
+	Limit                     int64    `json:"limit,omitempty"`              // Maximum keyspace to process
+	BackendDevices            string   `json:"backend_devices,omitempty"`    // Devices to use for the backend, comma-separated
+	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL devices to use, comma-separated
+	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Whether to enable additional hash types when benchmarking
 }
 
 // Validate checks if the parameters for the attack mode are valid.
@@ -41,29 +37,25 @@ type Params struct {
 func (params Params) Validate() error {
 	switch params.AttackMode {
 	case AttackModeDictionary:
-		if len(params.WordlistFilenames) != 1 {
-			return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but %d given", AttackModeDictionary,
-				len(params.WordlistFilenames))
-		}
-
-	case AttackModeCombinator:
-		if len(params.WordlistFilenames) != 2 {
-			return fmt.Errorf("expected 2 wordlists for combinator attack (%d), but %d given", AttackModeCombinator,
-				len(params.WordlistFilenames))
+		if strutil.IsBlank(params.WordListFilename) {
+			return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", AttackModeDictionary)
 		}
 
 	case AttackModeMask:
-		if params.Mask == "" {
+		if strutil.IsBlank(params.Mask) && strutil.IsBlank(params.MaskListFilename) {
 			return fmt.Errorf("using mask attack (%d), but no mask was given", AttackModeMask)
+		}
+
+		if strutil.IsNotBlank(params.Mask) && strutil.IsNotBlank(params.MaskListFilename) {
+			return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", AttackModeMask)
 		}
 
 	case AttackModeHybridDM, AttackModeHybridMD:
 		if params.Mask == "" {
 			return fmt.Errorf("using hybrid attack (%d), but no mask was given", params.AttackMode)
 		}
-		if len(params.WordlistFilenames) != 1 {
-			return fmt.Errorf("using hybrid attack (%d), but %d wordlist were given", params.AttackMode,
-				len(params.WordlistFilenames))
+		if strutil.IsBlank(params.WordListFilename) {
+			return fmt.Errorf("expected 1 wordlist for hybrid attack (%d), but none given", AttackModeDictionary)
 		}
 	case AttackBenchmark:
 		// No additional validation needed
@@ -174,44 +166,52 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		args = append(args, "--limit", convertor.ToString(params.Limit))
 	}
 
-	wordlists := make([]string, len(params.WordlistFilenames))
-	for i, list := range params.WordlistFilenames {
-		wordlists[i] = filepath.Join(shared.State.FilePath, filepath.Clean(list))
-		if !fileutil.IsExist(wordlists[i]) {
-			err = fmt.Errorf("provided wordlist %q couldn't be opened on filesystem", wordlists[i])
+	if strutil.IsNotBlank(params.WordListFilename) {
+		wordList := filepath.Join(shared.State.FilePath, filepath.Clean(params.WordListFilename))
+		if !fileutil.IsExist(wordList) {
+			err = fmt.Errorf("provided word list %q couldn't be opened on filesystem", wordList)
 			return
 		}
+		params.WordListFilename = wordList // Update the path to the word list
 	}
 
-	rules := make([]string, len(params.RulesFilenames))
-	for i, rule := range params.RulesFilenames {
-		rules[i] = filepath.Join(shared.State.FilePath, filepath.Clean(rule))
-		if !fileutil.IsExist(rules[i]) {
-			err = fmt.Errorf("provided rules file %q couldn't be opened on filesystem", wordlists[i])
+	if strutil.IsNotBlank(params.RuleListFilename) {
+		ruleList := filepath.Join(shared.State.FilePath, filepath.Clean(params.RuleListFilename))
+		if !fileutil.IsExist(ruleList) {
+			err = fmt.Errorf("provided rule list %q couldn't be opened on filesystem", ruleList)
 			return
 		}
+		params.RuleListFilename = ruleList // Update the path to the rule list
+	}
+
+	// If there's a mask list, use it instead of the mask
+	if strutil.IsNotBlank(params.MaskListFilename) {
+		maskList := filepath.Join(shared.State.FilePath, filepath.Clean(params.MaskListFilename))
+		if !fileutil.IsExist(maskList) {
+			err = fmt.Errorf("provided mask list %q couldn't be opened on filesystem", maskList)
+			return
+		}
+		params.Mask = maskList // Update the path to the mask list
 	}
 
 	args = append(args, hashFile)
 
 	switch params.AttackMode {
 	case AttackModeDictionary:
-		for _, rule := range rules {
-			args = append(args, "-r", rule)
-		}
-		args = append(args, wordlists[0])
+		args = append(args, params.WordListFilename)
 
-	case AttackModeCombinator:
-		args = append(args, wordlists[0], wordlists[1])
+		if strutil.IsNotBlank(params.RuleListFilename) {
+			args = append(args, "-r", params.RuleListFilename)
+		}
 
 	case AttackModeMask:
 		args = append(args, params.Mask)
 
 	case AttackModeHybridDM:
-		args = append(args, wordlists[0], params.Mask)
+		args = append(args, params.WordListFilename, params.Mask)
 
 	case AttackModeHybridMD:
-		args = append(args, params.Mask, wordlists[0])
+		args = append(args, params.Mask, params.WordListFilename)
 	}
 
 	switch params.AttackMode {
