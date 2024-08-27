@@ -1,4 +1,16 @@
 
+<a name="v0.5.2"></a>
+
+## [v0.5.2](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.5.1...v0.5.2)
+
+> 2024-08-27
+
+### Bug Fixes
+
+* Fixed an issue causing SegFaults on weird HTTP errors
+  * Fixed an issue causing SegFaults on weird HTTP errors
+  
+  
 <a name="v0.5.1"></a>
 
 ## [v0.5.1](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.5.0...v0.5.1)
