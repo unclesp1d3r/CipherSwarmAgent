@@ -1,3 +1,41 @@
+- semver: 0.5.0
+  date: 2024-08-26T02:27:02-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: 1d95828f203e9e9203946d7b561e63abdd54068e
+      note: 'chore: Update changelog'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Update changelog
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 2bb6d3fca8ffc6c4ccf3198acc51d3108f0535e5
+      note: 'feat: Added support for mask list files from v0.5.0 of API'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: feat
+        scope: ""
+        description: Added support for mask list files from v0.5.0 of API
+        body: ""
+        footer: []
+        major: false
+        minor: true
+        patch: false
 - semver: 0.4.2
   date: 2024-08-06T20:34:01-04:00
   packager: unclesp1d3r
