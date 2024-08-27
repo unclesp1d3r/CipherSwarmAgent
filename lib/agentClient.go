@@ -54,6 +54,8 @@ func AuthenticateAgent() error {
 				"message", se.Message)
 			return err
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return err
 	}
 
 	if response.Object == nil {
@@ -88,6 +90,8 @@ func GetAgentConfiguration() error {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return err
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return err
 	}
 
 	if response.Object == nil {
@@ -181,12 +185,14 @@ func UpdateAgentMetadata() {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 
 	if response.Agent != nil {
 		DisplayAgentMetadataUpdated(response)
 	} else {
-		shared.Logger.Error("bad response: %v", response.RawResponse.Status)
+		shared.ErrorLogger.Error("bad response: %v", response.RawResponse.Status)
 	}
 
 }
@@ -218,6 +224,8 @@ func UpdateCracker() {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 
 	if response.StatusCode == http.StatusNoContent {
@@ -323,6 +331,8 @@ func GetNewTask() (*components.Task, error) {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return nil, err
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return nil, err
 	}
 	if response.StatusCode == http.StatusNoContent {
 		// No new task available
@@ -357,6 +367,8 @@ func GetAttackParameters(attackID int64) (*components.Attack, error) {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return nil, err
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return nil, err
 	}
 
 	if response.StatusCode == http.StatusOK {
@@ -459,6 +471,8 @@ func UpdateBenchmarks() {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 }
 
@@ -548,14 +562,17 @@ func SendHeartBeat() *operations.State {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return nil
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return nil
 	}
-
 	// All good, nothing to see here
 	// We are not being asked to change anything
 	if resp.StatusCode == http.StatusNoContent {
+
 		if shared.State.ExtraDebugging {
 			shared.Logger.Debug("Heartbeat sent")
 		}
+		shared.State.JobCheckingStopped = false // Reset the flag
 		return nil
 	}
 
@@ -577,7 +594,6 @@ func SendHeartBeat() *operations.State {
 			}
 		case operations.StateStopped:
 			shared.Logger.Debug("Agent is stopped")
-			shared.Logger.Warn("Server has stopped the agent")
 		case operations.StateError:
 			shared.Logger.Debug("Agent is in error state")
 		default:
@@ -762,6 +778,8 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 
 	// There's a few possible responses that aren't actually errors:
@@ -816,6 +834,8 @@ func getZaps(task *components.Task) {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 
 	if res.ResponseStream != nil {
@@ -907,6 +927,8 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 
 }
@@ -946,6 +968,8 @@ func AcceptTask(task *components.Task) bool {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return false
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return false
 	}
 
 	shared.Logger.Debug("Task accepted")
@@ -977,6 +1001,8 @@ func markTaskExhausted(task *components.Task) {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 }
 
@@ -1000,6 +1026,8 @@ func SendAgentShutdown() {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 }
 
@@ -1036,6 +1064,8 @@ func AbandonTask(task *components.Task) {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 }
 
@@ -1077,6 +1107,8 @@ func sendCrackedHash(hash hashcat.Result, task *components.Task) {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return
 		}
+		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		return
 	}
 
 	if shared.State.WriteZapsToFile {

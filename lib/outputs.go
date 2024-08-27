@@ -42,7 +42,7 @@ func DisplayNewAttack(attack *components.Attack) {
 
 // DisplayInactive displays a message when the agent is inactive and sleeping
 func DisplayInactive(sleepTime time.Duration) {
-	shared.Logger.Info("Sleeping", "seconds", sleepTime)
+	shared.Logger.Debug("Sleeping", "seconds", sleepTime)
 }
 
 // DisplayShuttingDown displays a message when the agent is shutting down
