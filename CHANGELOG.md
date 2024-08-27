@@ -1,4 +1,15 @@
 
+<a name="v0.5.1"></a>
+
+## [v0.5.1](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.5.0...v0.5.1)
+
+> 2024-08-26
+
+### Bug Fixes
+
+* Added significant error checking to client to prevent nil crashes
+  
+  
 <a name="v0.5.0"></a>
 
 ## [v0.5.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.4.2...v0.5.0)
