@@ -202,15 +202,21 @@ func startAgent(cmd *cobra.Command, args []string) {
 	err = lib.AuthenticateAgent()
 	if err != nil {
 		shared.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
+		return // Exit the program
 	}
 	lib.DisplayAuthenticated()
 
 	// Get the configuration
 	// Override the configuration with the always_use_native_hashcat setting
 	err = fetchAgentConfig()
+	if err != nil {
+		shared.Logger.Fatal("Failed to fetch agent configuration", "error", err)
+		return // Exit the program
+	}
 
 	// Update the agent metadata with the CipherSwarm API
 	lib.UpdateAgentMetadata()
+
 	shared.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
@@ -247,6 +253,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 				}
 				shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
 				lib.UpdateBenchmarks()
+
 				shared.State.CurrentActivity = shared.CurrentActivityStarting
 				shared.State.Reload = false
 				heartbeat(signChan)
