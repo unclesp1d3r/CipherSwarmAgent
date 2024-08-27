@@ -1,3 +1,41 @@
+- semver: 0.5.1
+  date: 2024-08-26T21:34:21-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: c1bf22887b3717b530be0fae894e0f14907cfccc
+      note: 'chore: Updated CHANGELOG'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated CHANGELOG
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 19732b63a42f8b4d8919d795238d1877036fb8db
+      note: 'fix: Added significant error checking to client to prevent nil crashes'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: fix
+        scope: ""
+        description: Added significant error checking to client to prevent nil crashes
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: true
 - semver: 0.5.0
   date: 2024-08-26T02:27:02-04:00
   packager: unclesp1d3r
