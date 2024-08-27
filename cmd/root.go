@@ -105,6 +105,8 @@ func setupSharedState() {
 // If a configuration file is found, it logs the file path.
 // If no configuration file is found, it writes a new one.
 func initConfig() {
+	shared.ErrorLogger.SetReportCaller(true)
+
 	home, err := os.UserConfigDir()
 	cobra.CheckErr(err) // Check for errors
 
@@ -222,7 +224,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	// Kill any dangling hashcat processes
 	processFound := lib.CheckForExistingClient(shared.State.HashcatPidFile)
 	if err != nil {
-		shared.Logger.Fatal("Error checking for dangling hashcat processes", "error", err)
+		shared.ErrorLogger.Fatal("Error checking for dangling hashcat processes", "error", err)
 	}
 	if processFound {
 		shared.Logger.Info("Killed dangling hashcat process")
@@ -265,52 +267,54 @@ func startAgent(cmd *cobra.Command, args []string) {
 				heartbeat(signChan)
 			}
 
-			// - Request a new job from the CipherSwarm API
-			//   - If a job is available, download the job and start processing it
-			task, err := lib.GetNewTask()
-			if err != nil {
-				shared.Logger.Error("Failed to get new task", "error", err)
-				time.Sleep(viper.GetDuration("sleep_on_failure"))
-				continue
-			}
-			if task != nil {
-				shared.State.CurrentActivity = shared.CurrentActivityCracking
-				lib.DisplayNewTask(task)
-
-				// Process the task
-				// - Get the attack parameters
-				attack, err := lib.GetAttackParameters(task.GetAttackID())
-				if err != nil || attack == nil {
-					shared.Logger.Error("Failed to get attack parameters", "error", err)
-					lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
-					lib.AbandonTask(task)
-					time.Sleep(viper.GetDuration("sleep_on_failure"))
-					continue
-				}
-
-				lib.DisplayNewAttack(attack)
-
-				// - Accept the task
-				if lib.AcceptTask(task) {
-					lib.DisplayRunTaskAccepted(task)
-				} else {
-					shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
-					return
-				}
-				// - Download the files
-				err = lib.DownloadFiles(attack)
+			if !shared.State.JobCheckingStopped {
+				// - Request a new job from the CipherSwarm API
+				//   - If a job is available, download the job and start processing it
+				task, err := lib.GetNewTask()
 				if err != nil {
-					shared.Logger.Error("Failed to download files", "error", err)
-					lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
-					lib.AbandonTask(task)
+					shared.Logger.Error("Failed to get new task", "error", err)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
 					continue
-				} else {
-					lib.RunTask(task, attack)
 				}
-				shared.State.CurrentActivity = shared.CurrentActivityWaiting
-			} else {
-				shared.Logger.Info("No new task available")
+				if task != nil {
+					shared.State.CurrentActivity = shared.CurrentActivityCracking
+					lib.DisplayNewTask(task)
+
+					// Process the task
+					// - Get the attack parameters
+					attack, err := lib.GetAttackParameters(task.GetAttackID())
+					if err != nil || attack == nil {
+						shared.Logger.Error("Failed to get attack parameters", "error", err)
+						lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
+						lib.AbandonTask(task)
+						time.Sleep(viper.GetDuration("sleep_on_failure"))
+						continue
+					}
+
+					lib.DisplayNewAttack(attack)
+
+					// - Accept the task
+					if lib.AcceptTask(task) {
+						lib.DisplayRunTaskAccepted(task)
+					} else {
+						shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
+						return
+					}
+					// - Download the files
+					err = lib.DownloadFiles(attack)
+					if err != nil {
+						shared.Logger.Error("Failed to download files", "error", err)
+						lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
+						lib.AbandonTask(task)
+						time.Sleep(viper.GetDuration("sleep_on_failure"))
+						continue
+					} else {
+						lib.RunTask(task, attack)
+					}
+					shared.State.CurrentActivity = shared.CurrentActivityWaiting
+				} else {
+					shared.Logger.Info("No new task available")
+				}
 			}
 			heartbeat(signChan)
 			sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
@@ -349,11 +353,17 @@ func heartbeat(signChan chan os.Signal) {
 				shared.State.Reload = true
 			}
 		case operations.StateStopped:
-			shared.Logger.Info("Agent is stopped, shutting down")
-			lib.SendAgentError("Agent is stopped, shutting down", nil, operations.SeverityMajor)
-			signChan <- syscall.SIGTERM
+			if shared.State.CurrentActivity != shared.CurrentActivityCracking {
+				shared.State.CurrentActivity = shared.CurrentActivityStopping
+				shared.Logger.Debug("Agent is stopped, stopping processing")
+				if !shared.State.JobCheckingStopped {
+					shared.Logger.Warn("Job checking stopped, per server directive. Waiting for further instructions.")
+				}
+				shared.State.JobCheckingStopped = true
+			}
 		case operations.StateError:
 			shared.Logger.Info("Agent is in error state, stopping processing")
+			signChan <- syscall.SIGTERM
 		}
 	}
 }

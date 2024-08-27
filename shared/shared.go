@@ -31,6 +31,7 @@ type agentState struct {
 	WriteZapsToFile           bool     // WriteZapsToFile specifies whether the agent should write zaps to a file.
 	RetainZapsOnCompletion    bool     // RetainZapsOnCompletion specifies whether the agent should retain zaps after a job is completed.
 	EnableAdditionalHashTypes bool     // EnableAdditionalHashTypes specifies whether the agent should enable additional hash types.
+	JobCheckingStopped        bool     // Indicates that the server has directed the agent to stop checking for new jobs.
 }
 
 type Activity string
@@ -44,7 +45,11 @@ const (
 	CurrentActivityStopping     Activity = "stopping"
 )
 
-var Logger = log.NewWithOptions(os.Stderr, log.Options{
-	Prefix: "cipherswarm-agent",
-	Level:  log.InfoLevel,
+var Logger = log.NewWithOptions(os.Stdout, log.Options{
+	Level:           log.InfoLevel,
+	ReportTimestamp: true,
 })
+
+// ErrorLogger is a logger for errors that should never happen.
+// It includes more information than the default logger.
+var ErrorLogger = Logger.With()
