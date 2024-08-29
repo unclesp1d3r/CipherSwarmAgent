@@ -37,26 +37,26 @@ type Params struct {
 // It returns an error if the parameters are invalid, or nil if they are valid.
 func (params Params) Validate() error {
 	switch params.AttackMode {
-	case AttackModeDictionary:
+	case attackModeDictionary:
 		if strutil.IsBlank(params.WordListFilename) {
-			return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", AttackModeDictionary)
+			return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", attackModeDictionary)
 		}
 
-	case AttackModeMask:
+	case attackModeMask:
 		if strutil.IsBlank(params.Mask) && strutil.IsBlank(params.MaskListFilename) {
-			return fmt.Errorf("using mask attack (%d), but no mask was given", AttackModeMask)
+			return fmt.Errorf("using mask attack (%d), but no mask was given", attackModeMask)
 		}
 
 		if strutil.IsNotBlank(params.Mask) && strutil.IsNotBlank(params.MaskListFilename) {
-			return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", AttackModeMask)
+			return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", attackModeMask)
 		}
 
-	case AttackModeHybridDM, AttackModeHybridMD:
+	case attackModeHybridDM, attackModeHybridMD:
 		if params.Mask == "" {
 			return fmt.Errorf("using hybrid attack (%d), but no mask was given", params.AttackMode)
 		}
 		if strutil.IsBlank(params.WordListFilename) {
-			return fmt.Errorf("expected 1 wordlist for hybrid attack (%d), but none given", AttackModeDictionary)
+			return fmt.Errorf("expected 1 wordlist for hybrid attack (%d), but none given", attackModeDictionary)
 		}
 	case AttackBenchmark:
 		// No additional validation needed
@@ -204,25 +204,25 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	args = append(args, hashFile)
 
 	switch params.AttackMode {
-	case AttackModeDictionary:
+	case attackModeDictionary:
 		args = append(args, params.WordListFilename)
 
 		if strutil.IsNotBlank(params.RuleListFilename) {
 			args = append(args, "-r", params.RuleListFilename)
 		}
 
-	case AttackModeMask:
+	case attackModeMask:
 		args = append(args, params.Mask)
 
-	case AttackModeHybridDM:
+	case attackModeHybridDM:
 		args = append(args, params.WordListFilename, params.Mask)
 
-	case AttackModeHybridMD:
+	case attackModeHybridMD:
 		args = append(args, params.Mask, params.WordListFilename)
 	}
 
 	switch params.AttackMode {
-	case AttackModeMask, AttackModeHybridDM, AttackModeHybridMD:
+	case attackModeMask, attackModeHybridDM, attackModeHybridMD:
 		maskArgs, err := params.maskArgs()
 		if err != nil {
 			return nil, err

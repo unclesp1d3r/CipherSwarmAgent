@@ -229,7 +229,7 @@ func downloadFile(url string, path string, checksum string) error {
 			}
 		}
 	}
-	DisplayDownloadFile(url, path)
+	displayDownloadFile(url, path)
 	cwd, err := os.Getwd()
 	if err != nil {
 		shared.Logger.Error("Error getting current working directory: ", "error", err)
@@ -265,7 +265,7 @@ func downloadFile(url string, path string, checksum string) error {
 		shared.Logger.Debug("Error downloading file: ", "error", err)
 		return err
 	}
-	DisplayDownloadFileComplete(url, path)
+	displayDownloadFileComplete(url, path)
 	return nil
 }
 

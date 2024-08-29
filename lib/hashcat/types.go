@@ -5,14 +5,14 @@ import (
 )
 
 const (
-	AttackModeDictionary = 0 // AttackModeDictionary is the attack mode for dictionary attacks
-	AttackModeMask       = 3 // AttackModeMask is the attack mode for mask attacks
-	AttackModeHybridDM   = 6 // AttackModeHybridDM is the attack mode for hybrid dictionary + mask attacks
-	AttackModeHybridMD   = 7 // AttackModeHybridMD is the attack mode for hybrid mask + dictionary attacks
+	attackModeDictionary = 0 // attackModeDictionary is the attack mode for dictionary attacks
+	attackModeMask       = 3 // attackModeMask is the attack mode for mask attacks
+	attackModeHybridDM   = 6 // attackModeHybridDM is the attack mode for hybrid dictionary + mask attacks
+	attackModeHybridMD   = 7 // attackModeHybridMD is the attack mode for hybrid mask + dictionary attacks
 	AttackBenchmark      = 9 // AttackBenchmark is the attack mode for benchmarking
 )
 
-type StatusGuess struct {
+type statusGuess struct {
 	GuessBase        string  `json:"guess_base"`         // The base wordlist used for the attack
 	GuessBaseCount   int64   `json:"guess_base_count"`   // The number of words in the base wordlist
 	GuessBaseOffset  int64   `json:"guess_base_offset"`  // The offset into the base wordlist
@@ -24,7 +24,7 @@ type StatusGuess struct {
 	GuessMode        int64   `json:"guess_mode"`         // The attack mode
 }
 
-type StatusDevice struct {
+type statusDevice struct {
 	DeviceID   int64  `json:"device_id"`   // The device ID
 	DeviceName string `json:"device_name"` // The device name
 	DeviceType string `json:"device_type"` // The device type
@@ -37,7 +37,7 @@ type Status struct {
 	OriginalLine    string         `json:"original_line"`    // The original line from hashcat
 	Time            time.Time      `json:"time"`             // The time the status was received
 	Session         string         `json:"session"`          // The session ID
-	Guess           StatusGuess    `json:"guess"`            // The current guess
+	Guess           statusGuess    `json:"guess"`            // The current guess
 	Status          int64          `json:"status"`           // The status of the attack
 	Target          string         `json:"target"`           // The target hash
 	Progress        []int64        `json:"progress"`         // The progress of the attack
@@ -45,7 +45,7 @@ type Status struct {
 	RecoveredHashes []int64        `json:"recovered_hashes"` // The number of recovered hashes
 	RecoveredSalts  []int64        `json:"recovered_salts"`  // The number of recovered salts
 	Rejected        int64          `json:"rejected"`         // The number of rejected hashes
-	Devices         []StatusDevice `json:"devices"`          // The devices used for the attack
+	Devices         []statusDevice `json:"devices"`          // The devices used for the attack
 	TimeStart       int64          `json:"time_start"`       // The start time of the attack
 	EstimatedStop   int64          `json:"estimated_stop"`   // The estimated stop time of the attack
 }

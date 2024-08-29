@@ -18,7 +18,8 @@ cryptographic computations across the CipherSwarm network.
   commands.
 - **Efficient Task Management**: Streamlines the distribution and execution of hash-cracking tasks across distributed
   systems.
-- **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks efficiently.
+- **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks
+  efficiently.
 - **Secure Communication**: Ensures secure and reliable communication with the CipherSwarm server for task distribution
   and result submission.
 
@@ -64,7 +65,7 @@ the available configuration options:
 
 Optional configuration options include:
 
-- `DATA_PATH`: The path to the directory where the agent will store data, such as task files and results. 
+- `DATA_PATH`: The path to the directory where the agent will store data, such as task files and results.
   This is set to "data" by default in the current directory.
 - `GPU_TEMP_THRESHOLD`: The temperature threshold for the GPU is degrees Celsius. If the GPU temperature exceeds this
   threshold, the agent will pause task execution until the temperature drops below the threshold. By default, this is
@@ -73,12 +74,14 @@ Optional configuration options include:
   for task execution, even if a custom binary is provided in the web interface. By default, this is set to false.
 - `SLEEP_ON_FAILURE`: A duration to sleep after a task failure. By default, this is set to 60 seconds.
 - `FILES_PATH`: The path to the directory where the agent will store task files. This is set to "files" in
-  the data directory by default. These files include wordlists, rules, and masks. They can get pretty big, so make sure you have
+  the data directory by default. These files include wordlists, rules, and masks. They can get pretty big, so make sure
+  you have
   enough space.
 - `EXTRA_DEBUGGING`: If set to true, the agent will print additional debugging information to the console. By default,
   this is set to false.
 - `STATUS_TIMER`: The interval in seconds at which the agent will send status updates to the server. By default, this is
-  set to 3 seconds. This can be increased to reduce the load on the server, but it will also reduce the agent's responsiveness.
+  set to 3 seconds. This can be increased to reduce the load on the server, but it will also reduce the agent's
+  responsiveness.
 
 Optional configuration options for using the ZAP feature with a shared directory:
 
@@ -87,7 +90,8 @@ Optional configuration options for using the ZAP feature with a shared directory
   The server will still prompt the agent to download the zap output files, but this can be useful if you want to share
   the zap output with other clients.
 - `ZAP_PATH`: The path to the directory where the agent will store the zap output files. By default, this is set to "
-  zap" in the data directory. These files contain successful cracks, and setting this is sometimes used to allow multiple
+  zap" in the data directory. These files contain successful cracks, and setting this is sometimes used to allow
+  multiple
   clients to share cracks via a shared directory rather than the server.
 - `RETAIN_ZAPS_ON_COMPLETION`: If set to true, the agent will retain the zap files after completing a task. Otherwise,
   the zaps path contents are deleted upon completion of each task. By default, this is set to false.

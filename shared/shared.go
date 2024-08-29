@@ -25,7 +25,7 @@ type agentState struct {
 	URL                       string   // URL is the URL of the CipherSwarm API.
 	APIToken                  string   // APIToken is the token used to authenticate with the CipherSwarm API.
 	Reload                    bool     // Reload specifies whether the agent should reload its configuration.
-	CurrentActivity           Activity // CurrentActivity is the current activity of the agent.
+	CurrentActivity           activity // CurrentActivity is the current activity of the agent.
 	AlwaysTrustFiles          bool     // AlwaysTrustFiles specifies whether the agent should trust all files in the files directory and not check checksums.
 	ExtraDebugging            bool     // ExtraDebugging specifies whether the agent should show extra debugging information.
 	StatusTimer               int      // StatusTimer is the interval in seconds between status updates.
@@ -35,15 +35,15 @@ type agentState struct {
 	JobCheckingStopped        bool     // Indicates that the server has directed the agent to stop checking for new jobs.
 }
 
-type Activity string
+type activity string
 
 const (
-	CurrentActivityStarting     Activity = "starting"
-	CurrentActivityBenchmarking Activity = "benchmarking"
-	CurrentActivityUpdating     Activity = "updating"
-	CurrentActivityWaiting      Activity = "waiting"
-	CurrentActivityCracking     Activity = "cracking"
-	CurrentActivityStopping     Activity = "stopping"
+	CurrentActivityStarting     activity = "starting"
+	CurrentActivityBenchmarking activity = "benchmarking"
+	CurrentActivityUpdating     activity = "updating"
+	CurrentActivityWaiting      activity = "waiting"
+	CurrentActivityCracking     activity = "cracking"
+	CurrentActivityStopping     activity = "stopping"
 )
 
 var Logger = log.NewWithOptions(os.Stdout, log.Options{

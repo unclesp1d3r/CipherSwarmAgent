@@ -190,7 +190,7 @@ func UpdateAgentMetadata() {
 	}
 
 	if response.Agent != nil {
-		DisplayAgentMetadataUpdated(response)
+		displayAgentMetadataUpdated(response)
 	} else {
 		shared.ErrorLogger.Error("bad response: %v", response.RawResponse.Status)
 	}
@@ -236,7 +236,7 @@ func UpdateCracker() {
 	if response.StatusCode == http.StatusOK {
 		update := response.GetCrackerUpdate()
 		if update.GetAvailable() {
-			DisplayNewCrackerAvailable(update)
+			displayNewCrackerAvailable(update)
 
 			// Get the file to a temporary location and then move it to the correct location
 			// This is to prevent the file from being corrupted if the download is interrupted
@@ -378,13 +378,13 @@ func GetAttackParameters(attackID int64) (*components.Attack, error) {
 }
 
 // sendBenchmarkResults sends benchmark results to the SDK client.
-// It takes a slice of BenchmarkResult as input and returns an error if any.
+// It takes a slice of benchmarkResult as input and returns an error if any.
 // The function iterates over the benchmark results and converts the necessary fields to their respective types.
 // Then, it creates a HashcatBenchmark object and appends it to the results slice.
 // Finally, it submits the benchmark results to the SDK client using the SdkClient.Agents.SubmitBenchmark method.
 // If the submission is successful (HTTP status code 204), it returns nil.
 // Otherwise, it returns an error with the corresponding status message.
-func sendBenchmarkResults(benchmarkResults []BenchmarkResult) error {
+func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 	var benchmarks []components.HashcatBenchmark
 	for _, result := range benchmarkResults {
 		hashType, err := convertor.ToInt(result.HashType)
@@ -449,12 +449,12 @@ func UpdateBenchmarks() {
 	}
 	shared.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
 
-	DisplayBenchmarkStarting()
-	benchmarkResult, done := RunBenchmarkTask(sess)
+	displayBenchmarkStarting()
+	benchmarkResult, done := runBenchmarkTask(sess)
 	if done {
 		return
 	}
-	DisplayBenchmarksComplete(benchmarkResult)
+	displayBenchmarksComplete(benchmarkResult)
 	err = sendBenchmarkResults(benchmarkResult)
 	if err != nil {
 		var eo *sdkerrors.ErrorObject
@@ -481,7 +481,7 @@ func UpdateBenchmarks() {
 // The downloaded files are saved to the specified file paths.
 // If any error occurs during the download process, the function returns the error.
 func DownloadFiles(attack *components.Attack) error {
-	DisplayDownloadFileStart(attack)
+	displayDownloadFileStart(attack)
 
 	err := downloadHashList(attack)
 	if err != nil {
@@ -615,7 +615,7 @@ func SendHeartBeat() *operations.State {
 // After the attack task is completed, it displays a message indicating that the task has been completed.
 // If any error occurs during the process, it logs the error and returns.
 func RunTask(task *components.Task, attack *components.Attack) {
-	DisplayRunTaskStarting(task)
+	displayRunTaskStarting(task)
 	// Create the hashcat session
 
 	if attack == nil {
@@ -659,8 +659,8 @@ func RunTask(task *components.Task, attack *components.Attack) {
 		return
 	}
 
-	RunAttackTask(sess, task)
-	DisplayRunTaskCompleted()
+	runAttackTask(sess, task)
+	displayRunTaskCompleted()
 }
 
 // sendStatusUpdate sends a status update to the server for a given task.
@@ -740,7 +740,7 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 			// There's a few responses are error-like:
 			// 404	Task not found
 			// 410	status received successfully, but task paused
-			// these are fine and we can just keep going
+			// these are fine, and we can just keep going
 
 			if se.StatusCode == http.StatusNotFound {
 				// The task has been deleted by the server, which means we need to kill the task
@@ -759,7 +759,7 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 			}
 
 			if se.StatusCode == http.StatusGone {
-				// The task has been paused by the server and we need to pause it
+				// The task has been paused by the server, and we need to pause it
 				shared.Logger.Info("Pausing task", "task_id", task.GetID())
 				// TODO: Implement pausing the task
 				// err = sess.Pause()
@@ -816,7 +816,7 @@ func getZaps(task *components.Task) {
 		return
 	}
 
-	DisplayJobGetZap(task)
+	displayJobGetZap(task)
 
 	res, err := SdkClient.Tasks.GetTaskZaps(Context, task.GetID())
 	if err != nil {
@@ -954,14 +954,14 @@ func AcceptTask(task *components.Task) bool {
 			// 404 Task not found
 			// 422 Task already completed
 			// In these cases, we can just keep going because the task is either complete or deleted
-			// Both of these are expected and we don't need to do anything
+			// Both of these are expected, and we don't need to do anything
 			shared.Logger.Error("Error accepting task", "error", eo.Error())
 			SendAgentError(eo.Error(), nil, operations.SeverityInfo)
 			return false
 		}
 		var se *sdkerrors.SDKError
 		if errors.As(err, &se) {
-			// In this case, we have an unexpected error and we need to log it
+			// In this case, we have an unexpected error, and we need to log it
 			shared.Logger.Error("Error accepting task, unexpected error",
 				"status_code", se.StatusCode,
 				"message", se.Message)

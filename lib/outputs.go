@@ -11,7 +11,6 @@ import (
 	"github.com/dustin/go-humanize"
 
 	"github.com/duke-git/lancet/strutil"
-	"github.com/imroc/req/v3"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
@@ -50,39 +49,39 @@ func DisplayShuttingDown() {
 	shared.Logger.Info("Shutting down CipherSwarm Agent")
 }
 
-// DisplayBenchmark displays the results of a benchmark
-func DisplayBenchmark(result BenchmarkResult) {
+// displayBenchmark displays the results of a benchmark
+func displayBenchmark(result benchmarkResult) {
 	shared.Logger.Info("Benchmark result", "device", result.Device,
 		"hash_type", result.HashType, "runtime_ms", result.RuntimeMs, "speed_hs", result.SpeedHs)
 }
 
-// DisplayBenchmarkError displays an error message from a benchmark
-func DisplayBenchmarkError(stdErrLine string) {
+// displayBenchmarkError displays an error message from a benchmark
+func displayBenchmarkError(stdErrLine string) {
 	shared.Logger.Debug("Benchmark stderr", "line", strutil.RemoveNonPrintable(stdErrLine))
 }
 
-// DisplayJobFailed displays a message when a job session fails
-func DisplayJobFailed(err error) {
+// displayJobFailed displays a message when a job session fails
+func displayJobFailed(err error) {
 	shared.Logger.Error("Job session failed", "error", err)
 }
 
-// DisplayJobExhausted displays a message when a job session is exhausted
-func DisplayJobExhausted() {
+// displayJobExhausted displays a message when a job session is exhausted
+func displayJobExhausted() {
 	shared.Logger.Info("Job session exhausted", "status", "exhausted")
 }
 
-// DisplayJobCrackedHash displays a message when a job session cracks a hash
-func DisplayJobCrackedHash(crackedHash hashcat.Result) {
+// displayJobCrackedHash displays a message when a job session cracks a hash
+func displayJobCrackedHash(crackedHash hashcat.Result) {
 	shared.Logger.Debug("Job cracked hash", "hash", crackedHash)
 }
 
-// DisplayJobError displays an error message from a job session
-func DisplayJobError(stdErrLine string) {
+// displayJobError displays an error message from a job session
+func displayJobError(stdErrLine string) {
 	shared.Logger.Debug("Job stderr", "line", strutil.RemoveNonPrintable(stdErrLine))
 }
 
-// DisplayJobStatus displays a status update from a job session
-func DisplayJobStatus(update hashcat.Status) {
+// displayJobStatus displays a status update from a job session
+func displayJobStatus(update hashcat.Status) {
 	shared.Logger.Debug("Job status update", "status", update)
 	relativeProgress := mathutil.Percent(float64(update.Progress[0]), float64(update.Progress[1]), 2)
 
@@ -104,58 +103,55 @@ func DisplayJobStatus(update hashcat.Status) {
 	shared.Logger.Info("Progress update", "progress", progressText, "speed", speedText, "cracked_hashes", hashesText)
 }
 
-func DisplayJobGetZap(task *components.Task) {
+func displayJobGetZap(task *components.Task) {
 	shared.Logger.Info("New hashes available, updating job", "task_id", task.GetID())
 }
 
-// DisplayAgentMetadataUpdated displays the results of a job session
-func DisplayAgentMetadataUpdated(result *operations.UpdateAgentResponse) {
+// displayAgentMetadataUpdated displays the results of a job session
+func displayAgentMetadataUpdated(result *operations.UpdateAgentResponse) {
 	shared.Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", shared.State.AgentID)
 	shared.Logger.Debug("Agent metadata", "metadata", result)
 }
 
-// DisplayNewCrackerAvailable displays information about a new cracker available.
+// displayNewCrackerAvailable displays information about a new cracker available.
 // It logs the latest version and the download URL of the new cracker.
-func DisplayNewCrackerAvailable(result *components.CrackerUpdate) {
+func displayNewCrackerAvailable(result *components.CrackerUpdate) {
 	shared.Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
 	shared.Logger.Info("Download URL", "url", result.GetDownloadURL())
 }
 
-// DisplayBenchmarkStarting displays a message indicating that benchmarking is starting.
-func DisplayBenchmarkStarting() {
+// displayBenchmarkStarting displays a message indicating that benchmarking is starting.
+func displayBenchmarkStarting() {
 	shared.Logger.Info("Performing benchmarks")
 }
 
-// DisplayBenchmarksComplete displays the completed benchmark session results.
-// It takes a slice of BenchmarkResult as input and logs the results using the Logger.
-func DisplayBenchmarksComplete(benchmarkResult []BenchmarkResult) {
+// displayBenchmarksComplete displays the completed benchmark session results.
+// It takes a slice of benchmarkResult as input and logs the results using the Logger.
+func displayBenchmarksComplete(benchmarkResult []benchmarkResult) {
 	shared.Logger.Debug("Benchmark session completed", "results", benchmarkResult)
 }
 
-// DisplayDownloadFileStart displays a log message indicating the start of file downloading for an attack.
-func DisplayDownloadFileStart(attack *components.Attack) {
+// displayDownloadFileStart displays a log message indicating the start of file downloading for an attack.
+func displayDownloadFileStart(attack *components.Attack) {
 	shared.Logger.Info("Downloading files for attack", "attack_id", attack.GetID())
 }
 
-// DisplayDownloadFileComplete displays a message indicating that a file has been downloaded.
+// displayDownloadFileComplete displays a message indicating that a file has been downloaded.
 // It logs the URL and path of the downloaded file.
-func DisplayDownloadFileComplete(url string, path string) {
+func displayDownloadFileComplete(url string, path string) {
 	shared.Logger.Info("Downloaded file", "url", url, "path", path)
 }
 
 // DisplayDownloadFileStatusUpdate displays the download file status update.
 // It calculates the percentage of the downloaded file and logs it using the Logger.
-func DisplayDownloadFileStatusUpdate(info req.DownloadInfo) {
-	shared.Logger.Infof("downloaded %.2f%%\n", float64(info.DownloadedSize)/float64(info.Response.ContentLength)*100.0)
-}
 
-// DisplayDownloadFile downloads a file from the specified URL and saves it to the given path.
-func DisplayDownloadFile(url string, path string) {
+// displayDownloadFile downloads a file from the specified URL and saves it to the given path.
+func displayDownloadFile(url string, path string) {
 	shared.Logger.Info("Downloading file", "url", url, "path", path)
 }
 
-// DisplayRunTaskCompleted displays a message indicating that the attack has completed.
-func DisplayRunTaskCompleted() {
+// displayRunTaskCompleted displays a message indicating that the attack has completed.
+func displayRunTaskCompleted() {
 	shared.Logger.Info("Attack completed")
 }
 
@@ -164,7 +160,7 @@ func DisplayRunTaskAccepted(task *components.Task) {
 	shared.Logger.Info("Task accepted", "task_id", task.GetID())
 }
 
-// DisplayRunTaskStarting displays a log message indicating that a task is starting.
-func DisplayRunTaskStarting(task *components.Task) {
+// displayRunTaskStarting displays a log message indicating that a task is starting.
+func displayRunTaskStarting(task *components.Task) {
 	shared.Logger.Info("Running task", "task_id", task.GetID())
 }
