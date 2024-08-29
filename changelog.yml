@@ -1,3 +1,64 @@
+- semver: 0.5.2
+  date: 2024-08-27T19:54:17-04:00
+  packager: unclesp1d3r
+  changes:
+    - commit: 2deb4f81be0a58535ce70891bccf2ead2e7fb8a1
+      note: 'chore: Updated ChangeLog'
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: chore
+        scope: ""
+        description: Updated ChangeLog
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: 19dd475314ec7358d8d999493a99455a25ed320f
+      note: |-
+        fix: Fixed an issue causing SegFaults on weird HTTP errors
+
+        There was a condition where an HTTP error outside of the 4XX and 5XX range could cause a seg fault. I added more error checking to ensure that it only throws a verbose error and doesn’t crash the agent.
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: fix
+        scope: ""
+        description: Fixed an issue causing SegFaults on weird HTTP errors
+        body: There was a condition where an HTTP error outside of the 4XX and 5XX range could cause a seg fault. I added more error checking to ensure that it only throws a verbose error and doesn’t crash the agent.
+        footer: []
+        major: false
+        minor: false
+        patch: true
+    - commit: 1a98d7d69d10e1e275352daf0bd3af23ba985754
+      note: |-
+        fix: Fixed an issue causing SegFaults on weird HTTP errors
+
+        There was a condition where an HTTP error outside of the 4XX and 5XX range could cause a seg fault. I added more error checking to ensure that it only throws a verbose error and doesn’t crash the agent.
+      author:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      committer:
+        name: UncleSp1d3r
+        email: unclespider@protonmail.com
+      conventional_commit:
+        category: fix
+        scope: ""
+        description: Fixed an issue causing SegFaults on weird HTTP errors
+        body: There was a condition where an HTTP error outside of the 4XX and 5XX range could cause a seg fault. I added more error checking to ensure that it only throws a verbose error and doesn’t crash the agent.
+        footer: []
+        major: false
+        minor: false
+        patch: true
 - semver: 0.5.1
   date: 2024-08-26T21:34:21-04:00
   packager: unclesp1d3r
