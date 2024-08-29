@@ -16,18 +16,18 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
-// RunBenchmarkTask runs a benchmark session using the provided hashcat session.
+// runBenchmarkTask runs a benchmark session using the provided hashcat session.
 // It starts the session, reads the output from stdout and stderr, and handles various events.
-// The benchmark results are collected and returned as a slice of BenchmarkResult structs.
+// The benchmark results are collected and returned as a slice of benchmarkResult structs.
 // If there is an error starting the session, the function returns an empty slice and a boolean value of true.
 // If the benchmark session completes successfully, the function returns the benchmark results and a boolean value of false.
-func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
+func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 	err := sess.Start()
 	if err != nil {
 		shared.Logger.Error("Failed to start benchmark session", "error", err)
 		return nil, true
 	}
-	var benchmarkResult []BenchmarkResult
+	var benchmarkResults []benchmarkResult
 	waitChan := make(chan int)
 	go func() {
 	procLoop:
@@ -38,19 +38,19 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 				if len(fields) != 6 {
 					shared.Logger.Debug("Unknown benchmark line", "line", stdOutLine)
 				} else {
-					result := BenchmarkResult{
+					result := benchmarkResult{
 						Device:     fields[0],
 						HashType:   fields[1],
 						RuntimeMs:  fields[3],
 						HashTimeMs: fields[4],
 						SpeedHs:    fields[5],
 					}
-					DisplayBenchmark(result)
-					benchmarkResult = append(benchmarkResult, result)
+					displayBenchmark(result)
+					benchmarkResults = append(benchmarkResults, result)
 				}
 
 			case stdErrLine := <-sess.StderrMessages:
-				DisplayBenchmarkError(stdErrLine)
+				displayBenchmarkError(stdErrLine)
 				// Ignore empty lines
 				if strutil.IsNotBlank(stdErrLine) {
 					SendAgentError(stdErrLine, nil, operations.SeverityWarning)
@@ -70,10 +70,10 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 		waitChan <- 1
 	}()
 	<-waitChan
-	return benchmarkResult, false
+	return benchmarkResults, false
 }
 
-// RunAttackTask starts an attack session using the provided hashcat session and task.
+// runAttackTask starts an attack session using the provided hashcat session and task.
 // It continuously monitors the session for status updates, cracked hashes, and errors,
 // and sends corresponding updates and notifications.
 // If the session fails to start, a fatal agent error is sent and the function returns.
@@ -89,7 +89,7 @@ func RunBenchmarkTask(sess *hashcat.Session) ([]BenchmarkResult, bool) {
 //	sess := hashcat.NewSession()
 //	task := components.NewTask()
 //	RunAttackTask(sess, task)
-func RunAttackTask(sess *hashcat.Session, task *components.Task) {
+func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
 		shared.Logger.Error("Failed to start attack session", "error", err)
@@ -108,27 +108,27 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 					if err != nil {
 						shared.Logger.Error("Failed to parse status update", "error", err)
 					} else {
-						DisplayJobStatus(update)
+						displayJobStatus(update)
 						sendStatusUpdate(update, task, sess)
 					}
 				}
 			case stdErrLine := <-sess.StderrMessages:
-				DisplayJobError(stdErrLine)
+				displayJobError(stdErrLine)
 				if strutil.IsNotBlank(stdErrLine) {
 					SendAgentError(stdErrLine, task, operations.SeverityMinor)
 				}
 			case statusUpdate := <-sess.StatusUpdates:
-				DisplayJobStatus(statusUpdate)
+				displayJobStatus(statusUpdate)
 				sendStatusUpdate(statusUpdate, task, sess)
 			case crackedHash := <-sess.CrackedHashes:
-				DisplayJobCrackedHash(crackedHash)
+				displayJobCrackedHash(crackedHash)
 				sendCrackedHash(crackedHash, task)
 			case err := <-sess.DoneChan:
 				if err != nil {
 					if err.Error() != "exit status 1" {
 						// Something went wrong and we failed.
 						SendAgentError(err.Error(), task, operations.SeverityCritical)
-						DisplayJobFailed(err)
+						displayJobFailed(err)
 					} else if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
 						// This is a special case where hashcat failed to read the restore file.
 						// We should remove the restore file and try again.
@@ -141,7 +141,7 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 						}
 					} else {
 						// Exit status 1 means we exhausted the task. Mark it as such.
-						DisplayJobExhausted()
+						displayJobExhausted()
 						markTaskExhausted(task)
 					}
 				}

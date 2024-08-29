@@ -224,9 +224,6 @@ func startAgent(cmd *cobra.Command, args []string) {
 
 	// Kill any dangling hashcat processes
 	processFound := lib.CheckForExistingClient(shared.State.HashcatPidFile)
-	if err != nil {
-		shared.ErrorLogger.Fatal("Error checking for dangling hashcat processes", "error", err)
-	}
 	if processFound {
 		shared.Logger.Info("Killed dangling hashcat process")
 	}

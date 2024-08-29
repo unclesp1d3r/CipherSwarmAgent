@@ -32,7 +32,7 @@ func parseStringToDeviceType(deviceType string) components.DeviceType {
 	}
 }
 
-type BenchmarkResult struct {
+type benchmarkResult struct {
 	Device     string `json:"device,omitempty"`     // Device is the name of the device used for the benchmark.
 	HashType   string `json:"hash_type,omitempty"`  // HashType is the type of hash used for the benchmark.
 	RuntimeMs  string `json:"runtime,omitempty"`    // RuntimeMs is the runtime of the benchmark in milliseconds.
