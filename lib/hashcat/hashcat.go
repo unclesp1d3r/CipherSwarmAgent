@@ -29,6 +29,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/strutil"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
@@ -48,7 +49,6 @@ import (
 func NewHashcatSession(id string, params Params) (*Session, error) {
 	var err error
 
-	var hashFile *os.File
 	var outFile *os.File
 	var shardedCharsetFile *os.File
 	var charsetFiles []*os.File
@@ -85,9 +85,22 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		return nil, err
 	}
 
+	// Check for a restore file and generate the restore arguments if it exists
+	// We'll override the command arguments if a restore file is found
+	if !strutil.IsBlank(params.RestoreFilePath) {
+		if fileutil.IsExist(params.RestoreFilePath) {
+			args, err = params.toRestoreArgs(id)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	shared.ErrorLogger.Info("Hashcat command: ", args)
+
 	return &Session{
 		proc:               exec.Command(binaryPath, args...),
-		hashFile:           hashFile,
+		hashFile:           params.HashFile,
 		outFile:            outFile,
 		charsetFiles:       charsetFiles,
 		shardedCharsetFile: shardedCharsetFile,
@@ -97,5 +110,6 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		StdoutLines:        make(chan string, 5),
 		DoneChan:           make(chan error),
 		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
+		RestoreFilePath:    params.RestoreFilePath,
 	}, nil
 }

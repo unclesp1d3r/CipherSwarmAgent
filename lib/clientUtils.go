@@ -124,6 +124,7 @@ func CreateDataDirs() error {
 		shared.State.PreprocessorsPath,
 		shared.State.ToolsPath,
 		shared.State.OutPath,
+		shared.State.RestoreFilePath,
 	}
 	for _, dir := range dataDirs {
 		if dir == "" {

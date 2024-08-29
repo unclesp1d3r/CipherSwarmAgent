@@ -19,6 +19,7 @@ type agentState struct {
 	ToolsPath                 string   // ToolsPath is the path to the directory containing the agent's tools.
 	OutPath                   string   // OutPath is the path to the directory containing the agent's output files.
 	FilePath                  string   // FilePath is the path to the file containing various files for attacks.
+	RestoreFilePath           string   // RestoreFilePath is the path to the file containing hashcat's restore data.
 	Debug                     bool     // Debug specifies whether the agent is running in debug mode.
 	AgentID                   int64    // AgentID is the unique identifier of the agent.
 	URL                       string   // URL is the URL of the CipherSwarm API.

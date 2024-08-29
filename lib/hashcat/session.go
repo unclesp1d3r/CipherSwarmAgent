@@ -21,7 +21,7 @@ import (
 
 type Session struct {
 	proc               *exec.Cmd   // The hashcat process
-	hashFile           *os.File    // The file containing the hashes to crack
+	hashFile           string      // The path of the file containing the hashes to crack
 	outFile            *os.File    // The file to write cracked hashes to
 	charsetFiles       []*os.File  // Charset files for mask attacks
 	shardedCharsetFile *os.File    // Sharded charset file for mask attacks
@@ -31,6 +31,7 @@ type Session struct {
 	StdoutLines        chan string // Channel to send stdout lines to
 	DoneChan           chan error  // Channel to send the done signal to
 	SkipStatusUpdates  bool        // Whether to skip sending status updates
+	RestoreFilePath    string      // Path to the restore file
 }
 
 // Start starts the hashcat session by attaching the stdout and stderr pipes,
@@ -123,7 +124,13 @@ func (sess *Session) Start() error {
 					}
 					sess.StatusUpdates <- status
 				} else {
-					shared.Logger.Error("Unexpected stdout line", "line", line)
+					if strings.Contains(line, "starting in restore mode") {
+						// This is a special case where hashcat is starting in restore mode
+						shared.Logger.Info("Hashcat is starting in restore mode")
+					} else {
+						// This is an unexpected line in stdout
+						shared.Logger.Error("Unexpected stdout line", "line", line)
+					}
 				}
 			}
 		}
@@ -165,7 +172,10 @@ func (sess *Session) Kill() error {
 
 // Cleanup removes any temporary files associated with the session.
 // It deletes the hash file, output file, charset files, and sharded charset file (if present).
+// It does not remove the restore file.
 func (sess *Session) Cleanup() {
+	shared.Logger.Info("Cleaning up session files")
+
 	if sess.outFile != nil {
 		if fileutil.IsExist(sess.outFile.Name()) {
 			err := fileutil.RemoveFile(sess.outFile.Name())
@@ -195,15 +205,13 @@ func (sess *Session) Cleanup() {
 		}
 	}
 
-	if sess.hashFile != nil {
-		if fileutil.IsExist(sess.hashFile.Name()) {
-			err := fileutil.RemoveFile(sess.hashFile.Name())
-			if err != nil {
-				shared.Logger.Error("couldn't remove hash file", "file", sess.hashFile.Name(), "error", err)
-			}
+	if fileutil.IsExist(sess.hashFile) {
+		err := fileutil.RemoveFile(sess.hashFile)
+		if err != nil {
+			shared.Logger.Error("couldn't remove hash file", "file", sess.hashFile, "error", err)
 		}
-		sess.hashFile = nil
 	}
+	sess.hashFile = ""
 }
 
 // CmdLine returns the command line string used to start the session.

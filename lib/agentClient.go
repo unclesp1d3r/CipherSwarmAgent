@@ -562,7 +562,8 @@ func SendHeartBeat() *operations.State {
 			SendAgentError(se.Error(), nil, operations.SeverityCritical)
 			return nil
 		}
-		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		// This isn't a critical error, but we should log it, just in case
+		shared.ErrorLogger.Error("Error communicating with the CipherSwarm API", "error", err)
 		return nil
 	}
 	// All good, nothing to see here
@@ -648,9 +649,10 @@ func RunTask(task *components.Task, attack *components.Attack) {
 		Limit:            pointer.UnwrapOr(task.GetLimit(), 0),
 		BackendDevices:   Configuration.Config.BackendDevices,
 		OpenCLDevices:    Configuration.Config.OpenCLDevices,
+		RestoreFilePath:  path.Join(shared.State.RestoreFilePath, convertor.ToString(attack.GetID())+".restore"),
 	}
 
-	sess, err := hashcat.NewHashcatSession("attack", jobParams)
+	sess, err := hashcat.NewHashcatSession(convertor.ToString(attack.GetID()), jobParams)
 	if err != nil {
 		shared.Logger.Error("Failed to create attack session", "error", err)
 		SendAgentError(err.Error(), task, operations.SeverityCritical)
@@ -658,8 +660,6 @@ func RunTask(task *components.Task, attack *components.Attack) {
 	}
 
 	RunAttackTask(sess, task)
-	defer sess.Cleanup()
-
 	DisplayRunTaskCompleted()
 }
 

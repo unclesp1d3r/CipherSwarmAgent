@@ -90,6 +90,7 @@ func setupSharedState() {
 	shared.State.PreprocessorsPath = path.Join(dataRoot, "preprocessors")                  // Set the preprocessors path in the shared state
 	shared.State.ToolsPath = path.Join(dataRoot, "tools")                                  // Set the tools path in the shared state
 	shared.State.OutPath = path.Join(dataRoot, "output")                                   // Set the output path in the shared state
+	shared.State.RestoreFilePath = path.Join(dataRoot, "restore")                          // Set the restore file path in the shared state
 	shared.State.Debug = enableDebug                                                       // Set the debug flag in the shared state
 	shared.State.AlwaysTrustFiles = viper.GetBool("always_trust_files")                    // Set the always trust files flag in the shared state
 	shared.State.ExtraDebugging = viper.GetBool("extra_debugging")                         // Set the extra debugging flag in the shared state

@@ -2,6 +2,7 @@ package lib
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 
+	"github.com/duke-git/lancet/fileutil"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/duke-git/lancet/validator"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
@@ -125,14 +127,25 @@ func RunAttackTask(sess *hashcat.Session, task *components.Task) {
 				if err != nil {
 					if err.Error() != "exit status 1" {
 						// Something went wrong and we failed.
-						SendAgentError(err.Error(), task, operations.SeverityFatal)
+						SendAgentError(err.Error(), task, operations.SeverityCritical)
 						DisplayJobFailed(err)
+					} else if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
+						// This is a special case where hashcat failed to read the restore file.
+						// We should remove the restore file and try again.
+						if strutil.IsNotBlank(sess.RestoreFilePath) {
+							shared.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
+							err := fileutil.RemoveFile(sess.RestoreFilePath)
+							if err != nil {
+								shared.Logger.Error("Failed to remove restore file", "error", err)
+							}
+						}
 					} else {
 						// Exit status 1 means we exhausted the task. Mark it as such.
 						DisplayJobExhausted()
 						markTaskExhausted(task)
 					}
 				}
+				sess.Cleanup() // Clean up the session
 				break procLoop
 			}
 		}
