@@ -30,6 +30,7 @@ type Params struct {
 	BackendDevices            string   `json:"backend_devices,omitempty"`    // Devices to use for the backend, comma-separated
 	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL devices to use, comma-separated
 	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Whether to enable additional hash types when benchmarking
+	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to the restore file
 }
 
 // Validate checks if the parameters for the attack mode are valid.
@@ -130,12 +131,14 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 			args = append(args, "--benchmark-all")
 		}
 
-		return
+		return // No need to for further arguments for benchmark mode
 	}
+
+	// For full attack mode, we have many more arguments to add
 	args = append(
 		args,
 		"--quiet",
-		"--session", "sess-"+session,
+		"--session", "attack-"+session,
 		"--outfile-format", "1,3,5",
 		"--outfile", outFile,
 		"--status",
@@ -147,6 +150,10 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		"-a", convertor.ToString(params.AttackMode),
 		"-m", convertor.ToString(params.HashType),
 	)
+
+	if strutil.IsNotBlank(params.RestoreFilePath) {
+		args = append(args, "--restore-file-path", params.RestoreFilePath)
+	}
 
 	args = append(args, params.AdditionalArgs...)
 
@@ -232,4 +239,16 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	}
 
 	return
+}
+
+func (params Params) toRestoreArgs(session string) (args []string, err error) {
+
+	// We need a few arguments from standard attacks
+	args = append(args, "--session", "attack-"+session)
+
+	// Add the restore file path and the restore flag
+	args = append(args, "--restore-file-path", params.RestoreFilePath)
+	args = append(args, "--restore")
+
+	return args, nil
 }
