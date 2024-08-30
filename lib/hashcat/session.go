@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/duke-git/lancet/strutil"
+	"github.com/spf13/viper"
 	"os"
 	"os/exec"
 	"strings"
@@ -19,6 +21,9 @@ import (
 	"github.com/nxadm/tail"
 )
 
+// Session represents a running Hashcat session.
+// It contains the hashcat process, the path of the file containing the hashes to crack,
+// the file to write cracked hashes to, charset files for mask attacks, a channel to send cracked hashes to,
 type Session struct {
 	proc               *exec.Cmd   // The hashcat process
 	hashFile           string      // The path of the file containing the hashes to crack
@@ -56,6 +61,7 @@ func (sess *Session) Start() error {
 
 	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true, Logger: shared.Logger.StandardLog()})
 	if err != nil {
+		// Kill the hashcat process if we can't tail the outfile
 		err = sess.Kill()
 		if err != nil {
 			shared.Logger.Error("couldn't kill hashcat process", "error", err)
@@ -66,8 +72,8 @@ func (sess *Session) Start() error {
 
 	// Read the tailer output in a separate goroutine
 	go func() {
-		for tLine := range tailer.Lines {
-			line := tLine.Text
+		for tailLine := range tailer.Lines {
+			line := tailLine.Text
 			values := strings.Split(line, ":")
 			if len(values) < 3 {
 				shared.Logger.Error("unexpected line contents", "line", line)
@@ -217,4 +223,81 @@ func (sess *Session) Cleanup() {
 // CmdLine returns the command line string used to start the session.
 func (sess *Session) CmdLine() string {
 	return sess.proc.String()
+}
+
+// NewHashcatSession creates a new Hashcat session with the specified ID and parameters.
+// It returns a pointer to the created Session and an error, if any.
+// The Session represents a running Hashcat session and provides channels for receiving cracked hashes,
+// status updates, stderr messages, and stdout lines.
+// The function takes an ID string and a Params struct as input.
+// The ID is used to identify the session, and the Params struct contains the parameters for the Hashcat session.
+// The function creates temporary files for storing the output and custom charsets, and sets the necessary permissions.
+// It then constructs the command arguments based on the provided parameters and returns the initialized Session.
+// If any error occurs during the creation of the session, an error is returned.
+func NewHashcatSession(id string, params Params) (*Session, error) {
+	var (
+		outFile            *os.File
+		shardedCharsetFile *os.File
+		charsetFiles       []*os.File
+	)
+
+	binaryPath := viper.GetString("hashcat_path")
+	outFile, err := os.CreateTemp(shared.State.OutPath, id)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't make a temp file to store output: %w", err)
+	}
+	err = outFile.Chmod(0o600)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't set permissions on output file: %w", err)
+	}
+
+	charsetFiles = []*os.File{}
+	for i, charset := range params.MaskCustomCharsets {
+		if !strutil.IsBlank(charset) {
+			charsetFile, err := os.CreateTemp(shared.State.OutPath, "charset*")
+			if err != nil {
+				return nil, fmt.Errorf("couldn't make a temp file to store charset")
+			}
+			_, err = charsetFile.Write([]byte(charset))
+			if err != nil {
+				return nil, err
+			}
+
+			params.MaskCustomCharsets[i] = charsetFile.Name()
+			charsetFiles = append(charsetFiles, charsetFile)
+		}
+	}
+
+	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for a restore file and generate the restore arguments if it exists
+	// We'll override the command arguments if a restore file is found
+	if !strutil.IsBlank(params.RestoreFilePath) {
+		if fileutil.IsExist(params.RestoreFilePath) {
+			args, err = params.toRestoreArgs(id)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	shared.ErrorLogger.Info("Hashcat command: ", "args", args)
+
+	return &Session{
+		proc:               exec.Command(binaryPath, args...),
+		hashFile:           params.HashFile,
+		outFile:            outFile,
+		charsetFiles:       charsetFiles,
+		shardedCharsetFile: shardedCharsetFile,
+		CrackedHashes:      make(chan Result, 5),
+		StatusUpdates:      make(chan Status, 5),
+		StderrMessages:     make(chan string, 5),
+		StdoutLines:        make(chan string, 5),
+		DoneChan:           make(chan error),
+		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
+		RestoreFilePath:    params.RestoreFilePath,
+	}, nil
 }
