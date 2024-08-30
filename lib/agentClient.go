@@ -115,8 +115,9 @@ func GetAgentConfiguration() error {
 		agentConfig.Config.BackendDevices = *config.Config.BackendDevice
 	}
 
-	// TODO: Check if the OpenCL devices are set
-	// This has not been implemented in the API yet.
+	if config.Config.OpenclDevices != nil {
+		agentConfig.Config.OpenCLDevices = *config.Config.OpenclDevices
+	}
 
 	if agentConfig.Config.UseNativeHashcat {
 		shared.Logger.Debug("Using native Hashcat")

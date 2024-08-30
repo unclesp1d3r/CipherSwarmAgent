@@ -125,24 +125,28 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 				sendCrackedHash(crackedHash, task)
 			case err := <-sess.DoneChan:
 				if err != nil {
-					if err.Error() != "exit status 1" {
-						// Something went wrong and we failed.
-						SendAgentError(err.Error(), task, operations.SeverityCritical)
-						displayJobFailed(err)
-					} else if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
-						// This is a special case where hashcat failed to read the restore file.
-						// We should remove the restore file and try again.
-						if strutil.IsNotBlank(sess.RestoreFilePath) {
-							shared.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
-							err := fileutil.RemoveFile(sess.RestoreFilePath)
-							if err != nil {
-								shared.Logger.Error("Failed to remove restore file", "error", err)
-							}
-						}
-					} else {
+					if err.Error() == "exit status 1" {
 						// Exit status 1 means we exhausted the task. Mark it as such.
+						// This is fine and expected.
 						displayJobExhausted()
 						markTaskExhausted(task)
+					} else {
+						// If we get any other exit status, it's an error.
+						if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
+							// This is a special case where hashcat failed to read the restore file. We
+							// should remove the restore file and try again.
+							if strutil.IsNotBlank(sess.RestoreFilePath) {
+								shared.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
+								err := fileutil.RemoveFile(sess.RestoreFilePath)
+								if err != nil {
+									shared.Logger.Error("Failed to remove restore file", "error", err)
+								}
+							}
+						} else {
+							// Something went wrong and we failed. Send a critical error.
+							SendAgentError(err.Error(), task, operations.SeverityCritical)
+							displayJobFailed(err)
+						}
 					}
 				}
 				sess.Cleanup() // Clean up the session
