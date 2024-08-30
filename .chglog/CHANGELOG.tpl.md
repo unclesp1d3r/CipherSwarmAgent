@@ -12,8 +12,11 @@
 {{ range .Commits -}}
 
 * {{ if .Scope }}**{{ .Scope }}:** {{ end }}{{ .Subject }}
-  {{ end }}
-  {{ end -}}
+{{ if .TrimmedBody }}
+  {{ .TrimmedBody }}
+{{ end }}
+{{ end }}
+{{ end -}}
 
 {{- if .RevertCommits -}}
 
@@ -22,8 +25,8 @@
 {{ range .RevertCommits -}}
 
 * {{ .Revert.Header }}
-  {{ end }}
-  {{ end -}}
+{{ end }}
+{{ end -}}
 
 {{- if .MergeCommits -}}
 
@@ -32,8 +35,8 @@
 {{ range .MergeCommits -}}
 
 * {{ .Header }}
-  {{ end }}
-  {{ end -}}
+{{ end }}
+{{ end -}}
 
 {{- if .NoteGroups -}}
 {{ range .NoteGroups -}}
