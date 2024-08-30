@@ -9,16 +9,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/duke-git/lancet/fileutil"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarmagent/lib"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
-
 	"github.com/charmbracelet/log"
+	"github.com/duke-git/lancet/v2/fileutil"
 	gap "github.com/muesli/go-app-paths"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
 var (
@@ -149,7 +148,8 @@ func initConfig() {
 // startAgent is a function that starts the CipherSwarm Agent.
 //
 //goland:noinspection GoUnusedParameter
-func startAgent(cmd *cobra.Command, args []string) {
+//nolint:gocognit
+func startAgent(_ *cobra.Command, _ []string) {
 	if viper.GetString("api_url") == "" {
 		shared.Logger.Fatal("API URL not set")
 	}
@@ -207,6 +207,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	err = lib.AuthenticateAgent()
 	if err != nil {
 		shared.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
+
 		return // Exit the program
 	}
 	lib.DisplayAuthenticated()
@@ -216,6 +217,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 	err = fetchAgentConfig()
 	if err != nil {
 		shared.Logger.Fatal("Failed to fetch agent configuration", "error", err)
+
 		return // Exit the program
 	}
 
@@ -274,6 +276,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 				if err != nil {
 					shared.Logger.Error("Failed to get new task", "error", err)
 					time.Sleep(viper.GetDuration("sleep_on_failure"))
+
 					continue
 				}
 				if task != nil {
@@ -288,6 +291,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 						lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 						lib.AbandonTask(task)
 						time.Sleep(viper.GetDuration("sleep_on_failure"))
+
 						continue
 					}
 
@@ -298,6 +302,7 @@ func startAgent(cmd *cobra.Command, args []string) {
 						lib.DisplayRunTaskAccepted(task)
 					} else {
 						shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
+
 						return
 					}
 					// - Download the files
@@ -307,10 +312,12 @@ func startAgent(cmd *cobra.Command, args []string) {
 						lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 						lib.AbandonTask(task)
 						time.Sleep(viper.GetDuration("sleep_on_failure"))
+
 						continue
-					} else {
-						lib.RunTask(task, attack)
 					}
+
+					lib.RunTask(task, attack)
+
 					shared.State.CurrentActivity = shared.CurrentActivityWaiting
 				} else {
 					shared.Logger.Info("No new task available")
@@ -381,6 +388,7 @@ func fetchAgentConfig() error {
 	if viper.GetBool("always_use_native_hashcat") {
 		lib.Configuration.Config.UseNativeHashcat = true
 	}
+
 	return err
 }
 

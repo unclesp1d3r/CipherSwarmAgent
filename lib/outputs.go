@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/duke-git/lancet/v2/mathutil"
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/dustin/go-humanize"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-
-	"github.com/duke-git/lancet/mathutil"
-	"github.com/dustin/go-humanize"
-
-	"github.com/duke-git/lancet/strutil"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
@@ -97,7 +95,6 @@ func displayJobStatus(update hashcat.Status) {
 	if update.Guess.GuessBaseCount > 1 {
 		// progressText = fmt.Sprintf("%.2f%%, iteration %v of %v", update.Guess.GuessBasePercent, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
 		progressText = fmt.Sprintf("%s for iteration %v of %v", progressText, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
-
 	}
 
 	shared.Logger.Info("Progress update", "progress", progressText, "speed", speedText, "cracked_hashes", hashesText)

@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/duke-git/lancet/v2/fileutil"
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/duke-git/lancet/v2/validator"
+	"github.com/pkg/errors"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
-
-	"github.com/duke-git/lancet/fileutil"
-	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/duke-git/lancet/validator"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
 // runBenchmarkTask runs a benchmark session using the provided hashcat session.
@@ -25,6 +24,7 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 	err := sess.Start()
 	if err != nil {
 		shared.Logger.Error("Failed to start benchmark session", "error", err)
+
 		return nil, true
 	}
 	var benchmarkResults []benchmarkResult
@@ -64,12 +64,14 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 					shared.Logger.Error("Benchmark session failed", "error", err)
 					SendAgentError(err.Error(), nil, operations.SeverityFatal)
 				}
+
 				break procLoop
 			}
 		}
 		waitChan <- 1
 	}()
 	<-waitChan
+
 	return benchmarkResults, false
 }
 
@@ -89,11 +91,15 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 //	sess := hashcat.NewSession()
 //	task := components.NewTask()
 //	RunAttackTask(sess, task)
+//
+//nolint:funlen
+//nolint:gocognit
 func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
 		shared.Logger.Error("Failed to start attack session", "error", err)
 		SendAgentError(err.Error(), task, operations.SeverityFatal)
+
 		return
 	}
 	waitChan := make(chan int)
@@ -150,6 +156,7 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 					}
 				}
 				sess.Cleanup() // Clean up the session
+
 				break runLoop
 			}
 		}
@@ -174,11 +181,12 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 	if err != nil {
 		shared.Logger.Error("Failed to start hashcat startup test session", "error", err)
 		SendAgentError(err.Error(), nil, operations.SeverityFatal)
+
 		return nil, err
 	}
 
 	var testResults *hashcat.Status
-	var errorResult error = nil
+	var errorResult error
 	waitChan := make(chan int)
 	go func() {
 	runLoop:
@@ -192,7 +200,7 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 			case stdErrLine := <-sess.StderrMessages:
 				if strutil.IsNotBlank(stdErrLine) {
 					SendAgentError(stdErrLine, nil, operations.SeverityMinor)
-					errorResult = fmt.Errorf(stdErrLine)
+					errorResult = errors.New(stdErrLine)
 				}
 			case statusUpdate := <-sess.StatusUpdates:
 				// We should get only a single status update, which we'll return
@@ -200,7 +208,7 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 			case crackedHash := <-sess.CrackedHashes:
 				// We don't care about cracked hashes in this case
 				if strutil.IsBlank(crackedHash.Plaintext) {
-					errorResult = fmt.Errorf("received empty cracked hash")
+					errorResult = errors.New("received empty cracked hash")
 				}
 			case err := <-sess.DoneChan:
 				if err != nil {
@@ -215,11 +223,13 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 					// We don't care in this case, since we just want to see if hashcat will work.
 				}
 				sess.Cleanup() // Clean up the session
+
 				break runLoop
 			}
 		}
 		waitChan <- 1
 	}()
 	<-waitChan
+
 	return testResults, errorResult
 }

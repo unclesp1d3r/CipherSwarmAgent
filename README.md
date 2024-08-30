@@ -55,13 +55,15 @@ go build -o cipherswarm-agent
 
 ### Configuration
 
-The easiest way to configure the agent is by passing the required parameters as environment variables. The following are
+The easiest way to configure the agent is by providing the required parameters as environment variables. The 
+following are
 the available configuration options:
 
 - `API_TOKEN`: The API token for the CipherSwarm server. This token is provided when the agent is added to the
   CipherSwarm server.
 - `API_URL`: The URL of the CipherSwarm server. This is the URL where the CipherSwarm server runs,
-  e.g., <https://cipherswarm.example.com:3000>.
+  e.g.,
+  `https://cipherswarm.example.com:3000`.
 
 Optional configuration options include:
 
@@ -133,12 +135,12 @@ From now on, we will use [Conventional Commits](https://www.conventionalcommits.
 messages. This will help us automate the release process and generate changelogs. Please follow the commit message
 format below:
 
-```
+```plaintext
 <type>[optional scope]: <description>
 
-[optional body]
+        [optional body]
 
-[optional footer(s)]
+        [optional footer(s)]
 ```
 
 ## License
