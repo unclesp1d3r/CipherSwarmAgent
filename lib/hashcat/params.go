@@ -42,13 +42,13 @@ func (params Params) Validate() error {
 			return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", attackModeDictionary)
 		}
 
-	case attackModeMask:
+	case AttackModeMask:
 		if strutil.IsBlank(params.Mask) && strutil.IsBlank(params.MaskListFilename) {
-			return fmt.Errorf("using mask attack (%d), but no mask was given", attackModeMask)
+			return fmt.Errorf("using mask attack (%d), but no mask was given", AttackModeMask)
 		}
 
 		if strutil.IsNotBlank(params.Mask) && strutil.IsNotBlank(params.MaskListFilename) {
-			return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", attackModeMask)
+			return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", AttackModeMask)
 		}
 
 	case attackModeHybridDM, attackModeHybridMD:
@@ -211,7 +211,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 			args = append(args, "-r", params.RuleListFilename)
 		}
 
-	case attackModeMask:
+	case AttackModeMask:
 		args = append(args, params.Mask)
 
 	case attackModeHybridDM:
@@ -222,7 +222,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	}
 
 	switch params.AttackMode {
-	case attackModeMask, attackModeHybridDM, attackModeHybridMD:
+	case AttackModeMask, attackModeHybridDM, attackModeHybridMD:
 		maskArgs, err := params.maskArgs()
 		if err != nil {
 			return nil, err

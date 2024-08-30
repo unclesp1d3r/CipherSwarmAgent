@@ -155,10 +155,23 @@ func UpdateAgentMetadata() {
 	//   and kernel architecture.
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
-	devices, err := arch.GetDevices()
-	if err != nil {
-		shared.Logger.Error("Error getting devices: ", err)
-		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+	// We'll keep the legacy device identification method around in case the new one causes issues, but we'll default to the new one
+	// Legacy method: Get the devices using the arch package, which runs a shell command to get the devices
+	// New method: Get the devices using the getDevices function, which creates a test hashcat session and runs the test task to get the devices
+	// The new method is more reliable and should be used by default, but does create a small delay when the agent starts
+	var devices []string
+	if shared.State.UseLegacyDeviceIdentificationMethod {
+		devices, err = arch.GetDevices()
+		if err != nil {
+			shared.Logger.Error("Error getting devices: ", err)
+			SendAgentError(err.Error(), nil, operations.SeverityCritical)
+		}
+	} else {
+		devices, err = getDevices()
+		if err != nil {
+			shared.Logger.Error("Error getting devices: ", err)
+			SendAgentError(err.Error(), nil, operations.SeverityCritical)
+		}
 	}
 
 	agentPlatform = info.OS
@@ -196,6 +209,43 @@ func UpdateAgentMetadata() {
 		shared.ErrorLogger.Error("bad response: %v", response.RawResponse.Status)
 	}
 
+}
+
+// getDevices retrieves the devices available for the agent.
+// It creates a test hashcat session and runs the test task to get the devices.
+// If the test task is successful, it returns the devices.
+// Right now it just returns a slice of strings, but we could return more information about the devices in the future.
+// Probably device_id, device_name, and device_type.
+func getDevices() ([]string, error) {
+	jobParams := hashcat.Params{
+		AttackMode:     hashcat.AttackModeMask,
+		AdditionalArgs: arch.GetAdditionalHashcatArgs(),
+		HashFile:       "60b725f10c9c85c70d97880dfe8191b3", // "a"
+		Mask:           "?l",
+		OpenCLDevices:  "1,2,3",
+	}
+
+	sess, err := hashcat.NewHashcatSession("test", jobParams)
+	if err != nil {
+		shared.Logger.Error("Failed to create test session", "error", err)
+		SendAgentError(err.Error(), nil, operations.SeverityMajor)
+		return nil, err
+	}
+
+	testStatus, err := runTestTask(sess)
+	if err != nil {
+		shared.Logger.Error("Error running test task", "error", err)
+		SendAgentError(err.Error(), nil, operations.SeverityFatal) // If we can't run the test task, we should stop
+		return nil, err
+	}
+
+	deviceStatuses := testStatus.Devices
+	devices := make([]string, len(deviceStatuses))
+	for _, device := range deviceStatuses {
+		devices = append(devices, device.DeviceName)
+	}
+
+	return devices, nil
 }
 
 // UpdateCracker checks for an updated version of the cracker and performs the necessary updates.
@@ -695,6 +745,7 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 		deviceStatuses[i] = deviceStatus
 	}
 
+	// We need to convert the hashcat.Status to a cipherswarm.TaskStatus
 	taskStatus := components.TaskStatus{
 		OriginalLine: update.OriginalLine,
 		Time:         update.Time,

@@ -98,7 +98,7 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	}
 	waitChan := make(chan int)
 	go func() {
-	procLoop:
+	runLoop:
 		for {
 			select {
 			case stdoutLine := <-sess.StdoutLines:
@@ -150,10 +150,76 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 					}
 				}
 				sess.Cleanup() // Clean up the session
-				break procLoop
+				break runLoop
 			}
 		}
 		waitChan <- 1
 	}()
 	<-waitChan
+}
+
+// runTestTask runs a test session using the provided hashcat session.
+// It starts the session, reads the output from stdout and stderr, and handles various events.
+// The test results are collected and returned as a hashcat.Status struct.
+// If there is an error starting the session, the function returns nil and the error.
+//
+// Parameters:
+// - sess: The hashcat session to run the test.
+//
+// Returns:
+// - *hashcat.Status: The test results.
+// - error: An error if the session fails to start or an error occurs during the session.
+func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
+	err := sess.Start()
+	if err != nil {
+		shared.Logger.Error("Failed to start hashcat startup test session", "error", err)
+		SendAgentError(err.Error(), nil, operations.SeverityFatal)
+		return nil, err
+	}
+
+	var testResults *hashcat.Status
+	var errorResult error = nil
+	waitChan := make(chan int)
+	go func() {
+	runLoop:
+		for {
+			select {
+			case stdoutLine := <-sess.StdoutLines:
+				// If we're not getting JSON, which should be sent to the status updates channel, then log it
+				if !validator.IsJSON(stdoutLine) {
+					shared.Logger.Error("Failed to parse status update", "output", stdoutLine)
+				}
+			case stdErrLine := <-sess.StderrMessages:
+				if strutil.IsNotBlank(stdErrLine) {
+					SendAgentError(stdErrLine, nil, operations.SeverityMinor)
+					errorResult = fmt.Errorf(stdErrLine)
+				}
+			case statusUpdate := <-sess.StatusUpdates:
+				// We should get only a single status update, which we'll return
+				testResults = &statusUpdate
+			case crackedHash := <-sess.CrackedHashes:
+				// We don't care about cracked hashes in this case
+				if strutil.IsBlank(crackedHash.Plaintext) {
+					errorResult = fmt.Errorf("received empty cracked hash")
+				}
+			case err := <-sess.DoneChan:
+				if err != nil {
+					if err.Error() != "exit status 1" {
+						// If we get any other exit status, it's an error.
+						// Something went wrong and we failed. Send a critical error.
+						SendAgentError(err.Error(), nil, operations.SeverityCritical)
+						errorResult = err
+					}
+					// Exit status 1 means we exhausted the task. Mark it as such.
+					// This is fine and expected.
+					// We don't care in this case, since we just want to see if hashcat will work.
+				}
+				sess.Cleanup() // Clean up the session
+				break runLoop
+			}
+		}
+		waitChan <- 1
+	}()
+	<-waitChan
+	return testResults, errorResult
 }
