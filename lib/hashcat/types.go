@@ -6,7 +6,7 @@ import (
 
 const (
 	attackModeDictionary = 0 // attackModeDictionary is the attack mode for dictionary attacks
-	attackModeMask       = 3 // attackModeMask is the attack mode for mask attacks
+	AttackModeMask       = 3 // AttackModeMask is the attack mode for mask attacks
 	attackModeHybridDM   = 6 // attackModeHybridDM is the attack mode for hybrid dictionary + mask attacks
 	attackModeHybridMD   = 7 // attackModeHybridMD is the attack mode for hybrid mask + dictionary attacks
 	AttackBenchmark      = 9 // AttackBenchmark is the attack mode for benchmarking

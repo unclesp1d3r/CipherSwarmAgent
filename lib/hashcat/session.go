@@ -284,8 +284,6 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		}
 	}
 
-	shared.ErrorLogger.Info("Hashcat command: ", "args", args)
-
 	return &Session{
 		proc:               exec.Command(binaryPath, args...),
 		hashFile:           params.HashFile,
