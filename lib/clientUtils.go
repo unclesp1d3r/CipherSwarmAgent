@@ -10,22 +10,19 @@ import (
 	"os"
 	"path"
 
-	"github.com/duke-git/lancet/cryptor"
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/cryptor"
+	"github.com/duke-git/lancet/v2/fileutil"
+	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/duke-git/lancet/v2/validator"
 	"github.com/hashicorp/go-getter"
+	"github.com/shirou/gopsutil/v3/process"
+	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
-
-	"github.com/duke-git/lancet/convertor"
-	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/shirou/gopsutil/v3/process"
-
-	"github.com/duke-git/lancet/fileutil"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
-
-	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
 func getCurrentHashcatVersion() (string, error) {
@@ -49,6 +46,7 @@ func getCurrentHashcatVersion() (string, error) {
 	}
 	if !hashcatExists {
 		shared.Logger.Error("Hashcat binary does not exist", "path", viper.GetString("hashcat_path"))
+
 		return "0.0.0", errors.New("hashcat binary does not exist")
 	}
 
@@ -58,6 +56,7 @@ func getCurrentHashcatVersion() (string, error) {
 		return "0.0.0", err
 	}
 	shared.Logger.Debug("Current hashcat version", "version", hashcatVersion)
+
 	return hashcatVersion, nil
 }
 
@@ -72,18 +71,21 @@ func CheckForExistingClient(pidFilePath string) bool {
 		pidString, err := fileutil.ReadFileToString(pidFilePath)
 		if err != nil {
 			shared.Logger.Error("Error reading PID file", "path", pidFilePath)
+
 			return true
 		}
 
 		pidValue, err := convertor.ToInt(strutil.Trim(pidString))
 		if err != nil {
 			shared.Logger.Error("Error converting PID to integer", "pid", pidString)
+
 			return true
 		}
 
-		pidRunning, err := process.PidExists(int32(pidValue))
+		pidRunning, err := process.PidExists(int32(pidValue)) //nolint:gosec
 		if err != nil {
 			shared.Logger.Error("Error checking if process is running", "pid", pidValue)
+
 			return true
 		}
 
@@ -91,10 +93,11 @@ func CheckForExistingClient(pidFilePath string) bool {
 		if !pidRunning {
 			shared.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
 		}
+
 		return pidRunning
-	} else {
-		return false
 	}
+
+	return false
 }
 
 // CreateLockFile creates a lock file at the specified path using the configured PID file path.
@@ -107,8 +110,10 @@ func CreateLockFile() error {
 	err := fileutil.WriteStringToFile(lockFilePath, pidString, false)
 	if err != nil {
 		shared.Logger.Error("Error writing PID to file", "path", lockFilePath)
+
 		return err
 	}
+
 	return nil
 }
 
@@ -139,12 +144,14 @@ func CreateDataDirs() error {
 			shared.Logger.Info("Created directory", "path", dir)
 		}
 	}
+
 	return nil
 }
 
 func downloadHashList(attack *components.Attack) error {
 	if attack == nil {
 		shared.Logger.Error("Attack is nil")
+
 		return errors.New("attack is nil")
 	}
 
@@ -158,6 +165,7 @@ func downloadHashList(attack *components.Attack) error {
 		if err != nil {
 			shared.Logger.Error("Error removing old hashlist", "error", err)
 			SendAgentError(err.Error(), nil, operations.SeverityCritical)
+
 			return err
 		}
 	}
@@ -166,15 +174,17 @@ func downloadHashList(attack *components.Attack) error {
 	if err != nil {
 		shared.Logger.Error("Error downloading hashlist from the CipherSwarm API", "error", err)
 		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+
 		return err
 	}
 
 	if response.StatusCode == http.StatusOK {
 		if response.ResponseStream != nil {
-			f, err := os.Create(hashlistPath)
+			file, err := os.Create(hashlistPath)
 			if err != nil {
 				shared.Logger.Error("Error creating hashlist file", "error", err)
 				SendAgentError(err.Error(), nil, operations.SeverityCritical)
+
 				return err
 			}
 			defer func(f *os.File) {
@@ -182,11 +192,12 @@ func downloadHashList(attack *components.Attack) error {
 				if err != nil {
 					shared.Logger.Error("Error closing hashlist file", "error", err)
 				}
-			}(f)
-			_, err = io.Copy(f, response.ResponseStream)
+			}(file)
+			_, err = io.Copy(file, response.ResponseStream)
 			if err != nil {
 				shared.Logger.Error("Error writing hashlist file", "error", err)
 				SendAgentError(err.Error(), nil, operations.SeverityCritical)
+
 				return err
 			}
 			shared.Logger.Debug("Downloaded hashlist", "path", hashlistPath)
@@ -194,19 +205,24 @@ func downloadHashList(attack *components.Attack) error {
 			if hashSize == 0 {
 				shared.Logger.Error("Downloaded hashlist is empty", "path", hashlistPath)
 				SendAgentError("Downloaded hashlist is empty", nil, operations.SeverityCritical)
+
 				return errors.New("downloaded hashlist is empty, probably completed task")
 			}
 		}
 	} else {
 		shared.Logger.Error("Error downloading hashlist", "response", response.RawResponse.Status)
+
 		return errors.New("failed to download hashlist")
 	}
+
 	return nil
 }
 
+//nolint:funlen
 func downloadFile(url string, path string, checksum string) error {
 	if !validator.IsUrl(url) {
 		shared.Logger.Error("Invalid URL", "url", url)
+
 		return errors.New("invalid URL")
 	}
 
@@ -218,6 +234,7 @@ func downloadFile(url string, path string, checksum string) error {
 			}
 			if fileChecksum == checksum {
 				shared.Logger.Info("Download already exists", "path", path)
+
 				return nil
 			}
 			shared.Logger.Warn("Checksums do not match", "path", path, "url_checksum", checksum, "file_checksum", fileChecksum)
@@ -225,6 +242,7 @@ func downloadFile(url string, path string, checksum string) error {
 			err = os.Remove(path)
 			if err != nil {
 				SendAgentError(err.Error(), nil, operations.SeverityMajor)
+
 				return err
 			}
 		}
@@ -239,6 +257,7 @@ func downloadFile(url string, path string, checksum string) error {
 		urlA, err := url2.Parse(url)
 		if err != nil {
 			shared.Logger.Error("Error parsing URL: ", "error", err)
+
 			return err
 		}
 		values := urlA.Query()
@@ -263,9 +282,11 @@ func downloadFile(url string, path string, checksum string) error {
 
 	if err := client.Get(); err != nil {
 		shared.Logger.Debug("Error downloading file: ", "error", err)
+
 		return err
 	}
 	displayDownloadFileComplete(url, path)
+
 	return nil
 }
 
@@ -277,6 +298,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	if err != nil && !os.IsNotExist(err) {
 		shared.Logger.Error("Error removing old hashcat directory: ", "error", err)
 		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+
 		return "", err // Don't continue if we can't remove the old directory
 	}
 
@@ -285,6 +307,7 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	if err != nil && !os.IsNotExist(err) {
 		shared.Logger.Error("Error moving old hashcat directory: ", "error", err)
 		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+
 		return "", err // Don't continue if we can't move the old directory
 	}
 
@@ -293,8 +316,10 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	if err != nil {
 		shared.Logger.Error("Error extracting file: ", "error", err)
 		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+
 		return "", err // Don't continue if we can't extract the file
 	}
+
 	return hashcatDirectory, err
 }
 
@@ -303,9 +328,11 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
 		shared.Logger.Error("Error moving file: ", err)
+
 		return "", err
 	}
 	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
+
 	return newArchivePath, err
 }
 
@@ -315,6 +342,7 @@ func base64ToHex(base64 string) string {
 	}
 	str := cryptor.Base64StdDecode(base64)
 	hx := hex.EncodeToString([]byte(str))
+
 	return hx
 }
 
@@ -322,5 +350,6 @@ func resourceNameOrBlank(resource *components.AttackResourceFile) string {
 	if resource == nil {
 		return ""
 	}
+
 	return resource.FileName
 }

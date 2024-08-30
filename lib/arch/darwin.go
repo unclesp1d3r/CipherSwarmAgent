@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"regexp"
 
-	"github.com/duke-git/lancet/strutil"
+	"github.com/duke-git/lancet/v2/strutil"
 )
 
 // GetDevices retrieves a list of devices using the system_profiler command.
@@ -26,7 +26,7 @@ func GetDevices() ([]string, error) {
 	re := regexp.MustCompile(`Chipset Model: (.*)`)
 	matches := re.FindAllStringSubmatch(commandResult, -1)
 
-	var newArray []string
+	var newArray []string //nolint:prealloc
 	for _, match := range matches {
 		newArray = append(newArray, strutil.Trim(match[1]))
 	}
@@ -42,6 +42,7 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 	if err != nil {
 		return "0.0.0", err
 	}
+
 	return strutil.Trim(strutil.BytesToString(out)), nil
 }
 
@@ -53,7 +54,8 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 //
 //goland:noinspection GoLinter
 func Extract7z(srcFile string, destDir string) error {
-	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output()
+	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output() //nolint:gosec
+
 	return err
 }
 

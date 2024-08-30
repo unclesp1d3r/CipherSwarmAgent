@@ -6,19 +6,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/duke-git/lancet/strutil"
-	"github.com/spf13/viper"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
-
-	"github.com/duke-git/lancet/convertor"
-	"github.com/duke-git/lancet/fileutil"
-	"github.com/duke-git/lancet/validator"
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/fileutil"
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/duke-git/lancet/v2/validator"
 	"github.com/nxadm/tail"
+	"github.com/spf13/viper"
+	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
 // Session represents a running Hashcat session.
@@ -42,6 +41,8 @@ type Session struct {
 // Start starts the hashcat session by attaching the stdout and stderr pipes,
 // starting the hashcat process, and setting up goroutines to handle the output.
 // It returns an error if any of the steps fail.
+//
+//nolint:funlen
 func (sess *Session) Start() error {
 	pStdout, err := sess.proc.StdoutPipe()
 	if err != nil {
@@ -77,6 +78,7 @@ func (sess *Session) Start() error {
 			values := strings.Split(line, ":")
 			if len(values) < 3 {
 				shared.Logger.Error("unexpected line contents", "line", line)
+
 				continue
 			}
 
@@ -88,6 +90,7 @@ func (sess *Session) Start() error {
 			bs, err := hex.DecodeString(plainHex)
 			if err != nil {
 				shared.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
+
 				continue
 			}
 			plain := string(bs)
@@ -99,6 +102,7 @@ func (sess *Session) Start() error {
 			timestampI, err := convertor.ToInt(timestamp)
 			if err != nil {
 				shared.Logger.Error("couldn't parse hashcat timestamp.", "timestamp", timestamp, "error", err)
+
 				continue
 			}
 
@@ -126,6 +130,7 @@ func (sess *Session) Start() error {
 					err := json.Unmarshal([]byte(line), &status)
 					if err != nil {
 						shared.Logger.Error("WARN: couldn't unmarshal hashcat status", "error", err)
+
 						continue
 					}
 					sess.StatusUpdates <- status
@@ -234,6 +239,8 @@ func (sess *Session) CmdLine() string {
 // The function creates temporary files for storing the output and custom charsets, and sets the necessary permissions.
 // It then constructs the command arguments based on the provided parameters and returns the initialized Session.
 // If any error occurs during the creation of the session, an error is returned.
+//
+//nolint:funlen
 func NewHashcatSession(id string, params Params) (*Session, error) {
 	var (
 		outFile            *os.File
@@ -256,7 +263,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		if !strutil.IsBlank(charset) {
 			charsetFile, err := os.CreateTemp(shared.State.OutPath, "charset*")
 			if err != nil {
-				return nil, fmt.Errorf("couldn't make a temp file to store charset")
+				return nil, errors.New("couldn't make a temp file to store charset")
 			}
 			_, err = charsetFile.Write([]byte(charset))
 			if err != nil {
@@ -277,10 +284,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	// We'll override the command arguments if a restore file is found
 	if !strutil.IsBlank(params.RestoreFilePath) {
 		if fileutil.IsExist(params.RestoreFilePath) {
-			args, err = params.toRestoreArgs(id)
-			if err != nil {
-				return nil, err
-			}
+			args = params.toRestoreArgs(id)
 		}
 	}
 

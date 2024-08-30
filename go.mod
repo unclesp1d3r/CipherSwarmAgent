@@ -5,12 +5,12 @@ go 1.22
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/cheggaaa/pb v1.0.29
-	github.com/duke-git/lancet v1.4.3
 	github.com/duke-git/lancet/v2 v2.3.2
 	github.com/dustin/go-humanize v1.0.1
 	github.com/hashicorp/go-getter v1.7.6
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/nxadm/tail v1.4.11
+	github.com/pkg/errors v0.9.1
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
@@ -90,7 +90,7 @@ require (
 	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	google.golang.org/api v0.195.0 // indirect
-	google.golang.org/genproto v0.0.0-20240823204242-4ba0660f739c // indirect
+	google.golang.org/genproto v0.0.0-20240827150818-7e3bb234dfed // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240827150818-7e3bb234dfed // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
 	google.golang.org/grpc v1.66.0 // indirect

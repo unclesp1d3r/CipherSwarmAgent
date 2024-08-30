@@ -55,6 +55,7 @@ func (cpb *progressBar) TrackProgress(src string, currentSize, totalSize int64, 
 	reader := newPb.NewProxyReader(stream)
 
 	cpb.pbs++
+
 	return &readCloser{
 		Reader: reader,
 		close: func() error {
@@ -67,6 +68,7 @@ func (cpb *progressBar) TrackProgress(src string, currentSize, totalSize int64, 
 				_ = cpb.pool.Stop()
 				cpb.pool = nil
 			}
+
 			return nil
 		},
 	}

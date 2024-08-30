@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/duke-git/lancet/convertor"
-	"github.com/duke-git/lancet/fileutil"
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/fileutil"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
@@ -107,6 +107,8 @@ func (params Params) maskArgs() ([]string, error) {
 // toCmdArgs converts the Params struct into a slice of command-line arguments for the hashcat command.
 // It takes the session name, hash file path, and output file path as input parameters.
 // It returns the generated command-line arguments and any error encountered during the conversion.
+//
+//nolint:funlen
 func (params Params) toCmdArgs(session, hashFile string, outFile string) (args []string, err error) {
 	if err = params.Validate(); err != nil {
 		return
@@ -177,6 +179,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		wordList := filepath.Join(shared.State.FilePath, filepath.Clean(params.WordListFilename))
 		if !fileutil.IsExist(wordList) {
 			err = fmt.Errorf("provided word list %q couldn't be opened on filesystem", wordList)
+
 			return
 		}
 		params.WordListFilename = wordList // Update the path to the word list
@@ -186,6 +189,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		ruleList := filepath.Join(shared.State.FilePath, filepath.Clean(params.RuleListFilename))
 		if !fileutil.IsExist(ruleList) {
 			err = fmt.Errorf("provided rule list %q couldn't be opened on filesystem", ruleList)
+
 			return
 		}
 		params.RuleListFilename = ruleList // Update the path to the rule list
@@ -196,6 +200,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		maskList := filepath.Join(shared.State.FilePath, filepath.Clean(params.MaskListFilename))
 		if !fileutil.IsExist(maskList) {
 			err = fmt.Errorf("provided mask list %q couldn't be opened on filesystem", maskList)
+
 			return
 		}
 		params.Mask = maskList // Update the path to the mask list
@@ -241,8 +246,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	return
 }
 
-func (params Params) toRestoreArgs(session string) (args []string, err error) {
-
+func (params Params) toRestoreArgs(session string) (args []string) {
 	// We need a few arguments from standard attacks
 	args = append(args, "--session", "attack-"+session)
 
@@ -250,5 +254,5 @@ func (params Params) toRestoreArgs(session string) (args []string, err error) {
 	args = append(args, "--restore-file-path", params.RestoreFilePath)
 	args = append(args, "--restore")
 
-	return args, nil
+	return args
 }
