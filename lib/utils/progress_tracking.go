@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/cheggaaa/pb"
+	"github.com/cheggaaa/pb/v3"
 	"github.com/hashicorp/go-getter"
 )
 
@@ -33,8 +33,8 @@ type progressBar struct {
 }
 
 func progressBarConfig(bar *pb.ProgressBar, prefix string) {
-	bar.SetUnits(pb.U_BYTES)
-	bar.Prefix(prefix)
+	bar.Set(pb.Bytes, true)
+	bar.Set("prefix", prefix)
 }
 
 // TrackProgress instantiates a new progress bar that will
@@ -45,7 +45,7 @@ func (cpb *progressBar) TrackProgress(src string, currentSize, totalSize int64, 
 	defer cpb.lock.Unlock()
 
 	newPb := pb.New64(totalSize)
-	newPb.Set64(currentSize)
+	newPb.SetCurrent(currentSize)
 	progressBarConfig(newPb, filepath.Base(src))
 	if cpb.pool == nil {
 		cpb.pool = pb.NewPool()
