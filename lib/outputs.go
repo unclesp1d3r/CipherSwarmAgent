@@ -15,96 +15,107 @@ import (
 
 // Put all the functions that display output here so that they can be easily changed later
 
-// DisplayStartup displays a message when the agent starts up
+// DisplayStartup displays a message when the agent starts up.
 func DisplayStartup() {
 	shared.Logger.Info("Starting CipherSwarm Agent")
 }
 
-// DisplayAuthenticated displays a message when the agent is authenticated with the CipherSwarm API
+// DisplayAuthenticated displays a message when the agent is authenticated with the CipherSwarm API.
 func DisplayAuthenticated() {
 	shared.Logger.Info("Agent authenticated with the CipherSwarm API")
 }
 
-// DisplayNewTask displays a message when a new task is available
+// DisplayNewTask displays a message when a new task is available.
 func DisplayNewTask(task *components.Task) {
 	shared.Logger.Debug("New task available", "task", task)
 	shared.Logger.Info("New task available", "task_id", task.GetID())
 }
 
-// DisplayNewAttack displays a message when a new attack is started
+// DisplayNewAttack displays a message when a new attack is started.
 func DisplayNewAttack(attack *components.Attack) {
 	shared.Logger.Debug("Attack parameters", "attack", attack)
 	shared.Logger.Info("New attack started", "attack_id", attack.GetID(), "attack_type", *attack.GetAttackMode())
 }
 
-// DisplayInactive displays a message when the agent is inactive and sleeping
+// DisplayInactive displays a message when the agent is inactive and sleeping.
 func DisplayInactive(sleepTime time.Duration) {
 	shared.Logger.Debug("Sleeping", "seconds", sleepTime)
 }
 
-// DisplayShuttingDown displays a message when the agent is shutting down
+// DisplayShuttingDown displays a message when the agent is shutting down.
 func DisplayShuttingDown() {
 	shared.Logger.Info("Shutting down CipherSwarm Agent")
 }
 
-// displayBenchmark displays the results of a benchmark
+// displayBenchmark displays the results of a benchmark.
 func displayBenchmark(result benchmarkResult) {
 	shared.Logger.Info("Benchmark result", "device", result.Device,
 		"hash_type", result.HashType, "runtime_ms", result.RuntimeMs, "speed_hs", result.SpeedHs)
 }
 
-// displayBenchmarkError displays an error message from a benchmark
+// displayBenchmarkError displays an error message from a benchmark.
 func displayBenchmarkError(stdErrLine string) {
 	shared.Logger.Debug("Benchmark stderr", "line", strutil.RemoveNonPrintable(stdErrLine))
 }
 
-// displayJobFailed displays a message when a job session fails
+// displayJobFailed displays a message when a job session fails.
 func displayJobFailed(err error) {
 	shared.Logger.Error("Job session failed", "error", err)
 }
 
-// displayJobExhausted displays a message when a job session is exhausted
+// displayJobExhausted displays a message when a job session is exhausted.
 func displayJobExhausted() {
 	shared.Logger.Info("Job session exhausted", "status", "exhausted")
 }
 
-// displayJobCrackedHash displays a message when a job session cracks a hash
+// displayJobCrackedHash displays a message when a job session cracks a hash.
 func displayJobCrackedHash(crackedHash hashcat.Result) {
 	shared.Logger.Debug("Job cracked hash", "hash", crackedHash)
 }
 
-// displayJobError displays an error message from a job session
+// displayJobError displays an error message from a job session.
 func displayJobError(stdErrLine string) {
 	shared.Logger.Debug("Job stderr", "line", strutil.RemoveNonPrintable(stdErrLine))
 }
 
-// displayJobStatus displays a status update from a job session
+// displayJobStatus logs the current status of a hashcat job.
+// It calculates the relative progress, total speed, and recovered hashes,
+// and logs this information using the shared.Logger.
+//
+// Parameters:
+//   - update (hashcat.Status): The current status update from hashcat,
+//     containing progress, device speeds, and recovered hashes.
 func displayJobStatus(update hashcat.Status) {
 	shared.Logger.Debug("Job status update", "status", update)
-	relativeProgress := mathutil.Percent(float64(update.Progress[0]), float64(update.Progress[1]), 2)
 
-	var speedSum int64
+	relativeProgress := mathutil.Percent(float64(update.Progress[0]), float64(update.Progress[1]), 2)
+	progressText := fmt.Sprintf("%.2f%%", relativeProgress)
+
+	if update.Guess.GuessBaseCount > 1 {
+		progressText = fmt.Sprintf("%s for iteration %v of %v", progressText, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
+	}
+
+	speedSum := int64(0)
 	for _, device := range update.Devices {
 		speedSum += device.Speed
 	}
-
-	progressText := fmt.Sprintf("%.2f%%", relativeProgress)
 	speedText := humanize.SI(float64(speedSum), "H/s")
-	hashesText := fmt.Sprintf("%v of %v", update.RecoveredHashes[0], update.RecoveredHashes[1])
 
-	if update.Guess.GuessBaseCount > 1 {
-		// progressText = fmt.Sprintf("%.2f%%, iteration %v of %v", update.Guess.GuessBasePercent, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
-		progressText = fmt.Sprintf("%s for iteration %v of %v", progressText, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
-	}
+	hashesText := fmt.Sprintf("%v of %v", update.RecoveredHashes[0], update.RecoveredHashes[1])
 
 	shared.Logger.Info("Progress update", "progress", progressText, "speed", speedText, "cracked_hashes", hashesText)
 }
 
+// displayJobGetZap logs information about a task when new hashes are available.
+// It updates the job with the task ID.
+//
+// Parameters:
+//   - task: A pointer to a Task object from the components package.
 func displayJobGetZap(task *components.Task) {
 	shared.Logger.Info("New hashes available, updating job", "task_id", task.GetID())
 }
 
-// displayAgentMetadataUpdated displays the results of a job session
+// displayAgentMetadataUpdated displays the results of a job session.
 func displayAgentMetadataUpdated(result *operations.UpdateAgentResponse) {
 	shared.Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", shared.State.AgentID)
 	shared.Logger.Debug("Agent metadata", "metadata", result)

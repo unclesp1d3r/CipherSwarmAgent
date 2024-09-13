@@ -16,9 +16,16 @@ type agentConfiguration struct {
 	APIVersion int64       `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
 }
 
-// parseStringToDeviceType converts a string representation of a device type to its corresponding components.DeviceType value.
-// It takes a deviceType string as input and returns the corresponding components.DeviceType value.
-// If the deviceType string is not recognized, it defaults to components.DeviceTypeCPU.
+// parseStringToDeviceType converts a string representation of a device type
+// to its corresponding components.DeviceType value. Supported device types
+// are "CPU" and "GPU". If the input string does not match any supported
+// device type, the function defaults to returning components.DeviceTypeCPU.
+//
+// Parameters:
+// - deviceType: A string representing the device type.
+//
+// Returns:
+// - components.DeviceType: The corresponding device type enumeration value.
 func parseStringToDeviceType(deviceType string) components.DeviceType {
 	switch deviceType {
 	case "CPU":

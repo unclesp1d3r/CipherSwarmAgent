@@ -22,7 +22,7 @@ var DefaultProgressBar getter.ProgressTracker = &progressBar{}
 //
 // If two different instance of progressBar try to
 // display a progress only one will be displayed.
-// It is therefore recommended to use DefaultProgressBar
+// It is therefore recommended to use DefaultProgressBar.
 type progressBar struct {
 	// lock everything below
 	lock sync.Mutex

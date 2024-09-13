@@ -8,8 +8,7 @@
 
 # CipherSwarm Agent
 
-The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecosystem, designed to manage and execute
-distributed hash-cracking tasks efficiently. Built-in Go, this agent provides a robust solution for scaling and managing
+The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecosystem. It is designed to efficiently manage and execute distributed hash-cracking tasks. Built with Go, this agent provides a robust solution for scaling and managing
 cryptographic computations across the CipherSwarm network.
 
 ## Features
@@ -20,12 +19,12 @@ cryptographic computations across the CipherSwarm network.
   systems.
 - **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks
   efficiently.
-- **Secure Communication**: Ensures secure and reliable communication with the CipherSwarm server for task distribution
+- **Secure Communication**: Ensures safe and reliable communication with the CipherSwarm server for task distribution
   and result submission.
 
 > [!CAUTION]
-> This project is currently under active development and is not ready for production use. Please use it with
-> caution. Do not trust anything until v1.0.0 is released since the API may change anytime.
+> This project is currently under active development and is not ready for production. Please use it with
+> caution. Do not trust anything until v1.0.0 is released since the API may change at any time.
 
 ## Getting Started
 
@@ -35,7 +34,7 @@ Follow these instructions to set up and run the CipherSwarm Agent in your enviro
 
 - Go 1.22 or higher
 - Git (for cloning the repository)
-- Docker (optional, for running the agent in a container)
+- Docker (optional for running the agent in a container)
 - A [CipherSwarm](https://github.com/unclesp1d3r/CipherSwarm) server to connect to (e.g., a local or remote instance)
 
 ### Installation
@@ -55,7 +54,7 @@ go build -o cipherswarm-agent
 
 ### Configuration
 
-The easiest way to configure the agent is by providing the required parameters as environment variables. The 
+The easiest way to configure the agent is by providing the required parameters as environment variables. The
 following are
 the available configuration options:
 
@@ -68,18 +67,18 @@ the available configuration options:
 Optional configuration options include:
 
 - `DATA_PATH`: The path to the directory where the agent will store data, such as task files and results.
-  This is set to "data" by default in the current directory.
+  By default, this is set to "data" in the current directory.
 - `GPU_TEMP_THRESHOLD`: The temperature threshold for the GPU is degrees Celsius. If the GPU temperature exceeds this
   threshold, the agent will pause task execution until the temperature drops below the threshold. By default, this is
   set to 80 degrees Celsius.
 - `ALWAYS_USE_NATIVE_HASHCAT`: If set to true, the agent will always use the native hashcat binary on the local system
   for task execution, even if a custom binary is provided in the web interface. By default, this is set to false.
-- `SLEEP_ON_FAILURE`: A duration to sleep after a task failure. By default, this is set to 60 seconds.
+- `SLEEP_ON_FAILURE`: A duration of sleep after a task failure. By default, this is set to 60 seconds.
 - `FILES_PATH`: The path to the directory where the agent will store task files. This is set to "files" in
   the data directory by default. These files include wordlists, rules, and masks. They can get pretty big, so make sure
   you have
   enough space.
-- `EXTRA_DEBUGGING`: If set to true, the agent will print additional debugging information to the console. By default,
+- `EXTRA_DEBUGGING`: The agent will print additional debugging information to the console if set to true. By default,
   this is set to false.
 - `STATUS_TIMER`: The interval in seconds at which the agent will send status updates to the server. By default, this is
   set to 3 seconds. This can be increased to reduce the load on the server, but it will also reduce the agent's
@@ -87,19 +86,17 @@ Optional configuration options include:
 
 Optional configuration options for using the ZAP feature with a shared directory:
 
-- `WRITE_ZAPS_TO_FILE`: If set to true, the agent will write the zap output to a file in the zaps directory. By default,
+- `WRITE_ZAPS_TO_FILE`: The agent will write the zap output to a file in the zaps directory if set to true. By default,
   this is set to false. This is useful for debugging and sharing zap output with other clients via a shared directory.
-  The server will still prompt the agent to download the zap output files, but this can be useful if you want to share
-  the zap output with other clients.
-- `ZAP_PATH`: The path to the directory where the agent will store the zap output files. By default, this is set to "
-  zap" in the data directory. These files contain successful cracks, and setting this is sometimes used to allow
+  The server will still prompt the agent to download the Zap output files, but this can be useful if you want to share the Zap output with other clients.
+- `ZAP_PATH`: The path to the directory where the agent will store the zap output files. This is set to " zap" in the data directory by default. These files contain successful cracks, and setting this is sometimes used to allow
   multiple
   clients to share cracks via a shared directory rather than the server.
 - `RETAIN_ZAPS_ON_COMPLETION`: If set to true, the agent will retain the zap files after completing a task. Otherwise,
-  the zaps path contents are deleted upon completion of each task. By default, this is set to false.
+  the zap path contents are deleted upon completion of each task. By default, this is set to false.
 
 The agent will automatically create a configuration file in the same directory as the agent (`cipherswarmagent.yaml`)
-with the provided configuration options and default options that can be modified as needed.
+with the provided configuration options and default options that can be modified.
 
 ### Running the Agent
 
@@ -122,7 +119,7 @@ docker run -d -e API_TOKEN=your_api_token -e API_URL=https://cipherswarm.example
 ```
 
 This will start the agent in a Docker container, connecting it to the CipherSwarm network with Hashcat and other
-dependencies pre-installed.
+dependencies that have been pre-installed.
 
 ## Contributing
 
@@ -149,7 +146,7 @@ This project is licensed under the Apache License, Version 2.0 - see the [LICENS
 
 ## Acknowledgments
 
-- The CipherSwarm Team and community for their support and inspiration.
+- The CipherSwarm Team and community thank you for your support and inspiration.
 - The creators and maintainers of the Cobra library and GoReleaser for their fantastic tools.
 - The developers and contributors to the [PhatCrack](https://github.com/lachlan2k/phatcrack) project gave us
   hints and ideas for this project.

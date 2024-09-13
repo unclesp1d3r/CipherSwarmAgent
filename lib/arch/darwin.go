@@ -3,40 +3,56 @@
 package arch
 
 import (
+	"fmt"
 	"os/exec"
 	"regexp"
 
 	"github.com/duke-git/lancet/v2/strutil"
 )
 
-// GetDevices retrieves a list of devices using the system_profiler command.
-// It executes the "system_profiler SPDisplaysDataType -detaillevel mini" command
-// and parses the output to extract the Chipset Model information.
-// The function returns a slice of strings containing the Chipset Model of each device found.
-// If an error occurs during the execution of the command, an empty slice and the error are returned.
+// GetDevices retrieves a list of display device names on a macOS system.
+// It executes the "system_profiler" command to get display information and parses the output
+// to extract the chipset model names.
 //
-//goland:noinspection SpellCheckingInspection
+// Returns:
+//   - []string: A slice containing the names of the display devices.
+//   - error: An error object if the command execution or parsing fails.
 func GetDevices() ([]string, error) {
 	out, err := exec.Command("system_profiler", "SPDisplaysDataType", "-detaillevel", "mini").Output()
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
 
 	commandResult := string(out)
 	re := regexp.MustCompile(`Chipset Model: (.*)`)
 	matches := re.FindAllStringSubmatch(commandResult, -1)
+	if matches == nil {
+		return nil, fmt.Errorf("no display devices found")
+	}
 
 	var newArray []string //nolint:prealloc
 	for _, match := range matches {
-		newArray = append(newArray, strutil.Trim(match[1]))
+		if len(match) > 1 {
+			newArray = append(newArray, strutil.Trim(match[1]))
+		}
+	}
+
+	if len(newArray) == 0 {
+		return nil, fmt.Errorf("no valid display device names extracted")
 	}
 
 	return newArray, nil
 }
 
-// GetHashcatVersion returns the version of Hashcat installed at the specified path.
-// It executes the Hashcat command with the "--version" and "--quiet" flags and captures the output.
-// The version string is trimmed and returned along with any error that occurred during the execution.
+// GetHashcatVersion retrieves the version of Hashcat installed at the specified path.
+// It runs the Hashcat executable with the "--version" and "--quiet" flags and returns the output as a string.
+//
+// Parameters:
+//   - hashcatPath: The file path to the Hashcat executable.
+//
+// Returns:
+//   - A string representing the version of Hashcat.
+//   - An error if the command execution fails or if Hashcat is not found.
 func GetHashcatVersion(hashcatPath string) (string, error) {
 	out, err := exec.Command(hashcatPath, "--version", "--quiet").Output()
 	if err != nil {
@@ -46,26 +62,35 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 	return strutil.Trim(strutil.BytesToString(out)), nil
 }
 
-// Extract7z extracts the contents of a 7z archive file to the specified destination directory.
-// It uses the "7z" command-line tool to perform the extraction.
-// srcFile is the path to the 7z archive file.
-// destDir is the destination directory where the contents will be extracted.
-// Returns an error if the extraction fails.
+// Extract7z extracts the contents of a 7z archive to the specified destination directory.
+// It uses the `7z` command-line tool to perform the extraction.
 //
-//goland:noinspection GoLinter
+// Parameters:
+//   - srcFile: The path to the source 7z archive file.
+//   - destDir: The path to the destination directory where the contents will be extracted.
+//
+// Returns:
+//   - error: An error object if the extraction fails, otherwise nil.
 func Extract7z(srcFile string, destDir string) error {
 	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output() //nolint:gosec
 
 	return err
 }
 
-// GetDefaultHashcatBinaryName returns the default name of the Hashcat binary for the Darwin (macOS) platform.
+// GetDefaultHashcatBinaryName returns the default binary name for Hashcat on Darwin (macOS) systems.
+// This function is used to identify the standard executable name for Hashcat, which is "hashcat.bin".
 func GetDefaultHashcatBinaryName() string {
 	return "hashcat.bin"
 }
 
-// GetAdditionalHashcatArgs returns additional arguments to be passed to Hashcat.
-// In this case, it returns ["--backend-ignore-opencl"] to ignore OpenCL backend.
+// GetAdditionalHashcatArgs returns a slice of strings containing additional
+// arguments to be passed to Hashcat. Specifically, it includes an argument
+// to ignore OpenCL backend, which is useful for certain configurations
+// where OpenCL is not desired or supported.
+//
+// Returns:
+//
+//	[]string: A slice containing the additional Hashcat arguments.
 func GetAdditionalHashcatArgs() []string {
 	return []string{"--backend-ignore-opencl"}
 }

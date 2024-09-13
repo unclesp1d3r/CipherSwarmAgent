@@ -27,7 +27,7 @@ var (
 	scope       = gap.NewScope(gap.User, "CipherSwarm")
 )
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:     "cipherswarm-agent",
 	Version: lib.AgentVersion,
@@ -72,7 +72,7 @@ func init() {
 // - zap_path: Path to the zaps directory within the data directory (default: data_path + "/zaps")
 // - retain_zaps_on_completion: Flag to retain zaps on completion (default: false)
 // - enable_additional_hash_types: Flag to enable additional hash types when benchmarking (default: true)
-// - use_legacy_device_technique: Flag to use the legacy device technique (default: false)
+// - use_legacy_device_technique: Flag to use the legacy device technique (default: false).
 func setDefaultConfigValues() {
 	cwd, err := os.Getwd()
 	cobra.CheckErr(err)
@@ -228,7 +228,10 @@ func startAgent(_ *cobra.Command, _ []string) {
 	if err := fetchAgentConfig(); err != nil {
 		shared.Logger.Fatal("Failed to fetch agent configuration", "error", err)
 	}
-	lib.UpdateAgentMetadata()
+	err := lib.UpdateAgentMetadata()
+	if err != nil {
+		return // Error already logged
+	}
 	shared.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
@@ -248,7 +251,7 @@ func startAgent(_ *cobra.Command, _ []string) {
 	lib.DisplayShuttingDown()
 }
 
-// cleanupLockFile removes the PID file during shutdown
+// cleanupLockFile removes the PID file during shutdown.
 func cleanupLockFile(pidFile string) {
 	shared.Logger.Debug("Cleaning up PID file", "path", pidFile)
 	if err := fileutil.RemoveFile(pidFile); err != nil {
@@ -309,12 +312,12 @@ func handleReload() {
 		lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
 	}
 	shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
-	lib.UpdateBenchmarks()
+	_ = lib.UpdateBenchmarks() // Ignore error, as it is already logged and we can continue
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
 	shared.State.Reload = false
 }
 
-// handleCrackerUpdate updates the cracker if not using native Hashcat
+// handleCrackerUpdate updates the cracker if not using native Hashcat.
 func handleCrackerUpdate() {
 	shared.State.CurrentActivity = shared.CurrentActivityUpdating
 	lib.UpdateCracker()
@@ -331,11 +334,12 @@ func handleNewTask() {
 	if err != nil {
 		shared.Logger.Error("Failed to get new task", "error", err)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
+
 		return
 	}
 
 	if task != nil {
-		processTask(task)
+		_ = processTask(task) // Ignore error, as it is already logged and we can continue
 	} else {
 		shared.Logger.Info("No new task available")
 	}
@@ -349,7 +353,7 @@ func handleNewTask() {
 //
 // Parameters:
 //   - task (*components.Task): The task to be processed.
-func processTask(task *components.Task) {
+func processTask(task *components.Task) error {
 	shared.State.CurrentActivity = shared.CurrentActivityCracking
 	lib.DisplayNewTask(task)
 
@@ -359,15 +363,19 @@ func processTask(task *components.Task) {
 		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
-		return
+
+		return err
 	}
 
 	lib.DisplayNewAttack(attack)
 
-	if !lib.AcceptTask(task) {
+	err = lib.AcceptTask(task)
+	if err != nil {
 		shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
-		return
+
+		return err
 	}
+
 	lib.DisplayRunTaskAccepted(task)
 
 	if err := lib.DownloadFiles(attack); err != nil {
@@ -375,11 +383,17 @@ func processTask(task *components.Task) {
 		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
-		return
+
+		return err
 	}
 
-	lib.RunTask(task, attack)
+	err = lib.RunTask(task, attack)
+	if err != nil {
+		return err
+	}
 	shared.State.CurrentActivity = shared.CurrentActivityWaiting
+
+	return nil
 }
 
 // heartbeat sends a heartbeat signal and handles the response.
