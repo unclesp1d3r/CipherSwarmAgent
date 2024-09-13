@@ -1,3 +1,25 @@
+
+<a name="v0.5.4"></a>
+
+## [v0.5.4](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.5.3...v0.5.4)
+
+> 2024-09-12
+
+### Code Refactoring
+
+* Heavily cleanup and optimization.
+
+* Refactored the agentClient
+
+
+### Features
+
+* Added initial Windows client support
+
+  This is very experimental and has not been adequately tested. Since we haven’t tested it, use caution in this version. I firmly recommend not using the legacy device detection mode.
+
+
+
 <a name="v0.5.3"></a>
 
 ## [v0.5.3](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.5.2...v0.5.3)
@@ -8,6 +30,7 @@
 
 * Finished enabling support for opencl-devices
 
+
 ### Code Refactoring
 
 * Code changes to try and make golangci-lint happy
@@ -16,18 +39,18 @@
 
 * Minor code cleanup
 
+
 ### Features
 
 * Devices are now identified using hashcat rather than a brittle shell script
 
-  The system now runs a tiny attack job upon the agent’s startup, which verifies that the hashcat is working correctly
-  and then identifies the devices detected by the hashcat. This is much more accurate than the legacy technique since it
-  conforms to what hashcat will actually use.
+  The system now runs a tiny attack job upon the agent’s startup, which verifies that the hashcat is working correctly and then identifies the devices detected by the hashcat. This is much more accurate than the legacy technique since it conforms to what hashcat will actually use.
 
 * Added automatic hashcat capability
 
-  The hashcat session will be stored in the data directory, and if one is detected, it will automatically attempt to
-  resume it when starting the attack. When the attack is complete, the restore file will be removed.
+  The hashcat session will be stored in the data directory, and if one is detected, it will automatically attempt to resume it when starting the attack. When the attack is complete, the restore file will be removed.
+
+
 
 <a name="v0.5.2"></a>
 
@@ -39,13 +62,13 @@
 
 * Fixed an issue causing SegFaults on weird HTTP errors
 
-  There was a condition where an HTTP error outside of the 4XX and 5XX range could cause a seg fault. I added more error
-  checking to ensure that it only throws a verbose error and doesn’t crash the agent.
+  There was a condition where an HTTP error outside of the 4XX and 5XX range could cause a seg fault. I added more error checking to ensure that it only throws a verbose error and doesn’t crash the agent.
 
 * Fixed an issue causing SegFaults on weird HTTP errors
 
-  There was a condition where an HTTP error outside of the 4XX and 5XX range could cause a seg fault. I added more error
-  checking to ensure that it only throws a verbose error and doesn’t crash the agent.
+  There was a condition where an HTTP error outside of the 4XX and 5XX range could cause a seg fault. I added more error checking to ensure that it only throws a verbose error and doesn’t crash the agent.
+
+
 
 <a name="v0.5.1"></a>
 
@@ -57,6 +80,8 @@
 
 * Added significant error checking to client to prevent nil crashes
 
+
+
 <a name="v0.5.0"></a>
 
 ## [v0.5.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.4.2...v0.5.0)
@@ -66,6 +91,8 @@
 ### Features
 
 * Added support for mask list files from v0.5.0 of API
+
+
 
 <a name="v0.4.2"></a>
 
@@ -79,9 +106,12 @@
 
   The API was refactored, introducing breaking changes in the SDK, so we needed to rename some packages and objects.
 
+
 ### Code Refactoring
 
 * Minor cleanup to meet formatting standards
+
+
 
 <a name="v0.4.1"></a>
 
@@ -93,10 +123,9 @@
 
 * Automatic benchmark now performs all hash types
 
-  Since the benchmarking function determines what hash types this agent supports, we needed to change the feature to
-  benchmark all hash types, not just the common ones. The agent’s initial startup is significantly slower now but
-  supports more functionality. This can be turned off by setting `enable_additional_hash_types: false` in the agent
-  config.
+  Since the benchmarking function determines what hash types this agent supports, we needed to change the feature to benchmark all hash types, not just the common ones. The agent’s initial startup is significantly slower now but supports more functionality. This can be turned off by setting `enable_additional_hash_types: false` in the agent config.
+
+
 
 <a name="v0.4.0"></a>
 
@@ -110,8 +139,9 @@
 
   This enables running tasks to be notified of hashes cracked in another task and pause tasks currently running.
 
-We also added support for using a shared directory as a zap synchronization point. If configured, cracked hashes will be
-written to a directory, and the client will monitor that directory for new zaps.
+We also added support for using a shared directory as a zap synchronization point. If configured, cracked hashes will be written to a directory, and the client will monitor that directory for new zaps.
+
+
 
 <a name="v0.3.1"></a>
 
@@ -123,6 +153,8 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Tasks are accepted before the downloads start
 
+
+
 <a name="v0.3"></a>
 
 ## [v0.3](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.8...v0.3)
@@ -133,8 +165,7 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Fixed issue with always_use_native_hashcat on server messing up the client
 
-  When the server setting was set for the agent, the agent was not finding hashcat, but also not allowing it to be set
-  via config or environment variable.
+  When the server setting was set for the agent, the agent was not finding hashcat, but also not allowing it to be set via config or environment variable.
 
 * Removed exessive output in standard debugging
 
@@ -142,9 +173,12 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Replaced tail library with one still maintained
 
+
 ### Features
 
 * Add support for zaps
+
+
 
 <a name="v0.2.8"></a>
 
@@ -156,6 +190,8 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Added more checking for null tasks or attacks
 
+
+
 <a name="v0.2.7"></a>
 
 ## [v0.2.7](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.6...v0.2.7)
@@ -165,6 +201,8 @@ written to a directory, and the client will monitor that directory for new zaps.
 ### Code Refactoring
 
 * Moved utility code out of agentClient.go
+
+
 
 <a name="v0.2.6"></a>
 
@@ -176,6 +214,8 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Correctly handle when a running task is deleted
 
+
+
 <a name="v0.2.5"></a>
 
 ## [v0.2.5](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.2.4...v0.2.5)
@@ -186,8 +226,9 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Fix incorrect status and benchmark output
 
-  The benchmark was incorrectly sending the time in ms to complete a hash instead of the number of hashes per second.
-  Additionally, the cracked count was always 2, which wrong.
+  The benchmark was incorrectly sending the time in ms to complete a hash instead of the number of hashes per second. Additionally, the cracked count was always 2, which wrong.
+
+
 
 <a name="v0.2.4"></a>
 
@@ -201,11 +242,14 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Docker now finds hashcat correctly
 
+
 ### Features
 
 * Added the ability to override checking checksums
 
   This is useful when you set the data directory to be a network share
+
+
 
 <a name="v0.2.3"></a>
 
@@ -219,11 +263,14 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Docker now finds hashcat correctly
 
+
 ### Features
 
 * Added the ability to override checking checksums
 
   This is useful when you set the data directory to be a network share
+
+
 
 <a name="v0.2.2"></a>
 
@@ -242,6 +289,8 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Handle failure of getting agent config
 
+
+
 <a name="v0.2.0"></a>
 
 ## [v0.2.0](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.11...v0.2.0)
@@ -251,6 +300,7 @@ written to a directory, and the client will monitor that directory for new zaps.
 ### Bug Fixes
 
 * Download files are now compare checksums correctly
+
 
 ### Features
 
@@ -264,6 +314,8 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Added error metadata
 
+
+
 <a name="v0.1.11"></a>
 
 ## [v0.1.11](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.1.10...v0.1.11)
@@ -276,6 +328,7 @@ written to a directory, and the client will monitor that directory for new zaps.
 
   Fixed the bug where the agent died if there was a dangling lock.pid
 
+
 ### Features
 
 * Add support for the agent error API
@@ -284,7 +337,9 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Add parallel file downloads
 
-  Replaced the word and rule file downloads to use go-getter in parallel using go routines
+  Replaced  the word and rule file downloads to use go-getter in parallel using go routines
+
+
 
 <a name="v0.1.10"></a>
 
@@ -296,7 +351,9 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Add parallel file downloads
 
-  Replaced the word and rule file downloads to use go-getter in parallel using go routines
+  Replaced  the word and rule file downloads to use go-getter in parallel using go routines
+
+
 
 <a name="v0.1.9"></a>
 
@@ -309,6 +366,8 @@ written to a directory, and the client will monitor that directory for new zaps.
 * Move to v0.2.0 of the SDK
 
   Version 0.2.0 introduced major breaking changes.
+
+
 
 <a name="v0.1.8"></a>
 
@@ -329,9 +388,12 @@ written to a directory, and the client will monitor that directory for new zaps.
 
 * Fix git-chglog missing config_dir
 
+
 ### Code Refactoring
 
 * Update to latest Agent SDK v0.1.9
+
+
 
 <a name="v0.1.6"></a>
 
@@ -342,6 +404,8 @@ written to a directory, and the client will monitor that directory for new zaps.
 ### Features
 
 * Added improved changelog support
+
+
 
 <a name="v0.1.5"></a>
 
