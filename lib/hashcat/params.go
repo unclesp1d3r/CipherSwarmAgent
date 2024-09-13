@@ -33,37 +33,58 @@ type Params struct {
 	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to the restore file
 }
 
-// Validate checks if the parameters for the attack mode are valid.
-// It returns an error if the parameters are invalid, or nil if they are valid.
+// Validate checks the Params struct for valid attack mode configurations.
+// It validates the parameters based on the specified attack mode and returns
+// an error if the attack mode is unsupported or if the parameters are invalid
+// for the given attack mode.
+//
+// Supported attack modes:
+// - attackModeDictionary: Validates dictionary attack parameters.
+// - AttackModeMask: Validates mask attack parameters.
+// - attackModeHybridDM, attackModeHybridMD: Validates hybrid attack parameters.
+// - AttackBenchmark: No validation needed.
+//
+// Returns an error if the attack mode is unsupported or if validation fails.
 func (params Params) Validate() error {
 	switch params.AttackMode {
 	case attackModeDictionary:
-		if strutil.IsBlank(params.WordListFilename) {
-			return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", attackModeDictionary)
-		}
-
+		return validateDictionaryAttack(params)
 	case AttackModeMask:
-		if strutil.IsBlank(params.Mask) && strutil.IsBlank(params.MaskListFilename) {
-			return fmt.Errorf("using mask attack (%d), but no mask was given", AttackModeMask)
-		}
-
-		if strutil.IsNotBlank(params.Mask) && strutil.IsNotBlank(params.MaskListFilename) {
-			return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", AttackModeMask)
-		}
-
+		return validateMaskAttack(params)
 	case attackModeHybridDM, attackModeHybridMD:
-		if params.Mask == "" {
-			return fmt.Errorf("using hybrid attack (%d), but no mask was given", params.AttackMode)
-		}
-		if strutil.IsBlank(params.WordListFilename) {
-			return fmt.Errorf("expected 1 wordlist for hybrid attack (%d), but none given", attackModeDictionary)
-		}
+		return validateHybridAttack(params)
 	case AttackBenchmark:
-		// No additional validation needed
 		return nil
-
 	default:
 		return fmt.Errorf("unsupported attack mode %d", params.AttackMode)
+	}
+}
+
+func validateDictionaryAttack(params Params) error {
+	if strutil.IsBlank(params.WordListFilename) {
+		return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", attackModeDictionary)
+	}
+
+	return nil
+}
+
+func validateMaskAttack(params Params) error {
+	if strutil.IsBlank(params.Mask) && strutil.IsBlank(params.MaskListFilename) {
+		return fmt.Errorf("using mask attack (%d), but no mask was given", AttackModeMask)
+	}
+	if strutil.IsNotBlank(params.Mask) && strutil.IsNotBlank(params.MaskListFilename) {
+		return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", AttackModeMask)
+	}
+
+	return nil
+}
+
+func validateHybridAttack(params Params) error {
+	if strutil.IsBlank(params.Mask) {
+		return fmt.Errorf("using hybrid attack (%d), but no mask was given", params.AttackMode)
+	}
+	if strutil.IsBlank(params.WordListFilename) {
+		return fmt.Errorf("expected 1 wordlist for hybrid attack (%d), but none given", params.AttackMode)
 	}
 
 	return nil
@@ -75,15 +96,14 @@ func (params Params) Validate() error {
 // It also handles the mask increment option and its corresponding minimum and maximum values.
 // The returned arguments can be used directly in the command line when invoking Hashcat.
 func (params Params) maskArgs() ([]string, error) {
-	maxCharsets := 4
+	const maxCharsets = 4
 	if len(params.MaskCustomCharsets) > maxCharsets {
 		return nil, fmt.Errorf("too many custom charsets supplied (%d), the max is %d", len(params.MaskCustomCharsets), maxCharsets)
 	}
 
-	var args []string
+	args := make([]string, 0, len(params.MaskCustomCharsets)*2+6)
 
 	for i, charset := range params.MaskCustomCharsets {
-		// Hashcat accepts parameters --custom-charset1 to --custom-charset4
 		if strutil.IsNotBlank(charset) {
 			args = append(args, fmt.Sprintf("--custom-charset%d", i+1), charset)
 		}
@@ -91,11 +111,9 @@ func (params Params) maskArgs() ([]string, error) {
 
 	if params.MaskIncrement {
 		args = append(args, "--increment")
-
 		if params.MaskIncrementMin > 0 {
 			args = append(args, "--increment-min", convertor.ToString(params.MaskIncrementMin))
 		}
-
 		if params.MaskIncrementMax > 0 {
 			args = append(args, "--increment-max", convertor.ToString(params.MaskIncrementMax))
 		}
@@ -104,16 +122,26 @@ func (params Params) maskArgs() ([]string, error) {
 	return args, nil
 }
 
-// toCmdArgs converts the Params struct into a slice of command-line arguments for the hashcat command.
-// It takes the session name, hash file path, and output file path as input parameters.
-// It returns the generated command-line arguments and any error encountered during the conversion.
+// toCmdArgs generates the command-line arguments for running Hashcat based on the provided parameters.
+// It validates the parameters and constructs the appropriate arguments for either benchmark mode or full attack mode.
 //
-//nolint:funlen
-func (params Params) toCmdArgs(session, hashFile string, outFile string) (args []string, err error) {
-	if err = params.Validate(); err != nil {
-		return
+// Parameters:
+//   - session: A string representing the session name.
+//   - hashFile: A string representing the path to the hash file.
+//   - outFile: A string representing the path to the output file.
+//
+// Returns:
+//   - A slice of strings containing the command-line arguments.
+//   - An error if the parameters are invalid or if required files cannot be found.
+//
+// The function handles different attack modes and includes additional arguments based on the parameters provided.
+// It ensures that required files such as word lists, rule lists, and mask lists exist before including them in the arguments.
+func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, error) {
+	if err := params.Validate(); err != nil {
+		return nil, err
 	}
 
+	args := make([]string, 0, 32)
 	if params.AttackMode == AttackBenchmark {
 		args = append(
 			args,
@@ -133,7 +161,7 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 			args = append(args, "--benchmark-all")
 		}
 
-		return // No need to for further arguments for benchmark mode
+		return args, nil
 	}
 
 	// For full attack mode, we have many more arguments to add
@@ -178,9 +206,9 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	if strutil.IsNotBlank(params.WordListFilename) {
 		wordList := filepath.Join(shared.State.FilePath, filepath.Clean(params.WordListFilename))
 		if !fileutil.IsExist(wordList) {
-			err = fmt.Errorf("provided word list %q couldn't be opened on filesystem", wordList)
+			err := fmt.Errorf("provided word list %q couldn't be opened on filesystem", wordList)
 
-			return
+			return nil, err
 		}
 		params.WordListFilename = wordList // Update the path to the word list
 	}
@@ -188,9 +216,9 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	if strutil.IsNotBlank(params.RuleListFilename) {
 		ruleList := filepath.Join(shared.State.FilePath, filepath.Clean(params.RuleListFilename))
 		if !fileutil.IsExist(ruleList) {
-			err = fmt.Errorf("provided rule list %q couldn't be opened on filesystem", ruleList)
+			err := fmt.Errorf("provided rule list %q couldn't be opened on filesystem", ruleList)
 
-			return
+			return nil, err
 		}
 		params.RuleListFilename = ruleList // Update the path to the rule list
 	}
@@ -199,9 +227,9 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 	if strutil.IsNotBlank(params.MaskListFilename) {
 		maskList := filepath.Join(shared.State.FilePath, filepath.Clean(params.MaskListFilename))
 		if !fileutil.IsExist(maskList) {
-			err = fmt.Errorf("provided mask list %q couldn't be opened on filesystem", maskList)
+			err := fmt.Errorf("provided mask list %q couldn't be opened on filesystem", maskList)
 
-			return
+			return nil, err
 		}
 		params.Mask = maskList // Update the path to the mask list
 	}
@@ -243,16 +271,24 @@ func (params Params) toCmdArgs(session, hashFile string, outFile string) (args [
 		args = append(args, "--opencl-device-types", params.OpenCLDevices)
 	}
 
-	return
+	return args, nil
 }
 
-func (params Params) toRestoreArgs(session string) (args []string) {
-	// We need a few arguments from standard attacks
-	args = append(args, "--session", "attack-"+session)
-
-	// Add the restore file path and the restore flag
-	args = append(args, "--restore-file-path", params.RestoreFilePath)
-	args = append(args, "--restore")
-
-	return args
+// toRestoreArgs generates a slice of strings containing the arguments
+// needed to restore a Hashcat session. It takes a session string as input
+// and returns a slice of strings with the appropriate restore arguments.
+//
+// Parameters:
+//
+//	session (string): The session identifier to be used in the restore arguments.
+//
+// Returns:
+//
+//	[]string: A slice of strings containing the restore arguments for Hashcat.
+func (params Params) toRestoreArgs(session string) []string {
+	return []string{
+		"--session", "attack-" + session,
+		"--restore-file-path", params.RestoreFilePath,
+		"--restore",
+	}
 }

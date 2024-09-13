@@ -27,34 +27,18 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 
 		return nil, true
 	}
+
 	var benchmarkResults []benchmarkResult
 	waitChan := make(chan int)
+
 	go func() {
-	procLoop:
+		defer close(waitChan)
 		for {
 			select {
 			case stdOutLine := <-sess.StdoutLines:
-				fields := strings.Split(stdOutLine, ":")
-				if len(fields) != 6 {
-					shared.Logger.Debug("Unknown benchmark line", "line", stdOutLine)
-				} else {
-					result := benchmarkResult{
-						Device:     fields[0],
-						HashType:   fields[1],
-						RuntimeMs:  fields[3],
-						HashTimeMs: fields[4],
-						SpeedHs:    fields[5],
-					}
-					displayBenchmark(result)
-					benchmarkResults = append(benchmarkResults, result)
-				}
-
+				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults)
 			case stdErrLine := <-sess.StderrMessages:
-				displayBenchmarkError(stdErrLine)
-				// Ignore empty lines
-				if strutil.IsNotBlank(stdErrLine) {
-					SendAgentError(stdErrLine, nil, operations.SeverityWarning)
-				}
+				handleBenchmarkStdErrLine(stdErrLine)
 			case statusUpdate := <-sess.StatusUpdates:
 				shared.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
 			case crackedHash := <-sess.CrackedHashes:
@@ -65,14 +49,40 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 					SendAgentError(err.Error(), nil, operations.SeverityFatal)
 				}
 
-				break procLoop
+				return
 			}
 		}
-		waitChan <- 1
 	}()
+
 	<-waitChan
 
 	return benchmarkResults, false
+}
+
+func handleBenchmarkStdOutLine(line string, results *[]benchmarkResult) {
+	fields := strings.Split(line, ":")
+	if len(fields) != 6 {
+		shared.Logger.Debug("Unknown benchmark line", "line", line)
+
+		return
+	}
+
+	result := benchmarkResult{
+		Device:     fields[0],
+		HashType:   fields[1],
+		RuntimeMs:  fields[3],
+		HashTimeMs: fields[4],
+		SpeedHs:    fields[5],
+	}
+	displayBenchmark(result)
+	*results = append(*results, result)
+}
+
+func handleBenchmarkStdErrLine(line string) {
+	displayBenchmarkError(line)
+	if strutil.IsNotBlank(line) {
+		SendAgentError(line, nil, operations.SeverityWarning)
+	}
 }
 
 // runAttackTask starts an attack session using the provided hashcat session and task.
@@ -91,9 +101,6 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 //	sess := hashcat.NewSession()
 //	task := components.NewTask()
 //	RunAttackTask(sess, task)
-//
-//nolint:funlen
-//nolint:gocognit
 func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
@@ -102,67 +109,85 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 
 		return
 	}
+
 	waitChan := make(chan int)
 	go func() {
-	runLoop:
+		defer close(waitChan)
 		for {
 			select {
 			case stdoutLine := <-sess.StdoutLines:
-				if validator.IsJSON(stdoutLine) {
-					update := hashcat.Status{}
-					err := json.Unmarshal([]byte(stdoutLine), &update)
-					if err != nil {
-						shared.Logger.Error("Failed to parse status update", "error", err)
-					} else {
-						displayJobStatus(update)
-						sendStatusUpdate(update, task, sess)
-					}
-				}
+				handleStdOutLine(stdoutLine, task, sess)
 			case stdErrLine := <-sess.StderrMessages:
-				displayJobError(stdErrLine)
-				if strutil.IsNotBlank(stdErrLine) {
-					SendAgentError(stdErrLine, task, operations.SeverityMinor)
-				}
+				handleStdErrLine(stdErrLine, task)
 			case statusUpdate := <-sess.StatusUpdates:
-				displayJobStatus(statusUpdate)
-				sendStatusUpdate(statusUpdate, task, sess)
+				handleStatusUpdate(statusUpdate, task, sess)
 			case crackedHash := <-sess.CrackedHashes:
-				displayJobCrackedHash(crackedHash)
-				sendCrackedHash(crackedHash, task)
+				handleCrackedHash(crackedHash, task)
 			case err := <-sess.DoneChan:
-				if err != nil {
-					if err.Error() == "exit status 1" {
-						// Exit status 1 means we exhausted the task. Mark it as such.
-						// This is fine and expected.
-						displayJobExhausted()
-						markTaskExhausted(task)
-					} else {
-						// If we get any other exit status, it's an error.
-						if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
-							// This is a special case where hashcat failed to read the restore file. We
-							// should remove the restore file and try again.
-							if strutil.IsNotBlank(sess.RestoreFilePath) {
-								shared.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
-								err := fileutil.RemoveFile(sess.RestoreFilePath)
-								if err != nil {
-									shared.Logger.Error("Failed to remove restore file", "error", err)
-								}
-							}
-						} else {
-							// Something went wrong and we failed. Send a critical error.
-							SendAgentError(err.Error(), task, operations.SeverityCritical)
-							displayJobFailed(err)
-						}
-					}
-				}
-				sess.Cleanup() // Clean up the session
+				handleDoneChan(err, task, sess)
 
-				break runLoop
+				return
 			}
 		}
-		waitChan <- 1
 	}()
 	<-waitChan
+}
+
+func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Session) {
+	if validator.IsJSON(stdoutLine) {
+		update := hashcat.Status{}
+		err := json.Unmarshal([]byte(stdoutLine), &update)
+		if err != nil {
+			shared.Logger.Error("Failed to parse status update", "error", err)
+		} else {
+			displayJobStatus(update)
+			sendStatusUpdate(update, task, sess)
+		}
+	}
+}
+
+func handleStdErrLine(stdErrLine string, task *components.Task) {
+	displayJobError(stdErrLine)
+	if strutil.IsNotBlank(stdErrLine) {
+		SendAgentError(stdErrLine, task, operations.SeverityMinor)
+	}
+}
+
+func handleStatusUpdate(statusUpdate hashcat.Status, task *components.Task, sess *hashcat.Session) {
+	displayJobStatus(statusUpdate)
+	sendStatusUpdate(statusUpdate, task, sess)
+}
+
+func handleCrackedHash(crackedHash hashcat.Result, task *components.Task) {
+	displayJobCrackedHash(crackedHash)
+	sendCrackedHash(crackedHash, task)
+}
+
+func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
+	if err != nil {
+		if err.Error() == "exit status 1" {
+			displayJobExhausted()
+			markTaskExhausted(task)
+		} else {
+			handleNonExhaustedError(err, task, sess)
+		}
+	}
+	sess.Cleanup()
+}
+
+func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session) {
+	if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
+		if strutil.IsNotBlank(sess.RestoreFilePath) {
+			shared.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
+			err := fileutil.RemoveFile(sess.RestoreFilePath)
+			if err != nil {
+				shared.Logger.Error("Failed to remove restore file", "error", err)
+			}
+		}
+	} else {
+		SendAgentError(err.Error(), task, operations.SeverityCritical)
+		displayJobFailed(err)
+	}
 }
 
 // runTestTask runs a test session using the provided hashcat session.
@@ -187,49 +212,56 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 
 	var testResults *hashcat.Status
 	var errorResult error
-	waitChan := make(chan int)
+	waitChan := make(chan struct{})
+
 	go func() {
-	runLoop:
+		defer close(waitChan)
 		for {
 			select {
 			case stdoutLine := <-sess.StdoutLines:
-				// If we're not getting JSON, which should be sent to the status updates channel, then log it
-				if !validator.IsJSON(stdoutLine) {
-					shared.Logger.Error("Failed to parse status update", "output", stdoutLine)
-				}
+				handleTestStdOutLine(stdoutLine)
 			case stdErrLine := <-sess.StderrMessages:
-				if strutil.IsNotBlank(stdErrLine) {
-					SendAgentError(stdErrLine, nil, operations.SeverityMinor)
-					errorResult = errors.New(stdErrLine)
-				}
+				handleTestStdErrLine(stdErrLine, &errorResult)
 			case statusUpdate := <-sess.StatusUpdates:
-				// We should get only a single status update, which we'll return
 				testResults = &statusUpdate
 			case crackedHash := <-sess.CrackedHashes:
-				// We don't care about cracked hashes in this case
-				if strutil.IsBlank(crackedHash.Plaintext) {
-					errorResult = errors.New("received empty cracked hash")
-				}
+				handleTestCrackedHash(crackedHash, &errorResult)
 			case err := <-sess.DoneChan:
-				if err != nil {
-					if err.Error() != "exit status 1" {
-						// If we get any other exit status, it's an error.
-						// Something went wrong and we failed. Send a critical error.
-						SendAgentError(err.Error(), nil, operations.SeverityCritical)
-						errorResult = err
-					}
-					// Exit status 1 means we exhausted the task. Mark it as such.
-					// This is fine and expected.
-					// We don't care in this case, since we just want to see if hashcat will work.
-				}
-				sess.Cleanup() // Clean up the session
+				handleTestDoneChan(err, &errorResult)
+				sess.Cleanup()
 
-				break runLoop
+				return
 			}
 		}
-		waitChan <- 1
 	}()
+
 	<-waitChan
 
 	return testResults, errorResult
+}
+
+func handleTestStdOutLine(stdoutLine string) {
+	if !validator.IsJSON(stdoutLine) {
+		shared.Logger.Error("Failed to parse status update", "output", stdoutLine)
+	}
+}
+
+func handleTestStdErrLine(stdErrLine string, errorResult *error) {
+	if strutil.IsNotBlank(stdErrLine) {
+		SendAgentError(stdErrLine, nil, operations.SeverityMinor)
+		*errorResult = errors.New(stdErrLine)
+	}
+}
+
+func handleTestCrackedHash(crackedHash hashcat.Result, errorResult *error) {
+	if strutil.IsBlank(crackedHash.Plaintext) {
+		*errorResult = errors.New("received empty cracked hash")
+	}
+}
+
+func handleTestDoneChan(err error, errorResult *error) {
+	if err != nil && err.Error() != "exit status 1" {
+		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+		*errorResult = err
+	}
 }
