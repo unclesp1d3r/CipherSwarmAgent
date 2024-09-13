@@ -1,4 +1,4 @@
-// Package cmd /*
+// Package cmd
 package cmd
 
 import (
@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
@@ -51,22 +52,44 @@ func init() {
 	err := viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	cobra.CheckErr(err)
 
+	setDefaultConfigValues()
+}
+
+// setDefaultConfigValues sets the default configuration values for the application using Viper.
+// It initializes various configuration parameters such as paths, thresholds, and flags with their default values.
+// The function retrieves the current working directory and uses it to set default paths for data, files, and zaps.
+//
+// Default configuration values set by this function:
+// - data_path: Path to the data directory (default: current working directory + "/data")
+// - gpu_temp_threshold: GPU temperature threshold (default: 80)
+// - always_use_native_hashcat: Flag to always use native hashcat (default: false)
+// - sleep_on_failure: Sleep time on failure (default: 60 seconds)
+// - always_trust_files: Flag to always trust files (default: false)
+// - files_path: Path to the files directory within the data directory (default: data_path + "/files")
+// - extra_debugging: Flag to enable extra debugging (default: false)
+// - status_timer: Status timer in seconds (default: 3)
+// - write_zaps_to_file: Flag to write zaps to file (default: false)
+// - zap_path: Path to the zaps directory within the data directory (default: data_path + "/zaps")
+// - retain_zaps_on_completion: Flag to retain zaps on completion (default: false)
+// - enable_additional_hash_types: Flag to enable additional hash types when benchmarking (default: true)
+// - use_legacy_device_technique: Flag to use the legacy device technique (default: false)
+func setDefaultConfigValues() {
 	cwd, err := os.Getwd()
 	cobra.CheckErr(err)
 
-	viper.SetDefault("data_path", path.Join(cwd, "data"))                            // Set the default data path
-	viper.SetDefault("gpu_temp_threshold", 80)                                       // Set the default GPU temperature threshold
-	viper.SetDefault("always_use_native_hashcat", false)                             // Set the default to not always use native hashcat
-	viper.SetDefault("sleep_on_failure", 60*time.Second)                             // Set the default sleep time on failure
-	viper.SetDefault("always_trust_files", false)                                    // Set the default to not always trust files
-	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files")) // Set the default files path in the data directory if not set
-	viper.SetDefault("extra_debugging", false)                                       // Set the default to not enable extra debugging
-	viper.SetDefault("status_timer", 3)                                              // Set the default status timer in seconds
-	viper.SetDefault("write_zaps_to_file", false)                                    // Set the default to not write zaps to file
-	viper.SetDefault("zap_path", path.Join(viper.GetString("data_path"), "zaps"))    // Set the default zaps path in the data directory if not set
-	viper.SetDefault("retain_zaps_on_completion", false)                             // Set the default to not retain zaps on completion
-	viper.SetDefault("enable_additional_hash_types", true)                           // Set the default to enable additional hash types when benchmarking
-	viper.SetDefault("use_legacy_device_technique", false)                           // Set the default to not use the legacy device technique
+	viper.SetDefault("data_path", path.Join(cwd, "data"))
+	viper.SetDefault("gpu_temp_threshold", 80)
+	viper.SetDefault("always_use_native_hashcat", false)
+	viper.SetDefault("sleep_on_failure", 60*time.Second)
+	viper.SetDefault("always_trust_files", false)
+	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files"))
+	viper.SetDefault("extra_debugging", false)
+	viper.SetDefault("status_timer", 3)
+	viper.SetDefault("write_zaps_to_file", false)
+	viper.SetDefault("zap_path", path.Join(viper.GetString("data_path"), "zaps"))
+	viper.SetDefault("retain_zaps_on_completion", false)
+	viper.SetDefault("enable_additional_hash_types", true)
+	viper.SetDefault("use_legacy_device_technique", false)
 }
 
 // setupSharedState initializes the shared state of the application.
@@ -110,46 +133,58 @@ func initConfig() {
 	shared.ErrorLogger.SetReportCaller(true)
 
 	home, err := os.UserConfigDir()
-	cobra.CheckErr(err) // Check for errors
+	cobra.CheckErr(err)
 
-	cwd, err := os.Getwd()   // Get the current working directory
-	cobra.CheckErr(err)      // Check for errors
-	viper.AddConfigPath(cwd) // Add the current working directory to the configuration path
+	cwd, err := os.Getwd()
+	cobra.CheckErr(err)
+	viper.AddConfigPath(cwd)
 
 	configDirs, err := scope.ConfigDirs()
-	cobra.CheckErr(err)              // Check for errors
-	for _, dir := range configDirs { // Add the config directories to the configuration path
-		shared.Logger.Info("Adding config path", "path", dir)
+	cobra.CheckErr(err)
+	for _, dir := range configDirs {
+		viper.AddConfigPath(dir)
 	}
 
-	viper.AddConfigPath(home)               // Add the home directory to the configuration path
-	viper.SetConfigType("yaml")             // Set the configuration type to YAML
-	viper.SetConfigName("cipherswarmagent") // Set the configuration name
+	viper.AddConfigPath(home)
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("cipherswarmagent")
 
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.AutomaticEnv()
 
-	// If a config file is found, read it in. Otherwise, write a new one.
 	if err := viper.ReadInConfig(); err == nil {
 		shared.Logger.Info("Using config file", "config_file", viper.ConfigFileUsed())
 	} else {
-		err := viper.SafeWriteConfig()
-		if err != nil {
-			if err.Error() != "config file already exists" {
-				shared.Logger.Error("Error writing config file: ", "error", err)
-			}
+		shared.Logger.Warn("No config file found, attempting to write a new one")
+		if err := viper.SafeWriteConfig(); err != nil && err.Error() != "config file already exists" {
+			shared.Logger.Error("Error writing config file", "error", err)
 		}
 	}
 }
 
-// startAgent is a function that starts the CipherSwarm Agent.
+// startAgent initializes and starts the CipherSwarm agent. It performs the following steps:
+// 1. Checks if the API URL and API token are set, and logs a fatal error if they are not.
+// 2. Sets up shared state and initializes the logger.
+// 3. Sets up a signal handler to catch SIGINT and SIGTERM for cleanup purposes.
+// 4. Configures the logger level based on the debug state.
+// 5. Sets up the API and displays startup information.
+// 6. Checks for an existing lock file and aborts if one is found.
+// 7. Creates necessary data directories and a lock file to prevent multiple instances.
+// 8. Authenticates with the CipherSwarm API and logs the result.
+// 9. Fetches the agent configuration and updates agent metadata.
+// 10. Kills any dangling hashcat processes.
+// 11. Starts a heartbeat loop to send a heartbeat to the CipherSwarm API every 60 seconds.
+// 12. Starts the agent loop to request and process new tasks from the CipherSwarm API.
+// 13. Waits for a termination signal to clean up and shut down the agent.
 //
-//goland:noinspection GoUnusedParameter
-//nolint:gocognit
+// Parameters:
+// - _ *cobra.Command: The command that triggered this function (unused).
+// - _ []string: Additional arguments (unused).
 func startAgent(_ *cobra.Command, _ []string) {
+	// Ensure API URL and token are set
 	if viper.GetString("api_url") == "" {
 		shared.Logger.Fatal("API URL not set")
 	}
@@ -157,184 +192,194 @@ func startAgent(_ *cobra.Command, _ []string) {
 		shared.Logger.Fatal("API token not set")
 	}
 
+	// Initialize shared state and logger
 	setupSharedState()
-
 	initLogger()
 
+	// Set up signal handling for graceful shutdown
 	signChan := make(chan os.Signal, 1)
-	// Set up a signal handler to catch SIGINT and SIGTERM
-	// This will allow us to clean up the PID file when the agent is stopped
-	// We'll also use this to clean up any dangling hashcat processes
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
-	if shared.State.Debug {
-		shared.Logger.SetLevel(log.DebugLevel)
-	} else {
-		shared.Logger.SetLevel(log.InfoLevel)
-	}
 
+	// Initialize API client and display startup info
 	setupAPI()
-
 	lib.DisplayStartup()
 
-	lockFound := lib.CheckForExistingClient(shared.State.PidFile)
-	if lockFound {
+	// Check for existing lock file to prevent multiple instances
+	if lib.CheckForExistingClient(shared.State.PidFile) {
 		shared.Logger.Fatal("Aborting agent start, lock file found", "path", shared.State.PidFile)
 	}
 
-	err := lib.CreateDataDirs() // Create the data directories
-	if err != nil {
+	// Create necessary data directories and lock file
+	if err := lib.CreateDataDirs(); err != nil {
 		shared.Logger.Fatal("Error creating data directories", "error", err)
 	}
-
-	// Create a lock file to prevent multiple instances of the agent from running
-	err = lib.CreateLockFile()
-	if err != nil {
+	if err := lib.CreateLockFile(); err != nil {
 		shared.Logger.Fatal("Error creating lock file", "error", err)
 	}
+	defer cleanupLockFile(shared.State.PidFile)
 
-	defer func(pidFile string) {
-		shared.Logger.Debug("Cleaning up PID file", "path", pidFile)
-
-		err := fileutil.RemoveFile(pidFile)
-		if err != nil {
-			shared.Logger.Fatal("Failed to remove PID file", "error", err)
-		}
-	}(shared.State.PidFile)
-
-	// Connect to the CipherSwarm API URL and authenticate
-	// Right now, we're just logging the result of the authentication.
-	// Failure to authenticate will result in a fatal error.
-	err = lib.AuthenticateAgent()
-	if err != nil {
+	// Authenticate with the CipherSwarm API
+	if err := lib.AuthenticateAgent(); err != nil {
 		shared.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
-
-		return // Exit the program
 	}
 	lib.DisplayAuthenticated()
 
-	// Get the configuration
-	// Override the configuration with the always_use_native_hashcat setting
-	err = fetchAgentConfig()
-	if err != nil {
+	// Fetch agent configuration and update metadata
+	if err := fetchAgentConfig(); err != nil {
 		shared.Logger.Fatal("Failed to fetch agent configuration", "error", err)
-
-		return // Exit the program
 	}
-
-	// Update the agent metadata with the CipherSwarm API
 	lib.UpdateAgentMetadata()
-
 	shared.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
-	processFound := lib.CheckForExistingClient(shared.State.HashcatPidFile)
-	if processFound {
+	if lib.CheckForExistingClient(shared.State.HashcatPidFile) {
 		shared.Logger.Info("Killed dangling hashcat process")
 	}
 
-	// Start the heartbeat loop
-	// This will send a heartbeat to the CipherSwarm API every 60 seconds
-	go func() {
-		for {
-			heartbeat(signChan)
-			time.Sleep(60 * time.Second)
-		}
-	}()
+	// Start heartbeat and agent loops
+	go startHeartbeatLoop(signChan)
+	go startAgentLoop()
 
-	// Start the agent loop
-	go func() {
-		for {
-			heartbeat(signChan)
-
-			if shared.State.Reload {
-				lib.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
-				shared.State.CurrentActivity = shared.CurrentActivityStarting
-				shared.Logger.Info("Reloading agent")
-				err = fetchAgentConfig()
-				if err != nil {
-					shared.Logger.Error("Failed to fetch agent configuration", "error", err)
-					lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
-				}
-				shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
-				lib.UpdateBenchmarks()
-
-				shared.State.CurrentActivity = shared.CurrentActivityStarting
-				shared.State.Reload = false
-				heartbeat(signChan)
-			}
-			if !lib.Configuration.Config.UseNativeHashcat {
-				shared.State.CurrentActivity = shared.CurrentActivityUpdating
-				lib.UpdateCracker() // Should we update the cracker on every loop? It doesn't change often
-				shared.State.CurrentActivity = shared.CurrentActivityStarting
-				heartbeat(signChan)
-			}
-
-			if !shared.State.JobCheckingStopped {
-				// - Request a new job from the CipherSwarm API
-				//   - If a job is available, download the job and start processing it
-				task, err := lib.GetNewTask()
-				if err != nil {
-					shared.Logger.Error("Failed to get new task", "error", err)
-					time.Sleep(viper.GetDuration("sleep_on_failure"))
-
-					continue
-				}
-				if task != nil {
-					shared.State.CurrentActivity = shared.CurrentActivityCracking
-					lib.DisplayNewTask(task)
-
-					// Process the task
-					// - Get the attack parameters
-					attack, err := lib.GetAttackParameters(task.GetAttackID())
-					if err != nil || attack == nil {
-						shared.Logger.Error("Failed to get attack parameters", "error", err)
-						lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
-						lib.AbandonTask(task)
-						time.Sleep(viper.GetDuration("sleep_on_failure"))
-
-						continue
-					}
-
-					lib.DisplayNewAttack(attack)
-
-					// - Accept the task
-					if lib.AcceptTask(task) {
-						lib.DisplayRunTaskAccepted(task)
-					} else {
-						shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
-
-						return
-					}
-					// - Download the files
-					err = lib.DownloadFiles(attack)
-					if err != nil {
-						shared.Logger.Error("Failed to download files", "error", err)
-						lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
-						lib.AbandonTask(task)
-						time.Sleep(viper.GetDuration("sleep_on_failure"))
-
-						continue
-					}
-
-					lib.RunTask(task, attack)
-
-					shared.State.CurrentActivity = shared.CurrentActivityWaiting
-				} else {
-					shared.Logger.Info("No new task available")
-				}
-			}
-			heartbeat(signChan)
-			sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
-			lib.DisplayInactive(sleepTime)
-			time.Sleep(sleepTime)
-		}
-	}()
-
-	sig := <-signChan // Wait for a signal to shut down the agent
+	// Wait for termination signal
+	sig := <-signChan
 	shared.Logger.Debug("Received signal", "signal", sig)
 	lib.SendAgentError("Received signal to terminate. Shutting down", nil, operations.SeverityInfo)
 	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
+}
+
+// cleanupLockFile removes the PID file during shutdown
+func cleanupLockFile(pidFile string) {
+	shared.Logger.Debug("Cleaning up PID file", "path", pidFile)
+	if err := fileutil.RemoveFile(pidFile); err != nil {
+		shared.Logger.Fatal("Failed to remove PID file", "error", err)
+	}
+}
+
+// startHeartbeatLoop initiates an infinite loop that sends heartbeat signals at regular intervals.
+// It takes a channel of os.Signal as an argument, which is used to send the heartbeat signals.
+// The function calls the heartbeat function and then sleeps for 60 seconds before repeating the process.
+func startHeartbeatLoop(signChan chan os.Signal) {
+	for {
+		heartbeat(signChan)
+		time.Sleep(60 * time.Second)
+	}
+}
+
+// startAgentLoop continuously runs the agent's main loop, performing various tasks based on the current state and configuration.
+// It handles reloading the agent, updating the cracker, and checking for new tasks. The loop sleeps for a configured interval
+// between iterations.
+//
+// The loop performs the following actions:
+// 1. If the agent's state indicates a reload is needed, it calls handleReload().
+// 2. If the configuration specifies not to use the native Hashcat, it calls handleCrackerUpdate().
+// 3. If job checking is not stopped, it calls handleNewTask().
+// 4. It calculates the sleep time based on the configured AgentUpdateInterval and sleeps for that duration.
+//
+// This function runs indefinitely until the program is terminated.
+func startAgentLoop() {
+	for {
+		if shared.State.Reload {
+			handleReload()
+		}
+
+		if !lib.Configuration.Config.UseNativeHashcat {
+			handleCrackerUpdate()
+		}
+
+		if !shared.State.JobCheckingStopped {
+			handleNewTask()
+		}
+
+		sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
+		lib.DisplayInactive(sleepTime)
+		time.Sleep(sleepTime)
+	}
+}
+
+// handleReload reloads the agent configuration and performs a new benchmark.
+// It updates the agent's state and logs the process. If fetching the agent
+// configuration fails, it logs an error and sends a fatal error notification.
+func handleReload() {
+	lib.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
+	shared.State.CurrentActivity = shared.CurrentActivityStarting
+	shared.Logger.Info("Reloading agent")
+	if err := fetchAgentConfig(); err != nil {
+		shared.Logger.Error("Failed to fetch agent configuration", "error", err)
+		lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
+	}
+	shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
+	lib.UpdateBenchmarks()
+	shared.State.CurrentActivity = shared.CurrentActivityStarting
+	shared.State.Reload = false
+}
+
+// handleCrackerUpdate updates the cracker if not using native Hashcat
+func handleCrackerUpdate() {
+	shared.State.CurrentActivity = shared.CurrentActivityUpdating
+	lib.UpdateCracker()
+	shared.State.CurrentActivity = shared.CurrentActivityStarting
+}
+
+// handleNewTask fetches and processes a new task from the CipherSwarm API
+// If an error occurs during retrieval, it logs the error and sleeps for a duration
+// specified by the "sleep_on_failure" configuration before returning.
+// If a new task is successfully retrieved, it processes the task using the processTask function.
+// If no new task is available, it logs an informational message.
+func handleNewTask() {
+	task, err := lib.GetNewTask()
+	if err != nil {
+		shared.Logger.Error("Failed to get new task", "error", err)
+		time.Sleep(viper.GetDuration("sleep_on_failure"))
+		return
+	}
+
+	if task != nil {
+		processTask(task)
+	} else {
+		shared.Logger.Info("No new task available")
+	}
+}
+
+// processTask processes a given task by performing several steps including
+// displaying the task, retrieving attack parameters, accepting the task,
+// downloading necessary files, and running the task. If any step fails, it logs
+// the error, sends an agent error, abandons the task, and sleeps for a specified
+// duration before returning.
+//
+// Parameters:
+//   - task (*components.Task): The task to be processed.
+func processTask(task *components.Task) {
+	shared.State.CurrentActivity = shared.CurrentActivityCracking
+	lib.DisplayNewTask(task)
+
+	attack, err := lib.GetAttackParameters(task.GetAttackID())
+	if err != nil || attack == nil {
+		shared.Logger.Error("Failed to get attack parameters", "error", err)
+		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
+		lib.AbandonTask(task)
+		time.Sleep(viper.GetDuration("sleep_on_failure"))
+		return
+	}
+
+	lib.DisplayNewAttack(attack)
+
+	if !lib.AcceptTask(task) {
+		shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
+		return
+	}
+	lib.DisplayRunTaskAccepted(task)
+
+	if err := lib.DownloadFiles(attack); err != nil {
+		shared.Logger.Error("Failed to download files", "error", err)
+		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
+		lib.AbandonTask(task)
+		time.Sleep(viper.GetDuration("sleep_on_failure"))
+		return
+	}
+
+	lib.RunTask(task, attack)
+	shared.State.CurrentActivity = shared.CurrentActivityWaiting
 }
 
 // heartbeat sends a heartbeat signal and handles the response.
@@ -404,7 +449,9 @@ func initLogger() {
 	}
 }
 
-// setupAPI initializes the API configuration and context for the CipherSwarm Agent.
+// setupAPI initializes the SDK client and context for the application.
+// It sets up the SdkClient with the server URL and API token from the shared state,
+// and creates a new background context.
 func setupAPI() {
 	lib.SdkClient = sdk.New(sdk.WithServerURL(shared.State.URL), sdk.WithSecurity(shared.State.APIToken))
 	lib.Context = context.Background()

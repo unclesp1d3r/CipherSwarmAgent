@@ -24,7 +24,7 @@ type statusGuess struct {
 	GuessMode        int64   `json:"guess_mode"`         // The attack mode
 }
 
-type statusDevice struct {
+type StatusDevice struct {
 	DeviceID   int64  `json:"device_id"`   // The device ID
 	DeviceName string `json:"device_name"` // The device name
 	DeviceType string `json:"device_type"` // The device type
@@ -45,7 +45,7 @@ type Status struct {
 	RecoveredHashes []int64        `json:"recovered_hashes"` // The number of recovered hashes
 	RecoveredSalts  []int64        `json:"recovered_salts"`  // The number of recovered salts
 	Rejected        int64          `json:"rejected"`         // The number of rejected hashes
-	Devices         []statusDevice `json:"devices"`          // The devices used for the attack
+	Devices         []StatusDevice `json:"devices"`          // The devices used for the attack
 	TimeStart       int64          `json:"time_start"`       // The start time of the attack
 	EstimatedStop   int64          `json:"estimated_stop"`   // The estimated stop time of the attack
 }

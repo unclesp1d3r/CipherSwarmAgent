@@ -4,14 +4,16 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 )
 
+type agentConfig struct {
+	UseNativeHashcat    bool   `json:"use_native_hashcat"        yaml:"use_native_hashcat"`        // UseNativeHashcat specifies whether to use the native Hashcat implementation.
+	AgentUpdateInterval int64  `json:"agent_update_interval"     yaml:"agent_update_interval"`     // AgentUpdateInterval specifies the interval in seconds at which the agent should check in with the server.
+	BackendDevices      string `json:"backend_devices,omitempty" yaml:"backend_devices,omitempty"` // BackendDevices specifies the devices to use for the backend.
+	OpenCLDevices       string `json:"opencl_devices,omitempty"  yaml:"opencl_devices,omitempty"`  // OpenCLDevices specifies the OpenCL devices to use.
+}
+
 type agentConfiguration struct {
-	Config struct {
-		UseNativeHashcat    bool   `json:"use_native_hashcat"        yaml:"use_native_hashcat"`        // UseNativeHashcat specifies whether to use the native Hashcat implementation.
-		AgentUpdateInterval int64  `json:"agent_update_interval"     yaml:"agent_update_interval"`     // AgentUpdateInterval specifies the interval in seconds at which the agent should check in with the server.
-		BackendDevices      string `json:"backend_devices,omitempty" yaml:"backend_devices,omitempty"` // BackendDevices specifies the devices to use for the backend.
-		OpenCLDevices       string `json:"opencl_devices,omitempty"  yaml:"opencl_devices,omitempty"`  // OpenCLDevices specifies the OpenCL devices to use.
-	} `json:"config"      yaml:"config"`
-	APIVersion int64 `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
+	Config     agentConfig `json:"config"      yaml:"config"`
+	APIVersion int64       `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
 }
 
 // parseStringToDeviceType converts a string representation of a device type to its corresponding components.DeviceType value.
