@@ -115,7 +115,7 @@ The easiest way to run the CipherSwarm Agent is by using Docker. To build the Do
 ```bash
 docker pull ghcr.io/unclesp1d3r/cipherswarmagent:latest
 
-docker run -d -e API_TOKEN=your_api_token -e API_URL=https://cipherswarm.example.com:3000 unclesp1d3r/cipherswarm-agent
+docker run -e API_TOKEN=your_api_token -e API_URL=https://cipherswarm.example.com:3000 ghcr.io/unclesp1d3r/cipherswarmagent:latest
 ```
 
 This will start the agent in a Docker container, connecting it to the CipherSwarm network with Hashcat and other
