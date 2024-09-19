@@ -296,7 +296,7 @@ func (sess *Session) CmdLine() string {
 func NewHashcatSession(id string, params Params) (*Session, error) {
 	binaryPath := viper.GetString("hashcat_path")
 
-	outFile, err := createTempFile(shared.State.OutPath, id, 0o600)
+	outFile, err := createOutFile(shared.State.OutPath, id, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create output file: %w", err)
 	}
@@ -331,6 +331,47 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}, nil
 }
 
+// createOutFile creates a new output file with the specified name and permissions in the given directory.
+//
+// Parameters:
+//   - dir: The directory where the output file will be created.
+//   - id: The identifier string that will be used as part of the output file name.
+//   - perm: The file permission settings.
+//
+// Returns:
+//   - *os.File: A pointer to the created file.
+//   - error: An error object if the file creation or permission setting fails.
+//
+// Actions:
+//  1. Joins the directory and id to form the output file path.
+//  2. Creates the file at the specified path.
+//  3. Sets the file's permissions.
+//  4. Returns the file pointer and any error encountered.
+func createOutFile(dir string, id string, perm os.FileMode) (*os.File, error) {
+	outFilePath := filepath.Join(dir, id+".hcout")
+	file, err := os.Create(outFilePath)
+	if err != nil {
+		return nil, err
+	}
+	if err := file.Chmod(perm); err != nil {
+		_ = file.Close() // We need to close the file if the permissions change fails
+		return nil, err
+	}
+
+	return file, nil
+}
+
+// createTempFile creates a temporary file with the specified directory, name pattern, and permissions.
+// Params:
+//
+//	dir (string): Directory where the temporary file will be created.
+//	pattern (string): File name pattern, where '*' will be replaced with a random string.
+//	perm (os.FileMode): File permissions to set on the created file.
+//
+// Returns:
+//
+//	*os.File: A pointer to the created temporary file.
+//	error: An error value if any issues occurred during file creation or permission setting.
 func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 	file, err := os.CreateTemp(dir, pattern)
 	if err != nil {
