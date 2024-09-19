@@ -4,15 +4,12 @@
     <option name="enabledLinters">
       <list>
         <option value="exportloopref" />
-        <option value="intrange" />
+        <option value="funlen" />
         <option value="gocritic" />
         <option value="goconst" />
-        <option value="loggercheck" />
-        <option value="tenv" />
+        <option value="gocognit" />
         <option value="ineffassign" />
         <option value="revive" />
-        <option value="nilerr" />
-        <option value="nlreturn" />
         <option value="prealloc" />
         <option value="staticcheck" />
         <option value="interfacer" />
@@ -24,7 +21,6 @@
         <option value="maligned" />
         <option value="stylecheck" />
         <option value="whitespace" />
-        <option value="usestdlibvars" />
         <option value="gosimple" />
         <option value="goprintffuncname" />
         <option value="gocyclo" />

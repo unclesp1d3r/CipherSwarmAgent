@@ -6,8 +6,10 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+// State holds the global configuration and runtime state of the agent, including file paths, debug flags, and settings.
 var State = agentState{}
 
+// agentState represents the configuration and runtime state of an agent.
 type agentState struct {
 	PidFile                             string   // PidFile is the path to the file containing the agent's process ID.
 	HashcatPidFile                      string   // HashcatPidFile is the path to the file containing the Hashcat process ID.
@@ -36,6 +38,7 @@ type agentState struct {
 	UseLegacyDeviceIdentificationMethod bool     // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
 }
 
+// activity represents the current state or action being performed by an agent in the system.
 type activity string
 
 const (
@@ -47,11 +50,12 @@ const (
 	CurrentActivityStopping     activity = "stopping"
 )
 
+// Logger is initialized with options to log at the Info level and report timestamps to the standard output.
 var Logger = log.NewWithOptions(os.Stdout, log.Options{
 	Level:           log.InfoLevel,
 	ReportTimestamp: true,
 })
 
-// ErrorLogger is a logger for errors that should never happen.
-// It includes more information than the default logger.
+// ErrorLogger is a specialized logger instance for logging error messages.
+// It is configured to include additional context by chaining from the base Logger.
 var ErrorLogger = Logger.With()
