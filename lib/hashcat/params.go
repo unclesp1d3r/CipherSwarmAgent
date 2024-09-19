@@ -10,6 +10,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+// Params represents the configuration parameters for various attack modes in Hashcat.
 type Params struct {
 	AttackMode                int64    `json:"attack_mode"`                  // Attack mode to use
 	HashType                  int64    `json:"hash_type"`                    // Hash type to crack
@@ -33,18 +34,9 @@ type Params struct {
 	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to the restore file
 }
 
-// Validate checks the Params struct for valid attack mode configurations.
-// It validates the parameters based on the specified attack mode and returns
-// an error if the attack mode is unsupported or if the parameters are invalid
-// for the given attack mode.
-//
-// Supported attack modes:
-// - attackModeDictionary: Validates dictionary attack parameters.
-// - AttackModeMask: Validates mask attack parameters.
-// - attackModeHybridDM, attackModeHybridMD: Validates hybrid attack parameters.
-// - AttackBenchmark: No validation needed.
-//
-// Returns an error if the attack mode is unsupported or if validation fails.
+// Validate checks the Params struct to ensure that the necessary parameters are provided based on the selected attack mode.
+// It switches on the AttackMode field and calls the appropriate validation function for that mode.
+// For unsupported attack modes, it returns an error indicating the invalid attack mode.
 func (params Params) Validate() error {
 	switch params.AttackMode {
 	case attackModeDictionary:
@@ -60,6 +52,9 @@ func (params Params) Validate() error {
 	}
 }
 
+// validateDictionaryAttack checks if the necessary wordlist file is provided for a dictionary attack.
+// It verifies if the WordListFilename field in Params is not blank.
+// If the filename is blank, it returns an error indicating that the wordlist is missing.
 func validateDictionaryAttack(params Params) error {
 	if strutil.IsBlank(params.WordListFilename) {
 		return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", attackModeDictionary)
@@ -68,6 +63,9 @@ func validateDictionaryAttack(params Params) error {
 	return nil
 }
 
+// validateMaskAttack checks the required parameters for a mask attack mode in Hashcat.
+// It ensures either Mask or MaskListFilename is provided, but not both.
+// Returns an error if validation fails.
 func validateMaskAttack(params Params) error {
 	if strutil.IsBlank(params.Mask) && strutil.IsBlank(params.MaskListFilename) {
 		return fmt.Errorf("using mask attack (%d), but no mask was given", AttackModeMask)
@@ -79,6 +77,9 @@ func validateMaskAttack(params Params) error {
 	return nil
 }
 
+// validateHybridAttack checks if the necessary parameters for a hybrid attack are provided.
+// It validates the presence of both the mask and wordlist filename.
+// Returns an error if any required parameter is missing.
 func validateHybridAttack(params Params) error {
 	if strutil.IsBlank(params.Mask) {
 		return fmt.Errorf("using hybrid attack (%d), but no mask was given", params.AttackMode)
@@ -90,11 +91,9 @@ func validateHybridAttack(params Params) error {
 	return nil
 }
 
-// maskArgs returns the command line arguments for the mask attack mode in Hashcat.
-// It generates the arguments based on the provided Params struct.
-// The function checks the number of custom charsets and returns an error if it exceeds the maximum allowed.
-// It also handles the mask increment option and its corresponding minimum and maximum values.
-// The returned arguments can be used directly in the command line when invoking Hashcat.
+// maskArgs generates the command-line arguments for running a mask attack in Hashcat.
+// It constructs the arguments for custom charsets and increments.
+// Returns an error if too many custom charsets are supplied.
 func (params Params) maskArgs() ([]string, error) {
 	const maxCharsets = 4
 	if len(params.MaskCustomCharsets) > maxCharsets {
@@ -122,20 +121,10 @@ func (params Params) maskArgs() ([]string, error) {
 	return args, nil
 }
 
-// toCmdArgs generates the command-line arguments for running Hashcat based on the provided parameters.
-// It validates the parameters and constructs the appropriate arguments for either benchmark mode or full attack mode.
-//
-// Parameters:
-//   - session: A string representing the session name.
-//   - hashFile: A string representing the path to the hash file.
-//   - outFile: A string representing the path to the output file.
-//
-// Returns:
-//   - A slice of strings containing the command-line arguments.
-//   - An error if the parameters are invalid or if required files cannot be found.
-//
-// The function handles different attack modes and includes additional arguments based on the parameters provided.
-// It ensures that required files such as word lists, rule lists, and mask lists exist before including them in the arguments.
+// toCmdArgs generates a slice of strings containing the command-line arguments for a Hashcat session.
+// It performs validation of the parameters, constructs various arguments based on the attack mode, and
+// updates certain file paths to ensure they exist on the filesystem before returning the final list of arguments.
+// Returns an error if any required file path is invalid or if validation fails.
 func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, error) {
 	if err := params.Validate(); err != nil {
 		return nil, err
@@ -274,17 +263,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	return args, nil
 }
 
-// toRestoreArgs generates a slice of strings containing the arguments
-// needed to restore a Hashcat session. It takes a session string as input
-// and returns a slice of strings with the appropriate restore arguments.
-//
-// Parameters:
-//
-//	session (string): The session identifier to be used in the restore arguments.
-//
-// Returns:
-//
-//	[]string: A slice of strings containing the restore arguments for Hashcat.
+// toRestoreArgs generates and returns the command-line arguments required to restore a Hashcat session.
 func (params Params) toRestoreArgs(session string) []string {
 	return []string{
 		"--session", "attack-" + session,

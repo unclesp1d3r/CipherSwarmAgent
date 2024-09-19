@@ -15,11 +15,12 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
-// runBenchmarkTask runs a benchmark session using the provided hashcat session.
-// It starts the session, reads the output from stdout and stderr, and handles various events.
-// The benchmark results are collected and returned as a slice of benchmarkResult structs.
-// If there is an error starting the session, the function returns an empty slice and a boolean value of true.
-// If the benchmark session completes successfully, the function returns the benchmark results and a boolean value of false.
+// runBenchmarkTask runs a benchmark session and processes its output and errors.
+// It starts a benchmark session and initializes a results slice.
+// A goroutine is started to handle different types of messages from the session channels.
+// Stdout lines are processed to extract benchmark results, while stderr lines are handled separately.
+// Unexpected status updates and cracked hash messages are logged for debugging purposes.
+// The function waits for the goroutine to complete before returning the benchmark results and an error flag.
 func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 	err := sess.Start()
 	if err != nil {
@@ -59,6 +60,10 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 	return benchmarkResults, false
 }
 
+// handleBenchmarkStdOutLine processes a single line of standard output from a benchmark session.
+// It splits the line into fields and creates a benchmarkResult struct if the expected number of fields is found.
+// If the line format is incorrect, it logs a debug message and returns.
+// The function logs the benchmark results using displayBenchmark and appends the result to the results slice.
 func handleBenchmarkStdOutLine(line string, results *[]benchmarkResult) {
 	fields := strings.Split(line, ":")
 	if len(fields) != 6 {
@@ -78,6 +83,8 @@ func handleBenchmarkStdOutLine(line string, results *[]benchmarkResult) {
 	*results = append(*results, result)
 }
 
+// handleBenchmarkStdErrLine processes a line of benchmark standard error output.
+// It logs the error message and sends a warning-level error report to the agent server if the line is not blank.
 func handleBenchmarkStdErrLine(line string) {
 	displayBenchmarkError(line)
 	if strutil.IsNotBlank(line) {
@@ -85,22 +92,10 @@ func handleBenchmarkStdErrLine(line string) {
 	}
 }
 
-// runAttackTask starts an attack session using the provided hashcat session and task.
-// It continuously monitors the session for status updates, cracked hashes, and errors,
-// and sends corresponding updates and notifications.
-// If the session fails to start, a fatal agent error is sent and the function returns.
-// If the session completes successfully, the task is marked as exhausted.
-// If the session fails with a non-fatal error, a minor agent error is sent and the function returns.
-//
-// Parameters:
-// - sess: The hashcat session to run the attack.
-// - task: The task to be executed.
-//
-// Example usage:
-//
-//	sess := hashcat.NewSession()
-//	task := components.NewTask()
-//	RunAttackTask(sess, task)
+// runAttackTask starts a hashcat attack session with the given session and task.
+// It handles various session outputs such as stdout lines, stderr messages, status updates, cracked hashes,
+// and completion status by forwarding them to their respective handlers.
+// If the session fails to start, it logs the error and sends a fatal error notification.
 func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
@@ -133,6 +128,7 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	<-waitChan
 }
 
+// handleStdOutLine processes a single line of output. If the output is valid JSON, it parses and updates task status.
 func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Session) {
 	if validator.IsJSON(stdoutLine) {
 		update := hashcat.Status{}
@@ -146,6 +142,9 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 	}
 }
 
+// handleStdErrLine processes a line read from stderr for a given task.
+// It first logs the stderr line by calling displayJobError and, if the line is not blank,
+// sends an agent error report using SendAgentError with a severity of SeverityMinor.
 func handleStdErrLine(stdErrLine string, task *components.Task) {
 	displayJobError(stdErrLine)
 	if strutil.IsNotBlank(stdErrLine) {
@@ -153,16 +152,23 @@ func handleStdErrLine(stdErrLine string, task *components.Task) {
 	}
 }
 
+// handleStatusUpdate processes the status update by displaying the job status and sending the status update to the relevant components.
 func handleStatusUpdate(statusUpdate hashcat.Status, task *components.Task, sess *hashcat.Session) {
 	displayJobStatus(statusUpdate)
 	sendStatusUpdate(statusUpdate, task, sess)
 }
 
+// handleCrackedHash processes a cracked hash by displaying it and sending it to the task server.
 func handleCrackedHash(crackedHash hashcat.Result, task *components.Task) {
 	displayJobCrackedHash(crackedHash)
 	sendCrackedHash(crackedHash, task)
 }
 
+// handleDoneChan handles the completion scenario of a task with error checking and session cleanup.
+// If an error occurs, it evaluates the error message. If the error message is "exit status 1",
+// it signals that the job is exhausted by calling displayJobExhausted() and marks the task
+// as exhausted using markTaskExhausted(task). For other errors, it calls handleNonExhaustedError()
+// to address them. After these checks, sess.Cleanup() is called to cleanup the session.
 func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 	if err != nil {
 		if err.Error() == "exit status 1" {
@@ -175,6 +181,10 @@ func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 	sess.Cleanup()
 }
 
+// handleNonExhaustedError handles errors related to non-exhausted tasks in a hashcat session.
+// If the error indicates the inability to read the restore file and the restore file path is not blank,
+// it attempts to remove the restore file. Upon a successful or failed removal, it logs appropriate messages.
+// In case the condition is not met, it sends a critical severity agent error and displays a job failure.
 func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session) {
 	if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
 		if strutil.IsNotBlank(sess.RestoreFilePath) {
@@ -190,17 +200,8 @@ func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Ses
 	}
 }
 
-// runTestTask runs a test session using the provided hashcat session.
-// It starts the session, reads the output from stdout and stderr, and handles various events.
-// The test results are collected and returned as a hashcat.Status struct.
-// If there is an error starting the session, the function returns nil and the error.
-//
-// Parameters:
-// - sess: The hashcat session to run the test.
-//
-// Returns:
-// - *hashcat.Status: The test results.
-// - error: An error if the session fails to start or an error occurs during the session.
+// runTestTask starts a hashcat test session and handles its output, status updates, error messages, and cracked hashes.
+// It returns the final status of the test session and any errors encountered during execution.
 func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 	err := sess.Start()
 	if err != nil {
@@ -240,12 +241,14 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 	return testResults, errorResult
 }
 
+// handleTestStdOutLine processes a line of standard output from a test. If the line is not valid JSON, it logs an error.
 func handleTestStdOutLine(stdoutLine string) {
 	if !validator.IsJSON(stdoutLine) {
 		shared.Logger.Error("Failed to parse status update", "output", stdoutLine)
 	}
 }
 
+// handleTestStdErrLine processes a non-blank stderr line by sending an error report and updating the error result pointer.
 func handleTestStdErrLine(stdErrLine string, errorResult *error) {
 	if strutil.IsNotBlank(stdErrLine) {
 		SendAgentError(stdErrLine, nil, operations.SeverityMinor)
@@ -253,12 +256,18 @@ func handleTestStdErrLine(stdErrLine string, errorResult *error) {
 	}
 }
 
+// handleTestCrackedHash checks if the cracked hash's plaintext is blank. If so, it sets an error message in errorResult.
 func handleTestCrackedHash(crackedHash hashcat.Result, errorResult *error) {
 	if strutil.IsBlank(crackedHash.Plaintext) {
 		*errorResult = errors.New("received empty cracked hash")
 	}
 }
 
+// handleTestDoneChan handles the completion of a test by checking the error and sending a critical error message if needed.
+// Parameters:
+// - err: The error object received from the test execution.
+// - errorResult: A pointer to an error variable to store the error for further handling.
+// If the error is not "exit status 1", it sends a critical error message using SendAgentError and updates errorResult.
 func handleTestDoneChan(err error, errorResult *error) {
 	if err != nil && err.Error() != "exit status 1" {
 		SendAgentError(err.Error(), nil, operations.SeverityCritical)
