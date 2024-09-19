@@ -1,4 +1,18 @@
 
+<a name="v0.5.5"></a>
+
+## [v0.5.5](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.5.4...v0.5.5)
+
+> 2024-09-18
+
+### Bug Fixes
+
+* replace createTempFile with createOutFile
+
+  Replaced createTempFile with createOutFile in the NewHashcatSession function. This makes the output file more deterministic and fixes an issue where restored tasks weren't sending their cracked hashes.
+
+
+
 <a name="v0.5.4"></a>
 
 ## [v0.5.4](https://github.com/unclesp1d3r/CipherSwarmAgent/compare/v0.5.3...v0.5.4)
