@@ -19,8 +19,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/cmd"
 )
 
-// main is the entry point of the program.
-// It calls the Execute function from the cmd package to run the root command.
+// main is the entry point for the CipherSwarm Agent CLI application. It calls cmd.Execute to run the root command.
 func main() {
 	cmd.Execute()
 }

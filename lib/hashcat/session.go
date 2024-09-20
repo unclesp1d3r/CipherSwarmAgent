@@ -22,7 +22,8 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
-// Session represents a cracking session for hashcat.
+// Session represents a hashcat session that manages the execution, I/O, and communication
+// with the hashcat process.
 type Session struct {
 	proc               *exec.Cmd     // The hashcat process
 	hashFile           string        // The path of the file containing the hashes to crack
@@ -40,13 +41,8 @@ type Session struct {
 	pStderr            io.ReadCloser // Pipe for stderr
 }
 
-// Start initializes and runs the session process for hashcat.
-// Actions performed:
-// 1. Attaches necessary pipes for session communication.
-// 2. Starts the hashcat process.
-// 3. Initiates and starts a log tailer.
-// 4. Handles the output from the tailer, standard output, and standard error in separate goroutines.
-// Returns an error if any step fails.
+// Start initializes the session by attaching the necessary pipes and starting the hashcat process.
+// It also starts the tailer and handles the output from stdout and stderr concurrently.
 func (sess *Session) Start() error {
 	if err := sess.attachPipes(); err != nil {
 		return err
@@ -69,8 +65,8 @@ func (sess *Session) Start() error {
 	return nil
 }
 
-// attachPipes attaches the stdout and stderr pipes of the session process to the session object.
-// It returns an error if either pipe attachment fails.
+// attachPipes attaches stdout and stderr pipes to the session's process.
+// It returns an error if either the stdout or stderr pipe cannot be attached.
 func (sess *Session) attachPipes() error {
 	pStdout, err := sess.proc.StdoutPipe()
 	if err != nil {
@@ -87,9 +83,9 @@ func (sess *Session) attachPipes() error {
 	return nil
 }
 
-// startTailer initializes and starts a tailer to monitor the session's output file.
-// If an error occurs while starting the tailer, it attempts to kill the current session process.
-// Returns the initialized tail.Tail instance or an error if the tailer couldn't be started.
+// startTailer initiates a tail.Tail instance to follow the session output file.
+// In case of an error, it attempts to kill the session's process.
+// Returns the tail.Tail instance and an error if any occurred during the setup.
 func (sess *Session) startTailer() (*tail.Tail, error) {
 	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true, Logger: shared.Logger.StandardLog()})
 	if err != nil {
@@ -103,17 +99,8 @@ func (sess *Session) startTailer() (*tail.Tail, error) {
 	return tailer, nil
 }
 
-// handleTailerOutput processes each line from the tailer.Lines channel, extracts and decodes relevant information,
-// and sends the results to the CrackedHashes channel.
-// Actions:
-// - Reads lines from tailer.Lines.
-// - Splits each line by ":" and validates the format.
-// - Extracts and decodes the timestamp, hash, and plaintext from the line.
-// - Converts timestamp to an integer and then to a time.Time value.
-// - Sends the decoded result to the CrackedHashes channel.
-//
-// Parameters:
-// - tailer: A pointer to a tail.Tail instance that provides the lines to be processed.
+// handleTailerOutput processes the lines read from a tail.Tail instance that monitors a log file,
+// extracts the relevant information, and sends it to the CrackedHashes channel for further processing.
 func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 	for tailLine := range tailer.Lines {
 		line := tailLine.Text
@@ -150,10 +137,9 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 	}
 }
 
-// handleStdout processes stdout lines from a session, sending them to StdoutLines channel and handling status updates.
-// If SkipStatusUpdates is false, it checks if the line is JSON and unmarshals it into Status, then sends to StatusUpdates.
-// Logs unexpected lines and specific messages such as "starting in restore mode".
-// Waits for the process to finish and sends the result to DoneChan.
+// handleStdout processes the standard output of the hashcat process, sending lines to StdoutLines channel.
+// If JSON is detected and SkipStatusUpdates is false, unmarshal it into a Status struct and sends to StatusUpdates.
+// Handles specific stdout messages like "starting in restore mode" and logs errors if unexpected lines appear.
 func (sess *Session) handleStdout() {
 	scanner := bufio.NewScanner(sess.pStdout)
 	for scanner.Scan() {
@@ -187,7 +173,7 @@ func (sess *Session) handleStdout() {
 	sess.DoneChan <- done
 }
 
-// handleStderr reads from sess.pStderr, logs the text, and sends stderr messages to sess.StderrMessages channel.
+// handleStderr processes the standard error output of the hashcat process and sends each line to StderrMessages channel.
 func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
@@ -196,11 +182,8 @@ func (sess *Session) handleStderr() {
 	}
 }
 
-// Kill terminates the hashcat process associated with the current session.
-//
-// If the process is not running or has already finished, it returns nil.
-// If the process is successfully terminated, it returns nil.
-// Otherwise, it returns an error indicating the termination failure.
+// Kill terminates the hashcat process associated with the session if it is running.
+// Returns nil if no process is running or if the process was already terminated successfully.
 func (sess *Session) Kill() error {
 	if sess.proc == nil || sess.proc.Process == nil {
 		return nil
@@ -215,15 +198,8 @@ func (sess *Session) Kill() error {
 	return err
 }
 
-// Cleanup releases resources and deletes temporary files associated with the session.
-//
-// Actions performed:
-// 1. Logs the start of the cleanup process.
-// 2. Defines a helper function, removeFile, to delete a file if it exists.
-// 3. Removes and nils sess.outFile if it is not nil.
-// 4. Deletes the zaps directory if shared.State.RetainZapsOnCompletion is false.
-// 5. Iterates through sess.charsetFiles and removes each file if it exists.
-// 6. Removes sess.hashFile and sets it to an empty string.
+// Cleanup removes session-related temporary files and directories. It first attempts to remove output and charset files.
+// If zaps should not be retained, it deletes the zaps' directory. Finally, it clears the hashFile property.
 func (sess *Session) Cleanup() {
 	shared.Logger.Info("Cleaning up session files")
 
@@ -256,28 +232,13 @@ func (sess *Session) Cleanup() {
 	sess.hashFile = ""
 }
 
-// CmdLine returns the command line string representation of the hashcat process associated with the session.
+// CmdLine returns the command line string used to start the hashcat process.
 func (sess *Session) CmdLine() string {
 	return sess.proc.String()
 }
 
-// NewHashcatSession creates a new Hashcat session with the specified ID and parameters.
-//
-// Actions performed by this function:
-// 1. Retrieves the Hashcat binary path from the configuration.
-// 2. Creates an output file for storing the results of the cracking session.
-// 3. Generates custom charset files based on the provided parameters.
-// 4. Constructs the command-line arguments to run Hashcat.
-// 5. Handles session restoration if a restore file path is specified.
-// 6. Initializes and returns a new Session struct configured to run the Hashcat process.
-//
-// Parameters:
-//   - id: A string representing the unique identifier for the session.
-//   - params: A Params struct containing various configuration options for the session.
-//
-// Returns:
-//   - *Session: A pointer to the newly created Session object.
-//   - error: An error object if any step in setting up the session fails.
+// NewHashcatSession creates a new Hashcat session with given id and parameters,
+// initializes the necessary files, arguments, and channels, and returns the session.
 func NewHashcatSession(id string, params Params) (*Session, error) {
 	binaryPath := viper.GetString("hashcat_path")
 
@@ -316,22 +277,8 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}, nil
 }
 
-// createOutFile creates a new output file with the specified name and permissions in the given directory.
-//
-// Parameters:
-//   - dir: The directory where the output file will be created.
-//   - id: The identifier string that will be used as part of the output file name.
-//   - perm: The file permission settings.
-//
-// Returns:
-//   - *os.File: A pointer to the created file.
-//   - error: An error object if the file creation or permission setting fails.
-//
-// Actions:
-//  1. Joins the directory and id to form the output file path.
-//  2. Creates the file at the specified path.
-//  3. Sets the file's permissions.
-//  4. Returns the file pointer and any error encountered.
+// createOutFile creates a new file with the specified directory, id, and permissions.
+// It returns the created file or an error if the creation or permission setting fails.
 func createOutFile(dir string, id string, perm os.FileMode) (*os.File, error) {
 	outFilePath := filepath.Join(dir, id+".hcout")
 	file, err := os.Create(outFilePath)
@@ -346,17 +293,16 @@ func createOutFile(dir string, id string, perm os.FileMode) (*os.File, error) {
 	return file, nil
 }
 
-// createTempFile creates a temporary file with the specified directory, name pattern, and permissions.
-// Params:
+// createTempFile creates a temporary file in the specified directory with the given pattern and permissions.
 //
-//	dir (string): Directory where the temporary file will be created.
-//	pattern (string): File name pattern, where '*' will be replaced with a random string.
-//	perm (os.FileMode): File permissions to set on the created file.
+// Parameters:
+//   - dir: The directory where the temporary file will be created.
+//   - pattern: The pattern to use when naming the temporary file.
+//   - perm: The file permissions to set for the temporary file.
 //
 // Returns:
-//
-//	*os.File: A pointer to the created temporary file.
-//	error: An error value if any issues occurred during file creation or permission setting.
+//   - *os.File: A pointer to the created temporary file.
+//   - error: An error object if file creation or permission setting fails.
 func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 	file, err := os.CreateTemp(dir, pattern)
 	if err != nil {
@@ -369,15 +315,9 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 	return file, nil
 }
 
-// createCharsetFiles creates temporary files for each non-blank charset in the input slice and writes the charset to the file.
-// It returns a slice of pointers to the created files and any error encountered.
-//
-// Parameters:
-//   - charsets: A slice of strings where each string represents a charset.
-//
-// Returns:
-//   - []*os.File: A slice of pointers to the created temporary files.
-//   - error: An error object if file creation or writing fails.
+// createCharsetFiles creates temporary files for provided charsets, writes each charset to a file, and returns the file pointers.
+// Each charset is checked if it is non-blank before creating and writing to a temporary file.
+// If an error occurs during file creation or writing, the function returns an error.
 func createCharsetFiles(charsets []string) ([]*os.File, error) {
 	var charsetFiles []*os.File
 	for i, charset := range charsets {

@@ -12,6 +12,9 @@ const (
 	AttackBenchmark      = 9 // AttackBenchmark is the attack mode for benchmarking
 )
 
+// statusGuess represents the state and statistics of the current guess in a password cracking attack.
+// It holds information regarding the base and modifier wordlists used, including their counts, offsets, and processing percentages.
+// It also encapsulates the attack mode being used.
 type statusGuess struct {
 	GuessBase        string  `json:"guess_base"`         // The base wordlist used for the attack
 	GuessBaseCount   int64   `json:"guess_base_count"`   // The number of words in the base wordlist
@@ -24,6 +27,8 @@ type statusGuess struct {
 	GuessMode        int64   `json:"guess_mode"`         // The attack mode
 }
 
+// StatusDevice represents the state and statistics of a device involved in an operation.
+// It contains information such as the device ID, name, type, speed, utilization, and temperature.
 type StatusDevice struct {
 	DeviceID   int64  `json:"device_id"`   // The device ID
 	DeviceName string `json:"device_name"` // The device name
@@ -33,6 +38,7 @@ type StatusDevice struct {
 	Temp       int64  `json:"temp"`        // The temperature of the device
 }
 
+// Status represents the current status of a hashcat operation.
 type Status struct {
 	OriginalLine    string         `json:"original_line"`    // The original line from hashcat
 	Time            time.Time      `json:"time"`             // The time the status was received
@@ -50,6 +56,7 @@ type Status struct {
 	EstimatedStop   int64          `json:"estimated_stop"`   // The estimated stop time of the attack
 }
 
+// Result represents the outcome of a hashcat operation, including the timestamp, hash, and plaintext result.
 type Result struct {
 	Timestamp time.Time `json:"timestamp"` // The time the result was received
 	Hash      string    `json:"hash"`      // The hash
