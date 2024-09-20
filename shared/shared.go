@@ -6,10 +6,10 @@ import (
 	"github.com/charmbracelet/log"
 )
 
-// State holds the global configuration and runtime state of the agent, including file paths, debug flags, and settings.
+// State represents the configuration and runtime state of the agent.
 var State = agentState{}
 
-// agentState represents the configuration and runtime state of an agent.
+// agentState represents the state and configuration settings of an agent in the CipherSwarm system.
 type agentState struct {
 	PidFile                             string   // PidFile is the path to the file containing the agent's process ID.
 	HashcatPidFile                      string   // HashcatPidFile is the path to the file containing the Hashcat process ID.
@@ -38,7 +38,7 @@ type agentState struct {
 	UseLegacyDeviceIdentificationMethod bool     // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
 }
 
-// activity represents the current state or action being performed by an agent in the system.
+// activity represents the current state or action being carried out by an agent in the system.
 type activity string
 
 const (
@@ -50,12 +50,11 @@ const (
 	CurrentActivityStopping     activity = "stopping"
 )
 
-// Logger is initialized with options to log at the Info level and report timestamps to the standard output.
+// Logger is a shared logging instance configured to output logs at InfoLevel with timestamps to os.Stdout.
 var Logger = log.NewWithOptions(os.Stdout, log.Options{
 	Level:           log.InfoLevel,
 	ReportTimestamp: true,
 })
 
-// ErrorLogger is a specialized logger instance for logging error messages.
-// It is configured to include additional context by chaining from the base Logger.
+// ErrorLogger is a logger instance for logging critical errors with detailed error information.
 var ErrorLogger = Logger.With()

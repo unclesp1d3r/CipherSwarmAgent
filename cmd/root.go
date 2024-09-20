@@ -27,10 +27,7 @@ var (
 	scope       = gap.NewScope(gap.User, "CipherSwarm")
 )
 
-// rootCmd represents the base command when called without any subcommands.
-// Use: "cipherswarm-agent", Version: lib.AgentVersion, Short: "CipherSwarm Agent"
-// Long: "CipherSwarm Agent is the agent for connecting to the CipherSwarm system."
-// Run: Executes the startAgent function to initialize and start the agent.
+// rootCmd represents the base command for the CipherSwarm Agent CLI application.
 var rootCmd = &cobra.Command{
 	Use:     "cipherswarm-agent",
 	Version: lib.AgentVersion,
@@ -39,20 +36,14 @@ var rootCmd = &cobra.Command{
 	Run:     startAgent,
 }
 
-// Execute runs the root command for the CipherSwarm Agent.
-// It calls the `Execute` method on `rootCmd` to start processing commands.
-// Errors encountered during execution are checked and handled using `cobra.CheckErr`.
+// Execute runs the root command and checks for any errors that occur during its execution.
 func Execute() {
 	err := rootCmd.Execute()
 	cobra.CheckErr(err)
 }
 
-// init sets up the initial configuration for the application by initializing the Cobra commands and Viper configuration.
-// It performs the following actions:
-// 1. Calls initConfig to initialize configuration settings.
-// 2. Sets up persistent flags for configuration file path and debug mode.
-// 3. Binds the debug flag to Viper for configuration management.
-// 4. Sets default configuration values.
+// init initializes the Cobra root command by setting up persistent flags and binding them to Viper configuration variables.
+// It also sets default configuration values and ensures that configurations are properly loaded and applied.
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cipherswarmagent.yaml)")
@@ -63,11 +54,8 @@ func init() {
 	setDefaultConfigValues()
 }
 
-// setDefaultConfigValues sets default values for configuration settings using Viper.
-// It retrieves the current working directory and assigns default paths and settings for
-// data path, GPU temperature threshold, native Hashcat usage, failure sleep duration,
-// file trust, files path, debugging, status timer, zap file writing, zap path, zap retention,
-// additional hash types, and legacy device technique usage.
+// setDefaultConfigValues sets default configuration values using the Viper package.
+// It configures various default values such as "data_path", "gpu_temp_threshold", "always_use_native_hashcat", and others.
 func setDefaultConfigValues() {
 	cwd, err := os.Getwd()
 	cobra.CheckErr(err)
@@ -87,15 +75,7 @@ func setDefaultConfigValues() {
 	viper.SetDefault("use_legacy_device_technique", false)
 }
 
-// setupSharedState initializes the global shared state configuration using parameters from Viper configuration.
-// It sets various file paths and flags in the shared state structure.
-// The function performs the following actions:
-// 1. Sets the API URL and API token.
-// 2. Retrieves and sets the data path and other directory paths.
-// 3. Configures file paths for PID and hashcat PID files.
-// 4. Sets paths for crackers, files, hashlists, zaps, preprocessors, tools, output, and restore data.
-// 5. Configures various boolean flags related to debug, file trust, and zap handling.
-// 6. Sets additional configuration values like status timer and enabling additional hash types.
+// setupSharedState initializes the global configuration and runtime state of the application based on settings from viper.
 func setupSharedState() {
 	// Set the API URL and token
 	shared.State.URL = viper.GetString("api_url")
@@ -123,8 +103,9 @@ func setupSharedState() {
 	shared.State.UseLegacyDeviceIdentificationMethod = viper.GetBool("use_legacy_device_technique") // Set the use legacy device identification method flag in the shared state
 }
 
-// initConfig initializes configuration settings for the application.
-// It sets up error logging, determines configuration directories, and reads configuration files, prioritizing user configurations.
+// initConfig initializes and loads the configuration for the application.
+// It sets up the error logger, determines the config directory, adds config paths,
+// and attempts to read the configuration from a YAML file.
 func initConfig() {
 	shared.ErrorLogger.SetReportCaller(true)
 
@@ -161,13 +142,7 @@ func initConfig() {
 	}
 }
 
-// startAgent starts the CipherSwarm agent, performing a series of initialization steps, such as:
-// ensuring that API URL and token are set, initializing shared state and logger,
-// setting up signal handling for graceful shutdown, initializing API client,
-// checking for existing lock file to prevent multiple instances, creating necessary data directories and lock file,
-// authenticating with the CipherSwarm API, fetching agent configuration and updating metadata,
-// killing any dangling hashcat processes, starting heartbeat and agent loops,
-// and waiting for a termination signal to shut down the agent gracefully.
+// startAgent initializes the agent, ensuring the necessary settings are configured, creating the necessary directories, and starting loops.
 func startAgent(_ *cobra.Command, _ []string) {
 	// Ensure API URL and token are set
 	if viper.GetString("api_url") == "" {
@@ -189,7 +164,7 @@ func startAgent(_ *cobra.Command, _ []string) {
 	setupAPI()
 	lib.DisplayStartup()
 
-	// Check for existing lock file to prevent multiple instances
+	// Check for an existing lock file to prevent multiple instances
 	if lib.CheckForExistingClient(shared.State.PidFile) {
 		shared.Logger.Fatal("Aborting agent start, lock file found", "path", shared.State.PidFile)
 	}
@@ -236,7 +211,7 @@ func startAgent(_ *cobra.Command, _ []string) {
 	lib.DisplayShuttingDown()
 }
 
-// cleanupLockFile removes the specified PID file and logs the operation. On failure, it logs a fatal error and exits the program.
+// cleanupLockFile removes the specified PID file. Logs an error and shuts down the application if removal fails.
 func cleanupLockFile(pidFile string) {
 	shared.Logger.Debug("Cleaning up PID file", "path", pidFile)
 	if err := fileutil.RemoveFile(pidFile); err != nil {
@@ -244,8 +219,8 @@ func cleanupLockFile(pidFile string) {
 	}
 }
 
-// startHeartbeatLoop continuously sends heartbeat signals at regular intervals.
-// It logs the status of heartbeats and determines appropriate actions based on server responses.
+// startHeartbeatLoop runs an infinite loop that sends a heartbeat signal every 60 seconds.
+// It pauses for 60 seconds between each call to `heartbeat`.
 func startHeartbeatLoop(signChan chan os.Signal) {
 	for {
 		heartbeat(signChan)
@@ -253,14 +228,8 @@ func startHeartbeatLoop(signChan chan os.Signal) {
 	}
 }
 
-// startAgentLoop runs the main loop of the agent, managing its state and tasks.
-// It handles configuration reloads, cracker updates, and new task assignments.
-// During each iteration, it checks and executes actions based on the agent's current state:
-// 1. If the agent's state indicates a reload, it calls handleReload() to refresh the configuration.
-// 2. If the agent is not using native Hashcat, it calls handleCrackerUpdate() to update the cracker software.
-// 3. If job-checking is not stopped, it calls handleNewTask() to fetch and process new tasks.
-// After performing these checks and actions, it sets a sleep duration defined by the agent's update interval,
-// uses DisplayInactive() to log the sleep period, and pauses for the specified duration.
+// startAgentLoop runs the main loop for the agent, managing its state and handling various conditions periodically.
+// It continuously checks and reacts to the agent's runtime state flags, such as reload and task handling status.
 func startAgentLoop() {
 	for {
 		if shared.State.Reload {
@@ -281,16 +250,11 @@ func startAgentLoop() {
 	}
 }
 
-// handleReload reloads the agent configuration and performs a new benchmark.
-// It updates the current activity state and logs information and errors.
-//
-// Steps performed:
-// 1. Send an info message indicating the start of the reload process.
-// 2. Set the current activity state to 'starting' and log the reload action.
-// 3. Fetch the new agent configuration, logging and sending a fatal error if it fails.
-// 4. Update the current activity state to 'benchmarking' and perform benchmark updates.
-// 5. Ignore any errors from updating benchmarks as they are already logged.
-// 6. Revert the activity state to 'starting' and reset the reload flag.
+// handleReload handles the reloading of agent's configuration and updating benchmarks.
+// It sends an informational message about the reload, sets the agent's activity state to start,
+// logs the reload action, fetches the agent configuration, and processes errors accordingly.
+// Upon successful configuration fetch, it sets the agent's activity state to benchmarking, updates benchmarks,
+// ignores potential errors from the update, reverts the activity state to starting, and resets the reload flag.
 func handleReload() {
 	lib.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
@@ -312,10 +276,9 @@ func handleCrackerUpdate() {
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
 }
 
-// handleNewTask fetches a new task using lib.GetNewTask and processes it.
-// If fetching the task fails, it logs an error and sleeps for a configured duration before returning.
-// If a new task is available, it proceeds to process the task.
-// If no new task is available, it logs that information.
+// handleNewTask fetches a new task, logs any errors encountered, and processes the task if it is not nil.
+// It sleeps for a configured duration on failure, logs the absence of a new task if none is available.
+// It ensures that execution continues by ignoring processing errors which have been logged already.
 func handleNewTask() {
 	task, err := lib.GetNewTask()
 	if err != nil {
@@ -332,19 +295,11 @@ func handleNewTask() {
 	}
 }
 
-// processTask processes a given task by executing the following sequence of steps:
-//  1. Sets the current activity to "cracking".
-//  2. Displays the new task information.
-//  3. Retrieves attack parameters for the task based on attack ID. If it fails, logs the error, sends error report,
-//     abandons the task, sleeps for a specified duration, and returns the error.
-//  4. Displays attack details.
-//  5. Accepts the task. If it fails, logs the error and returns the error.
-//  6. Displays the log for task acceptance.
-//  7. Downloads required files for the attack. If it fails, logs the error, sends error report,
-//     abandons the task, sleeps for a specified duration, and returns the error.
-//  8. Runs the task with the provided attack parameters. If it fails, returns the error.
-//  9. Sets the current activity to "waiting".
-//  10. Returns nil if successful.
+// processTask processes a task, updates the current activity status, and handles possible errors.
+// First, it logs the new task and retrieves attack parameters. If retrieval fails, it logs, reports the error, and sleeps.
+// Next, it logs information about the attack and accepts the task. If task acceptance fails, it logs and returns the error.
+// The function then downloads the necessary files for the attack. Any errors in download are logged, reported, and the process sleeps.
+// If downloads succeed, it runs the task using the provided attack details, updates the current activity status, and returns any error.
 func processTask(task *components.Task) error {
 	shared.State.CurrentActivity = shared.CurrentActivityCracking
 	lib.DisplayNewTask(task)
@@ -388,11 +343,10 @@ func processTask(task *components.Task) error {
 	return nil
 }
 
-// heartbeat sends a heartbeat signal to the server and processes the server response.
-// If a valid state is returned, it takes actions based on that state, including pending, stopped, and error states.
-// For pending state: If the agent is not benchmarking, it sets a flag to reload the agent.
-// For stopped state: If the agent is not cracking, it marks the agent as stopping and processes job checking status.
-// For error state: It logs an error message and sends a termination signal.
+// heartbeat sends a heartbeat signal to the server and processes the response.
+// If `ExtraDebugging` is enabled, it logs the sending and receipt of the heartbeat.
+// Based on the received state, it either performs a reload, stops processing,
+// sets the job checking to stopped, or sends a termination signal.
 func heartbeat(signChan chan os.Signal) {
 	if shared.State.ExtraDebugging {
 		shared.Logger.Debug("Sending heartbeat")
@@ -424,8 +378,9 @@ func heartbeat(signChan chan os.Signal) {
 	}
 }
 
-// fetchAgentConfig retrieves the configuration of the agent from the CipherSwarm API and handles related errors.
-// If the configuration specifies the use of native Hashcat, it sets the appropriate flag in the configuration.
+// fetchAgentConfig retrieves and applies the agent configuration from the CipherSwarm API.
+// If the "always_use_native_hashcat" flag is set, it enforces using the native Hashcat binary.
+// Logs a fatal error if it fails to collect configuration data.
 func fetchAgentConfig() error {
 	err := lib.GetAgentConfiguration()
 	if err != nil {
@@ -439,9 +394,9 @@ func fetchAgentConfig() error {
 	return err
 }
 
-// initLogger initializes the logging configuration based on the current debug state.
-// If the debug mode is enabled, it sets the logging level to debug and enables caller reporting.
-// Otherwise, it sets the logging level to info.
+// initLogger initializes the logger based on the application's debug state.
+// If debugging is enabled, it sets the logger level to debug and enables caller reporting.
+// Otherwise, it sets the logger level to info.
 func initLogger() {
 	if shared.State.Debug {
 		shared.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug
@@ -451,7 +406,7 @@ func initLogger() {
 	}
 }
 
-// setupAPI initializes the SDK client and background context required for API interactions.
+// setupAPI initializes the SdkClient using the API URL and token from the shared state and sets the background context.
 func setupAPI() {
 	lib.SdkClient = sdk.New(sdk.WithServerURL(shared.State.URL), sdk.WithSecurity(shared.State.APIToken))
 	lib.Context = context.Background()

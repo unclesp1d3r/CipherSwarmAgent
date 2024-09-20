@@ -32,10 +32,10 @@ var (
 	SdkClient     *sdk.CipherSwarmAgentSDK // SdkClient is the client for interacting with the CipherSwarm API.
 )
 
-// AuthenticateAgent authenticates the agent with the CipherSwarm API and updates the shared state with the AgentID.
-// It sends a request to the API client for authentication using the current context.
-// If authentication fails, it logs an error and returns an appropriate error message.
-// Upon successful authentication and verification of the response, it updates the agent's ID in the shared state.
+// AuthenticateAgent authenticates the agent with the CipherSwarm API using the SDK client.
+// It sends an authentication request to the API, processes the response, and updates the shared state.
+// On error, it logs the error and returns it. If the response is nil or indicates a failed authentication,
+// an error is logged and returned.
 func AuthenticateAgent() error {
 	response, err := SdkClient.Client.Authenticate(Context)
 	if err != nil {
@@ -53,11 +53,8 @@ func AuthenticateAgent() error {
 	return nil
 }
 
-// handleAuthenticationError handles different types of errors during authentication with the CipherSwarm API.
-// Logs the error details using shared.Logger and shared.ErrorLogger based on error type and then returns the error.
-// If error matches sdkerrors.ErrorObject, logs a general connection error.
-// If error matches sdkerrors.SDKError, logs an error with status code and message.
-// Otherwise, logs a critical communication error with the CipherSwarm API.
+// handleAuthenticationError handles authentication errors from the CipherSwarm API.
+// It logs detailed error information based on the type of error and returns the original error.
 func handleAuthenticationError(err error) error {
 	var eo *sdkerrors.ErrorObject
 	if errors.As(err, &eo) {
@@ -78,11 +75,9 @@ func handleAuthenticationError(err error) error {
 	return err
 }
 
-// GetAgentConfiguration retrieves the agent configuration from the server.
-// It makes an API call to fetch the configuration and handles errors gracefully.
-// If the configuration specifies using native Hashcat, it sets the path for the native binary.
-// If the configuration retrieval is successful, it updates the global Configuration variable.
-// Logs detailed debug information about the configuration.
+// GetAgentConfiguration retrieves the agent configuration from the CipherSwarm API and handles errors.
+// It updates the global Configuration variable with the fetched configuration.
+// If UseNativeHashcat is true in the configuration, it sets the native Hashcat path.
 func GetAgentConfiguration() error {
 	response, err := SdkClient.Client.GetConfiguration(Context)
 	if err != nil {
@@ -112,11 +107,10 @@ func GetAgentConfiguration() error {
 	return nil
 }
 
-// handleConfigurationError handles errors encountered during configuration retrieval.
-// If the error is of type sdkerrors.ErrorObject, it logs the error and sends a critical error message.
-// If the error is of type sdkerrors.SDKError, it logs detailed error information and sends a critical error message.
-// For all other errors, it logs a critical error indicating issues with the CipherSwarm API.
-// The function returns the error after logging and sending relevant error messages.
+// handleConfigurationError processes configuration errors by logging them and sending critical error reports.
+// If the error is an sdkerrors.ErrorObject, logs the error and sends a critical error report.
+// If the error is an sdkerrors.SDKError, logs the error with status code and message, and sends a critical error report.
+// For all other errors, logs a critical communication error with the CipherSwarm API.
 func handleConfigurationError(err error) error {
 	var eo *sdkerrors.ErrorObject
 	if errors.As(err, &eo) {
@@ -139,10 +133,7 @@ func handleConfigurationError(err error) error {
 	return err
 }
 
-// mapConfiguration converts a GetConfigurationResponseBody into an agentConfiguration object.
-// It initializes the agentConfiguration struct and agentConfig struct with values from the response body.
-// For boolean and integer fields, it uses pointer.UnwrapOr to provide default values in case of nil pointers.
-// Returns the populated agentConfiguration struct.
+// mapConfiguration converts the GetConfigurationResponseBody into an agentConfiguration for use within the agent.
 func mapConfiguration(config *operations.GetConfigurationResponseBody) agentConfiguration {
 	agentConfig := agentConfiguration{
 		APIVersion: config.APIVersion,
@@ -157,8 +148,7 @@ func mapConfiguration(config *operations.GetConfigurationResponseBody) agentConf
 	return agentConfig
 }
 
-// setNativeHashcatPath attempts to set the path of the native Hashcat binary.
-// Logs debug information and errors if the binary is not found. Updates configuration with the found binary path.
+// setNativeHashcatPath sets the path for the native Hashcat binary if it is found in the system, otherwise logs and reports error.
 func setNativeHashcatPath() error {
 	shared.Logger.Debug("Using native Hashcat")
 	binPath, err := exec.LookPath("hashcat")
@@ -174,12 +164,9 @@ func setNativeHashcatPath() error {
 	return viper.WriteConfig()
 }
 
-// UpdateAgentMetadata updates the agent's metadata by performing the following steps:
-// 1. Retrieves the host information and constructs the client's signature.
-// 2. Fetches the list of devices associated with the agent.
-// 3. Constructs an UpdateAgentRequestBody with relevant metadata.
-// 4. Logs the updating action and sends an update request to the server.
-// 5. Handles the response by displaying the updated metadata or logging an error.
+// UpdateAgentMetadata updates the agent's metadata and sends it to the CipherSwarm API.
+// It retrieves host information, device list, constructs the agent update request body,
+// and sends the updated metadata to the API. Logs relevant information and handles any API errors.
 func UpdateAgentMetadata() error {
 	info, err := host.Info()
 	if err != nil {
@@ -221,10 +208,8 @@ func UpdateAgentMetadata() error {
 	return nil
 }
 
-// getDevicesList retrieves a list of device names.
-// It checks the shared.State.UseLegacyDeviceIdentificationMethod flag to determine which method to use.
-// If the flag is set, it uses the legacy method by calling arch.GetDevices.
-// Otherwise, it calls the getDevices function to get the list.
+// getDevicesList retrieves a list of device names based on the configured device identification method.
+// It checks the global state to determine if the legacy method should be used, then calls the appropriate function.
 func getDevicesList() ([]string, error) {
 	if shared.State.UseLegacyDeviceIdentificationMethod {
 		return arch.GetDevices()
@@ -233,9 +218,8 @@ func getDevicesList() ([]string, error) {
 	return getDevices()
 }
 
-// getDevices retrieves available OpenCL devices by creating a test Hashcat session
-// with predefined parameters, running a test task, and extracting the device names.
-// If any step fails, it logs an error with the severity level and returns it.
+// getDevices initializes a test Hashcat session and runs a test task, returning the names of available OpenCL devices.
+// An error is logged and returned if the session creation or test task execution fails.
 func getDevices() ([]string, error) {
 	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackModeMask,
@@ -258,12 +242,13 @@ func getDevices() ([]string, error) {
 	return extractDeviceNames(testStatus.Devices), nil
 }
 
-// logAndSendError logs an error message and sends an agent error to the server.
+// logAndSendError logs the provided error message and sends an error report with the specified severity and task metadata.
 // Parameters:
-// - message: The error message to log.
-// - err: The error object to log and send.
-// - severity: The severity level of the error.
-// - task: A pointer to the task associated with the error.
+// - message: The error message to be logged.
+// - err: The error object to be logged and reported.
+// - severity: The severity level of the error being reported.
+// - task: A pointer to the task associated with the error, can be nil.
+// Returns the same error passed in.
 func logAndSendError(message string, err error, severity operations.Severity, task *components.Task) error {
 	shared.Logger.Error(message, "error", err)
 	SendAgentError(err.Error(), task, severity)
@@ -271,8 +256,7 @@ func logAndSendError(message string, err error, severity operations.Severity, ta
 	return err
 }
 
-// extractDeviceNames extracts the device names from a slice of StatusDevice structs and returns them as a slice of strings.
-// It iterates over each StatusDevice in the provided slice, retrieves the DeviceName field, and stores it in a new slice.
+// extractDeviceNames extracts the device names from a slice of hashcat.StatusDevice and returns them as a slice of strings.
 func extractDeviceNames(deviceStatuses []hashcat.StatusDevice) []string {
 	devices := make([]string, len(deviceStatuses))
 	for i, device := range deviceStatuses {
@@ -282,9 +266,10 @@ func extractDeviceNames(deviceStatuses []hashcat.StatusDevice) []string {
 	return devices
 }
 
-// UpdateCracker checks if a new version of the cracker is available and updates it if necessary.
-// It logs each step of the process, including errors encountered during the version check, API communication,
-// and the update process itself.
+// UpdateCracker checks for updates to the cracker and applies them if available.
+// It starts by logging the beginning of the update process and attempts to fetch the current version of Hashcat.
+// It then calls the API to check if there are any updates available. Depending on the API response, it either handles
+// the update process or logs the absence of any new updates. If any errors occur during these steps, they are logged and handled accordingly.
 func UpdateCracker() {
 	shared.Logger.Info("Checking for updated cracker")
 	currentVersion, err := getCurrentHashcatVersion()
@@ -319,17 +304,16 @@ func UpdateCracker() {
 	}
 }
 
-// handleCrackerUpdate handles the process of downloading, moving, and extracting a new cracker update.
-// It performs the following steps:
-// 1. Displays information about the new cracker available.
-// 2. Creates a temporary directory to store the downloaded archive.
-// 3. Downloads the cracker archive to the temporary directory.
-// 4. Moves the archive from the temporary directory to a new location within the CrackersPath.
-// 5. Extracts the Hashcat archive to the CrackersPath.
-// 6. Validates the extracted Hashcat directory and binary.
-// 7. Removes the downloaded archive.
-// 8. Updates the configuration to point to the new Hashcat executable path.
-// If any step fails, an appropriate error is logged and returned.
+// handleCrackerUpdate manages the process of updating the cracker tool.
+// It follows these steps:
+// 1. Logs the new cracker update information.
+// 2. Creates a temporary directory for download and extraction.
+// 3. Downloads the cracker archive from the provided URL.
+// 4. Moves the downloaded archive to a predefined location.
+// 5. Extracts the archive to replace the old cracker directory.
+// 6. Validates the new cracker directory and executable.
+// 7. Updates the configuration with the new executable path.
+// Returns an error if any step in the process fails.
 func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	displayNewCrackerAvailable(update)
 
@@ -370,8 +354,7 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	return nil
 }
 
-// cleanupTempDir removes the specified temporary directory and handles any error by logging and sending an error report.
-// It returns an error if the directory cannot be removed.
+// cleanupTempDir removes the specified temporary directory and logs any errors encountered. Returns the error if removal fails.
 func cleanupTempDir(tempDir string) error {
 	if err := os.RemoveAll(tempDir); err != nil {
 		return logAndSendError("Error removing temporary directory", err, operations.SeverityCritical, nil)
@@ -380,9 +363,7 @@ func cleanupTempDir(tempDir string) error {
 	return nil
 }
 
-// validateHashcatDirectory checks if the given hashcat directory and its executable exist.
-// It logs an error if either the directory or the executable is missing and returns false.
-// If both checks pass, it returns true.
+// validateHashcatDirectory checks if the given hashcat directory exists and contains the specified executable.
 func validateHashcatDirectory(hashcatDirectory, execName string) bool {
 	if !fileutil.IsDir(hashcatDirectory) {
 		shared.Logger.Error("New hashcat directory does not exist", "path", hashcatDirectory)
@@ -400,13 +381,10 @@ func validateHashcatDirectory(hashcatDirectory, execName string) bool {
 	return true
 }
 
-// GetNewTask attempts to fetch a new task from the CipherSwarm API.
-//
-// It makes a request to the API and processes the response as follows:
-// - If the response is successful (Status OK), it returns the new task.
-// - If there is no new task available (Status No Content), it returns nil.
-// - If an error occurs during the API request, it handles the error and returns it.
-// - For any other response status, it returns a "bad response" error.
+// GetNewTask retrieves a new task from the server.
+// It sends a request using SdkClient, handles any errors, and returns the task if available.
+// If the server responds with no content, it means no new task is available, and the function returns nil without error.
+// For any other unexpected response status, an error is returned.
 func GetNewTask() (*components.Task, error) {
 	response, err := SdkClient.Tasks.GetNewTask(Context)
 	if err != nil {
@@ -427,10 +405,8 @@ func GetNewTask() (*components.Task, error) {
 	}
 }
 
-// GetAttackParameters retrieves the attack parameters using the provided attack ID.
-// It interacts with the SdkClient to fetch the attack details.
-// If there is an error during the API call, it handles the error and returns it.
-// If the API responds with a status other than HTTP 200 OK, it returns a "bad response" error.
+// GetAttackParameters retrieves the attack parameters for a given attackID via the SdkClient.
+// Returns an Attack object if the API call is successful and the response status is OK.
 func GetAttackParameters(attackID int64) (*components.Attack, error) {
 	response, err := SdkClient.Attacks.GetAttack(Context, attackID)
 	if err != nil {
@@ -446,12 +422,11 @@ func GetAttackParameters(attackID int64) (*components.Attack, error) {
 	return nil, errors.New("bad response: " + response.RawResponse.Status)
 }
 
-// handleAPIError handles errors returned from API calls.
-// It logs the error, categorizing it based on its type, and sends an appropriate error message to the agent.
-// Three types of errors are handled:
-// - sdkerrors.ErrorObject: Logs the error and sends an agent error with the provided severity.
-// - sdkerrors.SDKError: Logs the error with its status code and message, and sends an agent error with the provided severity.
-// - default: Logs a critical error for any other type of error.
+// handleAPIError handles errors returned from the CipherSwarm API. Logs error messages and sends error reports based on the error type.
+// Parameters:
+// - message: Description of the error context.
+// - err: The original error object encountered.
+// - severity: The severity level of the error for reporting.
 func handleAPIError(message string, err error, severity operations.Severity) {
 	switch e := err.(type) {
 	case *sdkerrors.ErrorObject:
@@ -467,11 +442,11 @@ func handleAPIError(message string, err error, severity operations.Severity) {
 	}
 }
 
-// sendBenchmarkResults submits the benchmark results to the server.
-// It converts the given benchmark results into a slice of HashcatBenchmark.
-// It creates a SubmitBenchmarkRequestBody with the converted benchmarks and submits it.
-// If an error occurs while creating a benchmark, it skips that result.
-// If the server returns a StatusNoContent, it returns nil, otherwise it returns an error.
+// sendBenchmarkResults sends the collected benchmark results to a server endpoint.
+// It converts each benchmarkResult into a HashcatBenchmark and appends them to a slice.
+// If the conversion fails for a result, it continues to the next result.
+// Creates a SubmitBenchmarkRequestBody with the HashcatBenchmarks slice and submits it via SdkClient.
+// Returns an error if submission or the response received is not successful.
 func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 	var benchmarks []components.HashcatBenchmark //nolint:prealloc
 
@@ -499,9 +474,9 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 	return errors.New("bad response: " + res.RawResponse.Status)
 }
 
-// createBenchmark converts a benchmarkResult into a HashcatBenchmark.
-// It attempts to convert each string field of benchmarkResult to the appropriate type.
-// Returns a HashcatBenchmark and an error if any conversion fails.
+// createBenchmark converts a benchmarkResult to a components.HashcatBenchmark struct.
+// It handles the conversion of string fields in benchmarkResult to appropriate types.
+// Returns a HashcatBenchmark instance and an error if any conversion fails.
 func createBenchmark(result benchmarkResult) (components.HashcatBenchmark, error) {
 	hashType, err := convertor.ToInt(result.HashType)
 	if err != nil {
@@ -528,9 +503,10 @@ func createBenchmark(result benchmarkResult) (components.HashcatBenchmark, error
 	}, nil
 }
 
-// UpdateBenchmarks updates and sends benchmark results to the server.
-// It creates a Hashcat session to perform benchmark tasks, runs the benchmark, and then sends the results.
-// If errors occur during the creation of the session or sending results, they are logged and the function returns such errors.
+// UpdateBenchmarks updates the benchmark metrics using Hashcat.
+// Creates a Hashcat session with benchmark parameters and initiates the benchmarking process.
+// Logs the session start, runs the benchmark task, and updates the results.
+// If any errors occur during session creation or result sending, logs the errors and returns them.
 func UpdateBenchmarks() error {
 	jobParams := hashcat.Params{
 		AttackMode:                hashcat.AttackBenchmark,
@@ -559,19 +535,12 @@ func UpdateBenchmarks() error {
 	return nil
 }
 
-// DownloadFiles downloads the necessary files for an attack.
-//
-// This function performs the following steps:
-// 1. Displays the start of the file download process.
-// 2. Downloads the hash list associated with the attack, returning an error if it fails.
-// 3. Iterates over the attack's resource files (word list, rule list, mask list) and downloads each one.
-// 4. Returns an error if any resource file download fails or nil if all downloads succeed.
-//
-// Parameters:
-//   - attack (*components.Attack): A pointer to the Attack object containing details of the attack.
-//
-// Returns:
-//   - error: An error object if any file download fails, otherwise nil.
+// DownloadFiles downloads the necessary files for the provided attack.
+// It performs the following steps:
+// 1. Logs the start of the download process.
+// 2. Downloads the hash list associated with the attack.
+// 3. Iterates over resource files (word list, rule list, and mask list) and downloads each one.
+// If any step encounters an error, the function returns that error.
 func DownloadFiles(attack *components.Attack) error {
 	displayDownloadFileStart(attack)
 
@@ -594,10 +563,11 @@ func DownloadFiles(attack *components.Attack) error {
 	return nil
 }
 
-// downloadResourceFile downloads the specified AttackResourceFile to a local path.
-// If the file already exists and AlwaysTrustFiles is true, it skips the checksum verification.
-// Otherwise, it verifies the checksum (if provided), downloads the file, and checks its size after download.
-// Logs appropriate messages during the process and returns errors if any issues are encountered.
+// downloadResourceFile downloads a resource file if the provided resource is not nil.
+// Constructs the file path based on the resource file name and logs the download action.
+// If checksum verification is not always skipped, converts the base64 checksum to hex.
+// Downloads the file using the resource's download URL, target file path, and checksum for verification.
+// Logs and sends an error report if file download fails or if the downloaded file is empty.
 func downloadResourceFile(resource *components.AttackResourceFile) error {
 	if resource == nil {
 		return nil
@@ -626,13 +596,9 @@ func downloadResourceFile(resource *components.AttackResourceFile) error {
 	return nil
 }
 
-// SendHeartBeat sends a heartbeat signal to the CipherSwarm Agent server and handles the response.
-// It logs the heartbeat status and processes the response based on the status code received.
-//   - If the response status is NoContent, it logs the successful sending of the heartbeat.
-//   - If the response status is OK, it logs the successful sending of the heartbeat and
-//     processes the state returned in the response using handleStateResponse method.
-//
-// In case of an error during the heartbeat sending, it handles the error using handleHeartbeatError method.
+// SendHeartBeat sends a heartbeat signal to the server and processes the server's response.
+// It handles different response status codes and logs relevant messages.
+// It returns the agent's state object or nil if an error occurs or if the response status is http.StatusNoContent.
 func SendHeartBeat() *operations.State {
 	resp, err := SdkClient.Agents.SendHeartbeat(Context, shared.State.AgentID)
 	if err != nil {
@@ -656,8 +622,11 @@ func SendHeartBeat() *operations.State {
 	return nil
 }
 
-// handleHeartbeatError handles errors that occur during the heartbeat process.
-// It differentiates the error type and takes appropriate logging and error handling actions.
+// handleHeartbeatError processes and logs errors occurring during the heartbeat operation.
+// It handles different types of errors and manages logging and reporting based on severity.
+// - For *sdkerrors.ErrorObject: logs a critical error and sends a critical agent error message.
+// - For *sdkerrors.SDKError: logs an unexpected error with status code and message, and sends a critical agent error message.
+// - For all other errors: logs a critical communication error with the CipherSwarm API.
 func handleHeartbeatError(err error) {
 	switch e := err.(type) {
 	case *sdkerrors.ErrorObject:
@@ -672,7 +641,8 @@ func handleHeartbeatError(err error) {
 	}
 }
 
-// logHeartbeatSent logs a "Heartbeat sent" message if extra debugging is enabled and marks job checking as active.
+// logHeartbeatSent logs a debug message indicating a heartbeat was sent if extra debugging is enabled.
+// It also sets the JobCheckingStopped state to false.
 func logHeartbeatSent() {
 	if shared.State.ExtraDebugging {
 		shared.Logger.Debug("Heartbeat sent")
@@ -680,10 +650,8 @@ func logHeartbeatSent() {
 	shared.State.JobCheckingStopped = false
 }
 
-// handleStateResponse processes the state response from the server and returns the current state.
-// - It logs debug messages based on the state of the agent if extra debugging is enabled.
-// - The agent states handled are pending, stopped, and error. Other states log an "Unknown agent state" message if extra debugging is enabled.
-// - If the state response is nil, it returns nil. The function returns a pointer to the detected state.
+// handleStateResponse processes the given state response and performs logging based on the agent state.
+// It returns the agent's state object or nil if the response is nil.
 func handleStateResponse(stateResponse *operations.SendHeartbeatResponseBody) *operations.State {
 	if stateResponse == nil {
 		return nil
@@ -708,20 +676,13 @@ func handleStateResponse(stateResponse *operations.SendHeartbeatResponseBody) *o
 	return &state
 }
 
-// RunTask executes a given task with the associated attack parameters. It performs the following actions:
-// 1. Displays a log indicating the start of the task.
-// 2. Checks if attack parameter is nil and logs and returns a critical error if so.
-// 3. Creates job parameters using the task and attack.
-// 4. Initiates a new Hashcat session with given job parameters.
-// 5. Runs the attack task and manages the session output, status updates, and errors.
-// 6. Displays a completion log message.
-//
+// RunTask performs a hashcat attack based on the provided task and attack objects.
+// It initializes the task, creates job parameters, starts the hashcat session, and handles task completion or errors.
 // Parameters:
-//   - task: A pointer to the task to be executed.
-//   - attack: A pointer to the associated attack parameters.
+//   - task: Pointer to the Task object to be run.
+//   - attack: Pointer to the Attack object describing the specifics of the attack.
 //
-// Returns:
-//   - error: An error object if any step in executing the task fails.
+// Returns an error if the task could not be run or if the attack session could not be started.
 func RunTask(task *components.Task, attack *components.Attack) error {
 	displayRunTaskStarting(task)
 
@@ -741,10 +702,10 @@ func RunTask(task *components.Task, attack *components.Attack) error {
 	return nil
 }
 
-// createJobParams generates Hashcat parameters from Task and Attack objects.
-// It unwraps values using pointer functions and joins paths based on configuration settings.
-// It sets attack mode, hash type, hash file, mask, increment modes, custom charsets, resource names,
-// additional arguments, and device configurations.
+// createJobParams creates hashcat parameters from the given Task and Attack objects.
+// The function initializes a hashcat.Params struct by extracting and converting fields
+// from the Task and Attack objects. It includes path settings for various resources
+// like hash files, word lists, rule lists, and restore files.
 func createJobParams(task *components.Task, attack *components.Attack) hashcat.Params {
 	return hashcat.Params{
 		AttackMode:       pointer.UnwrapOr(attack.AttackModeHashcat),
@@ -774,15 +735,9 @@ func createJobParams(task *components.Task, attack *components.Attack) hashcat.P
 	}
 }
 
-// sendStatusUpdate sends the current status update to the server and handles the response.
-// Ensures the update time is set to the current time if not already set.
-// Converts the device statuses from `hashcat.Status` to `components.DeviceStatus`.
-// Converts `hashcat.Status` to `components.TaskStatus`.
-// Sends the status update to the server using `SdkClient.Tasks.SendStatus`.
-// Handles any errors that occur during the send operation and calls `handleStatusUpdateError`.
-// Manages different HTTP response codes:
-// - `http.StatusNoContent`: Indicates the update was successfully sent.
-// - `http.StatusAccepted`: Indicates the update was sent but is stale, triggering a call to `getZaps()`.
+// sendStatusUpdate sends a status update to the server for a given task and session.
+// It ensures the update time is set, converts device statuses, and converts hashcat.Status to cipherswarm.TaskStatus.
+// Finally, it sends the status update to the server and handles the response.
 func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashcat.Session) {
 	// Ensure the update time is set
 	if update.Time.IsZero() {
@@ -853,10 +808,7 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	}
 }
 
-// handleStatusUpdateError handles errors that occur during a status update for a task within a hashcat session.
-// If the error is a sdkerrors.ErrorObject, it logs and sends a critical error message.
-// If the error is a sdkerrors.SDKError, it delegates handling to the handleSDKError function.
-// For other errors, it logs a critical error indicating issues communicating with the CipherSwarm API.
+// handleStatusUpdateError handles specific error types during a status update and logs or processes them accordingly.
 func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Session) {
 	var eo *sdkerrors.ErrorObject
 	if errors.As(err, &eo) {
@@ -875,7 +827,7 @@ func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Ses
 	shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 }
 
-// handleSDKError handles different SDK errors and performs specific actions based on the error type.
+// handleSDKError handles errors from the SDK by taking appropriate action based on the error's status code.
 func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat.Session) {
 	switch se.StatusCode {
 	case http.StatusNotFound:
@@ -889,9 +841,9 @@ func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat
 	}
 }
 
-// handleTaskNotFound handles scenarios where a task is not found in the session.
-// It logs an error about the missing task and makes attempts to properly terminate and clean up the session.
-// The function logs relevant information and potential errors occurring during session termination and cleanup.
+// handleTaskNotFound handles the scenario where a task is not found in the system.
+// It logs an error message with the task ID, attempts to kill the session, and cleans up the session.
+// If killing the session fails, it logs and sends an error.
 func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 	shared.Logger.Error("Task not found", "task_id", task.GetID())
 	shared.Logger.Info("Killing task", "task_id", task.GetID())
@@ -902,10 +854,7 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 	sess.Cleanup()
 }
 
-// handleTaskGone pauses the given task and attempts to kill the associated hashcat session.
-// First, it logs the information that the task is being paused.
-// Then, it calls the Kill method on the session.
-// If an error occurs during this operation, it logs and sends the error with a fatal severity.
+// handleTaskGone handles the termination of a task when it is no longer needed, ensuring the session is appropriately killed.
 func handleTaskGone(task *components.Task, sess *hashcat.Session) {
 	shared.Logger.Info("Pausing task", "task_id", task.GetID())
 	if err := sess.Kill(); err != nil {
@@ -913,9 +862,8 @@ func handleTaskGone(task *components.Task, sess *hashcat.Session) {
 	}
 }
 
-// getZaps downloads and processes cracked hashes for a given Task.
-// It logs errors if the Task is nil or if any issues occur while fetching zaps.
-// If zaps exist, handles the response stream and processes the cracked hashes.
+// getZaps fetches zap data for a given task, handles errors, and processes the response stream if available.
+// Logs an error if the task is nil, displays job progress, and retrieves zaps from the SdkClient.
 func getZaps(task *components.Task) {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
@@ -937,8 +885,10 @@ func getZaps(task *components.Task) {
 	}
 }
 
-// handleGetZapsError processes errors encountered when fetching zaps.
-// It logs the error and sends a critical severity agent error report.
+// handleGetZapsError handles different types of errors when fetching zaps from the server.
+// - If the error is of type sdkerrors.ErrorObject, it logs the error and sends a critical agent error message.
+// - If the error is of type sdkerrors.SDKError, it logs an unexpected error with its status code and message, then sends a critical agent error message.
+// - For all other errors, it logs a critical communication error with the CipherSwarm API.
 func handleGetZapsError(err error) {
 	switch e := err.(type) {
 	case *sdkerrors.ErrorObject:
@@ -954,17 +904,9 @@ func handleGetZapsError(err error) {
 	}
 }
 
-// handleResponseStream processes the response stream for a given task.
-// It creates a Zap file that contains a list of all cracked hashes and their plain text values.
-// First, it tries to remove any existing zap file for the specified task.
-// It then creates and writes the new zap file from the response stream.
-// Logs and sends critical errors if any step fails.
-//
-// Parameters:
-//   - task: A pointer to the Task object being processed.
-//   - responseStream: An io.Reader containing the data to write to the zap file.
-//
-// Returns an error if critical issues are encountered during file operations.
+// handleResponseStream processes a received response stream for a given task, writing it to a zap file on disk.
+// Constructs the zap file path from the task ID, removes existing zap files if necessary, and writes the new zap file.
+// Logs debug information for non-critical errors when removing existing files and logs critical errors for failures in creating or writing the zap file.
 func handleResponseStream(task *components.Task, responseStream io.Reader) error {
 	zapFilePath := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
 
@@ -981,7 +923,8 @@ func handleResponseStream(task *components.Task, responseStream io.Reader) error
 	return nil
 }
 
-// removeExistingZapFile removes a zap file if it already exists at the given path. Logs a debug message if the file exists.
+// removeExistingZapFile removes the zap file at the given path if it exists, logging debug information.
+// Returns an error if the file removal fails.
 func removeExistingZapFile(zapFilePath string) error {
 	if fileutil.IsExist(zapFilePath) {
 		shared.Logger.Debug("Zap file already exists", "path", zapFilePath)
@@ -992,13 +935,9 @@ func removeExistingZapFile(zapFilePath string) error {
 	return nil
 }
 
-// createAndWriteZapFile creates a new zap file at the specified path and writes the provided data from the responseStream.
-// If the file creation or writing fails, an error is logged and sent with severity critical, and the error is returned.
-// Parameters:
-// - zapFilePath: The file path where the zap file will be created.
-// - responseStream: An io.Reader containing the data to be written to the zap file.
-// - task: A pointer to the task associated with the operation.
-// Returns an error if unable to create, write, or close the zap file properly.
+// createAndWriteZapFile creates a zap file at the specified path and writes data from the provided responseStream.
+// The task parameter is used for logging and error reporting in case of failures.
+// Returns an error if file creation, writing, or closing fails.
 func createAndWriteZapFile(zapFilePath string, responseStream io.Reader, task *components.Task) error {
 	outFile, err := os.Create(zapFilePath)
 	if err != nil {
@@ -1015,15 +954,12 @@ func createAndWriteZapFile(zapFilePath string, responseStream io.Reader, task *c
 	return nil
 }
 
-// SendAgentError sends an error message to the agent server with relevant metadata and severity level.
-// Parameters:
-// - stdErrLine: The error message string to be sent.
-// - task: A pointer to the task associated with the error, can be nil.
-// - severity: The severity level of the error being reported.
-//
-// The function constructs metadata with the current timestamp, platform, and version information.
-// It creates an error request body and sends it using the SDK client.
-// If there is an error in sending the error report, handleSendError is called to manage it.
+// SendAgentError sends an error message to the centralized server, including metadata and severity level.
+// - stdErrLine: The error message string to send.
+// - task: Pointer to the task associated with the error, can be nil.
+// - severity: The severity level of the error (e.g., critical, warning).
+// The function prepares metadata including platform and agent version details, constructs the request body,
+// and sends it to the server using the SDK client. If the sending fails, it handles the error accordingly.
 func SendAgentError(stdErrLine string, task *components.Task, severity operations.Severity) {
 	var taskID *int64
 	if task != nil {
@@ -1051,15 +987,8 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 	}
 }
 
-// handleSendError handles different types of errors encountered during sending
-// operations by logging and sending a critical agent error message.
-// Parameters:
-//   - err: error object, can be of type *sdkerrors.ErrorObject, *sdkerrors.SDKError, or any other error type.
-//
-// Actions:
-//   - If the error is of type *sdkerrors.ErrorObject: logs a critical error and sends a critical agent error message.
-//   - If the error is of type *sdkerrors.SDKError: logs an unexpected error with status code and message, and sends a critical agent error message.
-//   - For all other errors: logs a critical communication error with the CipherSwarm API.
+// handleSendError handles errors that occur during communication with the server.
+// It logs the error locally and attempts to send critical errors to the server.
 func handleSendError(err error) {
 	switch e := err.(type) {
 	case *sdkerrors.ErrorObject:
@@ -1075,11 +1004,10 @@ func handleSendError(err error) {
 	}
 }
 
-// AcceptTask attempts to accept the given task using the SdkClient.
-// If the task is nil, it logs an error and returns a "task is nil" error.
-// It then calls SdkClient.Tasks.SetTaskAccepted with the task's ID and context.
-// If the API call is successful, it logs a debug message and returns nil.
-// If the API call fails, it invokes handleAcceptTaskError and returns the error.
+// AcceptTask attempts to accept the given task identified by its ID.
+// It logs an error and returns if the task is nil.
+// If the task is successfully accepted, it logs a debug message indicating success.
+// In case of an error during task acceptance, it handles the error and returns it.
 func AcceptTask(task *components.Task) error {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
@@ -1099,14 +1027,11 @@ func AcceptTask(task *components.Task) error {
 	return nil
 }
 
-// handleAcceptTaskError handles various task acceptance errors by logging them and sending appropriate agent error messages.
-// Parameters:
-//   - err: error object, can be of type *sdkerrors.ErrorObject, *sdkerrors.SDKError, or any other error type.
-//
-// Actions:
-//   - If the error is of type *sdkerrors.ErrorObject: logs the error and sends an informational agent error message.
-//   - If the error is of type *sdkerrors.SDKError: logs the error with status code and message, and sends a critical agent error message.
-//   - For all other errors: logs a critical communication error with the CipherSwarm API.
+// handleAcceptTaskError handles errors that occur when attempting to accept a task.
+// It distinguishes between different error types and logs messages accordingly.
+// For specific SDK errors, it logs the error and sends an info-severity agent error.
+// For unexpected SDK errors, it logs the error including status code and message, and sends a critical-severity agent error.
+// For all other errors, it logs a critical communication error.
 func handleAcceptTaskError(err error) {
 	switch e := err.(type) {
 	case *sdkerrors.ErrorObject:
@@ -1125,9 +1050,8 @@ func handleAcceptTaskError(err error) {
 	}
 }
 
-// markTaskExhausted marks the provided task as exhausted using the SdkClient to notify the server.
-// If the task is nil, it logs an error message and returns.
-// If an error occurs while notifying the server, it handles the error explicitly.
+// markTaskExhausted marks the given task as exhausted by notifying the server.
+// Logs an error if the task is nil or if notifying the server fails.
 func markTaskExhausted(task *components.Task) {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
@@ -1141,8 +1065,7 @@ func markTaskExhausted(task *components.Task) {
 	}
 }
 
-// SendAgentShutdown notifies the server of an agent shutdown event. It sends the shutdown signal using the SdkClient's Agents.SetAgentShutdown method.
-// If the API call returns an error, it handles the error by logging it and classifying it as a critical error using the handleAPIError function.
+// SendAgentShutdown notifies the server of the agent shutdown and handles any errors during the API call.
 func SendAgentShutdown() {
 	_, err := SdkClient.Agents.SetAgentShutdown(Context, shared.State.AgentID)
 	if err != nil {
@@ -1150,10 +1073,8 @@ func SendAgentShutdown() {
 	}
 }
 
-// AbandonTask marks a given task as abandoned by making an API call to notify the server.
+// AbandonTask sets the given task to an abandoned state using the SdkClient and logs any errors that occur.
 // If the task is nil, it logs an error and returns immediately.
-// Otherwise, it attempts to set the task as abandoned using the SdkClient.
-// If the API call fails, it handles the error by invoking handleTaskError.
 func AbandonTask(task *components.Task) {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
@@ -1167,6 +1088,8 @@ func AbandonTask(task *components.Task) {
 	}
 }
 
+// handleTaskError handles different types of errors encountered during task operations and logs appropriate messages.
+// It sends error details to a centralized server based on the error's severity level.
 func handleTaskError(err error, message string) {
 	switch e := err.(type) {
 	case *sdkerrors.ErrorObject:
@@ -1183,7 +1106,12 @@ func handleTaskError(err error, message string) {
 	}
 }
 
-// sendCrackedHash sends a cracked hash to the task server and handles logging and error management.
+// sendCrackedHash sends a cracked hash result to the task server and logs relevant information.
+// If the task pointer is nil, it logs an error and returns early.
+// Constructs a HashcatResult object and sends it to the server via the SDK client.
+// Logs and handles any errors encountered during the sending process.
+// If configured, writes the cracked hash to a file.
+// Logs additional information based on the HTTP response status.
 func sendCrackedHash(hash hashcat.Result, task *components.Task) {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
@@ -1216,14 +1144,8 @@ func sendCrackedHash(hash hashcat.Result, task *components.Task) {
 	}
 }
 
-// handleSendCrackError handles different types of errors encountered while sending cracked hash to the server.
-// Parameters:
-// - err: error object, which can be of type *sdkerrors.ErrorObject, *sdkerrors.SDKError, or any generic error.
-//
-// Actions:
-// - If the error is of type *sdkerrors.ErrorObject: logs an error indicating the task was not found and sends a major agent error.
-// - If the error is of type *sdkerrors.SDKError: logs an unexpected error with status code and message, and sends a critical agent error.
-// - For all other errors: logs a critical communication Error with the CipherSwarm API.
+// handleSendCrackError processes different types of errors encountered when communicating with the CipherSwarm API.
+// Logs errors based on their type and reports major or critical severity, or logs a critical error for unknown types.
 func handleSendCrackError(err error) {
 	switch e := err.(type) {
 	case *sdkerrors.ErrorObject:
@@ -1239,9 +1161,9 @@ func handleSendCrackError(err error) {
 	}
 }
 
-// writeCrackedHashToFile writes a cracked hash result to a file in a specified format.
-// It constructs the file path using task details and attempts to write the hash result string to the file.
-// If an error occurs during writing, it logs and sends this error with critical severity, associating it with the task.
+// writeCrackedHashToFile writes a cracked hash and its plaintext to a specified file.
+// It constructs the output string using the hash and plaintext, then writes it to a task-specific file in the ZapsPath.
+// Returns an error if the file writing operation fails.
 func writeCrackedHashToFile(hash hashcat.Result, task *components.Task) error {
 	hashOut := fmt.Sprintf("%s:%s\n", hash.Hash, hash.Plaintext)
 	hashFile := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.GetID()))

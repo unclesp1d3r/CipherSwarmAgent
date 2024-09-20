@@ -26,13 +26,10 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
-// getCurrentHashcatVersion retrieves the current version of the Hashcat binary.
-// It checks multiple locations for the Hashcat executable:
-// 1. The path specified in the configuration.
-// 2. The default crackers path with the expected binary name.
-// 3. The system's $PATH environment variable.
-// If found, it returns the Hashcat version and updates the configuration with the found path.
-// If not found, it returns a default version "0.0.0" and an error indicating the binary does not exist.
+// getCurrentHashcatVersion attempts to find and retrieve the current Hashcat version from multiple potential paths.
+// It first checks the path specified in the configuration, then a default crackers path, and finally the system $PATH.
+// The function returns the Hashcat version if found,
+// otherwise returns "0.0.0" and an error indicating the binary was not found.
 func getCurrentHashcatVersion() (string, error) {
 	hashcatPath := viper.GetString("hashcat_path")
 	if version, err := tryCheckForHashcat(hashcatPath); err == nil {
@@ -64,9 +61,8 @@ func getCurrentHashcatVersion() (string, error) {
 	return "0.0.0", errors.New("hashcat binary does not exist")
 }
 
-// tryCheckForHashcat checks if the Hashcat binary exists at the given path.
-// If it exists, it returns the Hashcat version using fetchHashcatVersion.
-// If it does not exist, it returns an error indicating the binary was not found.
+// tryCheckForHashcat checks if the Hashcat binary exists at the provided path and retrieves its version.
+// It returns an error if the binary is not found.
 func tryCheckForHashcat(hashcatPath string) (string, error) {
 	if fileutil.IsExist(hashcatPath) {
 		return fetchHashcatVersion(hashcatPath)
@@ -75,14 +71,8 @@ func tryCheckForHashcat(hashcatPath string) (string, error) {
 	return "", errors.New("hashcat binary not found")
 }
 
-// fetchHashcatVersion retrieves the current version of the Hashcat binary located at hashcatPath.
-// It utilizes the arch.GetHashcatVersion method to fetch the version. If there is an error, it logs the error and returns "0.0.0".
-// Parameters:
-//   - hashcatPath: The file path to the Hashcat executable.
-//
-// Returns:
-//   - A string representing the Hashcat version.
-//   - An error if fetching the version fails.
+// fetchHashcatVersion retrieves the version of the Hashcat installed at the given path.
+// It logs the current version or any error encountered during the retrieval process.
 func fetchHashcatVersion(hashcatPath string) (string, error) {
 	hashcatVersion, err := arch.GetHashcatVersion(hashcatPath)
 	if err != nil {
@@ -95,12 +85,8 @@ func fetchHashcatVersion(hashcatPath string) (string, error) {
 	return hashcatVersion, nil
 }
 
-// CheckForExistingClient verifies if a process described by a PID file is already running.
-// This function performs the following steps:
-// 1. Check if the PID file exists; if not, return false.
-// 2. Read the PID from the file and attempt to convert it to an integer.
-// 3. Check if the process with the given PID is running and log relevant information.
-// 4. Return true if the process is running, otherwise return false and clean up the PID file if necessary.
+// CheckForExistingClient checks if a client process is already running by examining a PID file at the specified path.
+// Returns true if the process is found or errors occur, otherwise false.
 func CheckForExistingClient(pidFilePath string) bool {
 	if fileutil.IsExist(pidFilePath) {
 		pidString, err := fileutil.ReadFileToString(pidFilePath)
@@ -135,9 +121,9 @@ func CheckForExistingClient(pidFilePath string) bool {
 	return false
 }
 
-// CreateLockFile creates a lock file with the current process ID to prevent multiple instances from running simultaneously.
-// It writes the PID to the file specified by shared.State.PidFile using fileutil.WriteStringToFile.
-// If an error occurs while writing the PID to the file, it logs the error and returns it.
+// CreateLockFile creates a lock file with the current process PID.
+// Writes the PID to the designated lock file in the shared state.
+// Logs an error and returns it if writing fails.
 func CreateLockFile() error {
 	lockFilePath := shared.State.PidFile
 
@@ -153,9 +139,9 @@ func CreateLockFile() error {
 	return nil
 }
 
-// CreateDataDirs creates necessary data directories specified in shared.State.
-// Iterates over a list of directory paths, checks for emptiness and existence,
-// and creates directories if they are missing. Logs errors and successes.
+// CreateDataDirs creates required directories based on the paths set in shared.State. It checks for each path's existence,
+// ensures it's not blank, and creates the directory if it doesn't exist, logging any errors that occur. Returns an error
+// if any directory creation fails.
 func CreateDataDirs() error {
 	dataDirs := []string{
 		shared.State.FilePath,
@@ -188,10 +174,11 @@ func CreateDataDirs() error {
 	return nil
 }
 
-// downloadHashList downloads the hashlist for the given attack and saves it to the specified path.
-// It removes any existing file at the target path before downloading.
-// Logs relevant actions and errors during the procedure and validates the downloaded file.
-// Returns an error if any step in the process encounters an issue, otherwise returns nil.
+// downloadHashList downloads the hash list for a given attack.
+// It constructs the local path for the hash list file and attempts to remove any existing file at that location.
+// The function makes an API call to fetch the hash list, checks the response status, and handles errors if the call fails.
+// If the response stream is not nil, it writes the hash list to the file and verifies the file's validity.
+// Logs relevant actions and errors encountered during the process and returns any errors that occur.
 func downloadHashList(attack *components.Attack) error {
 	if attack == nil {
 		return logAndSendError("Attack is nil", nil, operations.SeverityCritical, nil)
@@ -230,11 +217,10 @@ func downloadHashList(attack *components.Attack) error {
 	return nil
 }
 
-// removeExistingFile removes the file at the specified filePath if it exists.
-// If the removal fails, it logs the error and sends a critical error to the server.
+// removeExistingFile removes the file specified by filePath if it exists, logging and reporting an error if removal fails.
 // Parameters:
-// - filePath: The path to the file to remove.
-// Returns an error if the file removal fails, otherwise returns nil.
+// - filePath: The path to the file that needs to be removed.
+// Returns an error if file removal fails, otherwise returns nil.
 func removeExistingFile(filePath string) error {
 	if fileutil.IsExist(filePath) {
 		if err := os.Remove(filePath); err != nil {
@@ -245,10 +231,8 @@ func removeExistingFile(filePath string) error {
 	return nil
 }
 
-// writeResponseToFile writes the contents of the responseStream to a file specified by filePath.
-// It attempts to create the file at the given path, logging and returning a critical error if creation fails.
-// The function ensures the file is properly closed after writing the response stream content.
-// If an error occurs during writing, it logs and returns a critical error.
+// writeResponseToFile writes the data from an io.Reader (responseStream) to a file specified by the filePath.
+// Creates a new file at the given path, writes the response stream to it, and handles errors accordingly.
 func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -267,10 +251,8 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	return nil
 }
 
-// downloadFile downloads a file from the provided URL to the specified path and verifies it using the given checksum.
-// If the URL is invalid, it logs an error and returns an error.
-// If the file already exists and passes checksum verification, it logs an info message and returns nil.
-// Otherwise, it downloads the file, verifies the checksum, and logs either success or failure.
+// downloadFile downloads a file from a given URL and saves it to the specified path with optional checksum verification.
+// If the URL is invalid, it returns an error. If the file already exists and the checksum matches, the download is skipped.
 func downloadFile(url string, path string, checksum string) error {
 	if !validator.IsUrl(url) {
 		shared.Logger.Error("Invalid URL", "url", url)
@@ -293,21 +275,9 @@ func downloadFile(url string, path string, checksum string) error {
 	return nil
 }
 
-// fileExistsAndValid checks if a file exists at the given path and verifies it against the provided checksum.
-//
-// Parameters:
-// - path: The file path to check existence.
-// - checksum: The expected checksum to verify the file's validity.
-//
-// Returns:
-// - bool: true if the file exists and is valid based on the provided checksum; false otherwise.
-//
-// Actions:
-// - Checks if the file at the given path exists using fileutil.IsExist.
-// - If the checksum is blank, returns true since existence is validated.
-// - Calculates the file's MD5 checksum using cryptor.Md5File and compares it against the provided checksum.
-// - Logs errors and warnings for checksum mismatches or other issues.
-// - Removes the file if checksums do not match and logs the removal error if any.
+// fileExistsAndValid checks if a file exists at the given path and, if a checksum is provided, verifies its validity.
+// The function returns true if the file exists and matches the given checksum, or if no checksum is provided.
+// If the file does not exist or the checksum verification fails, appropriate error messages are logged.
 func fileExistsAndValid(path string, checksum string) bool {
 	if !fileutil.IsExist(path) {
 		return false
@@ -338,22 +308,10 @@ func fileExistsAndValid(path string, checksum string) bool {
 	return false
 }
 
-// downloadAndVerifyFile downloads a file from the given URL and saves it to the specified path.
-//
-// Parameters:
-// - url: The URL to download the file from.
-// - path: The local file path to save the downloaded file.
-// - checksum: The expected checksum to verify the integrity of the downloaded file.
-//
-// Actions:
-// - If a checksum is provided, append it to the URL as a query parameter.
-// - Configures and initializes the getter.Client for downloading the file.
-// - Attempts to download the file to the specified path.
-// - If a checksum is provided, verifies the downloaded file's integrity by comparing it with the given checksum.
-// - Logs and returns an error if the file download fails or if checksum verification fails.
-//
-// Returns:
-// - An error if the download or checksum verification fails, otherwise returns nil.
+// downloadAndVerifyFile downloads a file from the given URL and saves it to the specified path, verifying the checksum if provided.
+// If a checksum is given, it is appended to the URL before download. The function then configures a client for secure file transfer.
+// The file is downloaded using the configured client. After downloading, the file's checksum is verified, if provided, to ensure integrity.
+// If the checksum does not match, an error is returned, indicating the downloaded file is corrupt.
 func downloadAndVerifyFile(url string, path string, checksum string) error {
 	if strutil.IsNotBlank(checksum) {
 		var err error
@@ -390,20 +348,8 @@ func downloadAndVerifyFile(url string, path string, checksum string) error {
 	return nil
 }
 
-// appendChecksumToURL appends a checksum query parameter to a given URL and returns the modified URL string.
-//
-// Parameters:
-// - url: The base URL to which the checksum will be appended.
-// - checksum: The checksum value to append as a query parameter.
-//
-// Returns:
-// - A string representing the modified URL with the checksum appended as a query parameter.
-// - An error if the base URL is malformed or cannot be parsed.
-//
-// Actions:
-// - Parses the provided URL string.
-// - Adds the "checksum" query parameter to the parsed URL.
-// - Encodes the modified URL and returns it as a string.
+// appendChecksumToURL appends the given checksum as a query parameter to the provided URL and returns the updated URL.
+// If there is an error parsing the URL, it logs the error and returns an empty string and the error.
 func appendChecksumToURL(url string, checksum string) (string, error) {
 	urlA, err := url2.Parse(url)
 	if err != nil {
@@ -418,12 +364,11 @@ func appendChecksumToURL(url string, checksum string) (string, error) {
 	return urlA.String(), nil
 }
 
-// extractHashcatArchive extracts a Hashcat archive to the designated CrackersPath.
-// It performs the following steps:
-// 1. Removes any existing backup of the old Hashcat directory.
-// 2. Renames the current Hashcat directory to create a backup.
-// 3. Extracts the new Hashcat directory from the provided archive using the `7z` command.
-// Returns the path to the new Hashcat directory or an error if any step fails.
+// extractHashcatArchive extracts a new Hashcat archive, backing up and removing any old versions.
+// - Removes the previous backup directory if existent.
+// - Renames the current Hashcat directory for backup.
+// - Extracts the new Hashcat archive to the specified directory.
+// Returns the path to the new Hashcat directory and any error encountered.
 func extractHashcatArchive(newArchivePath string) (string, error) {
 	hashcatDirectory := path.Join(shared.State.CrackersPath, "hashcat")
 	hashcatBackupDirectory := hashcatDirectory + "_old"
@@ -457,12 +402,10 @@ func extractHashcatArchive(newArchivePath string) (string, error) {
 	return hashcatDirectory, err
 }
 
-// moveArchiveFile moves a temporary archive file to a predefined path within the CrackersPath.
-// It performs the following steps:
-// 1. Constructs the new archive path using the shared state for CrackersPath.
-// 2. Renames (moves) the temporary archive file to the new archive path.
-// 3. Logs an error if the rename operation fails and returns the error.
-// 4. Logs a debug message indicating the move was successful and returns the new archive path without error.
+// moveArchiveFile moves a temporary archive file to the designated CrackersPath directory and logs the operation.
+// Parameters:
+// - tempArchivePath: The path to the temporary archive file that needs to be moved.
+// Returns the new path of the moved archive and any error encountered during the move operation.
 func moveArchiveFile(tempArchivePath string) (string, error) {
 	newArchivePath := path.Join(shared.State.CrackersPath, "hashcat.7z")
 	err := os.Rename(tempArchivePath, newArchivePath)
@@ -476,9 +419,9 @@ func moveArchiveFile(tempArchivePath string) (string, error) {
 	return newArchivePath, err
 }
 
-// base64ToHex converts a base64 encoded string to its hexadecimal representation.
-// Returns an empty string if the input is blank.
-// It decodes the base64 string, converts the result to bytes, and then encodes those bytes as a hex string.
+// base64ToHex converts a Base64-encoded string to its hexadecimal representation.
+// Returns an empty string if the input Base64 string is blank.
+// Decodes the Base64 string and encodes it as a hexadecimal string.
 func base64ToHex(base64 string) string {
 	if strutil.IsBlank(base64) {
 		return ""
@@ -489,8 +432,7 @@ func base64ToHex(base64 string) string {
 	return hx
 }
 
-// resourceNameOrBlank returns the file name from an AttackResourceFile if it exists, otherwise it returns an empty string.
-// If the resource is nil, it returns an empty string. If the resource is non-nil, it returns the FileName of the resource.
+// resourceNameOrBlank returns the FileName from the given AttackResourceFile or an empty string if the resource is nil.
 func resourceNameOrBlank(resource *components.AttackResourceFile) string {
 	if resource == nil {
 		return ""
