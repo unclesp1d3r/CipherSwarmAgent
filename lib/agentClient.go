@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"time"
 
@@ -151,7 +150,7 @@ func mapConfiguration(config *operations.GetConfigurationResponseBody) agentConf
 // setNativeHashcatPath sets the path for the native Hashcat binary if it is found in the system, otherwise logs and reports error.
 func setNativeHashcatPath() error {
 	shared.Logger.Debug("Using native Hashcat")
-	binPath, err := exec.LookPath("hashcat")
+	binPath, err := findHashcatBinary()
 	if err != nil {
 		shared.Logger.Error("Error finding hashcat binary: ", err)
 		SendAgentError(err.Error(), nil, operations.SeverityCritical)
