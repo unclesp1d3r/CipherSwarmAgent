@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/cryptor"
@@ -26,49 +27,69 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
-// getCurrentHashcatVersion attempts to find and retrieve the current Hashcat version from multiple potential paths.
-// It first checks the path specified in the configuration, then a default crackers path, and finally the system $PATH.
-// The function returns the Hashcat version if found,
-// otherwise returns "0.0.0" and an error indicating the binary was not found.
-func getCurrentHashcatVersion() (string, error) {
-	hashcatPath := viper.GetString("hashcat_path")
-	if version, err := tryCheckForHashcat(hashcatPath); err == nil {
-		return version, nil
+const emptyVersion = "0.0.0"
+
+// findHashcatBinary attempts to locate the Hashcat binary in various predefined paths and within the user's PATH environment.
+// If found, it returns the path to the Hashcat binary and a nil error. If not found, it returns an empty string and an error.
+func findHashcatBinary() (string, error) {
+	var foundPath = ""
+	possiblePaths := []string{
+		viper.GetString("hashcat_path"),
+		path.Join(shared.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
+		path.Join(filepath.Dir(fileutil.CurrentPath()), arch.GetDefaultHashcatBinaryName()),
+		path.Join(shared.State.CrackersPath, "hashcat", "hashcat"),
+		path.Join(filepath.Dir(fileutil.CurrentPath()), "hashcat"),
+		"/usr/bin/hashcat",
+		"/usr/local/bin/hashcat",
 	}
 
-	shared.Logger.Error("Didn't find hashcat binary in expected location", "path", hashcatPath)
-	hashcatPath = path.Join(shared.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName())
-	if version, err := tryCheckForHashcat(hashcatPath); err == nil {
-		shared.Logger.Debug("Using hashcat binary from crackers directory", "path", hashcatPath)
-		viper.Set("hashcat_path", hashcatPath)
-
-		return version, nil
+	for _, path := range possiblePaths {
+		if fileutil.IsExist(path) && isExecAny(path) {
+			foundPath = path
+			return foundPath, nil
+		}
 	}
 
-	shared.Logger.Error("Hashcat binary not found in crackers path",
-		"bin_name", arch.GetDefaultHashcatBinaryName(),
-		"path", hashcatPath)
+	// Didn't find it on the predefined locations. Checking the user's path for the default name on this architecture.
+	if hashcatPath, err := exec.LookPath(arch.GetDefaultHashcatBinaryName()); err == nil {
+		foundPath = hashcatPath
+	}
 
+	// Last try we'll check for the default name of just hashcat within the user's path.
 	if hashcatPath, err := exec.LookPath("hashcat"); err == nil {
-		shared.Logger.Debug("Using hashcat binary from $PATH", "path", hashcatPath)
-		viper.Set("hashcat_path", hashcatPath)
-
-		return fetchHashcatVersion(hashcatPath)
+		foundPath = hashcatPath
 	}
 
-	shared.Logger.Error("Hashcat binary does not exist", "path", hashcatPath)
-
-	return "0.0.0", errors.New("hashcat binary does not exist")
-}
-
-// tryCheckForHashcat checks if the Hashcat binary exists at the provided path and retrieves its version.
-// It returns an error if the binary is not found.
-func tryCheckForHashcat(hashcatPath string) (string, error) {
-	if fileutil.IsExist(hashcatPath) {
-		return fetchHashcatVersion(hashcatPath)
+	if strutil.IsNotBlank(foundPath) && fileutil.IsExist(foundPath) && isExecAny(foundPath) {
+		return foundPath, nil
 	}
 
 	return "", errors.New("hashcat binary not found")
+}
+
+// isExecAny checks if the file at the given filePath has any executable permissions (user, group, or others).
+func isExecAny(filePath string) bool {
+	info, _ := os.Stat(filePath)
+	mode := info.Mode()
+	return mode&0111 != 0
+}
+
+// getCurrentHashcatVersion attempts to find the Hashcat binary and retrieve its version.
+// It first searches for the Hashcat binary using findHashcatBinary. If found,
+// it calls arch.GetHashcatVersion with the binary's path. If any step fails,
+// it returns an empty version string and an error.
+func getCurrentHashcatVersion() (string, error) {
+	hashcatPath, err := findHashcatBinary()
+	if err != nil {
+		return emptyVersion, err
+	}
+
+	version, err := arch.GetHashcatVersion(hashcatPath)
+	if err != nil {
+		return emptyVersion, err
+	}
+
+	return version, nil
 }
 
 // fetchHashcatVersion retrieves the version of the Hashcat installed at the given path.
@@ -78,7 +99,7 @@ func fetchHashcatVersion(hashcatPath string) (string, error) {
 	if err != nil {
 		shared.Logger.Error("Error getting hashcat version", "error", err)
 
-		return "0.0.0", err
+		return emptyVersion, err
 	}
 	shared.Logger.Debug("Current hashcat version", "version", hashcatVersion)
 
