@@ -29,8 +29,9 @@ import (
 
 const emptyVersion = "0.0.0"
 
-// findHashcatBinary attempts to locate the Hashcat binary in various predefined paths and within the user's PATH environment.
-// If found, it returns the path to the Hashcat binary and a nil error. If not found, it returns an empty string and an error.
+// findHashcatBinary searches for the Hashcat binary at several predefined locations and returns its path if found.
+// It checks directories specified by configuration, default locations, and the system's PATH environment variable.
+// The function returns an error if the binary is not found or not executable.
 func findHashcatBinary() (string, error) {
 	var foundPath = ""
 	possiblePaths := []string{
@@ -43,19 +44,19 @@ func findHashcatBinary() (string, error) {
 		"/usr/local/bin/hashcat",
 	}
 
-	for _, path := range possiblePaths {
-		if fileutil.IsExist(path) && isExecAny(path) {
-			foundPath = path
+	for _, filePath := range possiblePaths {
+		if fileutil.IsExist(filePath) && isExecAny(filePath) {
+			foundPath = filePath
 			return foundPath, nil
 		}
 	}
 
-	// Didn't find it on the predefined locations. Checking the user's path for the default name on this architecture.
+	// Didn't find it on the predefined locations. Checking the user's `$PATH` for the default name on this architecture.
 	if hashcatPath, err := exec.LookPath(arch.GetDefaultHashcatBinaryName()); err == nil {
 		foundPath = hashcatPath
 	}
 
-	// Last try we'll check for the default name of just hashcat within the user's path.
+	// Last try we'll check for the default name of just hashcat within the user's filePath.
 	if hashcatPath, err := exec.LookPath("hashcat"); err == nil {
 		foundPath = hashcatPath
 	}
@@ -90,20 +91,6 @@ func getCurrentHashcatVersion() (string, error) {
 	}
 
 	return version, nil
-}
-
-// fetchHashcatVersion retrieves the version of the Hashcat installed at the given path.
-// It logs the current version or any error encountered during the retrieval process.
-func fetchHashcatVersion(hashcatPath string) (string, error) {
-	hashcatVersion, err := arch.GetHashcatVersion(hashcatPath)
-	if err != nil {
-		shared.Logger.Error("Error getting hashcat version", "error", err)
-
-		return emptyVersion, err
-	}
-	shared.Logger.Debug("Current hashcat version", "version", hashcatVersion)
-
-	return hashcatVersion, nil
 }
 
 // CheckForExistingClient checks if a client process is already running by examining a PID file at the specified path.
