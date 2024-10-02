@@ -1,4 +1,3 @@
-// Package cmd
 package cmd
 
 import (
@@ -42,13 +41,61 @@ func Execute() {
 	cobra.CheckErr(err)
 }
 
-// init initializes the Cobra root command by setting up persistent flags and binding them to Viper configuration variables.
-// It also sets default configuration values and ensures that configurations are properly loaded and applied.
+// init initializes the root command and binds various flags to the configuration using Viper.
+// It sets up the required flags and binds them to configuration variables for easy access throughout the application.
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cipherswarmagent.yaml)")
-	rootCmd.PersistentFlags().BoolVar(&enableDebug, "debug", false, "Enable debug mode")
+	rootCmd.PersistentFlags().BoolVarP(&enableDebug, "debug", "d", false, "Enable debug mode")
 	err := viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().StringP("api_token", "a", "", "API token for the CipherSwarm server")
+	err = viper.BindPFlag("api_token", rootCmd.PersistentFlags().Lookup("api_token"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().StringP("api_url", "u", "", "URL of the CipherSwarm server")
+	err = viper.BindPFlag("api_url", rootCmd.PersistentFlags().Lookup("api_url"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().StringP("data_path", "p", "", "Path to the directory where the agent will store data")
+	err = viper.BindPFlag("data_path", rootCmd.PersistentFlags().Lookup("data_path"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().IntP("gpu_temp_threshold", "g", 80, "Temperature threshold for the GPU in degrees Celsius")
+	err = viper.BindPFlag("gpu_temp_threshold", rootCmd.PersistentFlags().Lookup("gpu_temp_threshold"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().BoolP("always_use_native_hashcat", "n", false, "Force using the native hashcat binary")
+	err = viper.BindPFlag("always_use_native_hashcat", rootCmd.PersistentFlags().Lookup("always_use_native_hashcat"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().DurationP("sleep_on_failure", "s", 60*time.Second, "Duration of sleep after a task failure")
+	err = viper.BindPFlag("sleep_on_failure", rootCmd.PersistentFlags().Lookup("sleep_on_failure"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().StringP("files_path", "f", "", "Path to the directory where the agent will store task files")
+	err = viper.BindPFlag("files_path", rootCmd.PersistentFlags().Lookup("files_path"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().BoolP("extra_debugging", "e", false, "Enable additional debugging information")
+	err = viper.BindPFlag("extra_debugging", rootCmd.PersistentFlags().Lookup("extra_debugging"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().IntP("status_timer", "t", 3, "Interval in seconds for sending status updates to the server")
+	err = viper.BindPFlag("status_timer", rootCmd.PersistentFlags().Lookup("status_timer"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().BoolP("write_zaps_to_file", "w", false, "Write zap output to a file in the zaps directory")
+	err = viper.BindPFlag("write_zaps_to_file", rootCmd.PersistentFlags().Lookup("write_zaps_to_file"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().StringP("zap_path", "z", "", "Path to the directory where the agent will store zap output files")
+	err = viper.BindPFlag("zap_path", rootCmd.PersistentFlags().Lookup("zap_path"))
+	cobra.CheckErr(err)
+
+	rootCmd.PersistentFlags().BoolP("retain_zaps_on_completion", "r", false, "Retain zap files after completing a task")
+	err = viper.BindPFlag("retain_zaps_on_completion", rootCmd.PersistentFlags().Lookup("retain_zaps_on_completion"))
 	cobra.CheckErr(err)
 
 	setDefaultConfigValues()
