@@ -182,7 +182,7 @@ func UpdateAgentMetadata() error {
 	agentPlatform = info.OS
 	agentUpdate := &operations.UpdateAgentRequestBody{
 		ID:              shared.State.AgentID,
-		Name:            info.Hostname,
+		HostName:        info.Hostname,
 		ClientSignature: clientSignature,
 		OperatingSystem: info.OS,
 		Devices:         devices,
