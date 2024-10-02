@@ -98,6 +98,25 @@ Optional configuration options for using the ZAP feature with a shared directory
 The agent will automatically create a configuration file in the same directory as the agent (`cipherswarmagent.yaml`)
 with the provided configuration options and default options that can be modified.
 
+### Command Line Flags
+
+The agent can also be configured using command line flags. The following flags are available:
+
+- `--api_token` or `-a`: The API token for the CipherSwarm server.
+- `--api_url` or `-u`: The URL of the CipherSwarm server.
+- `--data_path` or `-p`: The path to the directory where the agent will store data.
+- `--gpu_temp_threshold` or `-g`: The temperature threshold for the GPU in degrees Celsius.
+- `--always_use_native_hashcat` or `-n`: Force using the native hashcat binary.
+- `--sleep_on_failure` or `-s`: Duration of sleep after a task failure.
+- `--files_path` or `-f`: The path to the directory where the agent will store task files.
+- `--extra_debugging` or `-e`: Enable additional debugging information.
+- `--status_timer` or `-t`: Interval in seconds for sending status updates to the server.
+- `--write_zaps_to_file` or `-w`: Write zap output to a file in the zaps directory.
+- `--zap_path` or `-z`: The path to the directory where the agent will store zap output files.
+- `--retain_zaps_on_completion` or `-r`: Retain zap files after completing a task.
+- `--help` or `-h`: Show help information.
+- `--version` or `-v`: Show the version of the agent.
+
 ### Running the Agent
 
 To start the agent, run the following:
