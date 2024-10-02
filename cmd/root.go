@@ -41,8 +41,8 @@ func Execute() {
 	cobra.CheckErr(err)
 }
 
-// init initializes the Cobra root command by setting up persistent flags and binding them to Viper configuration variables.
-// It also sets default configuration values and ensures that configurations are properly loaded and applied.
+// init initializes the root command and binds various flags to the configuration using Viper.
+// It sets up the required flags and binds them to configuration variables for easy access throughout the application.
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cipherswarmagent.yaml)")
