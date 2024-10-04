@@ -11,7 +11,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/errorUtils"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/fileUtils"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/taskManager"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
@@ -43,7 +46,7 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 			case err := <-sess.DoneChan:
 				if err != nil {
 					shared.Logger.Error("Benchmark session failed", "error", err)
-					SendAgentError(err.Error(), nil, operations.SeverityFatal)
+					taskManager.SendAgentError(err.Error(), nil, operations.SeverityFatal)
 				}
 
 				return
@@ -80,7 +83,7 @@ func handleBenchmarkStdOutLine(line string, results *[]benchmarkResult) {
 func handleBenchmarkStdErrLine(line string) {
 	displayBenchmarkError(line)
 	if strutil.IsNotBlank(line) {
-		SendAgentError(line, nil, operations.SeverityWarning)
+		taskManager.SendAgentError(line, nil, operations.SeverityWarning)
 	}
 }
 
@@ -90,7 +93,7 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
 		shared.Logger.Error("Failed to start attack session", "error", err)
-		SendAgentError(err.Error(), task, operations.SeverityFatal)
+		taskManager.SendAgentError(err.Error(), task, operations.SeverityFatal)
 
 		return
 	}
@@ -127,7 +130,7 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 			shared.Logger.Error("Failed to parse status update", "error", err)
 		} else {
 			displayJobStatus(update)
-			sendStatusUpdate(update, task, sess)
+			taskManager.sendStatusUpdate(update, task, sess)
 		}
 	}
 }
@@ -136,7 +139,7 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 func handleStdErrLine(stdErrLine string, task *components.Task) {
 	displayJobError(stdErrLine)
 	if strutil.IsNotBlank(stdErrLine) {
-		SendAgentError(stdErrLine, task, operations.SeverityMinor)
+		taskManager.SendAgentError(stdErrLine, task, operations.SeverityMinor)
 	}
 }
 
@@ -144,7 +147,7 @@ func handleStdErrLine(stdErrLine string, task *components.Task) {
 // It does this by displaying the job status and sending the status update.
 func handleStatusUpdate(statusUpdate hashcat.Status, task *components.Task, sess *hashcat.Session) {
 	displayJobStatus(statusUpdate)
-	sendStatusUpdate(statusUpdate, task, sess)
+	taskManager.sendStatusUpdate(statusUpdate, task, sess)
 }
 
 // handleCrackedHash processes a cracked hash by displaying it and then sending it to a task server.
@@ -177,7 +180,7 @@ func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Ses
 			}
 		}
 	} else {
-		SendAgentError(err.Error(), task, operations.SeverityCritical)
+		taskManager.SendAgentError(err.Error(), task, operations.SeverityCritical)
 		displayJobFailed(err)
 	}
 }
@@ -187,7 +190,7 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 	err := sess.Start()
 	if err != nil {
 		shared.Logger.Error("Failed to start hashcat startup test session", "error", err)
-		SendAgentError(err.Error(), nil, operations.SeverityFatal)
+		taskManager.SendAgentError(err.Error(), nil, operations.SeverityFatal)
 
 		return nil, err
 	}
@@ -232,7 +235,7 @@ func handleTestStdOutLine(stdoutLine string) {
 // handleTestStdErrLine sends the specified stderr line to the central server and sets the provided error result.
 func handleTestStdErrLine(stdErrLine string, errorResult *error) {
 	if strutil.IsNotBlank(stdErrLine) {
-		SendAgentError(stdErrLine, nil, operations.SeverityMinor)
+		taskManager.SendAgentError(stdErrLine, nil, operations.SeverityMinor)
 		*errorResult = errors.New(stdErrLine)
 	}
 }
@@ -247,7 +250,7 @@ func handleTestCrackedHash(crackedHash hashcat.Result, errorResult *error) {
 // handleTestDoneChan handles errors from the test session's done channel, sends them to central server if not exit status 1.
 func handleTestDoneChan(err error, errorResult *error) {
 	if err != nil && err.Error() != "exit status 1" {
-		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+		taskManager.SendAgentError(err.Error(), nil, operations.SeverityCritical)
 		*errorResult = err
 	}
 }
