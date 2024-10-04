@@ -2,8 +2,10 @@ style: github
 template: CHANGELOG.tpl.md
 info:
   title: CHANGELOG
-  repository_url: https://github.com/unclesp1d3r/CipherSwarmAgent
+  repository_url: https://github.com/unclesp1d3r/CipherSwarm
 options:
+  tag_filter_pattern: '^v'
+  sort: "date"
   commits:
     filters:
       Type:
@@ -11,27 +13,51 @@ options:
         - fix
         - perf
         - refactor
-        - ci
+        - docs
+        - style
+        - test
+        - chore
   commit_groups:
+    group_by: Type
+    sort_by: Title
+    title_order:
+      - feat
+      - fix
+      - perf
+      - refactor
+      - docs
+      - style
+      - test
+      - chore
     title_maps:
-      feat: Features
-      fix: Bug Fixes
-      perf: Performance Improvements
-      refactor: Code Refactoring
-      ci: CI Changes
-      docs: Documentation
-      style: Style Changes
-      test: Test Changes
-      chore: Chores
-      Bump: Dependency Bumps
-      Merge: Merge Commits
-      Added: Added Features
+      feat: Features 🚀
+      fix: Bug Fixes 🐛
+      perf: Performance Improvements 🚀
+      refactor: Code Refactoring 🛠
+      docs: Documentation Changes 📚
+      style: Style Changes 🎨
+      test: Test Changes 🧪
+      chore: Maintenance Changes 🧹
   header:
-    pattern: "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?\\:\\s(.*)$"
+    pattern: "^(\\w*)\\:\\s(.*)$"
     pattern_maps:
       - Type
-      - Scope
       - Subject
   notes:
     keywords:
       - BREAKING CHANGE
+  issues:
+    prefix:
+      - #
+  refs:
+    actions:
+      - Closes
+      - Fixes
+  merges:
+    pattern: "^Merge '(\\w+)'$"
+    pattern_maps:
+      - Source
+  reverts:
+    pattern: "^Revert \"([\\s\\S]*)\"$"
+    pattern_maps:
+      - Header
