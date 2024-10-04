@@ -17,9 +17,6 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/errorUtils"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/fileUtils"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/taskManager"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
@@ -215,21 +212,21 @@ func startAgent(_ *cobra.Command, _ []string) {
 	lib.DisplayStartup()
 
 	// Check for an existing lock file to prevent multiple instances
-	if fileUtils.CheckForExistingClient(shared.State.PidFile) {
+	if lib.CheckForExistingClient(shared.State.PidFile) {
 		shared.Logger.Fatal("Aborting agent start, lock file found", "path", shared.State.PidFile)
 	}
 
 	// Create necessary data directories and lock file
-	if err := fileUtils.CreateDataDirs(); err != nil {
+	if err := lib.CreateDataDirs(); err != nil {
 		shared.Logger.Fatal("Error creating data directories", "error", err)
 	}
-	if err := fileUtils.CreateLockFile(); err != nil {
+	if err := lib.CreateLockFile(); err != nil {
 		shared.Logger.Fatal("Error creating lock file", "error", err)
 	}
 	defer cleanupLockFile(shared.State.PidFile)
 
 	// Authenticate with the CipherSwarm API
-	if err := errorUtils.AuthenticateAgent(); err != nil {
+	if err := lib.AuthenticateAgent(); err != nil {
 		shared.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
 	}
 	lib.DisplayAuthenticated()
@@ -238,14 +235,14 @@ func startAgent(_ *cobra.Command, _ []string) {
 	if err := fetchAgentConfig(); err != nil {
 		shared.Logger.Fatal("Failed to fetch agent configuration", "error", err)
 	}
-	err := errorUtils.UpdateAgentMetadata()
+	err := lib.UpdateAgentMetadata()
 	if err != nil {
 		return // Error already logged
 	}
 	shared.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
-	if fileUtils.CheckForExistingClient(shared.State.HashcatPidFile) {
+	if lib.CheckForExistingClient(shared.State.HashcatPidFile) {
 		shared.Logger.Info("Killed dangling hashcat process")
 	}
 
@@ -256,8 +253,8 @@ func startAgent(_ *cobra.Command, _ []string) {
 	// Wait for termination signal
 	sig := <-signChan
 	shared.Logger.Debug("Received signal", "signal", sig)
-	taskManager.SendAgentError("Received signal to terminate. Shutting down", nil, operations.SeverityInfo)
-	taskManager.SendAgentShutdown()
+	lib.SendAgentError("Received signal to terminate. Shutting down", nil, operations.SeverityInfo)
+	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
 }
 
@@ -306,15 +303,15 @@ func startAgentLoop() {
 // Upon successful configuration fetch, it sets the agent's activity state to benchmarking, updates benchmarks,
 // ignores potential errors from the update, reverts the activity state to starting, and resets the reload flag.
 func handleReload() {
-	taskManager.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
+	lib.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
 	shared.Logger.Info("Reloading agent")
 	if err := fetchAgentConfig(); err != nil {
 		shared.Logger.Error("Failed to fetch agent configuration", "error", err)
-		taskManager.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
+		lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
 	}
 	shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
-	_ = errorUtils.UpdateBenchmarks() // Ignore error, as it is already logged and we can continue
+	_ = lib.UpdateBenchmarks() // Ignore error, as it is already logged and we can continue
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
 	shared.State.Reload = false
 }
@@ -322,7 +319,7 @@ func handleReload() {
 // handleCrackerUpdate updates the cracker software, setting the current activity to updating and starting.
 func handleCrackerUpdate() {
 	shared.State.CurrentActivity = shared.CurrentActivityUpdating
-	errorUtils.UpdateCracker()
+	lib.UpdateCracker()
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
 }
 
@@ -330,7 +327,7 @@ func handleCrackerUpdate() {
 // It sleeps for a configured duration on failure, logs the absence of a new task if none is available.
 // It ensures that execution continues by ignoring processing errors which have been logged already.
 func handleNewTask() {
-	task, err := taskManager.GetNewTask()
+	task, err := lib.GetNewTask()
 	if err != nil {
 		shared.Logger.Error("Failed to get new task", "error", err)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
@@ -354,11 +351,11 @@ func processTask(task *components.Task) error {
 	shared.State.CurrentActivity = shared.CurrentActivityCracking
 	lib.DisplayNewTask(task)
 
-	attack, err := taskManager.GetAttackParameters(task.GetAttackID())
+	attack, err := lib.GetAttackParameters(task.GetAttackID())
 	if err != nil || attack == nil {
 		shared.Logger.Error("Failed to get attack parameters", "error", err)
-		taskManager.SendAgentError(err.Error(), task, operations.SeverityFatal)
-		taskManager.AbandonTask(task)
+		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
+		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
 
 		return err
@@ -366,7 +363,7 @@ func processTask(task *components.Task) error {
 
 	lib.DisplayNewAttack(attack)
 
-	err = taskManager.AcceptTask(task)
+	err = lib.AcceptTask(task)
 	if err != nil {
 		shared.Logger.Error("Failed to accept task", "task_id", task.GetID())
 
@@ -375,16 +372,16 @@ func processTask(task *components.Task) error {
 
 	lib.DisplayRunTaskAccepted(task)
 
-	if err := fileUtils.DownloadFiles(attack); err != nil {
+	if err := lib.DownloadFiles(attack); err != nil {
 		shared.Logger.Error("Failed to download files", "error", err)
-		taskManager.SendAgentError(err.Error(), task, operations.SeverityFatal)
-		taskManager.AbandonTask(task)
+		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
+		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
 
 		return err
 	}
 
-	err = taskManager.RunTask(task, attack)
+	err = lib.RunTask(task, attack)
 	if err != nil {
 		return err
 	}
@@ -401,7 +398,7 @@ func heartbeat(signChan chan os.Signal) {
 	if shared.State.ExtraDebugging {
 		shared.Logger.Debug("Sending heartbeat")
 	}
-	state := errorUtils.SendHeartBeat()
+	state := lib.SendHeartBeat()
 	if state != nil {
 		if shared.State.ExtraDebugging {
 			shared.Logger.Debug("Received heartbeat response", "state", state)
@@ -416,7 +413,7 @@ func heartbeat(signChan chan os.Signal) {
 			if shared.State.CurrentActivity != shared.CurrentActivityCracking {
 				shared.State.CurrentActivity = shared.CurrentActivityStopping
 				shared.Logger.Debug("Agent is stopped, stopping processing")
-				if (!shared.State.JobCheckingStopped) {
+				if !shared.State.JobCheckingStopped {
 					shared.Logger.Warn("Job checking stopped, per server directive. Waiting for further instructions.")
 				}
 				shared.State.JobCheckingStopped = true
@@ -432,7 +429,7 @@ func heartbeat(signChan chan os.Signal) {
 // If the "always_use_native_hashcat" flag is set, it enforces using the native Hashcat binary.
 // Logs a fatal error if it fails to collect configuration data.
 func fetchAgentConfig() error {
-	err := errorUtils.GetAgentConfiguration()
+	err := lib.GetAgentConfiguration()
 	if err != nil {
 		shared.Logger.Fatal("Failed to get agent configuration from the CipherSwarm API", "error", err)
 	}
@@ -458,6 +455,6 @@ func initLogger() {
 
 // setupAPI initializes the SdkClient using the API URL and token from the shared state and sets the background context.
 func setupAPI() {
-	taskManager.SdkClient = sdk.New(sdk.WithServerURL(shared.State.URL), sdk.WithSecurity(shared.State.APIToken))
-	taskManager.Context = context.Background()
+	lib.SdkClient = sdk.New(sdk.WithServerURL(shared.State.URL), sdk.WithSecurity(shared.State.APIToken))
+	lib.Context = context.Background()
 }
