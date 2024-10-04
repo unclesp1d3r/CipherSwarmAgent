@@ -8,81 +8,11 @@ import (
 	"github.com/duke-git/lancet/v2/fileutil"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/duke-git/lancet/v2/validator"
-	"github.com/pkg/errors"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
-
-// runBenchmarkTask starts a hashcat benchmark session and processes its output.
-// It returns a slice of benchmark results and a boolean indicating an error state.
-func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
-	err := sess.Start()
-	if err != nil {
-		shared.Logger.Error("Failed to start benchmark session", "error", err)
-
-		return nil, true
-	}
-
-	var benchmarkResults []benchmarkResult
-	waitChan := make(chan int)
-
-	go func() {
-		defer close(waitChan)
-		for {
-			select {
-			case stdOutLine := <-sess.StdoutLines:
-				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults)
-			case stdErrLine := <-sess.StderrMessages:
-				handleBenchmarkStdErrLine(stdErrLine)
-			case statusUpdate := <-sess.StatusUpdates:
-				shared.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
-			case crackedHash := <-sess.CrackedHashes:
-				shared.Logger.Debug("Benchmark cracked hash", "hash", crackedHash) // This should never happen
-			case err := <-sess.DoneChan:
-				if err != nil {
-					shared.Logger.Error("Benchmark session failed", "error", err)
-					SendAgentError(err.Error(), nil, operations.SeverityFatal)
-				}
-
-				return
-			}
-		}
-	}()
-
-	<-waitChan
-
-	return benchmarkResults, false
-}
-
-// handleBenchmarkStdOutLine processes a line of benchmark output, extracting relevant data and appending it to result.
-func handleBenchmarkStdOutLine(line string, results *[]benchmarkResult) {
-	fields := strings.Split(line, ":")
-	if len(fields) != 6 {
-		shared.Logger.Debug("Unknown benchmark line", "line", line)
-
-		return
-	}
-
-	result := benchmarkResult{
-		Device:     fields[0],
-		HashType:   fields[1],
-		RuntimeMs:  fields[3],
-		HashTimeMs: fields[4],
-		SpeedHs:    fields[5],
-	}
-	displayBenchmark(result)
-	*results = append(*results, result)
-}
-
-// handleBenchmarkStdErrLine processes each line from the benchmark's standard error output, logs it, and reports warnings to the server.
-func handleBenchmarkStdErrLine(line string) {
-	displayBenchmarkError(line)
-	if strutil.IsNotBlank(line) {
-		SendAgentError(line, nil, operations.SeverityWarning)
-	}
-}
 
 // runAttackTask starts the attack session and handles real-time outputs and status updates.
 // It processes stdout, stderr, status updates, cracked hashes, and handles session completion.
@@ -179,75 +109,5 @@ func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Ses
 	} else {
 		SendAgentError(err.Error(), task, operations.SeverityCritical)
 		displayJobFailed(err)
-	}
-}
-
-// runTestTask runs a hashcat test session, handles various output channels, and returns the session status or an error.
-func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
-	err := sess.Start()
-	if err != nil {
-		shared.Logger.Error("Failed to start hashcat startup test session", "error", err)
-		SendAgentError(err.Error(), nil, operations.SeverityFatal)
-
-		return nil, err
-	}
-
-	var testResults *hashcat.Status
-	var errorResult error
-	waitChan := make(chan struct{})
-
-	go func() {
-		defer close(waitChan)
-		for {
-			select {
-			case stdoutLine := <-sess.StdoutLines:
-				handleTestStdOutLine(stdoutLine)
-			case stdErrLine := <-sess.StderrMessages:
-				handleTestStdErrLine(stdErrLine, &errorResult)
-			case statusUpdate := <-sess.StatusUpdates:
-				testResults = &statusUpdate
-			case crackedHash := <-sess.CrackedHashes:
-				handleTestCrackedHash(crackedHash, &errorResult)
-			case err := <-sess.DoneChan:
-				handleTestDoneChan(err, &errorResult)
-				sess.Cleanup()
-
-				return
-			}
-		}
-	}()
-
-	<-waitChan
-
-	return testResults, errorResult
-}
-
-// handleTestStdOutLine processes a line of standard output from a test, logging an error if the line isn't valid JSON.
-func handleTestStdOutLine(stdoutLine string) {
-	if !validator.IsJSON(stdoutLine) {
-		shared.Logger.Error("Failed to parse status update", "output", stdoutLine)
-	}
-}
-
-// handleTestStdErrLine sends the specified stderr line to the central server and sets the provided error result.
-func handleTestStdErrLine(stdErrLine string, errorResult *error) {
-	if strutil.IsNotBlank(stdErrLine) {
-		SendAgentError(stdErrLine, nil, operations.SeverityMinor)
-		*errorResult = errors.New(stdErrLine)
-	}
-}
-
-// handleTestCrackedHash processes a cracked hash result from hashcat and sets an error if the plaintext is blank.
-func handleTestCrackedHash(crackedHash hashcat.Result, errorResult *error) {
-	if strutil.IsBlank(crackedHash.Plaintext) {
-		*errorResult = errors.New("received empty cracked hash")
-	}
-}
-
-// handleTestDoneChan handles errors from the test session's done channel, sends them to central server if not exit status 1.
-func handleTestDoneChan(err error, errorResult *error) {
-	if err != nil && err.Error() != "exit status 1" {
-		SendAgentError(err.Error(), nil, operations.SeverityCritical)
-		*errorResult = err
 	}
 }
