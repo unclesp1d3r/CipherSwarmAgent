@@ -1,0 +1,26 @@
+site_name: CipherSwarm Agent Documentation
+site_url: https://github.com/unclesp1d3r/CipherSwarmAgent
+repo_url: https://github.com/unclesp1d3r/CipherSwarmAgent
+repo_name: unclesp1d3r/CipherSwarmAgent
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Usage: usage.md
+  - Configuration: configuration.md
+  - Project Structure: project_structure.md
+  - Contributing: contributing.md
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+    - toc.integrate
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
