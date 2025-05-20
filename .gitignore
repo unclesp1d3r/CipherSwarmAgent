@@ -137,3 +137,6 @@ modules.xml
 
 data/
 cipherswarmagent.yaml
+.venv/
+.DS_Store
+site/
