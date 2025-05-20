@@ -9,11 +9,7 @@ alwaysApply: true
 - **Purpose:** Distributed agent for CipherSwarm, managing and executing hash-cracking tasks at scale.
 - **Language:** Go (>=1.22)
 - **Entrypoint:** `main.go` → `cmd/root.go` (Cobra CLI)
-- **Core Functionality:**
-  - Securely connects to CipherSwarm server
-  - Receives, manages, and executes hash-cracking jobs (Hashcat)
-  - Handles benchmarking, status reporting, and result submission
-  - Supports cross-platform operation (Linux, macOS, Windows)
+- **Cross-platform:** Designed for Linux, macOS, and Windows operation.
 
 ## Directory Layout
 - `cmd/` — CLI entrypoint and command registration (Cobra)
@@ -32,20 +28,18 @@ alwaysApply: true
 
 ## Configuration
 - **Environment variables** and **CLI flags** (via Cobra/Viper)
-- Auto-generates YAML config file on first run
-- Key options: API token, server URL, data paths, GPU thresholds, debug flags
+- Auto-generates YAML config file on first run.
+- Key options: API token, server URL, data paths, GPU thresholds, debug flags.
 
-## Key Concepts
-- **Task Management:** Receives jobs, downloads resources, runs Hashcat, reports status/results
-- **Benchmarking:** Runs and submits device benchmarks for scheduling/optimization
-- **Cross-Platform:** Uses `lib/arch/` for OS-specific logic (device enumeration, binary names)
-- **State & Logging:** Centralized in `shared/`, with Info/Error loggers and agent state struct
-- **Extensibility:** Modular structure for new attack modes, device types, or resource handling
+## Extensibility & Modularity
+- Modular structure for new attack modes, device types, or resource handling.
+- OS-specific logic is abstracted in `lib/arch/`.
+- Shared state and logging are centralized in `shared/`.
 
 ## Contribution & Maintenance
-- Follows Conventional Commits
-- Automated CI (lint, test, changelog)
-- Not production-ready (pre-v1.0)
+- Follows Conventional Commits.
+- Automated CI (lint, test, changelog).
+- Not production-ready (pre-v1.0).
 
 ---
 This file is for Cursor context only. Do not include in builds or documentation.
