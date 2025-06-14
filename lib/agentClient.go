@@ -320,7 +320,7 @@ func convertToTaskStatus(update hashcat.Status, deviceStatuses []components.Devi
 			GuessBase:           update.Guess.GuessBase,
 			GuessBaseCount:      update.Guess.GuessBaseCount,
 			GuessBaseOffset:     update.Guess.GuessBaseOffset,
-			GuessBasePercentage: update.Guess.GuessModPercent,
+			GuessBasePercentage: update.Guess.GuessBasePercent,
 			GuessMod:            update.Guess.GuessMod,
 			GuessModCount:       update.Guess.GuessModCount,
 			GuessModOffset:      update.Guess.GuessModOffset,
