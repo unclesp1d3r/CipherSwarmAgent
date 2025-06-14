@@ -197,7 +197,7 @@ func downloadHashList(attack *components.Attack) error {
 
 	response, err := SdkClient.Attacks.GetHashList(Context, attack.ID)
 	if err != nil {
-		return logAndSendError("Error downloading hashlist from the CipherSwarm API", nil, operations.SeverityCritical, nil)
+		return logAndSendError("Error downloading hashlist from the CipherSwarm API", err, operations.SeverityCritical, nil)
 	}
 
 	if response.StatusCode != http.StatusOK {
