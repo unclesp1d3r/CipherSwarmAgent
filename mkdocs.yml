@@ -1,5 +1,4 @@
 site_name: CipherSwarm Agent Documentation
-site_url: https://github.com/unclesp1d3r/CipherSwarmAgent
 repo_url: https://github.com/unclesp1d3r/CipherSwarmAgent
 repo_name: unclesp1d3r/CipherSwarmAgent
 nav:
@@ -14,13 +13,46 @@ theme:
   features:
     - navigation.tabs
     - navigation.top
-    - content.code.copy
-    - content.code.annotate
     - search.suggest
     - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
     - toc.integrate
+  language: en
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+      primary: custom
+      accent: custom
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+      primary: custom
+      accent: custom
 markdown_extensions:
-  - admonition
   - codehilite
+  - sane_lists
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - admonition
+  - footnotes
+  - pymdownx.details
   - toc:
       permalink: true
+  - attr_list
+  - def_list
+  - tables
