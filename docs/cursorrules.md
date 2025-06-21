@@ -33,7 +33,7 @@ network:
   - `POST /agents/{id}/submit_error` – send structured error
   - `POST /agents/{id}/heartbeat` – heartbeat
   - `POST /agents/{id}/shutdown` – notify of shutdown
-- Response parsing must conform to the schemas defined in `swagger.json`.
+- Response parsing must conform to the schemas defined in `contracts/v1_api_swagger.json`.
 
 ## === 3. Hashcat Execution ===
 
@@ -60,7 +60,7 @@ config:
 
 resilience:
 
-- Implement exponential backoff for all failed API requests (see `x-speakeasy-retries` in swagger.json).
+- Implement exponential backoff for all failed API requests (see `x-speakeasy-retries` in `contracts/v1_api_swagger.json`).
 - Network or API errors should be logged and retried when safe.
 - Fatal errors should be reported to `/submit_error` with full metadata.
 - A shutdown routine should gracefully notify the server.
