@@ -2,7 +2,7 @@ module github.com/unclesp1d3r/cipherswarmagent
 
 go 1.22.7
 
-toolchain go1.23.2
+toolchain go1.24.4
 
 require (
 	github.com/charmbracelet/log v0.4.0
