@@ -1,6 +1,6 @@
 module github.com/unclesp1d3r/cipherswarmagent
 
-go 1.22.7
+go 1.23
 
 toolchain go1.23.2
 
@@ -14,6 +14,7 @@ require (
 	github.com/nxadm/tail v1.4.11
 	github.com/pkg/errors v0.9.1
 	github.com/shirou/gopsutil/v3 v3.24.5
+	github.com/shirou/gopsutil/v4 v4.25.5
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.8.5
