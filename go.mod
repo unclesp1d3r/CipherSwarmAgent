@@ -7,7 +7,7 @@ toolchain go1.23.2
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/cheggaaa/pb/v3 v3.1.5
-	github.com/duke-git/lancet/v2 v2.3.4
+	github.com/duke-git/lancet/v2 v2.3.6
 	github.com/dustin/go-humanize v1.0.1
 	github.com/hashicorp/go-getter v1.7.6
 	github.com/muesli/go-app-paths v0.2.2
