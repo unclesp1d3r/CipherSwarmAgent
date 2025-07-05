@@ -2,11 +2,11 @@ package hashcat
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
-	"github.com/duke-git/lancet/v2/convertor"
-	"github.com/duke-git/lancet/v2/fileutil"
-	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
@@ -54,7 +54,7 @@ func (params Params) Validate() error {
 // validateDictionaryAttack checks if the WordListFilename parameter is provided for a dictionary attack.
 // It returns an error if the parameter is missing or blank.
 func validateDictionaryAttack(params Params) error {
-	if strutil.IsBlank(params.WordListFilename) {
+	if strings.TrimSpace(params.WordListFilename) == "" {
 		return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", attackModeDictionary)
 	}
 
@@ -63,10 +63,10 @@ func validateDictionaryAttack(params Params) error {
 
 // validateMaskAttack validates the parameters for a mask attack. It checks if either Mask or MaskListFilename is provided but not both.
 func validateMaskAttack(params Params) error {
-	if strutil.IsBlank(params.Mask) && strutil.IsBlank(params.MaskListFilename) {
+	if strings.TrimSpace(params.Mask) == "" && strings.TrimSpace(params.MaskListFilename) == "" {
 		return fmt.Errorf("using mask attack (%d), but no mask was given", AttackModeMask)
 	}
-	if strutil.IsNotBlank(params.Mask) && strutil.IsNotBlank(params.MaskListFilename) {
+	if strings.TrimSpace(params.Mask) != "" && strings.TrimSpace(params.MaskListFilename) != "" {
 		return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", AttackModeMask)
 	}
 
@@ -76,10 +76,10 @@ func validateMaskAttack(params Params) error {
 // validateHybridAttack validates the parameters for a hybrid attack mode.
 // It ensures that both a mask and a wordlist filename are provided.
 func validateHybridAttack(params Params) error {
-	if strutil.IsBlank(params.Mask) {
+	if strings.TrimSpace(params.Mask) == "" {
 		return fmt.Errorf("using hybrid attack (%d), but no mask was given", params.AttackMode)
 	}
-	if strutil.IsBlank(params.WordListFilename) {
+	if strings.TrimSpace(params.WordListFilename) == "" {
 		return fmt.Errorf("expected 1 wordlist for hybrid attack (%d), but none given", params.AttackMode)
 	}
 
@@ -98,7 +98,7 @@ func (params Params) maskArgs() ([]string, error) {
 	args := make([]string, 0, len(params.MaskCustomCharsets)*2+6)
 
 	for i, charset := range params.MaskCustomCharsets {
-		if strutil.IsNotBlank(charset) {
+		if strings.TrimSpace(charset) != "" {
 			args = append(args, fmt.Sprintf("--custom-charset%d", i+1), charset)
 		}
 	}
@@ -106,10 +106,10 @@ func (params Params) maskArgs() ([]string, error) {
 	if params.MaskIncrement {
 		args = append(args, "--increment")
 		if params.MaskIncrementMin > 0 {
-			args = append(args, "--increment-min", convertor.ToString(params.MaskIncrementMin))
+			args = append(args, "--increment-min", strconv.FormatInt(params.MaskIncrementMin, 10))
 		}
 		if params.MaskIncrementMax > 0 {
-			args = append(args, "--increment-max", convertor.ToString(params.MaskIncrementMax))
+			args = append(args, "--increment-max", strconv.FormatInt(params.MaskIncrementMax, 10))
 		}
 	}
 
@@ -132,11 +132,11 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			"--machine-readable",
 			"--benchmark",
 		)
-		if strutil.IsNotBlank(params.BackendDevices) {
+		if strings.TrimSpace(params.BackendDevices) != "" {
 			args = append(args, "--backend-devices", params.BackendDevices)
 		}
 
-		if strutil.IsNotBlank(params.OpenCLDevices) {
+		if strings.TrimSpace(params.OpenCLDevices) != "" {
 			args = append(args, "--opencl-device-types", params.OpenCLDevices)
 		}
 
@@ -156,15 +156,15 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		"--outfile", outFile,
 		"--status",
 		"--status-json",
-		"--status-timer", convertor.ToString(shared.State.StatusTimer),
+		"--status-timer", strconv.FormatInt(int64(shared.State.StatusTimer), 10),
 		"--potfile-disable",
-		"--outfile-check-timer", convertor.ToString(shared.State.StatusTimer),
+		"--outfile-check-timer", strconv.FormatInt(int64(shared.State.StatusTimer), 10),
 		"--outfile-check-dir", shared.State.ZapsPath,
-		"-a", convertor.ToString(params.AttackMode),
-		"-m", convertor.ToString(params.HashType),
+		"-a", strconv.FormatInt(params.AttackMode, 10),
+		"-m", strconv.FormatInt(params.HashType, 10),
 	)
 
-	if strutil.IsNotBlank(params.RestoreFilePath) {
+	if strings.TrimSpace(params.RestoreFilePath) != "" {
 		args = append(args, "--restore-file-path", params.RestoreFilePath)
 	}
 
@@ -179,16 +179,16 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if params.Skip > 0 {
-		args = append(args, "--skip", convertor.ToString(params.Skip))
+		args = append(args, "--skip", strconv.FormatInt(params.Skip, 10))
 	}
 
 	if params.Limit > 0 {
-		args = append(args, "--limit", convertor.ToString(params.Limit))
+		args = append(args, "--limit", strconv.FormatInt(params.Limit, 10))
 	}
 
-	if strutil.IsNotBlank(params.WordListFilename) {
+	if strings.TrimSpace(params.WordListFilename) != "" {
 		wordList := filepath.Join(shared.State.FilePath, filepath.Clean(params.WordListFilename))
-		if !fileutil.IsExist(wordList) {
+		if _, err := os.Stat(wordList); os.IsNotExist(err) {
 			err := fmt.Errorf("provided word list %q couldn't be opened on filesystem", wordList)
 
 			return nil, err
@@ -196,9 +196,9 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		params.WordListFilename = wordList // Update the path to the word list
 	}
 
-	if strutil.IsNotBlank(params.RuleListFilename) {
+	if strings.TrimSpace(params.RuleListFilename) != "" {
 		ruleList := filepath.Join(shared.State.FilePath, filepath.Clean(params.RuleListFilename))
-		if !fileutil.IsExist(ruleList) {
+		if _, err := os.Stat(ruleList); os.IsNotExist(err) {
 			err := fmt.Errorf("provided rule list %q couldn't be opened on filesystem", ruleList)
 
 			return nil, err
@@ -207,9 +207,9 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	// If there's a mask list, use it instead of the mask
-	if strutil.IsNotBlank(params.MaskListFilename) {
+	if strings.TrimSpace(params.MaskListFilename) != "" {
 		maskList := filepath.Join(shared.State.FilePath, filepath.Clean(params.MaskListFilename))
-		if !fileutil.IsExist(maskList) {
+		if _, err := os.Stat(maskList); os.IsNotExist(err) {
 			err := fmt.Errorf("provided mask list %q couldn't be opened on filesystem", maskList)
 
 			return nil, err
@@ -223,7 +223,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	case attackModeDictionary:
 		args = append(args, params.WordListFilename)
 
-		if strutil.IsNotBlank(params.RuleListFilename) {
+		if strings.TrimSpace(params.RuleListFilename) != "" {
 			args = append(args, "-r", params.RuleListFilename)
 		}
 
@@ -246,11 +246,11 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		args = append(args, maskArgs...)
 	}
 
-	if strutil.IsNotBlank(params.BackendDevices) {
+	if strings.TrimSpace(params.BackendDevices) != "" {
 		args = append(args, "--backend-devices", params.BackendDevices)
 	}
 
-	if strutil.IsNotBlank(params.OpenCLDevices) {
+	if strings.TrimSpace(params.OpenCLDevices) != "" {
 		args = append(args, "--opencl-device-types", params.OpenCLDevices)
 	}
 

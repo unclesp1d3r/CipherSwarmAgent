@@ -2,14 +2,15 @@ package lib
 
 import (
 	"fmt"
+	"strings"
 	"time"
+	"unicode"
 
-	"github.com/duke-git/lancet/v2/mathutil"
-	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/dustin/go-humanize"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
@@ -58,7 +59,12 @@ func displayBenchmark(result benchmarkResult) {
 
 // displayBenchmarkError logs a debug-level message detailing a line of standard error output from a benchmark process.
 func displayBenchmarkError(stdErrLine string) {
-	shared.Logger.Debug("Benchmark stderr", "line", strutil.RemoveNonPrintable(stdErrLine))
+	shared.Logger.Debug("Benchmark stderr", "line", strings.Map(func(r rune) rune {
+		if unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, stdErrLine))
 }
 
 // displayJobFailed logs an error message indicating that a job session has failed using the shared logger.
@@ -78,19 +84,24 @@ func displayJobCrackedHash(crackedHash hashcat.Result) {
 
 // displayJobError logs a single line of standard error for a job after removing non-printable characters from the line.
 func displayJobError(stdErrLine string) {
-	shared.Logger.Debug("Job stderr", "line", strutil.RemoveNonPrintable(stdErrLine))
+	shared.Logger.Debug("Job stderr", "line", strings.Map(func(r rune) rune {
+		if unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, stdErrLine))
 }
 
 // displayJobStatus logs the current status of a hashcat operation, including progress, speed, and cracked hashes.
 func displayJobStatus(update hashcat.Status) {
 	shared.Logger.Debug("Job status update", "status", update)
 
-	relativeProgress := mathutil.Percent(float64(update.Progress[0]), float64(update.Progress[1]), 2)
-	progressText := fmt.Sprintf("%.2f%%", relativeProgress)
+	relativeProgress := utils.CalculatePercentage(float64(update.Progress[0]), float64(update.Progress[1]))
 
 	if update.Guess.GuessBaseCount > 1 {
-		progressText = fmt.Sprintf("%s for iteration %v of %v", progressText, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
+		relativeProgress = fmt.Sprintf("%s for iteration %v of %v", relativeProgress, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
 	}
+	progressText := relativeProgress
 
 	speedSum := int64(0)
 	for _, device := range update.Devices {
@@ -116,7 +127,7 @@ func displayAgentMetadataUpdated(result *operations.UpdateAgentResponse) {
 }
 
 // displayNewCrackerAvailable logs details about the newly available cracker, including the latest version and download URL.
-func displayNewCrackerAvailable(result *components.CrackerUpdate) {
+func DisplayNewCrackerAvailable(result *components.CrackerUpdate) {
 	shared.Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
 	shared.Logger.Info("Download URL", "url", result.GetDownloadURL())
 }
