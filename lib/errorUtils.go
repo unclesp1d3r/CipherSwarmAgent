@@ -1,32 +1,34 @@
 package lib
 
 import (
-	"errors"
-	"fmt"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/downloader"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
-	"io"
 	"net/http"
 	"os"
 	"path"
 	"time"
+
+	stderrors "errors"
 )
 
 // handleAuthenticationError handles authentication errors from the CipherSwarm API.
 // It logs detailed error information based on the type of error and returns the original error.
 func handleAuthenticationError(err error) error {
 	var eo *sdkerrors.ErrorObject
-	if errors.As(err, &eo) {
+	if stderrors.As(err, &eo) {
 		shared.Logger.Error("Error connecting to the CipherSwarm API", "error", eo.Error())
 
 		return err
 	}
 	var se *sdkerrors.SDKError
-	if errors.As(err, &se) {
+	if stderrors.As(err, &se) {
 		shared.Logger.Error("Error connecting to the CipherSwarm API, unexpected error",
 			"status_code", se.StatusCode,
 			"message", se.Message)
@@ -44,14 +46,14 @@ func handleAuthenticationError(err error) error {
 // For all other errors, logs a critical communication error with the CipherSwarm API.
 func handleConfigurationError(err error) error {
 	var eo *sdkerrors.ErrorObject
-	if errors.As(err, &eo) {
+	if stderrors.As(err, &eo) {
 		shared.Logger.Error("Error getting agent configuration", "error", eo.Error())
 		SendAgentError(eo.Error(), nil, operations.SeverityCritical)
 
 		return err
 	}
 	var se *sdkerrors.SDKError
-	if errors.As(err, &se) {
+	if stderrors.As(err, &se) {
 		shared.Logger.Error("Error getting agent configuration, unexpected error",
 			"status_code", se.StatusCode,
 			"message", se.Message)
@@ -60,20 +62,6 @@ func handleConfigurationError(err error) error {
 		return err
 	}
 	shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
-
-	return err
-}
-
-// logAndSendError logs the provided error message and sends an error report with the specified severity and task metadata.
-// Parameters:
-// - message: The error message to be logged.
-// - err: The error object to be logged and reported.
-// - severity: The severity level of the error being reported.
-// - task: A pointer to the task associated with the error, can be nil.
-// Returns the same error passed in.
-func logAndSendError(message string, err error, severity operations.Severity, task *components.Task) error {
-	shared.Logger.Error(message, "error", err)
-	SendAgentError(err.Error(), task, severity)
 
 	return err
 }
@@ -89,29 +77,29 @@ func logAndSendError(message string, err error, severity operations.Severity, ta
 // 7. Updates the configuration with the new executable path.
 // Returns an error if any step in the process fails.
 func handleCrackerUpdate(update *components.CrackerUpdate) error {
-	displayNewCrackerAvailable(update)
+	DisplayNewCrackerAvailable(update)
 
 	tempDir, err := os.MkdirTemp("", "cipherswarm-*")
 	if err != nil {
-		return logAndSendError("Error creating temporary directory", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error creating temporary directory", err, operations.SeverityCritical, nil)
 	}
 	defer func(tempDir string) {
-		_ = cleanupTempDir(tempDir)
+		_ = downloader.CleanupTempDir(tempDir)
 	}(tempDir)
 
 	tempArchivePath := path.Join(tempDir, "hashcat.7z")
-	if err := downloadFile(*update.GetDownloadURL(), tempArchivePath, ""); err != nil {
-		return logAndSendError("Error downloading cracker", err, operations.SeverityCritical, nil)
+	if err := downloader.DownloadFile(*update.GetDownloadURL(), tempArchivePath, ""); err != nil {
+		return cserrors.LogAndSendError("Error downloading cracker", err, operations.SeverityCritical, nil)
 	}
 
-	newArchivePath, err := moveArchiveFile(tempArchivePath)
+	newArchivePath, err := cracker.MoveArchiveFile(tempArchivePath)
 	if err != nil {
-		return logAndSendError("Error moving file", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error moving file", err, operations.SeverityCritical, nil)
 	}
 
-	hashcatDirectory, err := extractHashcatArchive(newArchivePath)
+	hashcatDirectory, err := cracker.ExtractHashcatArchive(newArchivePath)
 	if err != nil {
-		return logAndSendError("Error extracting file", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error extracting file", err, operations.SeverityCritical, nil)
 	}
 
 	if !validateHashcatDirectory(hashcatDirectory, *update.GetExecName()) {
@@ -119,7 +107,7 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	}
 
 	if err := os.Remove(newArchivePath); err != nil {
-		_ = logAndSendError("Error removing 7z file", err, operations.SeverityWarning, nil)
+		_ = cserrors.LogAndSendError("Error removing 7z file", err, operations.SeverityWarning, nil)
 	}
 
 	viper.Set("hashcat_path", path.Join(shared.State.CrackersPath, "hashcat", *update.GetExecName()))
@@ -156,7 +144,7 @@ func handleAPIError(message string, err error, severity operations.Severity) {
 func handleHeartbeatError(err error) {
 	switch e := err.(type) {
 	case *sdkerrors.ErrorObject:
-		_ = logAndSendError("Error sending heartbeat", e, operations.SeverityCritical, nil)
+		_ = cserrors.LogAndSendError("Error sending heartbeat", e, operations.SeverityCritical, nil)
 	case *sdkerrors.SDKError:
 		shared.Logger.Error("Error sending heartbeat, unexpected error",
 			"status_code", e.StatusCode,
@@ -170,14 +158,14 @@ func handleHeartbeatError(err error) {
 // handleStatusUpdateError handles specific error types during a status update and logs or processes them accordingly.
 func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Session) {
 	var eo *sdkerrors.ErrorObject
-	if errors.As(err, &eo) {
-		_ = logAndSendError("Error sending status update", eo, operations.SeverityCritical, task)
+	if stderrors.As(err, &eo) {
+		_ = cserrors.LogAndSendError("Error sending status update", eo, operations.SeverityCritical, task)
 
 		return
 	}
 
 	var se *sdkerrors.SDKError
-	if errors.As(err, &se) {
+	if stderrors.As(err, &se) {
 		handleSDKError(se, task, sess)
 
 		return
@@ -196,7 +184,7 @@ func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat
 		// Not an error, just log and pause the task
 		handleTaskGone(task, sess)
 	default:
-		_ = logAndSendError("Error connecting to the CipherSwarm API, unexpected error", se, operations.SeverityCritical, task)
+		_ = cserrors.LogAndSendError("Error connecting to the CipherSwarm API, unexpected error", se, operations.SeverityCritical, task)
 	}
 }
 
@@ -208,7 +196,7 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 	shared.Logger.Info("Killing task", "task_id", task.GetID())
 	shared.Logger.Info("It is possible that multiple errors appear as the task takes some time to kill. This is expected.")
 	if err := sess.Kill(); err != nil {
-		_ = logAndSendError("Error killing task", err, operations.SeverityCritical, task)
+		_ = cserrors.LogAndSendError("Error killing task", err, operations.SeverityCritical, task)
 	}
 	sess.Cleanup()
 }
@@ -217,7 +205,7 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 func handleTaskGone(task *components.Task, sess *hashcat.Session) {
 	shared.Logger.Info("Pausing task", "task_id", task.GetID())
 	if err := sess.Kill(); err != nil {
-		_ = logAndSendError("Error pausing task", err, operations.SeverityFatal, task)
+		_ = cserrors.LogAndSendError("Error pausing task", err, operations.SeverityFatal, task)
 	}
 }
 
@@ -238,25 +226,6 @@ func handleGetZapsError(err error) {
 	default:
 		shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 	}
-}
-
-// handleResponseStream processes a received response stream for a given task, writing it to a zap file on disk.
-// Constructs the zap file path from the task ID, removes existing zap files if necessary, and writes the new zap file.
-// Logs debug information for non-critical errors when removing existing files and logs critical errors for failures in creating or writing the zap file.
-func handleResponseStream(task *components.Task, responseStream io.Reader) error {
-	zapFilePath := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
-
-	if err := removeExistingZapFile(zapFilePath); err != nil {
-		// It's not critical to remove the existing zap file since we're going to overwrite it anyway
-		_ = logAndSendError("Error removing existing zap file", err, operations.SeverityCritical, task)
-	}
-
-	if err := createAndWriteZapFile(zapFilePath, responseStream, task); err != nil {
-		// This is a critical error since we need the zap file to be written
-		return logAndSendError("Error handling zap file", err, operations.SeverityCritical, task)
-	}
-
-	return nil
 }
 
 // SendAgentError sends an error message to the centralized server, including metadata and severity level.
@@ -287,7 +256,7 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 		TaskID:   taskID,
 	}
 
-	if _, err := SdkClient.Agents.SubmitErrorAgent(Context, shared.State.AgentID, agentError); err != nil {
+	if _, err := shared.State.SdkClient.Agents.SubmitErrorAgent(shared.State.Context, shared.State.AgentID, agentError); err != nil {
 		handleSendError(err)
 	}
 }

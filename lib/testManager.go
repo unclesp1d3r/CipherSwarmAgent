@@ -1,11 +1,13 @@
 package lib
 
 import (
-	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/duke-git/lancet/v2/validator"
-	"github.com/pkg/errors"
+	"encoding/json"
+	"strings"
+
+	pkg_errors "github.com/pkg/errors"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
@@ -23,12 +25,12 @@ func getDevices() ([]string, error) {
 
 	sess, err := hashcat.NewHashcatSession("test", jobParams)
 	if err != nil {
-		return nil, logAndSendError("Failed to create test session", err, operations.SeverityMajor, nil)
+		return nil, cserrors.LogAndSendError("Failed to create test session", err, operations.SeverityMajor, nil)
 	}
 
 	testStatus, err := runTestTask(sess)
 	if err != nil {
-		return nil, logAndSendError("Error running test task", err, operations.SeverityFatal, nil)
+		return nil, cserrors.LogAndSendError("Error running test task", err, operations.SeverityFatal, nil)
 	}
 
 	return extractDeviceNames(testStatus.Devices), nil
@@ -86,23 +88,23 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 
 // handleTestStdOutLine processes a line of standard output from a test, logging an error if the line isn't valid JSON.
 func handleTestStdOutLine(stdoutLine string) {
-	if !validator.IsJSON(stdoutLine) {
+	if !json.Valid([]byte(stdoutLine)) {
 		shared.Logger.Error("Failed to parse status update", "output", stdoutLine)
 	}
 }
 
 // handleTestStdErrLine sends the specified stderr line to the central server and sets the provided error result.
 func handleTestStdErrLine(stdErrLine string, errorResult *error) {
-	if strutil.IsNotBlank(stdErrLine) {
+	if strings.TrimSpace(stdErrLine) != "" {
 		SendAgentError(stdErrLine, nil, operations.SeverityMinor)
-		*errorResult = errors.New(stdErrLine)
+		*errorResult = pkg_errors.New(stdErrLine)
 	}
 }
 
 // handleTestCrackedHash processes a cracked hash result from hashcat and sets an error if the plaintext is blank.
 func handleTestCrackedHash(crackedHash hashcat.Result, errorResult *error) {
-	if strutil.IsBlank(crackedHash.Plaintext) {
-		*errorResult = errors.New("received empty cracked hash")
+	if strings.TrimSpace(crackedHash.Plaintext) == "" {
+		*errorResult = pkg_errors.New("received empty cracked hash")
 	}
 }
 

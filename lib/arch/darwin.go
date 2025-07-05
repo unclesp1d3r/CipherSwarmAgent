@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-
-	"github.com/duke-git/lancet/v2/strutil"
+	"strings"
 )
 
 // GetDevices retrieves a list of display device names on a macOS system.
@@ -33,7 +32,7 @@ func GetDevices() ([]string, error) {
 	var newArray []string //nolint:prealloc
 	for _, match := range matches {
 		if len(match) > 1 {
-			newArray = append(newArray, strutil.Trim(match[1]))
+			newArray = append(newArray, strings.TrimSpace(match[1]))
 		}
 	}
 
@@ -59,7 +58,7 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 		return "0.0.0", err
 	}
 
-	return strutil.Trim(strutil.BytesToString(out)), nil
+	return strings.TrimSpace(string(out)), nil
 }
 
 // Extract7z extracts the contents of a 7z archive to the specified destination directory.

@@ -10,15 +10,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/duke-git/lancet/v2/convertor"
-	"github.com/duke-git/lancet/v2/fileutil"
-	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/duke-git/lancet/v2/validator"
 	"github.com/nxadm/tail"
-	"github.com/spf13/viper"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
@@ -122,7 +119,7 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 		hashParts := values[1 : len(values)-1]
 		hash := strings.Join(hashParts, ":")
 
-		timestampI, err := convertor.ToInt(timestamp)
+		timestampI, err := strconv.ParseInt(timestamp, 10, 64)
 		if err != nil {
 			shared.Logger.Error("couldn't parse hashcat timestamp.", "timestamp", timestamp, "error", err)
 
@@ -150,7 +147,7 @@ func (sess *Session) handleStdout() {
 			continue
 		}
 		if !sess.SkipStatusUpdates {
-			if validator.IsJSON(line) {
+			if json.Valid([]byte(line)) {
 				var status Status
 				if err := json.Unmarshal([]byte(line), &status); err != nil {
 					shared.Logger.Error("WARN: couldn't unmarshal hashcat status", "error", err)
@@ -204,8 +201,8 @@ func (sess *Session) Cleanup() {
 	shared.Logger.Info("Cleaning up session files")
 
 	removeFile := func(filePath string) {
-		if fileutil.IsExist(filePath) {
-			if err := fileutil.RemoveFile(filePath); err != nil {
+		if _, err := os.Stat(filePath); err == nil {
+			if err := os.Remove(filePath); err != nil {
 				shared.Logger.Error("couldn't remove file", "file", filePath, "error", err)
 			}
 		}
@@ -240,7 +237,10 @@ func (sess *Session) CmdLine() string {
 // NewHashcatSession creates a new Hashcat session with given id and parameters,
 // initializes the necessary files, arguments, and channels, and returns the session.
 func NewHashcatSession(id string, params Params) (*Session, error) {
-	binaryPath := viper.GetString("hashcat_path")
+	binaryPath, err := cracker.FindHashcatBinary()
+	if err != nil {
+		return nil, err
+	}
 
 	outFile, err := createOutFile(shared.State.OutPath, id, 0o600)
 	if err != nil {
@@ -257,7 +257,10 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		return nil, err
 	}
 
-	if !strutil.IsBlank(params.RestoreFilePath) && fileutil.IsExist(params.RestoreFilePath) {
+	if strings.TrimSpace(params.RestoreFilePath) != "" && func() bool {
+		_, err := os.Stat(params.RestoreFilePath)
+		return err == nil
+	}() {
 		args = params.toRestoreArgs(id)
 	}
 
@@ -321,7 +324,7 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 func createCharsetFiles(charsets []string) ([]*os.File, error) {
 	var charsetFiles []*os.File
 	for i, charset := range charsets {
-		if !strutil.IsBlank(charset) {
+		if strings.TrimSpace(charset) != "" {
 			charsetFile, err := createTempFile(shared.State.OutPath, "charset*", 0o600)
 			if err != nil {
 				return nil, fmt.Errorf("couldn't create charset file: %w", err)

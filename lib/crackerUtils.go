@@ -1,18 +1,20 @@
 package lib
 
 import (
-	"github.com/duke-git/lancet/v2/fileutil"
+	"os"
+	"path"
+
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 	"net/http"
-	"path"
 )
 
 // setNativeHashcatPath sets the path for the native Hashcat binary if it is found in the system, otherwise logs and reports error.
 func setNativeHashcatPath() error {
 	shared.Logger.Debug("Using native Hashcat")
-	binPath, err := findHashcatBinary()
+	binPath, err := cracker.FindHashcatBinary()
 	if err != nil {
 		shared.Logger.Error("Error finding hashcat binary: ", err)
 		SendAgentError(err.Error(), nil, operations.SeverityCritical)
@@ -31,14 +33,14 @@ func setNativeHashcatPath() error {
 // the update process or logs the absence of any new updates. If any errors occur during these steps, they are logged and handled accordingly.
 func UpdateCracker() {
 	shared.Logger.Info("Checking for updated cracker")
-	currentVersion, err := getCurrentHashcatVersion()
+	currentVersion, err := cracker.GetCurrentHashcatVersion()
 	if err != nil {
 		shared.Logger.Error("Error getting current hashcat version", "error", err)
 
 		return
 	}
 
-	response, err := SdkClient.Crackers.CheckForCrackerUpdate(Context, &agentPlatform, &currentVersion)
+	response, err := shared.State.SdkClient.Crackers.CheckForCrackerUpdate(shared.State.Context, &agentPlatform, &currentVersion)
 	if err != nil {
 		handleAPIError("Error connecting to the CipherSwarm API", err, operations.SeverityCritical)
 
@@ -65,15 +67,16 @@ func UpdateCracker() {
 
 // validateHashcatDirectory checks if the given hashcat directory exists and contains the specified executable.
 func validateHashcatDirectory(hashcatDirectory, execName string) bool {
-	if !fileutil.IsDir(hashcatDirectory) {
+	if fileInfo, err := os.Stat(hashcatDirectory); err != nil || !fileInfo.IsDir() {
 		shared.Logger.Error("New hashcat directory does not exist", "path", hashcatDirectory)
 
 		return false
 	}
 
 	hashcatBinaryPath := path.Join(hashcatDirectory, execName)
-	if !fileutil.IsExist(hashcatBinaryPath) {
-		shared.Logger.Error("New hashcat binary does not exist", "path", hashcatBinaryPath)
+	fileInfo, err := os.Stat(hashcatBinaryPath)
+	if err != nil || fileInfo.Mode()&0111 == 0 {
+		shared.Logger.Error("New hashcat binary does not exist or is not executable", "path", hashcatBinaryPath)
 
 		return false
 	}

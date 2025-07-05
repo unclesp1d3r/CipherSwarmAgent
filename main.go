@@ -16,10 +16,17 @@ limitations under the License.
 package main
 
 import (
+	"context"
+	"os"
+
+	"github.com/charmbracelet/fang"
 	"github.com/unclesp1d3r/cipherswarmagent/cmd"
 )
 
 // main is the entry point for the CipherSwarm Agent CLI application. It calls cmd.Execute to run the root command.
 func main() {
-	cmd.Execute()
+	if err := fang.Execute(context.Background(), cmd.RootCmd); err != nil {
+		os.Exit(1)
+	}
+
 }

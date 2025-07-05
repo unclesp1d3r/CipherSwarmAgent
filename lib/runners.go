@@ -3,11 +3,9 @@ package lib
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/duke-git/lancet/v2/fileutil"
-	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/duke-git/lancet/v2/validator"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
@@ -50,7 +48,7 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 
 // handleStdOutLine handles a line of standard output, parses it if it's JSON, and updates the task and session status.
 func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Session) {
-	if validator.IsJSON(stdoutLine) {
+	if json.Valid([]byte(stdoutLine)) {
 		update := hashcat.Status{}
 		err := json.Unmarshal([]byte(stdoutLine), &update)
 		if err != nil {
@@ -65,7 +63,7 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 // handleStdErrLine handles a single line of standard error output by displaying and sending the error to the server.
 func handleStdErrLine(stdErrLine string, task *components.Task) {
 	displayJobError(stdErrLine)
-	if strutil.IsNotBlank(stdErrLine) {
+	if strings.TrimSpace(stdErrLine) != "" {
 		SendAgentError(stdErrLine, task, operations.SeverityMinor)
 	}
 }
@@ -80,7 +78,7 @@ func handleStatusUpdate(statusUpdate hashcat.Status, task *components.Task, sess
 // handleCrackedHash processes a cracked hash by displaying it and then sending it to a task server.
 func handleCrackedHash(crackedHash hashcat.Result, task *components.Task) {
 	displayJobCrackedHash(crackedHash)
-	sendCrackedHash(crackedHash, task)
+	sendCrackedHash(crackedHash.Timestamp, crackedHash.Hash, crackedHash.Plaintext, task)
 }
 
 // handleDoneChan handles the completion of a task, marking it exhausted on specific error, handling other errors, and cleaning up the session.
@@ -99,9 +97,9 @@ func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 // handleNonExhaustedError handles errors which are not related to exhaustion by performing specific actions based on the error message.
 func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session) {
 	if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
-		if strutil.IsNotBlank(sess.RestoreFilePath) {
+		if strings.TrimSpace(sess.RestoreFilePath) != "" {
 			shared.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
-			err := fileutil.RemoveFile(sess.RestoreFilePath)
+			err := os.Remove(sess.RestoreFilePath)
 			if err != nil {
 				shared.Logger.Error("Failed to remove restore file", "error", err)
 			}
