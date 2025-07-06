@@ -56,24 +56,35 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 		return nil, err
 	}
 
-	var testResults *hashcat.Status
-	var errorResult error
+	var (
+		testResults *hashcat.Status
+		errorResult error
+	)
+
 	waitChan := make(chan struct{})
 
 	go func() {
 		defer close(waitChan)
+
 		for {
 			select {
 			case stdoutLine := <-sess.StdoutLines:
 				handleTestStdOutLine(stdoutLine)
 			case stdErrLine := <-sess.StderrMessages:
-				handleTestStdErrLine(stdErrLine, &errorResult)
+				if err := handleTestStdErrLine(stdErrLine); err != nil {
+					errorResult = err
+				}
 			case statusUpdate := <-sess.StatusUpdates:
 				testResults = &statusUpdate
 			case crackedHash := <-sess.CrackedHashes:
-				handleTestCrackedHash(crackedHash, &errorResult)
+				if err := handleTestCrackedHash(crackedHash); err != nil {
+					errorResult = err
+				}
 			case err := <-sess.DoneChan:
-				handleTestDoneChan(err, &errorResult)
+				if err := handleTestDoneChan(err); err != nil {
+					errorResult = err
+				}
+
 				sess.Cleanup()
 
 				return
@@ -93,25 +104,31 @@ func handleTestStdOutLine(stdoutLine string) {
 	}
 }
 
-// handleTestStdErrLine sends the specified stderr line to the central server and sets the provided error result.
-func handleTestStdErrLine(stdErrLine string, errorResult *error) {
+// handleTestStdErrLine sends the specified stderr line to the central server and returns an error if the line is not empty.
+func handleTestStdErrLine(stdErrLine string) error {
 	if strings.TrimSpace(stdErrLine) != "" {
 		SendAgentError(stdErrLine, nil, operations.SeverityMinor)
-		*errorResult = pkg_errors.New(stdErrLine)
+		return pkg_errors.New(stdErrLine)
 	}
+
+	return nil
 }
 
-// handleTestCrackedHash processes a cracked hash result from hashcat and sets an error if the plaintext is blank.
-func handleTestCrackedHash(crackedHash hashcat.Result, errorResult *error) {
+// handleTestCrackedHash processes a cracked hash result from hashcat and returns an error if the plaintext is blank.
+func handleTestCrackedHash(crackedHash hashcat.Result) error {
 	if strings.TrimSpace(crackedHash.Plaintext) == "" {
-		*errorResult = pkg_errors.New("received empty cracked hash")
+		return pkg_errors.New("received empty cracked hash")
 	}
+
+	return nil
 }
 
 // handleTestDoneChan handles errors from the test session's done channel, sends them to central server if not exit status 1.
-func handleTestDoneChan(err error, errorResult *error) {
+func handleTestDoneChan(err error) error {
 	if err != nil && err.Error() != "exit status 1" {
 		SendAgentError(err.Error(), nil, operations.SeverityCritical)
-		*errorResult = err
+		return err
 	}
+
+	return nil
 }

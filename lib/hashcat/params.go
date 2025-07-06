@@ -1,6 +1,8 @@
+// Package hashcat provides hashcat session management and parameter handling.
 package hashcat
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +10,35 @@ import (
 	"strings"
 
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
+)
+
+const (
+	maxCharsets         = 4  // Maximum number of custom charsets allowed
+	defaultArgsCapacity = 32 // Default capacity for command arguments slice
+	maskArgsCapacity    = 6  // Default capacity for mask arguments
+)
+
+var (
+	// ErrUnsupportedAttackMode is returned when an unsupported attack mode is specified.
+	ErrUnsupportedAttackMode = errors.New("unsupported attack mode")
+	// ErrDictionaryAttackWordlist is returned when a dictionary attack is missing a wordlist.
+	ErrDictionaryAttackWordlist = errors.New("expected 1 wordlist for dictionary attack, but none given")
+	// ErrMaskAttackNoMask is returned when a mask attack is missing a mask.
+	ErrMaskAttackNoMask = errors.New("using mask attack, but no mask was given")
+	// ErrMaskAttackBothMaskAndList is returned when both mask and mask list are provided for a mask attack.
+	ErrMaskAttackBothMaskAndList = errors.New("using mask attack, but both mask and mask list were given")
+	// ErrHybridAttackNoMask is returned when a hybrid attack is missing a mask.
+	ErrHybridAttackNoMask = errors.New("using hybrid attack, but no mask was given")
+	// ErrHybridAttackNoWordlist is returned when a hybrid attack is missing a wordlist.
+	ErrHybridAttackNoWordlist = errors.New("expected 1 wordlist for hybrid attack, but none given")
+	// ErrTooManyCustomCharsets is returned when too many custom charsets are provided.
+	ErrTooManyCustomCharsets = errors.New("too many custom charsets supplied")
+	// ErrWordlistNotOpened is returned when a wordlist file cannot be opened.
+	ErrWordlistNotOpened = errors.New("provided word list couldn't be opened on filesystem")
+	// ErrRuleListNotOpened is returned when a rule list file cannot be opened.
+	ErrRuleListNotOpened = errors.New("provided rule list couldn't be opened on filesystem")
+	// ErrMaskListNotOpened is returned when a mask list file cannot be opened.
+	ErrMaskListNotOpened = errors.New("provided mask list couldn't be opened on filesystem")
 )
 
 // Params represents the configuration parameters for running a hash cracking attack using Hashcat.
@@ -47,7 +78,7 @@ func (params Params) Validate() error {
 	case AttackBenchmark:
 		return nil
 	default:
-		return fmt.Errorf("unsupported attack mode %d", params.AttackMode)
+		return fmt.Errorf("%w: %d", ErrUnsupportedAttackMode, params.AttackMode)
 	}
 }
 
@@ -55,7 +86,7 @@ func (params Params) Validate() error {
 // It returns an error if the parameter is missing or blank.
 func validateDictionaryAttack(params Params) error {
 	if strings.TrimSpace(params.WordListFilename) == "" {
-		return fmt.Errorf("expected 1 wordlist for dictionary attack (%d), but none given", attackModeDictionary)
+		return ErrDictionaryAttackWordlist
 	}
 
 	return nil
@@ -64,10 +95,11 @@ func validateDictionaryAttack(params Params) error {
 // validateMaskAttack validates the parameters for a mask attack. It checks if either Mask or MaskListFilename is provided but not both.
 func validateMaskAttack(params Params) error {
 	if strings.TrimSpace(params.Mask) == "" && strings.TrimSpace(params.MaskListFilename) == "" {
-		return fmt.Errorf("using mask attack (%d), but no mask was given", AttackModeMask)
+		return ErrMaskAttackNoMask
 	}
+
 	if strings.TrimSpace(params.Mask) != "" && strings.TrimSpace(params.MaskListFilename) != "" {
-		return fmt.Errorf("using mask attack (%d), but both mask and mask list were given", AttackModeMask)
+		return ErrMaskAttackBothMaskAndList
 	}
 
 	return nil
@@ -77,10 +109,11 @@ func validateMaskAttack(params Params) error {
 // It ensures that both a mask and a wordlist filename are provided.
 func validateHybridAttack(params Params) error {
 	if strings.TrimSpace(params.Mask) == "" {
-		return fmt.Errorf("using hybrid attack (%d), but no mask was given", params.AttackMode)
+		return ErrHybridAttackNoMask
 	}
+
 	if strings.TrimSpace(params.WordListFilename) == "" {
-		return fmt.Errorf("expected 1 wordlist for hybrid attack (%d), but none given", params.AttackMode)
+		return ErrHybridAttackNoWordlist
 	}
 
 	return nil
@@ -90,12 +123,11 @@ func validateHybridAttack(params Params) error {
 // Validates the number of custom charsets, then appends charset and increment options to args slice.
 // Returns the constructed args slice or an error if validation fails.
 func (params Params) maskArgs() ([]string, error) {
-	const maxCharsets = 4
 	if len(params.MaskCustomCharsets) > maxCharsets {
-		return nil, fmt.Errorf("too many custom charsets supplied (%d), the max is %d", len(params.MaskCustomCharsets), maxCharsets)
+		return nil, fmt.Errorf("%w (%d), the max is %d", ErrTooManyCustomCharsets, len(params.MaskCustomCharsets), maxCharsets)
 	}
 
-	args := make([]string, 0, len(params.MaskCustomCharsets)*2+6)
+	args := make([]string, 0, len(params.MaskCustomCharsets)*2+maskArgsCapacity)
 
 	for i, charset := range params.MaskCustomCharsets {
 		if strings.TrimSpace(charset) != "" {
@@ -108,6 +140,7 @@ func (params Params) maskArgs() ([]string, error) {
 		if params.MaskIncrementMin > 0 {
 			args = append(args, "--increment-min", strconv.FormatInt(params.MaskIncrementMin, 10))
 		}
+
 		if params.MaskIncrementMax > 0 {
 			args = append(args, "--increment-max", strconv.FormatInt(params.MaskIncrementMax, 10))
 		}
@@ -124,7 +157,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		return nil, err
 	}
 
-	args := make([]string, 0, 32)
+	args := make([]string, 0, defaultArgsCapacity)
 	if params.AttackMode == AttackBenchmark {
 		args = append(
 			args,
@@ -189,20 +222,18 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	if strings.TrimSpace(params.WordListFilename) != "" {
 		wordList := filepath.Join(shared.State.FilePath, filepath.Clean(params.WordListFilename))
 		if _, err := os.Stat(wordList); os.IsNotExist(err) {
-			err := fmt.Errorf("provided word list %q couldn't be opened on filesystem", wordList)
-
-			return nil, err
+			return nil, fmt.Errorf("%w: %s", ErrWordlistNotOpened, wordList)
 		}
+
 		params.WordListFilename = wordList // Update the path to the word list
 	}
 
 	if strings.TrimSpace(params.RuleListFilename) != "" {
 		ruleList := filepath.Join(shared.State.FilePath, filepath.Clean(params.RuleListFilename))
 		if _, err := os.Stat(ruleList); os.IsNotExist(err) {
-			err := fmt.Errorf("provided rule list %q couldn't be opened on filesystem", ruleList)
-
-			return nil, err
+			return nil, fmt.Errorf("%w: %s", ErrRuleListNotOpened, ruleList)
 		}
+
 		params.RuleListFilename = ruleList // Update the path to the rule list
 	}
 
@@ -210,10 +241,9 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	if strings.TrimSpace(params.MaskListFilename) != "" {
 		maskList := filepath.Join(shared.State.FilePath, filepath.Clean(params.MaskListFilename))
 		if _, err := os.Stat(maskList); os.IsNotExist(err) {
-			err := fmt.Errorf("provided mask list %q couldn't be opened on filesystem", maskList)
-
-			return nil, err
+			return nil, fmt.Errorf("%w: %s", ErrMaskListNotOpened, maskList)
 		}
+
 		params.Mask = maskList // Update the path to the mask list
 	}
 
@@ -243,6 +273,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		if err != nil {
 			return nil, err
 		}
+
 		args = append(args, maskArgs...)
 	}
 

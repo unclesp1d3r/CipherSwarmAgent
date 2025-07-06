@@ -63,10 +63,10 @@ linters:
     - unused
     - usestdlibvars
     - wastedassign
-    - wrapcheck
     - wsl_v5
   disable:
     - gomodguard
+    - wrapcheck # Disabled: most violations are internal package calls within same module
   settings:
     gocritic:
       enabled-tags:

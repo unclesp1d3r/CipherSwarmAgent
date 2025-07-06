@@ -10,8 +10,8 @@
 
 The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecosystem. It is designed to efficiently manage and execute distributed hash-cracking tasks. Built with Go, this agent provides a robust solution for scaling and managing cryptographic computations across the CipherSwarm network.
 
-!!! warning "Development Status"
-    This project is currently under active development and is not ready for production. Please use it with caution. Do not trust anything until v1.0.0 is released since the API may change at any time.
+> [!WARNING]
+> This project is currently under active development and is not ready for production. Please use it with caution. Do not trust anything until v1.0.0 is released since the API may change at any time.
 
 ## Features
 
@@ -41,13 +41,13 @@ git clone https://github.com/unclesp1d3r/cipherswarm-agent.git
 cd cipherswarm-agent
 ```
 
-2. **Build the agent:**
+1. **Build the agent:**
 
 ```bash
 just install
 ```
 
-3. **Run the agent:**
+1. **Run the agent:**
 
 ```bash
 export API_TOKEN=your_api_token

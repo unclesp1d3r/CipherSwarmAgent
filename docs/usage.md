@@ -142,7 +142,7 @@ INFO [Task 123] Task completed successfully
 
 The agent creates several files for monitoring:
 
-```
+```text
 data/
 ├── lock.pid              # Agent process ID
 ├── hashcat.pid           # Hashcat process ID (when running)
@@ -215,21 +215,24 @@ go run main.go --debug --extra_debugging
 ### First-Time Setup
 
 1. **Get API token** from your CipherSwarm server admin
+
 2. **Install the agent** (see [Installation](installation.md))
+
 3. **Configure basic settings**:
 
-   ```bash
-   export API_TOKEN="your_token"
-   export API_URL="https://your-server.com:3000"
-   ```
+    ```bash
+    export API_TOKEN="your_token"
+    export API_URL="https://your-server.com:3000"
+    ```
 
 4. **Test connection**:
 
-   ```bash
-   ./cipherswarm-agent --debug
-   ```
+    ```bash
+    ./cipherswarm-agent --debug
+    ```
 
 5. **Monitor initial benchmarking** (may take several minutes)
+
 6. **Verify agent appears** in server's agent list
 
 ### Routine Operations
@@ -312,7 +315,7 @@ mv new-cipherswarm-agent cipherswarm-agent
 
 #### Agent Won't Start
 
-**API Connection Failed**
+#### API Connection Failed
 
 ```bash
 # Test API connectivity
@@ -325,7 +328,7 @@ nslookup your-server.com
 telnet your-server.com 3000
 ```
 
-**Permission Errors**
+#### Permission Errors
 
 ```bash
 # Fix binary permissions
@@ -339,7 +342,7 @@ chmod 750 data
 chmod 600 cipherswarmagent.yaml
 ```
 
-**Lock File Issues**
+#### Lock File Issues
 
 ```bash
 # Remove stale lock file
@@ -352,19 +355,19 @@ pkill -9 cipherswarm-agent  # force kill if needed
 
 #### Performance Issues
 
-**High CPU Usage**
+#### High CPU Usage
 
 - Check if multiple agents are running: `ps aux | grep cipherswarm-agent`
 - Monitor Hashcat process: `top -p $(cat data/hashcat.pid)`
 - Adjust status update frequency: `--status_timer 5`
 
-**High Memory Usage**
+#### High Memory Usage
 
 - Check for memory leaks in logs
 - Restart agent periodically in production
 - Limit concurrent file downloads
 
-**GPU Overheating**
+#### GPU Overheating
 
 - Lower temperature threshold: `--gpu_temp_threshold 75`
 - Improve system cooling
@@ -372,7 +375,7 @@ pkill -9 cipherswarm-agent  # force kill if needed
 
 #### Task Failures
 
-**Download Failures**
+#### Download Failures
 
 ```bash
 # Check network connectivity
@@ -385,7 +388,7 @@ curl -H "Authorization: Bearer your_token" https://your-server.com:3000/api/v1/c
 df -h
 ```
 
-**Hashcat Errors**
+#### Hashcat Errors
 
 ```bash
 # Test Hashcat directly
@@ -396,7 +399,7 @@ hashcat --benchmark
 nvidia-smi  # for NVIDIA GPUs
 ```
 
-**Task Timeout**
+#### Task Timeout
 
 - Check server-side task timeouts
 - Monitor network stability
@@ -446,11 +449,11 @@ If you're still experiencing issues:
 1. **Check the logs** with debug mode enabled
 2. **Search existing issues** on [GitHub](https://github.com/unclesp1d3r/CipherSwarmAgent/issues)
 3. **Create a new issue** with:
-   - Agent version (`--version`)
-   - Operating system and architecture
-   - Configuration (sanitized, no tokens)
-   - Error logs
-   - Steps to reproduce
+    - Agent version (`--version`)
+    - Operating system and architecture
+    - Configuration (sanitized, no tokens)
+    - Error logs
+    - Steps to reproduce
 
 ## Production Deployment
 
@@ -507,5 +510,5 @@ See [Installation](installation.md) for Docker Compose configuration.
 ## Next Steps
 
 - Review [Configuration](configuration.md) for advanced configuration options
-- Check [Project Structure](project_structure.md) for development information  
+- Check [Project Structure](project_structure.md) for development information
 - See [Contributing](contributing.md) to help improve the project

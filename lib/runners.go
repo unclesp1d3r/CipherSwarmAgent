@@ -2,7 +2,6 @@ package lib
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 
@@ -24,8 +23,10 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	}
 
 	waitChan := make(chan int)
+
 	go func() {
 		defer close(waitChan)
+
 		for {
 			select {
 			case stdoutLine := <-sess.StdoutLines:
@@ -43,6 +44,7 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 			}
 		}
 	}()
+
 	<-waitChan
 }
 
@@ -50,6 +52,7 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Session) {
 	if json.Valid([]byte(stdoutLine)) {
 		update := hashcat.Status{}
+
 		err := json.Unmarshal([]byte(stdoutLine), &update)
 		if err != nil {
 			shared.Logger.Error("Failed to parse status update", "error", err)
@@ -63,6 +66,7 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 // handleStdErrLine handles a single line of standard error output by displaying and sending the error to the server.
 func handleStdErrLine(stdErrLine string, task *components.Task) {
 	displayJobError(stdErrLine)
+
 	if strings.TrimSpace(stdErrLine) != "" {
 		SendAgentError(stdErrLine, task, operations.SeverityMinor)
 	}
@@ -91,14 +95,16 @@ func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 			handleNonExhaustedError(err, task, sess)
 		}
 	}
+
 	sess.Cleanup()
 }
 
 // handleNonExhaustedError handles errors which are not related to exhaustion by performing specific actions based on the error message.
 func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session) {
-	if strings.Contains(err.Error(), fmt.Sprintf("Cannot read %s", sess.RestoreFilePath)) {
+	if strings.Contains(err.Error(), "Cannot read "+sess.RestoreFilePath) {
 		if strings.TrimSpace(sess.RestoreFilePath) != "" {
 			shared.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
+
 			err := os.Remove(sess.RestoreFilePath)
 			if err != nil {
 				shared.Logger.Error("Failed to remove restore file", "error", err)

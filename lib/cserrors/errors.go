@@ -1,6 +1,9 @@
+// Package cserrors provides error handling and logging utilities for CipherSwarm.
 package cserrors
 
 import (
+	"context"
+
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
@@ -17,13 +20,15 @@ func LogAndSendError(message string, err error, severity operations.Severity, ta
 		if task != nil {
 			taskID = &task.ID
 		}
+
 		agentError := &operations.SubmitErrorAgentRequestBody{
 			AgentID:  shared.State.AgentID,
 			Message:  message,
 			Severity: severity,
 			TaskID:   taskID,
 		}
-		_, err := shared.State.SdkClient.Agents.SubmitErrorAgent(shared.State.Context, shared.State.AgentID, agentError)
+
+		_, err := shared.State.SdkClient.Agents.SubmitErrorAgent(context.Background(), shared.State.AgentID, agentError)
 		if err != nil {
 			shared.Logger.Error("Error sending error to server", "error", err)
 		}

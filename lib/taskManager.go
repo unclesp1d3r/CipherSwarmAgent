@@ -1,6 +1,8 @@
 package lib
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -14,14 +16,23 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+var (
+	// ErrTaskBadResponse is returned when the server returns a bad response.
+	ErrTaskBadResponse = errors.New("bad response")
+	// ErrTaskIsNil is returned when a task parameter is nil.
+	ErrTaskIsNil = errors.New("task is nil")
+	// ErrNoTaskAvailable is returned when no task is available from the server.
+	ErrNoTaskAvailable = errors.New("no task available")
+)
+
 // GetNewTask retrieves a new task from the server.
 // It sends a request using SdkClient, handles any errors, and returns the task if available.
 // If the server responds with no content, it means no new task is available, and the function returns nil without error.
 // For any other unexpected response status, an error is returned.
 func GetNewTask() (*components.Task, error) {
-	response, err := shared.State.SdkClient.Tasks.GetNewTask(shared.State.Context)
+	response, err := shared.State.SdkClient.Tasks.GetNewTask(context.Background())
 	if err != nil {
-		handleAPIError("Error getting new task", err, operations.SeverityCritical)
+		handleAPIError("Error getting new task", err)
 
 		return nil, err
 	}
@@ -29,21 +40,21 @@ func GetNewTask() (*components.Task, error) {
 	switch response.StatusCode {
 	case http.StatusNoContent:
 		// No new task available
-		return nil, nil
+		return nil, ErrNoTaskAvailable
 	case http.StatusOK:
 		// New task available
 		return response.Task, nil
 	default:
-		return nil, fmt.Errorf("bad response: %s", response.RawResponse.Status)
+		return nil, fmt.Errorf("%w: %s", ErrTaskBadResponse, response.RawResponse.Status)
 	}
 }
 
 // GetAttackParameters retrieves the attack parameters for a given attackID via the SdkClient.
 // Returns an Attack object if the API call is successful and the response status is OK.
 func GetAttackParameters(attackID int64) (*components.Attack, error) {
-	response, err := shared.State.SdkClient.Attacks.GetAttack(shared.State.Context, attackID)
+	response, err := shared.State.SdkClient.Attacks.GetAttack(context.Background(), attackID)
 	if err != nil {
-		handleAPIError("Error getting attack parameters", err, operations.SeverityCritical)
+		handleAPIError("Error getting attack parameters", err)
 
 		return nil, err
 	}
@@ -52,7 +63,7 @@ func GetAttackParameters(attackID int64) (*components.Attack, error) {
 		return response.Attack, nil
 	}
 
-	return nil, fmt.Errorf("bad response: %s", response.RawResponse.Status)
+	return nil, fmt.Errorf("%w: %s", ErrTaskBadResponse, response.RawResponse.Status)
 }
 
 // createJobParams creates hashcat parameters from the given Task and Attack objects.
@@ -60,10 +71,11 @@ func GetAttackParameters(attackID int64) (*components.Attack, error) {
 // from the Task and Attack objects. It includes path settings for various resources
 // like hash files, word lists, rule lists, and restore files.
 func createJobParams(task *components.Task, attack *components.Attack) hashcat.Params {
-	unwrapOr := func(val *int64, def int64) int64 {
+	unwrapOr := func(val *int64) int64 {
 		if val == nil {
-			return def
+			return 0
 		}
+
 		return *val
 	}
 
@@ -71,29 +83,31 @@ func createJobParams(task *components.Task, attack *components.Attack) hashcat.P
 		if val == nil {
 			return def
 		}
+
 		return *val
 	}
 
-	unwrapOrString := func(val *string, def string) string {
+	unwrapOrString := func(val *string) string {
 		if val == nil {
-			return def
+			return ""
 		}
+
 		return *val
 	}
 
 	return hashcat.Params{
-		AttackMode:       unwrapOr(attack.AttackModeHashcat, 0),
-		HashType:         unwrapOr(attack.HashMode, 0),
+		AttackMode:       unwrapOr(attack.AttackModeHashcat),
+		HashType:         unwrapOr(attack.HashMode),
 		HashFile:         path.Join(shared.State.HashlistPath, strconv.FormatInt(attack.GetHashListID(), 10)+".txt"),
-		Mask:             unwrapOrString(attack.GetMask(), ""),
+		Mask:             unwrapOrString(attack.GetMask()),
 		MaskIncrement:    unwrapOrBool(attack.GetIncrementMode(), false),
 		MaskIncrementMin: attack.GetIncrementMinimum(),
 		MaskIncrementMax: attack.GetIncrementMaximum(),
 		MaskCustomCharsets: []string{
-			unwrapOrString(attack.GetCustomCharset1(), ""),
-			unwrapOrString(attack.GetCustomCharset2(), ""),
-			unwrapOrString(attack.GetCustomCharset3(), ""),
-			unwrapOrString(attack.GetCustomCharset4(), ""),
+			unwrapOrString(attack.GetCustomCharset1()),
+			unwrapOrString(attack.GetCustomCharset2()),
+			unwrapOrString(attack.GetCustomCharset3()),
+			unwrapOrString(attack.GetCustomCharset4()),
 		},
 		WordListFilename: resourceNameOrBlank(attack.WordList),
 		RuleListFilename: resourceNameOrBlank(attack.RuleList),
@@ -101,8 +115,8 @@ func createJobParams(task *components.Task, attack *components.Attack) hashcat.P
 		AdditionalArgs:   arch.GetAdditionalHashcatArgs(),
 		OptimizedKernels: *attack.Optimized,
 		SlowCandidates:   *attack.SlowCandidateGenerators,
-		Skip:             unwrapOr(task.GetSkip(), 0),
-		Limit:            unwrapOr(task.GetLimit(), 0),
+		Skip:             unwrapOr(task.GetSkip()),
+		Limit:            unwrapOr(task.GetLimit()),
 		BackendDevices:   Configuration.Config.BackendDevices,
 		OpenCLDevices:    Configuration.Config.OpenCLDevices,
 		RestoreFilePath:  path.Join(shared.State.RestoreFilePath, strconv.FormatInt(attack.GetID(), 10)+".restore"),
@@ -113,6 +127,7 @@ func resourceNameOrBlank(resource *components.AttackResourceFile) string {
 	if resource == nil {
 		return ""
 	}
+
 	return resource.FileName
 }
 
@@ -124,10 +139,10 @@ func AcceptTask(task *components.Task) error {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
 
-		return fmt.Errorf("task is nil")
+		return ErrTaskIsNil
 	}
 
-	_, err := shared.State.SdkClient.Tasks.SetTaskAccepted(shared.State.Context, task.GetID())
+	_, err := shared.State.SdkClient.Tasks.SetTaskAccepted(context.Background(), task.GetID())
 	if err != nil {
 		handleAcceptTaskError(err)
 
@@ -148,7 +163,7 @@ func markTaskExhausted(task *components.Task) {
 		return
 	}
 
-	_, err := shared.State.SdkClient.Tasks.SetTaskExhausted(shared.State.Context, task.GetID())
+	_, err := shared.State.SdkClient.Tasks.SetTaskExhausted(context.Background(), task.GetID())
 	if err != nil {
 		handleTaskError(err, "Error notifying server of task exhaustion")
 	}
@@ -163,7 +178,7 @@ func AbandonTask(task *components.Task) {
 		return
 	}
 
-	_, err := shared.State.SdkClient.Tasks.SetTaskAbandoned(shared.State.Context, task.GetID())
+	_, err := shared.State.SdkClient.Tasks.SetTaskAbandoned(context.Background(), task.GetID())
 	if err != nil {
 		handleTaskError(err, "Error notifying server of task abandonment")
 	}
@@ -184,6 +199,7 @@ func RunTask(task *components.Task, attack *components.Attack) error {
 	}
 
 	jobParams := createJobParams(task, attack)
+
 	sess, err := hashcat.NewHashcatSession(strconv.FormatInt(attack.GetID(), 10), jobParams)
 	if err != nil {
 		return cserrors.LogAndSendError("Failed to create attack session", err, operations.SeverityCritical, task)

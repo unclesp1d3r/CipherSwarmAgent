@@ -4,12 +4,14 @@ import (
 	"time"
 )
 
+// Attack mode constants define the different types of hashcat attacks.
 const (
 	attackModeDictionary = 0 // attackModeDictionary is the attack mode for dictionary attacks
-	AttackModeMask       = 3 // AttackModeMask is the attack mode for mask attacks
-	attackModeHybridDM   = 6 // attackModeHybridDM is the attack mode for hybrid dictionary + mask attacks
-	attackModeHybridMD   = 7 // attackModeHybridMD is the attack mode for hybrid mask + dictionary attacks
-	AttackBenchmark      = 9 // AttackBenchmark is the attack mode for benchmarking
+	// AttackModeMask is the attack mode for mask attacks.
+	AttackModeMask     = 3
+	attackModeHybridDM = 6 // attackModeHybridDM is the attack mode for hybrid dictionary + mask attacks
+	attackModeHybridMD = 7 // attackModeHybridMD is the attack mode for hybrid mask + dictionary attacks
+	AttackBenchmark    = 9 // AttackBenchmark is the attack mode for benchmarking
 )
 
 // statusGuess represents the state and statistics of the current guess in a password cracking attack.

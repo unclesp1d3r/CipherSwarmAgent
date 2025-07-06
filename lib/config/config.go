@@ -1,3 +1,4 @@
+// Package config provides configuration management for the CipherSwarm agent.
 package config
 
 import (
@@ -11,10 +12,18 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
-var (
-	scope = gap.NewScope(gap.User, "CipherSwarm")
+const (
+	// Default configuration values.
+	defaultGPUTempThreshold = 80               // Default GPU temperature threshold in Celsius
+	defaultSleepOnFailure   = 60 * time.Second // Default sleep duration after task failure
+	defaultStatusTimer      = 3                // Default status update interval in seconds
 )
 
+var (
+	scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // Configuration scope
+)
+
+// InitConfig initializes the configuration from various sources.
 func InitConfig(cfgFile string) {
 	shared.ErrorLogger.SetReportCaller(true)
 
@@ -27,6 +36,7 @@ func InitConfig(cfgFile string) {
 
 	configDirs, err := scope.ConfigDirs()
 	cobra.CheckErr(err)
+
 	for _, dir := range configDirs {
 		viper.AddConfigPath(dir)
 	}
@@ -45,12 +55,14 @@ func InitConfig(cfgFile string) {
 		shared.Logger.Info("Using config file", "config_file", viper.ConfigFileUsed())
 	} else {
 		shared.Logger.Warn("No config file found, attempting to write a new one")
+
 		if err := viper.SafeWriteConfig(); err != nil && err.Error() != "config file already exists" {
 			shared.Logger.Error("Error writing config file", "error", err)
 		}
 	}
 }
 
+// SetupSharedState configures the shared state from configuration values.
 func SetupSharedState() {
 	// Set the API URL and token
 	shared.State.URL = viper.GetString("api_url")
@@ -78,18 +90,19 @@ func SetupSharedState() {
 	shared.State.UseLegacyDeviceIdentificationMethod = viper.GetBool("use_legacy_device_technique") // Set the use legacy device identification method flag in the shared state
 }
 
+// SetDefaultConfigValues sets default configuration values.
 func SetDefaultConfigValues() {
 	cwd, err := os.Getwd()
 	cobra.CheckErr(err)
 
 	viper.SetDefault("data_path", path.Join(cwd, "data"))
-	viper.SetDefault("gpu_temp_threshold", 80)
+	viper.SetDefault("gpu_temp_threshold", defaultGPUTempThreshold)
 	viper.SetDefault("always_use_native_hashcat", false)
-	viper.SetDefault("sleep_on_failure", 60*time.Second)
+	viper.SetDefault("sleep_on_failure", defaultSleepOnFailure)
 	viper.SetDefault("always_trust_files", false)
 	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files"))
 	viper.SetDefault("extra_debugging", false)
-	viper.SetDefault("status_timer", 3)
+	viper.SetDefault("status_timer", defaultStatusTimer)
 	viper.SetDefault("write_zaps_to_file", false)
 	viper.SetDefault("zap_path", path.Join(viper.GetString("data_path"), "zaps"))
 	viper.SetDefault("retain_zaps_on_completion", false)

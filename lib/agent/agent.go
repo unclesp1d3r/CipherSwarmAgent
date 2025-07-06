@@ -1,7 +1,8 @@
+// Package agent provides the main agent functionality for CipherSwarm.
 package agent
 
 import (
-	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,11 +20,13 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+// StartAgent initializes and starts the CipherSwarm agent.
 func StartAgent() {
 	// Ensure API URL and token are set
 	if viper.GetString("api_url") == "" {
 		shared.Logger.Fatal("API URL not set")
 	}
+
 	if viper.GetString("api_token") == "" {
 		shared.Logger.Fatal("API token not set")
 	}
@@ -33,8 +36,7 @@ func StartAgent() {
 	initLogger()
 
 	// Initialize API client
-	shared.State.SdkClient = sdk.New(sdk.WithServerURL(shared.State.URL), sdk.WithSecurity(shared.State.APIToken))
-	shared.State.Context = context.Background()
+	shared.State.SdkClient = sdk.New(sdk.WithSecurity(shared.State.APIToken), sdk.WithServerURL(shared.State.URL))
 
 	lib.DisplayStartup()
 
@@ -51,25 +53,30 @@ func StartAgent() {
 	if err := cracker.CreateDataDirs(); err != nil {
 		shared.Logger.Fatal("Error creating data directories", "error", err)
 	}
+
 	if err := cracker.CreateLockFile(); err != nil {
 		shared.Logger.Fatal("Error creating lock file", "error", err)
 	}
+
 	defer cleanupLockFile(shared.State.PidFile)
 
 	// Authenticate with the CipherSwarm API
 	if err := lib.AuthenticateAgent(); err != nil {
 		shared.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
 	}
+
 	lib.DisplayAuthenticated()
 
 	// Fetch agent configuration and update metadata
 	if err := fetchAgentConfig(); err != nil {
 		shared.Logger.Fatal("Failed to fetch agent configuration", "error", err)
 	}
+
 	err := lib.UpdateAgentMetadata()
 	if err != nil {
 		return // Error already logged
 	}
+
 	shared.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Kill any dangling hashcat processes
@@ -91,6 +98,7 @@ func StartAgent() {
 
 func cleanupLockFile(pidFile string) {
 	shared.Logger.Debug("Cleaning up PID file", "path", pidFile)
+
 	if err := os.Remove(pidFile); err != nil {
 		shared.Logger.Fatal("Failed to remove PID file", "error", err)
 	}
@@ -125,27 +133,37 @@ func startAgentLoop() {
 
 func handleReload() {
 	lib.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
+
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
 	shared.Logger.Info("Reloading agent")
+
 	if err := fetchAgentConfig(); err != nil {
 		shared.Logger.Error("Failed to fetch agent configuration", "error", err)
 		lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
 	}
+
 	shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
-	_ = lib.UpdateBenchmarks() // Ignore error, as it is already logged and we can continue
+	_ = lib.UpdateBenchmarks() //nolint:errcheck // Ignore error, as it is already logged and we can continue
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
 	shared.State.Reload = false
 }
 
 func handleCrackerUpdate() {
 	shared.State.CurrentActivity = shared.CurrentActivityUpdating
+
 	lib.UpdateCracker()
+
 	shared.State.CurrentActivity = shared.CurrentActivityStarting
 }
 
 func handleNewTask() {
 	task, err := lib.GetNewTask()
 	if err != nil {
+		if errors.Is(err, lib.ErrNoTaskAvailable) {
+			shared.Logger.Debug("No new task available")
+			return
+		}
+
 		shared.Logger.Error("Failed to get new task", "error", err)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
 
@@ -153,14 +171,13 @@ func handleNewTask() {
 	}
 
 	if task != nil {
-		_ = processTask(task) // Ignore error, as it is already logged and we can continue
-	} else {
-		shared.Logger.Info("No new task available")
+		_ = processTask(task) //nolint:errcheck // Ignore error, as it is already logged and we can continue
 	}
 }
 
 func processTask(task *components.Task) error {
 	shared.State.CurrentActivity = shared.CurrentActivityCracking
+
 	lib.DisplayNewTask(task)
 
 	attack, err := lib.GetAttackParameters(task.GetAttackID())
@@ -197,6 +214,7 @@ func processTask(task *components.Task) error {
 	if err != nil {
 		return err
 	}
+
 	shared.State.CurrentActivity = shared.CurrentActivityWaiting
 
 	return nil
@@ -206,11 +224,13 @@ func heartbeat(signChan chan os.Signal) {
 	if shared.State.ExtraDebugging {
 		shared.Logger.Debug("Sending heartbeat")
 	}
+
 	state := lib.SendHeartBeat()
 	if state != nil {
 		if shared.State.ExtraDebugging {
 			shared.Logger.Debug("Received heartbeat response", "state", state)
 		}
+
 		switch *state {
 		case operations.StatePending:
 			if shared.State.CurrentActivity != shared.CurrentActivityBenchmarking {
@@ -221,13 +241,16 @@ func heartbeat(signChan chan os.Signal) {
 			if shared.State.CurrentActivity != shared.CurrentActivityCracking {
 				shared.State.CurrentActivity = shared.CurrentActivityStopping
 				shared.Logger.Debug("Agent is stopped, stopping processing")
+
 				if !shared.State.JobCheckingStopped {
 					shared.Logger.Warn("Job checking stopped, per server directive. Waiting for further instructions.")
 				}
+
 				shared.State.JobCheckingStopped = true
 			}
 		case operations.StateError:
 			shared.Logger.Info("Agent is in error state, stopping processing")
+
 			signChan <- syscall.SIGTERM
 		}
 	}

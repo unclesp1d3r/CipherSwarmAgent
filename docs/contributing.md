@@ -10,8 +10,8 @@ We welcome contributions! To contribute:
 ## Commit Style
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
-  - `<type>(<scope>): <description>`
-  - Example: `feat(cli): add support for custom config path`
+    - `<type>(<scope>): <description>`
+    - Example: `feat(cli): add support for custom config path`
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
 - Scope: Use a noun (e.g., `(cli)`, `(api)`, `(deps)`)
 - Description: Imperative, ≤72 characters, no period

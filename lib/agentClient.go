@@ -1,6 +1,9 @@
+// Package lib provides core functionality for the CipherSwarm agent.
 package lib
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,9 +22,22 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+const (
+	defaultAgentUpdateInterval = 300   // Default agent update interval in seconds
+	filePermissions            = 0o600 // Default file permissions for created files
+)
+
 var (
-	agentPlatform string             // agentPlatform represents the platform on which the agent is running.
-	Configuration agentConfiguration // Configuration represents the configuration of the agent.
+	agentPlatform string //nolint:gochecknoglobals // agentPlatform represents the platform on which the agent is running.
+	// Configuration represents the configuration of the agent.
+	Configuration agentConfiguration //nolint:gochecknoglobals // Global agent configuration
+)
+
+// Define static errors.
+var (
+	ErrAuthenticationFailed = errors.New("failed to authenticate with the CipherSwarm API")
+	ErrConfigurationFailed  = errors.New("failed to get agent configuration")
+	ErrBadResponse          = errors.New("bad response from server")
 )
 
 // AuthenticateAgent authenticates the agent with the CipherSwarm API using the SDK client.
@@ -29,7 +45,7 @@ var (
 // On error, it logs the error and returns it. If the response is nil or indicates a failed authentication,
 // an error is logged and returned.
 func AuthenticateAgent() error {
-	response, err := shared.State.SdkClient.Client.Authenticate(shared.State.Context)
+	response, err := shared.State.SdkClient.Client.Authenticate(context.Background())
 	if err != nil {
 		return handleAuthenticationError(err)
 	}
@@ -37,7 +53,7 @@ func AuthenticateAgent() error {
 	if response.Object == nil || !response.GetObject().Authenticated {
 		shared.Logger.Error("Failed to authenticate with the CipherSwarm API")
 
-		return fmt.Errorf("failed to authenticate with the CipherSwarm API")
+		return ErrAuthenticationFailed
 	}
 
 	shared.State.AgentID = response.GetObject().AgentID
@@ -49,7 +65,7 @@ func AuthenticateAgent() error {
 // It updates the global Configuration variable with the fetched configuration.
 // If UseNativeHashcat is true in the configuration, it sets the native Hashcat path.
 func GetAgentConfiguration() error {
-	response, err := shared.State.SdkClient.Client.GetConfiguration(shared.State.Context)
+	response, err := shared.State.SdkClient.Client.GetConfiguration(context.Background())
 	if err != nil {
 		return handleConfigurationError(err)
 	}
@@ -57,7 +73,7 @@ func GetAgentConfiguration() error {
 	if response.Object == nil {
 		shared.Logger.Error("Error getting agent configuration")
 
-		return fmt.Errorf("failed to get agent configuration")
+		return ErrConfigurationFailed
 	}
 
 	config := response.GetObject()
@@ -83,7 +99,7 @@ func mapConfiguration(config *operations.GetConfigurationResponseBody) agentConf
 		APIVersion: config.APIVersion,
 		Config: agentConfig{
 			UseNativeHashcat:    pointer.UnwrapOr(config.Config.UseNativeHashcat, false),
-			AgentUpdateInterval: pointer.UnwrapOr(config.Config.AgentUpdateInterval, 300),
+			AgentUpdateInterval: pointer.UnwrapOr(config.Config.AgentUpdateInterval, defaultAgentUpdateInterval),
 			BackendDevices:      pointer.UnwrapOr(config.Config.BackendDevice, ""),
 			OpenCLDevices:       pointer.UnwrapOr(config.Config.OpenclDevices, ""),
 		},
@@ -118,9 +134,10 @@ func UpdateAgentMetadata() error {
 	}
 
 	shared.Logger.Debug("Updating agent metadata", "agent_id", shared.State.AgentID, "hostname", info.Hostname, "client_signature", clientSignature, "os", info.OS, "devices", devices)
-	response, err := shared.State.SdkClient.Agents.UpdateAgent(shared.State.Context, shared.State.AgentID, agentUpdate)
+
+	response, err := shared.State.SdkClient.Agents.UpdateAgent(context.Background(), shared.State.AgentID, agentUpdate)
 	if err != nil {
-		handleAPIError("Error updating agent metadata", err, operations.SeverityCritical)
+		handleAPIError("Error updating agent metadata", err)
 
 		return err
 	}
@@ -130,7 +147,7 @@ func UpdateAgentMetadata() error {
 	} else {
 		shared.ErrorLogger.Error("bad response: %v", response.RawResponse.Status)
 
-		return fmt.Errorf("bad response: %s", response.RawResponse.Status)
+		return fmt.Errorf("%w: %s", ErrBadResponse, response.RawResponse.Status)
 	}
 
 	return nil
@@ -211,7 +228,7 @@ func downloadResourceFile(resource *components.AttackResourceFile) error {
 // It handles different response status codes and logs relevant messages.
 // It returns the agent's state object or nil if an error occurs or if the response status is http.StatusNoContent.
 func SendHeartBeat() *operations.State {
-	resp, err := shared.State.SdkClient.Agents.SendHeartbeat(shared.State.Context, shared.State.AgentID)
+	resp, err := shared.State.SdkClient.Agents.SendHeartbeat(context.Background(), shared.State.AgentID)
 	if err != nil {
 		handleHeartbeatError(err)
 
@@ -239,6 +256,7 @@ func logHeartbeatSent() {
 	if shared.State.ExtraDebugging {
 		shared.Logger.Debug("Heartbeat sent")
 	}
+
 	shared.State.JobCheckingStopped = false
 }
 
@@ -276,6 +294,7 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	if update.Time.IsZero() {
 		update.Time = time.Now()
 	}
+
 	if shared.State.ExtraDebugging {
 		shared.Logger.Debug("Sending status update", "status", update)
 	}
@@ -284,11 +303,12 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	taskStatus := convertToTaskStatus(update, deviceStatuses)
 
 	// Send status update to the server
-	resp, err := shared.State.SdkClient.Tasks.SendStatus(shared.State.Context, task.GetID(), taskStatus)
+	resp, err := shared.State.SdkClient.Tasks.SendStatus(context.Background(), task.GetID(), taskStatus)
 	if err != nil {
 		handleStatusUpdateError(err, task, sess)
 		return
 	}
+
 	handleSendStatusResponse(resp, task)
 }
 
@@ -304,6 +324,7 @@ func convertDeviceStatuses(devices []hashcat.StatusDevice) []components.DeviceSt
 			Temperature: device.Temp,
 		}
 	}
+
 	return deviceStatuses
 }
 
@@ -350,9 +371,9 @@ func handleSendStatusResponse(resp *operations.SendStatusResponse, task *compone
 
 // SendAgentShutdown notifies the server of the agent shutdown and handles any errors during the API call.
 func SendAgentShutdown() {
-	_, err := shared.State.SdkClient.Agents.SetAgentShutdown(shared.State.Context, shared.State.AgentID)
+	_, err := shared.State.SdkClient.Agents.SetAgentShutdown(context.Background(), shared.State.AgentID)
 	if err != nil {
-		handleAPIError("Error notifying server of agent shutdown", err, operations.SeverityCritical)
+		handleAPIError("Error notifying server of agent shutdown", err)
 	}
 }
 
@@ -362,7 +383,7 @@ func SendAgentShutdown() {
 // Logs and handles any errors encountered during the sending process.
 // If configured, writes the cracked hash to a file.
 // Logs additional information based on the HTTP response status.
-func sendCrackedHash(timestamp time.Time, hash string, plaintext string, task *components.Task) {
+func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *components.Task) {
 	if task == nil {
 		shared.Logger.Error("Task is nil")
 
@@ -377,7 +398,7 @@ func sendCrackedHash(timestamp time.Time, hash string, plaintext string, task *c
 
 	shared.Logger.Info("Cracked hash", "hash", hash, "plaintext", plaintext)
 
-	response, err := shared.State.SdkClient.Tasks.SendCrack(shared.State.Context, task.GetID(), hashcatResult)
+	response, err := shared.State.SdkClient.Tasks.SendCrack(context.Background(), task.GetID(), hashcatResult)
 	if err != nil {
 		handleSendCrackError(err)
 
@@ -386,20 +407,24 @@ func sendCrackedHash(timestamp time.Time, hash string, plaintext string, task *c
 
 	if shared.State.WriteZapsToFile {
 		hashFile := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.GetID()))
-		file, err := os.OpenFile(hashFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+		file, err := os.OpenFile(hashFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, filePermissions) //nolint:gosec // File path is constructed safely within application data directory
 		if err != nil {
-			_ = cserrors.LogAndSendError("Error opening cracked hash file", err, operations.SeverityCritical, task)
+			_ = cserrors.LogAndSendError("Error opening cracked hash file", err, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
 			return
 		}
-		defer file.Close()
+
+		defer func() { _ = file.Close() }() //nolint:errcheck // Defer close, error not critical
+
 		_, err = file.WriteString(fmt.Sprintf("%s:%s", hash, plaintext) + "\n")
 		if err != nil {
-			_ = cserrors.LogAndSendError("Error writing cracked hash to file", err, operations.SeverityCritical, task)
+			_ = cserrors.LogAndSendError("Error writing cracked hash to file", err, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
 			return
 		}
 	}
 
 	shared.Logger.Debug("Cracked hash sent")
+
 	if response.StatusCode == http.StatusNoContent {
 		shared.Logger.Info("Hashlist completed", "hash", hash)
 	}

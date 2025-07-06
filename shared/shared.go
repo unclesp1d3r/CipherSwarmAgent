@@ -1,7 +1,7 @@
+// Package shared provides common state and configuration structures used across the CipherSwarm Agent.
 package shared
 
 import (
-	"context"
 	"os"
 
 	"github.com/charmbracelet/log"
@@ -9,7 +9,7 @@ import (
 )
 
 // State represents the configuration and runtime state of the agent.
-var State = agentState{}
+var State = agentState{} //nolint:gochecknoglobals // Global agent state
 
 // agentState represents the state and configuration settings of an agent in the CipherSwarm system.
 type agentState struct {
@@ -39,13 +39,15 @@ type agentState struct {
 	JobCheckingStopped                  bool                     // JobCheckingStopped indicates that the server has directed the agent to stop checking for new jobs.
 	UseLegacyDeviceIdentificationMethod bool                     // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
 	SdkClient                           *sdk.CipherSwarmAgentSDK // SdkClient is the client for interacting with the CipherSwarm API.
-	Context                             context.Context          // Context represents the context of the agent.
+	// Context should be passed as a parameter instead of stored in struct
 }
 
 // activity represents the current state or action being carried out by an agent in the system.
 type activity string
 
+// Activity constants define the different states an agent can be in.
 const (
+	// CurrentActivityStarting indicates the agent is starting up.
 	CurrentActivityStarting     activity = "starting"
 	CurrentActivityBenchmarking activity = "benchmarking"
 	CurrentActivityUpdating     activity = "updating"
@@ -55,10 +57,10 @@ const (
 )
 
 // Logger is a shared logging instance configured to output logs at InfoLevel with timestamps to os.Stdout.
-var Logger = log.NewWithOptions(os.Stdout, log.Options{
+var Logger = log.NewWithOptions(os.Stdout, log.Options{ //nolint:gochecknoglobals // Global logger instance
 	Level:           log.InfoLevel,
 	ReportTimestamp: true,
 })
 
 // ErrorLogger is a logger instance for logging critical errors with detailed error information.
-var ErrorLogger = Logger.With()
+var ErrorLogger = Logger.With() //nolint:gochecknoglobals // Global error logger instance
