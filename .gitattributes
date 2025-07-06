@@ -79,4 +79,7 @@ LICENSE text
 *.so binary
 *.dylib binary
 
+# Go files
+*.go text eol=lf diff=go
+
 .env text=utf-8 eol=lf
