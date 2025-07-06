@@ -1,12 +1,20 @@
 //go:build darwin
 
+// Package arch provides platform-specific functionality for macOS systems.
 package arch
 
 import (
-	"fmt"
+	"errors"
 	"os/exec"
 	"regexp"
 	"strings"
+)
+
+var (
+	// ErrNoDisplayDevices is returned when no display devices are found.
+	ErrNoDisplayDevices = errors.New("no display devices found")
+	// ErrNoValidDeviceNames is returned when no valid display device names can be extracted.
+	ErrNoValidDeviceNames = errors.New("no valid display device names extracted")
 )
 
 // GetDevices retrieves a list of display device names on a macOS system.
@@ -24,12 +32,14 @@ func GetDevices() ([]string, error) {
 
 	commandResult := string(out)
 	re := regexp.MustCompile(`Chipset Model: (.*)`)
+
 	matches := re.FindAllStringSubmatch(commandResult, -1)
 	if matches == nil {
-		return nil, fmt.Errorf("no display devices found")
+		return nil, ErrNoDisplayDevices
 	}
 
-	var newArray []string //nolint:prealloc
+	var newArray []string
+
 	for _, match := range matches {
 		if len(match) > 1 {
 			newArray = append(newArray, strings.TrimSpace(match[1]))
@@ -37,7 +47,7 @@ func GetDevices() ([]string, error) {
 	}
 
 	if len(newArray) == 0 {
-		return nil, fmt.Errorf("no valid display device names extracted")
+		return nil, ErrNoValidDeviceNames
 	}
 
 	return newArray, nil
@@ -70,8 +80,8 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 //
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
-func Extract7z(srcFile string, destDir string) error {
-	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output() //nolint:gosec
+func Extract7z(srcFile, destDir string) error {
+	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output() //nolint:gosec // 7z command is safe here
 
 	return err
 }

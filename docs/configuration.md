@@ -58,17 +58,17 @@ The agent automatically creates a `cipherswarmagent.yaml` file on first run:
 
 ```yaml
 # cipherswarmagent.yaml
-api_token: "your_api_token"
-api_url: "https://your-server.com:3000"
-data_path: "/opt/cipherswarm/data"
+api_token: your_api_token
+api_url: https://your-server.com:3000
+data_path: /opt/cipherswarm/data
 gpu_temp_threshold: 85
 always_use_native_hashcat: false
 sleep_on_failure: 60s
-files_path: "/opt/cipherswarm/data/files"
+files_path: /opt/cipherswarm/data/files
 extra_debugging: false
 status_timer: 3
 write_zaps_to_file: false
-zap_path: "/opt/cipherswarm/data/zaps"
+zap_path: /opt/cipherswarm/data/zaps
 retain_zaps_on_completion: false
 enable_additional_hash_types: true
 use_legacy_device_technique: false
@@ -215,9 +215,9 @@ You can specify a custom config file location:
 
 ```yaml
 # cipherswarmagent.yaml
-api_token: "csa_agent001_xyz789"
-api_url: "http://192.168.1.100:3000"
-data_path: "./agent-data"
+api_token: csa_agent001_xyz789
+api_url: http://192.168.1.100:3000
+data_path: ./agent-data
 gpu_temp_threshold: 75
 ```
 
@@ -225,15 +225,15 @@ gpu_temp_threshold: 75
 
 ```yaml
 # cipherswarmagent.yaml
-api_token: "csa_prod_agent_abc123"
-api_url: "https://cipherswarm-prod.company.com"
-data_path: "/var/lib/cipherswarm"
-files_path: "/mnt/shared/cipherswarm-files"
+api_token: csa_prod_agent_abc123
+api_url: https://cipherswarm-prod.company.com
+data_path: /var/lib/cipherswarm
+files_path: /mnt/shared/cipherswarm-files
 gpu_temp_threshold: 85
 status_timer: 1
 always_use_native_hashcat: true
 write_zaps_to_file: true
-zap_path: "/mnt/shared/zaps"
+zap_path: /mnt/shared/zaps
 retain_zaps_on_completion: true
 ```
 
@@ -241,9 +241,9 @@ retain_zaps_on_completion: true
 
 ```yaml
 # cipherswarmagent.yaml
-api_token: "csa_dev_token"
-api_url: "http://localhost:3000"
-data_path: "./dev-data"
+api_token: csa_dev_token
+api_url: http://localhost:3000
+data_path: ./dev-data
 debug: true
 extra_debugging: true
 sleep_on_failure: 10s
@@ -313,16 +313,19 @@ chmod 750 /var/lib/cipherswarm
 ### Common Issues
 
 1. **Configuration not applied**:
-   - Check precedence order (CLI flags override env vars)
-   - Verify correct variable names (case-sensitive)
+
+    - Check precedence order (CLI flags override env vars)
+    - Verify correct variable names (case-sensitive)
 
 2. **File permission errors**:
-   - Ensure agent has write access to `data_path`
-   - Check parent directory permissions
+
+    - Ensure agent has write access to `data_path`
+    - Check parent directory permissions
 
 3. **API connection failures**:
-   - Verify API URL format and accessibility
-   - Test network connectivity: `curl https://your-server.com:3000/health`
+
+    - Verify API URL format and accessibility
+    - Test network connectivity: `curl https://your-server.com:3000/health`
 
 ### Debug Configuration Loading
 
@@ -362,9 +365,9 @@ Create template configurations for easy deployment:
 
 ```yaml
 # config-template.yaml
-api_token: "${API_TOKEN}"
-api_url: "${API_URL}"
-data_path: "${DATA_PATH:-./data}"
+api_token: ${API_TOKEN}
+api_url: ${API_URL}
+data_path: ${DATA_PATH:-./data}
 gpu_temp_threshold: ${GPU_TEMP_THRESHOLD:-80}
 ```
 

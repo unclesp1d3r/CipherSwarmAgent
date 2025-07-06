@@ -1,3 +1,4 @@
+// Package cracker provides hashcat binary management and execution utilities.
 package cracker
 
 import (
@@ -16,13 +17,19 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+var (
+	// ErrHashcatBinaryNotFound is returned when the hashcat binary cannot be located.
+	ErrHashcatBinaryNotFound = errors.New("hashcat binary not found")
+)
+
 const emptyVersion = "0.0.0"
 
-// findHashcatBinary searches for the Hashcat binary at several predefined locations and returns its path if found.
+// FindHashcatBinary searches for the Hashcat binary at several predefined locations and returns its path if found.
 // It checks directories specified by configuration, default locations, and the system's PATH environment variable.
 // The function returns an error if the binary is not found or not executable.
 func FindHashcatBinary() (string, error) {
 	var foundPath = ""
+
 	possiblePaths := []string{
 		viper.GetString("hashcat_path"),
 		path.Join(shared.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
@@ -35,7 +42,7 @@ func FindHashcatBinary() (string, error) {
 
 	for _, filePath := range possiblePaths {
 		info, err := os.Stat(filePath)
-		if err == nil && info.Mode()&0111 != 0 {
+		if err == nil && info.Mode()&0o111 != 0 {
 			foundPath = filePath
 			return foundPath, nil
 		}
@@ -52,18 +59,11 @@ func FindHashcatBinary() (string, error) {
 	}
 
 	info, err := os.Stat(foundPath)
-	if err == nil && info.Mode()&0111 != 0 {
+	if err == nil && info.Mode()&0o111 != 0 {
 		return foundPath, nil
 	}
 
-	return "", errors.New("hashcat binary not found")
-}
-
-// isExecAny checks if the file at the given filePath has any executable permissions (user, group, or others).
-func isExecAny(filePath string) bool {
-	info, _ := os.Stat(filePath)
-	mode := info.Mode()
-	return mode&0111 != 0
+	return "", ErrHashcatBinaryNotFound
 }
 
 // GetCurrentHashcatVersion attempts to find the Hashcat binary and retrieve its version.
@@ -102,7 +102,7 @@ func CheckForExistingClient(pidFilePath string) bool {
 			return true
 		}
 
-		pidRunning, err := process.PidExists(int32(pidValue)) //nolint:gosec
+		pidRunning, err := process.PidExists(int32(pidValue)) //nolint:gosec // PID conversion from file is safe
 		if err != nil {
 			shared.Logger.Error("Error checking if process is running", "pid", pidValue)
 
@@ -110,6 +110,7 @@ func CheckForExistingClient(pidFilePath string) bool {
 		}
 
 		shared.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
+
 		if !pidRunning {
 			shared.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
 		}
@@ -128,6 +129,7 @@ func CreateLockFile() error {
 
 	pidValue := os.Getpid()
 	pidString := convertor.ToString(pidValue)
+
 	err := fileutil.WriteStringToFile(lockFilePath, pidString, false)
 	if err != nil {
 		shared.Logger.Error("Error writing PID to file", "path", lockFilePath)
@@ -166,6 +168,7 @@ func CreateDataDirs() error {
 
 				return err
 			}
+
 			shared.Logger.Info("Created directory", "path", dir)
 		}
 	}
@@ -173,7 +176,7 @@ func CreateDataDirs() error {
 	return nil
 }
 
-// extractHashcatArchive extracts a new Hashcat archive, backing up and removing any old versions.
+// ExtractHashcatArchive extracts a new Hashcat archive, backing up and removing any old versions.
 // - Removes the previous backup directory if existent.
 // - Renames the current Hashcat directory for backup.
 // - Extracts the new Hashcat archive to the specified directory.
@@ -185,7 +188,6 @@ func ExtractHashcatArchive(newArchivePath string) (string, error) {
 	err := os.RemoveAll(hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
 		shared.Logger.Error("Error removing old hashcat directory: ", "error", err)
-		// SendAgentError(err.Error(), nil, operations.SeverityCritical) // Assuming this is an agent-specific function
 
 		return "", err // Don't continue if we can't remove the old directory
 	}
@@ -194,7 +196,6 @@ func ExtractHashcatArchive(newArchivePath string) (string, error) {
 	err = os.Rename(hashcatDirectory, hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
 		shared.Logger.Error("Error moving old hashcat directory: ", "error", err)
-		// SendAgentError(err.Error(), nil, operations.SeverityCritical) // Assuming this is an agent-specific function
 
 		return "", err // Don't continue if we can't move the old directory
 	}
@@ -203,7 +204,6 @@ func ExtractHashcatArchive(newArchivePath string) (string, error) {
 	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
 	if err != nil {
 		shared.Logger.Error("Error extracting file: ", "error", err)
-		// SendAgentError(err.Error(), nil, operations.SeverityCritical) // Assuming this is an agent-specific function
 
 		return "", err // Don't continue if we can't extract the file
 	}
@@ -217,12 +217,14 @@ func ExtractHashcatArchive(newArchivePath string) (string, error) {
 // Returns the new path of the moved archive and any error encountered during the move operation.
 func MoveArchiveFile(tempArchivePath string) (string, error) {
 	newArchivePath := path.Join(shared.State.CrackersPath, "hashcat.7z")
+
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
 		shared.Logger.Error("Error moving file: ", err)
 
 		return "", err
 	}
+
 	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
 
 	return newArchivePath, err

@@ -19,6 +19,15 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+const (
+	// Channel buffer sizes.
+	channelBufferSize = 5
+	// File permissions.
+	filePermissions = 0o600
+	// Log parsing constants.
+	logParseMinParts = 3
+)
+
 // Session represents a hashcat session that manages the execution, I/O, and communication
 // with the hashcat process.
 type Session struct {
@@ -46,6 +55,7 @@ func (sess *Session) Start() error {
 	}
 
 	shared.Logger.Debug("Running hashcat command", "command", sess.proc.String())
+
 	if err := sess.proc.Start(); err != nil {
 		return fmt.Errorf("couldn't start hashcat: %w", err)
 	}
@@ -69,12 +79,14 @@ func (sess *Session) attachPipes() error {
 	if err != nil {
 		return fmt.Errorf("couldn't attach stdout to hashcat: %w", err)
 	}
+
 	sess.pStdout = pStdout
 
 	pStderr, err := sess.proc.StderrPipe()
 	if err != nil {
 		return fmt.Errorf("couldn't attach stderr to hashcat: %w", err)
 	}
+
 	sess.pStderr = pStderr
 
 	return nil
@@ -101,20 +113,23 @@ func (sess *Session) startTailer() (*tail.Tail, error) {
 func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 	for tailLine := range tailer.Lines {
 		line := tailLine.Text
+
 		values := strings.Split(line, ":")
-		if len(values) < 3 {
+		if len(values) < logParseMinParts {
 			shared.Logger.Error("unexpected line contents", "line", line)
 
 			continue
 		}
 
 		timestamp, plainHex := values[0], values[len(values)-1]
+
 		bs, err := hex.DecodeString(plainHex)
 		if err != nil {
 			shared.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
 
 			continue
 		}
+
 		plain := string(bs)
 		hashParts := values[1 : len(values)-1]
 		hash := strings.Join(hashParts, ":")
@@ -143,9 +158,10 @@ func (sess *Session) handleStdout() {
 		line := scanner.Text()
 		sess.StdoutLines <- line
 
-		if len(line) == 0 {
+		if line == "" {
 			continue
 		}
+
 		if !sess.SkipStatusUpdates {
 			if json.Valid([]byte(line)) {
 				var status Status
@@ -154,6 +170,7 @@ func (sess *Session) handleStdout() {
 
 					continue
 				}
+
 				sess.StatusUpdates <- status
 			} else {
 				if strings.Contains(line, "starting in restore mode") {
@@ -166,7 +183,9 @@ func (sess *Session) handleStdout() {
 	}
 
 	done := sess.proc.Wait()
+
 	time.Sleep(time.Second)
+
 	sess.DoneChan <- done
 }
 
@@ -175,6 +194,7 @@ func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
 		shared.Logger.Error("read stderr", "text", scanner.Text())
+
 		sess.StderrMessages <- scanner.Text()
 	}
 }
@@ -187,7 +207,6 @@ func (sess *Session) Kill() error {
 	}
 
 	err := sess.proc.Process.Kill()
-
 	if errors.Is(err, os.ErrProcessDone) {
 		return nil
 	}
@@ -242,7 +261,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		return nil, err
 	}
 
-	outFile, err := createOutFile(shared.State.OutPath, id, 0o600)
+	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create output file: %w", err)
 	}
@@ -265,15 +284,15 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}
 
 	return &Session{
-		proc:               exec.Command(binaryPath, args...),
+		proc:               exec.Command(binaryPath, args...), //nolint:gosec // Binary path is validated, args are constructed safely
 		hashFile:           params.HashFile,
 		outFile:            outFile,
 		charsetFiles:       charsetFiles,
 		shardedCharsetFile: nil,
-		CrackedHashes:      make(chan Result, 5),
-		StatusUpdates:      make(chan Status, 5),
-		StderrMessages:     make(chan string, 5),
-		StdoutLines:        make(chan string, 5),
+		CrackedHashes:      make(chan Result, channelBufferSize),
+		StatusUpdates:      make(chan Status, channelBufferSize),
+		StderrMessages:     make(chan string, channelBufferSize),
+		StdoutLines:        make(chan string, channelBufferSize),
 		DoneChan:           make(chan error),
 		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
 		RestoreFilePath:    params.RestoreFilePath,
@@ -282,14 +301,16 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 
 // createOutFile creates a new file with the specified directory, id, and permissions.
 // It returns the created file or an error if the creation or permission setting fails.
-func createOutFile(dir string, id string, perm os.FileMode) (*os.File, error) {
+func createOutFile(dir, id string, perm os.FileMode) (*os.File, error) {
 	outFilePath := filepath.Join(dir, id+".hcout")
-	file, err := os.Create(outFilePath)
+
+	file, err := os.Create(outFilePath) //nolint:gosec // File path is constructed safely within application data directory
 	if err != nil {
 		return nil, err
 	}
+
 	if err := file.Chmod(perm); err != nil {
-		_ = file.Close() // We need to close the file if the permissions change fails
+		_ = file.Close() //nolint:errcheck // We need to close the file if the permissions change fails
 		return nil, err
 	}
 
@@ -311,6 +332,7 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := file.Chmod(perm); err != nil {
 		return nil, err
 	}
@@ -322,19 +344,24 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 // Each charset is checked if it is non-blank before creating and writing to a temporary file.
 // If an error occurs during file creation or writing, the function returns an error.
 func createCharsetFiles(charsets []string) ([]*os.File, error) {
-	var charsetFiles []*os.File
+	charsetFiles := make([]*os.File, 0, len(charsets))
+
 	for i, charset := range charsets {
-		if strings.TrimSpace(charset) != "" {
-			charsetFile, err := createTempFile(shared.State.OutPath, "charset*", 0o600)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't create charset file: %w", err)
-			}
-			if _, err := charsetFile.WriteString(charset); err != nil {
-				return nil, err
-			}
-			charsets[i] = charsetFile.Name()
-			charsetFiles = append(charsetFiles, charsetFile)
+		if strings.TrimSpace(charset) == "" {
+			continue
 		}
+
+		charsetFile, err := createTempFile(shared.State.OutPath, "charset*", filePermissions)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create charset file: %w", err)
+		}
+
+		if _, err := charsetFile.WriteString(charset); err != nil {
+			return nil, err
+		}
+
+		charsets[i] = charsetFile.Name()
+		charsetFiles = append(charsetFiles, charsetFile)
 	}
 
 	return charsetFiles, nil

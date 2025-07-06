@@ -53,10 +53,10 @@ func main() {
 
 - **Purpose**: Cobra CLI command definition and configuration
 - **Key Functions**:
-  - Command-line flag parsing
-  - Configuration binding (Viper)
-  - Agent lifecycle management
-  - Signal handling for graceful shutdown
+    - Command-line flag parsing
+    - Configuration binding (Viper)
+    - Agent lifecycle management
+    - Signal handling for graceful shutdown
 
 **Key Components**:
 
@@ -73,83 +73,83 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Primary agent logic and server communication
 - **Key Functions**:
-  - `AuthenticateAgent()`: Server authentication
-  - `GetAgentConfiguration()`: Fetch server configuration
-  - `UpdateAgentMetadata()`: Send agent info to server
-  - `SendHeartBeat()`: Periodic health check
-  - `DownloadFiles()`: Attack resource downloads
+    - `AuthenticateAgent()`: Server authentication
+    - `GetAgentConfiguration()`: Fetch server configuration
+    - `UpdateAgentMetadata()`: Send agent info to server
+    - `SendHeartBeat()`: Periodic health check
+    - `DownloadFiles()`: Attack resource downloads
 
 #### `lib/taskManager.go`
 
 - **Purpose**: Task lifecycle management
 - **Key Functions**:
-  - `GetNewTask()`: Poll for available tasks
-  - `AcceptTask()`: Accept and prepare task
-  - `RunTask()`: Execute task with Hashcat
-  - `markTaskExhausted()`: Mark task complete
+    - `GetNewTask()`: Poll for available tasks
+    - `AcceptTask()`: Accept and prepare task
+    - `RunTask()`: Execute task with Hashcat
+    - `markTaskExhausted()`: Mark task complete
 
 #### `lib/benchmarkManager.go`
 
 - **Purpose**: Device benchmarking and capability detection
 - **Key Functions**:
-  - `UpdateBenchmarks()`: Run performance benchmarks
-  - `sendBenchmarkResults()`: Submit results to server
-  - `runBenchmarkTask()`: Execute benchmark session
+    - `UpdateBenchmarks()`: Run performance benchmarks
+    - `sendBenchmarkResults()`: Submit results to server
+    - `runBenchmarkTask()`: Execute benchmark session
 
 #### `lib/errorUtils.go`
 
 - **Purpose**: Centralized error handling and reporting
 - **Key Functions**:
-  - `SendAgentError()`: Report errors to server
-  - `handleAPIError()`: API error processing
-  - `logAndSendError()`: Combined logging and reporting
+    - `SendAgentError()`: Report errors to server
+    - `handleAPIError()`: API error processing
+    - `logAndSendError()`: Combined logging and reporting
 
 #### `lib/fileUtils.go`
 
 - **Purpose**: File operations and download management
 - **Key Functions**:
-  - `downloadFile()`: Secure file downloads with checksums
-  - `fileExistsAndValid()`: File validation
-  - `writeCrackedHashToFile()`: Result file management
+    - `downloadFile()`: Secure file downloads with checksums
+    - `fileExistsAndValid()`: File validation
+    - `writeCrackedHashToFile()`: Result file management
 
 #### `lib/clientUtils.go`
 
 - **Purpose**: System utilities and helper functions
 - **Key Functions**:
-  - `findHashcatBinary()`: Locate Hashcat executable
-  - `CreateLockFile()`: Process management
-  - `CreateDataDirs()`: Directory structure setup
+    - `findHashcatBinary()`: Locate Hashcat executable
+    - `CreateLockFile()`: Process management
+    - `CreateDataDirs()`: Directory structure setup
 
 #### `lib/crackerUtils.go`
 
 - **Purpose**: Hashcat binary management
 - **Key Functions**:
-  - `UpdateCracker()`: Download/update Hashcat binaries
-  - `setNativeHashcatPath()`: Configure native binary usage
+    - `UpdateCracker()`: Download/update Hashcat binaries
+    - `setNativeHashcatPath()`: Configure native binary usage
 
 #### `lib/runners.go`
 
 - **Purpose**: Task execution and monitoring
 - **Key Functions**:
-  - `runAttackTask()`: Main task runner
-  - `handleStdOutLine()`: Process Hashcat output
-  - `handleCrackedHash()`: Process found hashes
+    - `runAttackTask()`: Main task runner
+    - `handleStdOutLine()`: Process Hashcat output
+    - `handleCrackedHash()`: Process found hashes
 
 #### `lib/outputs.go`
 
 - **Purpose**: User interface and logging output
 - **Key Functions**:
-  - `DisplayStartup()`: Startup messages
-  - `DisplayNewTask()`: Task information display
-  - Various status and progress displays
+    - `DisplayStartup()`: Startup messages
+    - `DisplayNewTask()`: Task information display
+    - Various status and progress displays
 
 #### `lib/dataTypes.go`
 
 - **Purpose**: Core data structures and type definitions
 - **Key Types**:
-  - `agentConfig`: Configuration structure
-  - `benchmarkResult`: Performance data
-  - Type conversion utilities
+    - `agentConfig`: Configuration structure
+    - `benchmarkResult`: Performance data
+    - Type conversion utilities
 
 ### 4. Hashcat Integration (`lib/hashcat/`)
 
@@ -159,30 +159,30 @@ Specialized module for Hashcat process management:
 
 - **Purpose**: Hashcat process lifecycle management
 - **Key Types**:
-  - `Session`: Represents a running Hashcat instance
+    - `Session`: Represents a running Hashcat instance
 - **Key Functions**:
-  - `NewHashcatSession()`: Create configured session
-  - `Start()`: Launch Hashcat process
-  - `Kill()`: Terminate process gracefully
-  - `Cleanup()`: Resource cleanup
+    - `NewHashcatSession()`: Create configured session
+    - `Start()`: Launch Hashcat process
+    - `Kill()`: Terminate process gracefully
+    - `Cleanup()`: Resource cleanup
 
 #### `lib/hashcat/params.go`
 
 - **Purpose**: Hashcat parameter configuration
 - **Key Types**:
-  - `Params`: Attack configuration structure
+    - `Params`: Attack configuration structure
 - **Key Functions**:
-  - `Validate()`: Parameter validation
-  - `toCmdArgs()`: Command-line argument generation
-  - Attack mode-specific parameter handling
+    - `Validate()`: Parameter validation
+    - `toCmdArgs()`: Command-line argument generation
+    - Attack mode-specific parameter handling
 
 #### `lib/hashcat/types.go`
 
 - **Purpose**: Hashcat data structure definitions
 - **Key Types**:
-  - `Status`: Real-time status information
-  - `Result`: Cracked hash results
-  - `StatusDevice`: GPU/CPU device status
+    - `Status`: Real-time status information
+    - `Result`: Cracked hash results
+    - `StatusDevice`: GPU/CPU device status
 
 ### 5. OS Abstractions (`lib/arch/`)
 
@@ -219,11 +219,11 @@ Platform-specific functionality for cross-platform support:
 
 - **Purpose**: Download progress monitoring
 - **Key Types**:
-  - `progressBar`: Progress display management
+    - `progressBar`: Progress display management
 - **Features**:
-  - Real-time download progress
-  - Multiple concurrent progress bars
-  - Terminal-friendly display
+    - Real-time download progress
+    - Multiple concurrent progress bars
+    - Terminal-friendly display
 
 ### 7. Shared State (`shared/`)
 
@@ -231,12 +231,12 @@ Platform-specific functionality for cross-platform support:
 
 - **Purpose**: Global application state and configuration
 - **Key Types**:
-  - `agentState`: Runtime state management
-  - `activity`: Current agent activity enum
+    - `agentState`: Runtime state management
+    - `activity`: Current agent activity enum
 - **Global Variables**:
-  - `State`: Shared agent state
-  - `Logger`: Application logger
-  - `ErrorLogger`: Error-specific logger
+    - `State`: Shared agent state
+    - `Logger`: Application logger
+    - `ErrorLogger`: Error-specific logger
 
 ## Architecture Patterns
 
@@ -326,8 +326,8 @@ graph TD
 - **Coverage**: Core logic and utilities
 - **Mocking**: External dependencies mocked
 - **Examples**:
-  - `lib/agentClient_test.go`
-  - `lib/clientUtils_test.go`
+    - `lib/agentClient_test.go`
+    - `lib/clientUtils_test.go`
 
 ### Integration Tests
 

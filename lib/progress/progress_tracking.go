@@ -1,4 +1,5 @@
-package utils
+// Package progress provides utility functions for progress tracking and other common tasks.
+package progress
 
 // Source: https://raw.githubusercontent.com/hashicorp/go-getter/main/cmd/go-getter/progress_tracking.go
 // Progress tracking for downloads.
@@ -14,7 +15,7 @@ import (
 )
 
 // DefaultProgressBar is the default instance of a cheggaaa progress bar.
-var DefaultProgressBar getter.ProgressTracker = &progressBar{}
+var DefaultProgressBar getter.ProgressTracker = &progressBar{} //nolint:gochecknoglobals // Default progress bar instance
 
 // progressBar wraps a github.com/cheggaaa/pb.Pool
 // in order to display download progress for one or multiple
@@ -47,10 +48,12 @@ func (cpb *progressBar) TrackProgress(src string, currentSize, totalSize int64, 
 	newPb := pb.New64(totalSize)
 	newPb.SetCurrent(currentSize)
 	progressBarConfig(newPb, filepath.Base(src))
+
 	if cpb.pool == nil {
 		cpb.pool = pb.NewPool()
-		_ = cpb.pool.Start()
+		_ = cpb.pool.Start() //nolint:errcheck // Progress bar start failure not critical
 	}
+
 	cpb.pool.Add(newPb)
 	reader := newPb.NewProxyReader(stream)
 
@@ -65,7 +68,7 @@ func (cpb *progressBar) TrackProgress(src string, currentSize, totalSize int64, 
 			newPb.Finish()
 			cpb.pbs--
 			if cpb.pbs <= 0 {
-				_ = cpb.pool.Stop()
+				_ = cpb.pool.Stop() //nolint:errcheck // Progress bar stop failure not critical
 				cpb.pool = nil
 			}
 

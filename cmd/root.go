@@ -1,3 +1,4 @@
+// Package cmd provides the command-line interface for the CipherSwarm Agent.
 package cmd
 
 import (
@@ -10,18 +11,25 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 )
 
+const (
+	// Default configuration values.
+	defaultGPUTempThreshold = 80               // Default GPU temperature threshold in Celsius
+	defaultSleepOnFailure   = 60 * time.Second // Default sleep duration after task failure
+	defaultStatusTimer      = 3                // Default status update interval in seconds
+)
+
 var (
-	cfgFile     string
-	enableDebug bool
+	cfgFile     string //nolint:gochecknoglobals // CLI flag variable
+	enableDebug bool   //nolint:gochecknoglobals // CLI flag variable
 )
 
 // RootCmd represents the base command for the CipherSwarm Agent CLI application.
-var RootCmd = &cobra.Command{
+var RootCmd = &cobra.Command{ //nolint:gochecknoglobals // CLI root command
 	Use:     "cipherswarm-agent",
 	Version: lib.AgentVersion,
 	Short:   "CipherSwarm Agent",
 	Long:    "CipherSwarm Agent is the agent for connecting to the CipherSwarm system.",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		agent.StartAgent()
 	},
 }
@@ -55,7 +63,7 @@ func init() {
 	err = viper.BindPFlag("data_path", RootCmd.PersistentFlags().Lookup("data_path"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().IntP("gpu_temp_threshold", "g", 80, "Temperature threshold for the GPU in degrees Celsius")
+	RootCmd.PersistentFlags().IntP("gpu_temp_threshold", "g", defaultGPUTempThreshold, "Temperature threshold for the GPU in degrees Celsius")
 	err = viper.BindPFlag("gpu_temp_threshold", RootCmd.PersistentFlags().Lookup("gpu_temp_threshold"))
 	cobra.CheckErr(err)
 
@@ -63,7 +71,7 @@ func init() {
 	err = viper.BindPFlag("always_use_native_hashcat", RootCmd.PersistentFlags().Lookup("always_use_native_hashcat"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().DurationP("sleep_on_failure", "s", 60*time.Second, "Duration of sleep after a task failure")
+	RootCmd.PersistentFlags().DurationP("sleep_on_failure", "s", defaultSleepOnFailure, "Duration of sleep after a task failure")
 	err = viper.BindPFlag("sleep_on_failure", RootCmd.PersistentFlags().Lookup("sleep_on_failure"))
 	cobra.CheckErr(err)
 
@@ -75,7 +83,7 @@ func init() {
 	err = viper.BindPFlag("extra_debugging", RootCmd.PersistentFlags().Lookup("extra_debugging"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().IntP("status_timer", "t", 3, "Interval in seconds for sending status updates to the server")
+	RootCmd.PersistentFlags().IntP("status_timer", "t", defaultStatusTimer, "Interval in seconds for sending status updates to the server")
 	err = viper.BindPFlag("status_timer", RootCmd.PersistentFlags().Lookup("status_timer"))
 	cobra.CheckErr(err)
 

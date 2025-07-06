@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -14,19 +15,24 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+const (
+	benchmarkFieldCount = 6 // Expected number of fields in benchmark output line
+)
+
 // sendBenchmarkResults sends the collected benchmark results to a server endpoint.
 // It converts each benchmarkResult into a HashcatBenchmark and appends them to a slice.
 // If the conversion fails for a result, it continues to the next result.
 // Creates a SubmitBenchmarkRequestBody with the HashcatBenchmarks slice and submits it via SdkClient.
 // Returns an error if submission or the response received is not successful.
 func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
-	var benchmarks []components.HashcatBenchmark //nolint:prealloc
+	var benchmarks []components.HashcatBenchmark //nolint:prealloc // Size unknown until after parsing
 
 	for _, result := range benchmarkResults {
 		benchmark, err := createBenchmark(result)
 		if err != nil {
 			continue
 		}
+
 		benchmarks = append(benchmarks, benchmark)
 	}
 
@@ -34,7 +40,7 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 		HashcatBenchmarks: benchmarks,
 	}
 
-	res, err := shared.State.SdkClient.Agents.SubmitBenchmark(shared.State.Context, shared.State.AgentID, results)
+	res, err := shared.State.SdkClient.Agents.SubmitBenchmark(context.Background(), shared.State.AgentID, results)
 	if err != nil {
 		return err
 	}
@@ -43,7 +49,7 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 		return nil
 	}
 
-	return fmt.Errorf("bad response: %s", res.RawResponse.Status)
+	return fmt.Errorf("%w: %s", ErrBadResponse, res.RawResponse.Status)
 }
 
 // createBenchmark converts a benchmarkResult to a components.HashcatBenchmark struct.
@@ -54,14 +60,17 @@ func createBenchmark(result benchmarkResult) (components.HashcatBenchmark, error
 	if err != nil {
 		return components.HashcatBenchmark{}, fmt.Errorf("failed to convert HashType: %w", err)
 	}
+
 	runtimeMs, err := strconv.Atoi(result.RuntimeMs)
 	if err != nil {
 		return components.HashcatBenchmark{}, fmt.Errorf("failed to convert RuntimeMs: %w", err)
 	}
+
 	speedHs, err := strconv.ParseFloat(result.SpeedHs, 64)
 	if err != nil {
 		return components.HashcatBenchmark{}, fmt.Errorf("failed to convert SpeedHs: %w", err)
 	}
+
 	device, err := strconv.Atoi(result.Device)
 	if err != nil {
 		return components.HashcatBenchmark{}, fmt.Errorf("failed to convert Device: %w", err)
@@ -92,14 +101,18 @@ func UpdateBenchmarks() error {
 	if err != nil {
 		return cserrors.LogAndSendError("Failed to create benchmark session", err, operations.SeverityMajor, nil)
 	}
+
 	shared.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
 
 	displayBenchmarkStarting()
+
 	benchmarkResult, done := runBenchmarkTask(sess)
 	if done {
 		return nil
 	}
+
 	displayBenchmarksComplete(benchmarkResult)
+
 	if err := sendBenchmarkResults(benchmarkResult); err != nil {
 		return cserrors.LogAndSendError("Error updating benchmarks", err, operations.SeverityCritical, nil)
 	}
@@ -118,10 +131,12 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 	}
 
 	var benchmarkResults []benchmarkResult
+
 	waitChan := make(chan int)
 
 	go func() {
 		defer close(waitChan)
+
 		for {
 			select {
 			case stdOutLine := <-sess.StdoutLines:
@@ -151,7 +166,7 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 // handleBenchmarkStdOutLine processes a line of benchmark output, extracting relevant data and appending it to result.
 func handleBenchmarkStdOutLine(line string, results *[]benchmarkResult) {
 	fields := strings.Split(line, ":")
-	if len(fields) != 6 {
+	if len(fields) != benchmarkFieldCount {
 		shared.Logger.Debug("Unknown benchmark line", "line", line)
 
 		return
@@ -171,6 +186,7 @@ func handleBenchmarkStdOutLine(line string, results *[]benchmarkResult) {
 // handleBenchmarkStdErrLine processes each line from the benchmark's standard error output, logs it, and reports warnings to the server.
 func handleBenchmarkStdErrLine(line string) {
 	displayBenchmarkError(line)
+
 	if strings.TrimSpace(line) != "" {
 		SendAgentError(line, nil, operations.SeverityWarning)
 	}

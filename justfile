@@ -21,16 +21,16 @@ install:
 # Run pre-commit hooks and linting
 check:
     cd {{justfile_dir()}}
-    pre-commit run -a # Runs all hooks on all files
-    just lint
-    goreleaser check --verbose
+    @pre-commit run -a # Runs all hooks on all files
+    @just lint
+    @goreleaser check --verbose
 
 # Run lint and code checks
 lint:
     cd {{justfile_dir()}}
-    golangci-lint fmt ./...
-    golangci-lint run ./...
-    go vet ./...
+    @golangci-lint fmt ./...
+    @golangci-lint run ./...
+    @go vet ./...
 # Run tests
 test:
     go test ./...
@@ -38,9 +38,9 @@ test:
 # Run all checks and tests (CI)
 ci-check:
     cd {{justfile_dir()}}
-    pre-commit run # Same as just check, but only runs on staged files
-    just lint
-    just test
+    @pre-commit run # Same as just check, but only runs on staged files
+    @just lint
+    @just test
 
 build:
     cd {{justfile_dir()}}

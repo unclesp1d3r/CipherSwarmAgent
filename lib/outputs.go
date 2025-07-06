@@ -10,7 +10,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/utils"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
@@ -63,6 +63,7 @@ func displayBenchmarkError(stdErrLine string) {
 		if unicode.IsPrint(r) {
 			return r
 		}
+
 		return -1
 	}, stdErrLine))
 }
@@ -88,6 +89,7 @@ func displayJobError(stdErrLine string) {
 		if unicode.IsPrint(r) {
 			return r
 		}
+
 		return -1
 	}, stdErrLine))
 }
@@ -96,27 +98,24 @@ func displayJobError(stdErrLine string) {
 func displayJobStatus(update hashcat.Status) {
 	shared.Logger.Debug("Job status update", "status", update)
 
-	relativeProgress := utils.CalculatePercentage(float64(update.Progress[0]), float64(update.Progress[1]))
+	relativeProgress := progress.CalculatePercentage(float64(update.Progress[0]), float64(update.Progress[1]))
 
 	if update.Guess.GuessBaseCount > 1 {
 		relativeProgress = fmt.Sprintf("%s for iteration %v of %v", relativeProgress, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
 	}
+
 	progressText := relativeProgress
 
 	speedSum := int64(0)
 	for _, device := range update.Devices {
 		speedSum += device.Speed
 	}
+
 	speedText := humanize.SI(float64(speedSum), "H/s")
 
 	hashesText := fmt.Sprintf("%v of %v", update.RecoveredHashes[0], update.RecoveredHashes[1])
 
 	shared.Logger.Info("Progress update", "progress", progressText, "speed", speedText, "cracked_hashes", hashesText)
-}
-
-// displayJobGetZap logs an informational message indicating that new hashes are available for the given task, along with the task ID.
-func displayJobGetZap(task *components.Task) {
-	shared.Logger.Info("New hashes available, updating job", "task_id", task.GetID())
 }
 
 // displayAgentMetadataUpdated logs that the agent metadata has been updated using the CipherSwarm API.
@@ -126,7 +125,7 @@ func displayAgentMetadataUpdated(result *operations.UpdateAgentResponse) {
 	shared.Logger.Debug("Agent metadata", "metadata", result)
 }
 
-// displayNewCrackerAvailable logs details about the newly available cracker, including the latest version and download URL.
+// DisplayNewCrackerAvailable logs details about the newly available cracker, including the latest version and download URL.
 func DisplayNewCrackerAvailable(result *components.CrackerUpdate) {
 	shared.Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
 	shared.Logger.Info("Download URL", "url", result.GetDownloadURL())
@@ -145,26 +144,6 @@ func displayBenchmarksComplete(benchmarkResult []benchmarkResult) {
 // displayDownloadFileStart logs the start of the file download process for the provided attack.
 func displayDownloadFileStart(attack *components.Attack) {
 	shared.Logger.Info("Downloading files for attack", "attack_id", attack.GetID())
-}
-
-// displayDownloadFileComplete logs the completion of a file download with the provided URL and path.
-// Parameters:
-// - url: The URL from which the file was downloaded.
-// - path: The local path where the file was saved.
-// Actions:
-// - Logs an informational message indicating the successful completion of the download process, including the URL and the path.
-func displayDownloadFileComplete(url string, path string) {
-	shared.Logger.Info("Downloaded file", "url", url, "path", path)
-}
-
-// displayDownloadFile logs the initiation of a file download with the provided URL and path.
-// Parameters:
-// - url: The URL from which the file is being downloaded.
-// - path: The local path where the file will be saved.
-// Actions:
-// - Logs an informational message indicating the start of the download process, including both the URL and the path.
-func displayDownloadFile(url string, path string) {
-	shared.Logger.Info("Downloading file", "url", url, "path", path)
 }
 
 // displayRunTaskCompleted logs a message indicating that a task has been completed successfully.
