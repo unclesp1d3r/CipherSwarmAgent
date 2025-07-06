@@ -10,21 +10,42 @@ dev:
 
 # Install all requirements and build the project
 install:
+    cd {{justfile_dir()}}
     python3 -m venv .venv
     source .venv/bin/activate && pip install mkdocs-material
+    pnpm install
+    pre-commit install --hook-type commit-msg
     go mod tidy
-    go build -o cipherswarm-agent
+
+
+# Run pre-commit hooks and linting
+check:
+    cd {{justfile_dir()}}
+    pre-commit run -a # Runs all hooks on all files
+    just lint
+    goreleaser check --verbose
 
 # Run lint and code checks
-check:
-    go fmt ./...
+lint:
+    cd {{justfile_dir()}}
+    golangci-lint fmt ./...
+    golangci-lint run ./...
     go vet ./...
-
 # Run tests
 test:
     go test ./...
 
 # Run all checks and tests (CI)
 ci-check:
+    cd {{justfile_dir()}}
+    pre-commit run # Same as just check, but only runs on staged files
+    just lint
+    just test
+
+build:
+    cd {{justfile_dir()}}
+    just install
+    go mod tidy
     just check
-    just test 
+    just test
+    go build -o cipherswarm-agent
