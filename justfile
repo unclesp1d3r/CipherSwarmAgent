@@ -49,3 +49,13 @@ build:
     just check
     just test
     go build -o cipherswarm-agent
+
+update-deps:
+    cd {{justfile_dir()}}
+    go get -u ./...
+    go mod tidy
+    go mod verify
+    go mod vendor
+    go mod tidy
+
+    pnpm update -r
