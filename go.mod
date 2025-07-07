@@ -12,13 +12,16 @@ require (
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/nxadm/tail v1.4.11
 	github.com/pkg/errors v0.9.1
-	github.com/shirou/gopsutil/v3 v3.24.5
+	github.com/shirou/gopsutil/v4 v4.25.6
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.8.5
 )
 
-require github.com/duke-git/lancet/v2 v2.3.6
+require (
+	github.com/duke-git/lancet/v2 v2.3.6
+	github.com/shirou/gopsutil/v3 v3.24.5
+)
 
 require (
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta1 // indirect
