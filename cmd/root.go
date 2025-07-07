@@ -13,9 +13,10 @@ import (
 
 const (
 	// Default configuration values.
-	defaultGPUTempThreshold = 80               // Default GPU temperature threshold in Celsius
-	defaultSleepOnFailure   = 60 * time.Second // Default sleep duration after task failure
-	defaultStatusTimer      = 3                // Default status update interval in seconds
+	defaultGPUTempThreshold  = 80               // Default GPU temperature threshold in Celsius
+	defaultSleepOnFailure    = 60 * time.Second // Default sleep duration after task failure
+	defaultStatusTimer       = 10               // Default status update interval in seconds (10 seconds)
+	defaultHeartbeatInterval = 10 * time.Second // Default heartbeat interval (10 seconds)
 )
 
 var (
@@ -85,6 +86,10 @@ func init() {
 
 	RootCmd.PersistentFlags().IntP("status_timer", "t", defaultStatusTimer, "Interval in seconds for sending status updates to the server")
 	err = viper.BindPFlag("status_timer", RootCmd.PersistentFlags().Lookup("status_timer"))
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().DurationP("heartbeat_interval", "", defaultHeartbeatInterval, "Interval between heartbeat messages to the server")
+	err = viper.BindPFlag("heartbeat_interval", RootCmd.PersistentFlags().Lookup("heartbeat_interval"))
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().BoolP("write_zaps_to_file", "w", false, "Write zap output to a file in the zaps directory")

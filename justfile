@@ -31,6 +31,7 @@ lint:
     @golangci-lint fmt ./...
     @golangci-lint run ./...
     @go vet ./...
+
 # Run tests
 test:
     go test ./...
@@ -42,13 +43,14 @@ ci-check:
     @just lint
     @just test
 
+# Run all checks and tests, and build the agent
 build:
     cd {{justfile_dir()}}
     just install
     go mod tidy
     just check
     just test
-    go build -o cipherswarm-agent
+    goreleaser build --clean --auto-snapshot --single-target
 
 update-deps:
     cd {{justfile_dir()}}

@@ -133,7 +133,15 @@ func UpdateAgentMetadata() error {
 		Devices:         devices,
 	}
 
-	shared.Logger.Debug("Updating agent metadata", "agent_id", shared.State.AgentID, "hostname", info.Hostname, "client_signature", clientSignature, "os", info.OS, "devices", devices)
+	// Debug logging for troubleshooting credentials issue
+	shared.Logger.Debug("Preparing agent metadata update",
+		"agent_id", shared.State.AgentID,
+		"hostname", info.Hostname,
+		"client_signature", clientSignature,
+		"os", info.OS,
+		"devices", devices,
+		"api_url", shared.State.URL,
+		"has_token", shared.State.APIToken != "")
 
 	response, err := shared.State.SdkClient.Agents.UpdateAgent(context.Background(), shared.State.AgentID, agentUpdate)
 	if err != nil {

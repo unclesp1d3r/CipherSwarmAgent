@@ -79,13 +79,23 @@ func StartAgent() {
 
 	shared.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
+	// Start heartbeat loop early so UI can see agent is connected
+	go startHeartbeatLoop(signChan)
+
+	// Submit initial benchmarks to the server
+	shared.State.CurrentActivity = shared.CurrentActivityBenchmarking
+	if err := lib.UpdateBenchmarks(); err != nil {
+		shared.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
+	}
+
+	shared.State.CurrentActivity = shared.CurrentActivityStarting
+
 	// Kill any dangling hashcat processes
 	if cracker.CheckForExistingClient(shared.State.HashcatPidFile) {
 		shared.Logger.Info("Killed dangling hashcat process")
 	}
 
-	// Start heartbeat and agent loops
-	go startHeartbeatLoop(signChan)
+	// Start agent loop (heartbeat loop already started above)
 	go startAgentLoop()
 
 	// Wait for termination signal
@@ -107,7 +117,9 @@ func cleanupLockFile(pidFile string) {
 func startHeartbeatLoop(signChan chan os.Signal) {
 	for {
 		heartbeat(signChan)
-		time.Sleep(viper.GetDuration("heartbeat_interval"))
+		// Use the same interval as the agent update interval from server configuration
+		sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
+		time.Sleep(sleepTime)
 	}
 }
 
@@ -157,6 +169,11 @@ func handleCrackerUpdate() {
 }
 
 func handleNewTask() {
+	if !shared.State.BenchmarksSubmitted {
+		shared.Logger.Debug("Benchmarks not yet submitted, skipping task retrieval")
+		return
+	}
+
 	task, err := lib.GetNewTask()
 	if err != nil {
 		if errors.Is(err, lib.ErrNoTaskAvailable) {
