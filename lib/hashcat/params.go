@@ -165,6 +165,10 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			"--machine-readable",
 			"--benchmark",
 		)
+
+		// Include additional arguments for benchmark mode (e.g., -m for specific hash type)
+		args = append(args, params.AdditionalArgs...)
+
 		if strings.TrimSpace(params.BackendDevices) != "" {
 			args = append(args, "--backend-devices", params.BackendDevices)
 		}

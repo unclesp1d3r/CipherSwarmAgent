@@ -20,6 +20,11 @@ import (
 	stderrors "errors"
 )
 
+// Static errors to comply with err113 linter.
+var (
+	ErrCouldNotValidateCredentials = stderrors.New("could not validate credentials")
+)
+
 // handleAuthenticationError handles authentication errors from the CipherSwarm API.
 // It logs detailed error information based on the type of error and returns the original error.
 func handleAuthenticationError(err error) error {
@@ -135,10 +140,31 @@ func handleAPIError(message string, err error) {
 
 		switch {
 		case stderrors.As(err, &e):
-			shared.Logger.Error(message, "error", e.Error())
+			// Enhanced logging for credential validation errors
+			if stderrors.Is(err, ErrCouldNotValidateCredentials) {
+				shared.Logger.Error(message+" - credentials validation failed",
+					"error", e.Error(),
+					"agent_id", shared.State.AgentID,
+					"api_url", shared.State.URL,
+					"has_token", shared.State.APIToken != "")
+			} else {
+				shared.Logger.Error(message, "error", e.Error())
+			}
+
 			SendAgentError(e.Error(), nil, operations.SeverityCritical)
 		case stderrors.As(err, &e1):
-			shared.Logger.Error(message+", unexpected error", "status_code", e1.StatusCode, "message", e1.Message)
+			// Enhanced logging for HTTP status errors that might indicate auth issues
+			if e1.StatusCode == http.StatusUnauthorized || e1.StatusCode == http.StatusForbidden {
+				shared.Logger.Error(message+" - authentication/authorization error",
+					"status_code", e1.StatusCode,
+					"message", e1.Message,
+					"agent_id", shared.State.AgentID,
+					"api_url", shared.State.URL,
+					"has_token", shared.State.APIToken != "")
+			} else {
+				shared.Logger.Error(message+", unexpected error", "status_code", e1.StatusCode, "message", e1.Message)
+			}
+
 			SendAgentError(e1.Error(), nil, operations.SeverityCritical)
 		default:
 			shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)

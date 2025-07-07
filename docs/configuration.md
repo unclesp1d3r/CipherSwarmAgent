@@ -66,7 +66,8 @@ always_use_native_hashcat: false
 sleep_on_failure: 60s
 files_path: /opt/cipherswarm/data/files
 extra_debugging: false
-status_timer: 3
+status_timer: 10
+heartbeat_interval: 10s  # Note: Server overrides this via agent_update_interval
 write_zaps_to_file: false
 zap_path: /opt/cipherswarm/data/zaps
 retain_zaps_on_completion: false
@@ -122,9 +123,17 @@ You can specify a custom config file location:
 
 - **Flag**: `--status_timer`, `-t`
 - **Type**: Integer
-- **Default**: `3`
+- **Default**: `10`
 - **Description**: Interval in seconds for sending status updates to server
 - **Range**: 1-60
+
+#### `heartbeat_interval` / `HEARTBEAT_INTERVAL`
+
+- **Flag**: `--heartbeat_interval`
+- **Type**: Duration
+- **Default**: `10s` (fallback only - server provides actual value via `agent_update_interval`)
+- **Description**: Interval between heartbeat messages to the server. **Note**: This value is automatically set by the server via the `agent_update_interval` configuration field and should not normally be overridden.
+- **Examples**: `15s`, `1m`, `90s`
 
 #### `sleep_on_failure` / `SLEEP_ON_FAILURE`
 
@@ -219,6 +228,7 @@ api_token: csa_agent001_xyz789
 api_url: http://192.168.1.100:3000
 data_path: ./agent-data
 gpu_temp_threshold: 75
+status_timer: 10
 ```
 
 ### High-Performance Production Setup
@@ -352,7 +362,7 @@ Use different config files for different environments:
 # Development
 ./cipherswarm-agent --config config-dev.yaml
 
-# Staging  
+# Staging
 ./cipherswarm-agent --config config-staging.yaml
 
 # Production

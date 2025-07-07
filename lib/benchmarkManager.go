@@ -89,12 +89,18 @@ func createBenchmark(result benchmarkResult) (components.HashcatBenchmark, error
 // Logs the session start, runs the benchmark task, and updates the results.
 // If any errors occur during session creation or result sending, logs the errors and returns them.
 func UpdateBenchmarks() error {
+	shared.State.BenchmarksSubmitted = false
+
+	// FOR TESTING: Only benchmark MD5 (hash type 0) instead of all hash types
+	additionalArgs := arch.GetAdditionalHashcatArgs()
+	additionalArgs = append(additionalArgs, "-m", "0") // Add MD5 hash type for testing
+
 	jobParams := hashcat.Params{
 		AttackMode:                hashcat.AttackBenchmark,
-		AdditionalArgs:            arch.GetAdditionalHashcatArgs(),
+		AdditionalArgs:            additionalArgs,
 		BackendDevices:            Configuration.Config.BackendDevices,
 		OpenCLDevices:             Configuration.Config.OpenCLDevices,
-		EnableAdditionalHashTypes: shared.State.EnableAdditionalHashTypes,
+		EnableAdditionalHashTypes: false, // Disable --benchmark-all for testing
 	}
 
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
@@ -116,6 +122,9 @@ func UpdateBenchmarks() error {
 	if err := sendBenchmarkResults(benchmarkResult); err != nil {
 		return cserrors.LogAndSendError("Error updating benchmarks", err, operations.SeverityCritical, nil)
 	}
+
+	shared.State.BenchmarksSubmitted = true
+	shared.Logger.Info("Benchmarks successfully submitted to server")
 
 	return nil
 }

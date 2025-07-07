@@ -140,5 +140,6 @@ cipherswarmagent.yaml
 .venv/
 .DS_Store
 site/
-cipherswarm-agent
 **/node_modules/
+cipherswarmagent
+cipherswarm-agent

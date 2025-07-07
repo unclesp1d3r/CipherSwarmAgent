@@ -14,9 +14,10 @@ import (
 
 const (
 	// Default configuration values.
-	defaultGPUTempThreshold = 80               // Default GPU temperature threshold in Celsius
-	defaultSleepOnFailure   = 60 * time.Second // Default sleep duration after task failure
-	defaultStatusTimer      = 3                // Default status update interval in seconds
+	defaultGPUTempThreshold  = 80               // Default GPU temperature threshold in Celsius
+	defaultSleepOnFailure    = 60 * time.Second // Default sleep duration after task failure
+	defaultStatusTimer       = 10               // Default status update interval in seconds (10 seconds)
+	defaultHeartbeatInterval = 10 * time.Second // Default heartbeat interval (10 seconds)
 )
 
 var (
@@ -103,6 +104,7 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files"))
 	viper.SetDefault("extra_debugging", false)
 	viper.SetDefault("status_timer", defaultStatusTimer)
+	viper.SetDefault("heartbeat_interval", defaultHeartbeatInterval)
 	viper.SetDefault("write_zaps_to_file", false)
 	viper.SetDefault("zap_path", path.Join(viper.GetString("data_path"), "zaps"))
 	viper.SetDefault("retain_zaps_on_completion", false)

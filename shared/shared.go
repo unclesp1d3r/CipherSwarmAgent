@@ -38,6 +38,7 @@ type agentState struct {
 	EnableAdditionalHashTypes           bool                     // EnableAdditionalHashTypes specifies whether the agent should enable additional hash types.
 	JobCheckingStopped                  bool                     // JobCheckingStopped indicates that the server has directed the agent to stop checking for new jobs.
 	UseLegacyDeviceIdentificationMethod bool                     // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
+	BenchmarksSubmitted                 bool                     // BenchmarksSubmitted indicates whether the agent has successfully submitted its benchmark data to the server.
 	SdkClient                           *sdk.CipherSwarmAgentSDK // SdkClient is the client for interacting with the CipherSwarm API.
 	// Context should be passed as a parameter instead of stored in struct
 }
