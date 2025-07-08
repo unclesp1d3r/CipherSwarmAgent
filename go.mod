@@ -18,7 +18,7 @@ require (
 	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.8.5
 )
 
-require github.com/duke-git/lancet/v2 v2.3.6
+require github.com/duke-git/lancet/v2 v2.3.7
 
 require (
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta1 // indirect
