@@ -8,7 +8,7 @@ require (
 	github.com/charmbracelet/log v0.4.2
 	github.com/cheggaaa/pb/v3 v3.1.7
 	github.com/dustin/go-humanize v1.0.1
-	github.com/hashicorp/go-getter v1.7.8
+	github.com/hashicorp/go-getter/v2 v2.2.3
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/nxadm/tail v1.4.11
 	github.com/pkg/errors v0.9.1
@@ -18,7 +18,10 @@ require (
 	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.8.5
 )
 
-require github.com/duke-git/lancet/v2 v2.3.6
+require (
+	github.com/duke-git/lancet/v2 v2.3.6
+	github.com/hashicorp/go-getter v1.7.9
+)
 
 require (
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta1 // indirect
