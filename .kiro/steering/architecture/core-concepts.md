@@ -1,0 +1,45 @@
+---
+inclusion: always
+---
+# CipherSwarmAgent: Core Concepts & Structure
+
+## Project Overview
+
+- **Purpose:** Distributed agent for CipherSwarm, managing and executing hash-cracking tasks at scale.
+- **Language:** Go (>=1.22)
+- **Entrypoint:** `main.go` → `cmd/root.go` (Cobra CLI)
+- **Cross-platform:** Designed for Linux, macOS, and Windows operation.
+
+## Directory Layout
+
+- `cmd/` — CLI entrypoint and command registration (Cobra)
+- `lib/` — Core agent logic and utilities
+    - `agentClient.go` — Main agent logic, server communication, task lifecycle
+    - `benchmarkManager.go` — Benchmarking logic
+    - `clientUtils.go` — File, process, and environment utilities
+    - `dataTypes.go` — Core data structures (agent config, benchmark results)
+    - `hashcat/` — Hashcat session management, parameterization, and result parsing
+    - `arch/` — OS-specific abstractions (device detection, binary handling)
+    - `utils/` — Reusable utilities (e.g., progress tracking)
+- `shared/` — Global state, logging, and shared types
+- `.github/` — Issue templates and CI workflows
+- `Dockerfile` — Container build for agent deployment
+- `README.md` — Setup, configuration, and usage documentation
+
+## Configuration
+
+- **Environment variables** and **CLI flags** (via Cobra/Viper)
+- Auto-generates YAML config file on first run.
+- Key options: API token, server URL, data paths, GPU thresholds, debug flags.
+
+## Extensibility & Modularity
+
+- Modular structure for new attack modes, device types, or resource handling.
+- OS-specific logic is abstracted in `lib/arch/`.
+- Shared state and logging are centralized in `shared/`.
+
+## Contribution & Maintenance
+
+- Follows Conventional Commits.
+- Automated CI (lint, test, changelog).
+- Not production-ready (pre-v1.0).
