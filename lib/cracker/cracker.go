@@ -2,6 +2,7 @@
 package cracker
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -74,7 +75,7 @@ func GetCurrentHashcatVersion() (string, error) {
 		return emptyVersion, err
 	}
 
-	version, err := arch.GetHashcatVersion(hashcatPath)
+	version, err := arch.GetHashcatVersion(context.Background(), hashcatPath)
 	if err != nil {
 		return emptyVersion, err
 	}
@@ -199,7 +200,7 @@ func ExtractHashcatArchive(newArchivePath string) (string, error) {
 	}
 
 	// Extract the new hashcat directory using the 7z command
-	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
+	err = arch.Extract7z(context.Background(), newArchivePath, shared.State.CrackersPath)
 	if err != nil {
 		shared.Logger.Error("Error extracting file: ", "error", err)
 

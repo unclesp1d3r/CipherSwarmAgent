@@ -28,6 +28,38 @@ check: lint
     @pre-commit run -a # Runs all hooks on all files
     @goreleaser check --verbose
 
+# Lint the justfile itself
+lint-just:
+    just --fmt --check --unstable
+
+# Format Go code
+fmt-go:
+    gofmt -s -w .
+
+# Run Go vet
+vet-go:
+    go vet ./...
+
+# Run gosec security scanner
+lint-gosec:
+    go install github.com/securego/gosec/v2/cmd/gosec@latest
+    gosec ./...
+
+# Run golangci-lint
+lint-golangci:
+    golangci-lint run ./...
+
+# Run all Go linting
+lint-go:
+    @just fmt-go
+    @just vet-go
+    @just lint-gosec
+    @just lint-golangci
+
+# Run Go tests
+test-go:
+    go test ./...
+
 # Run lint and code checks
 lint:
     cd {{justfile_dir()}}

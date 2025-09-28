@@ -200,7 +200,7 @@ func RunTask(task *components.Task, attack *components.Attack) error {
 
 	jobParams := createJobParams(task, attack)
 
-	sess, err := hashcat.NewHashcatSession(strconv.FormatInt(attack.GetID(), 10), jobParams)
+	sess, err := hashcat.NewHashcatSession(context.Background(), strconv.FormatInt(attack.GetID(), 10), jobParams)
 	if err != nil {
 		return cserrors.LogAndSendError("Failed to create attack session", err, operations.SeverityCritical, task)
 	}

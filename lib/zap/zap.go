@@ -36,11 +36,13 @@ func GetZaps(task *components.Task, sendCrackedHashFunc func(time.Time, string, 
 	}
 
 	if res.ResponseStream != nil {
-		_ = handleResponseStream(
+		if err := handleResponseStream(
 			task,
 			res.ResponseStream,
 			sendCrackedHashFunc,
-		)
+		); err != nil {
+			shared.Logger.Warn("failed to handle response stream", "err", err)
+		}
 	}
 }
 
@@ -94,30 +96,36 @@ func handleResponseStream(
 
 	zapFilePath := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
-		_ = cserrors.LogAndSendError(
+		if sendErr := cserrors.LogAndSendError(
 			"Error removing existing zap file",
 			err,
 			operations.SeverityCritical,
 			task,
-		)
+		); sendErr != nil {
+			shared.Logger.Warn("failed to report zap file removal error", "err", sendErr, "originalErr", err)
+		}
 	}
 
 	if err := createAndWriteZapFile(zapFilePath, responseStream, task); err != nil {
-		_ = cserrors.LogAndSendError(
+		if sendErr := cserrors.LogAndSendError(
 			"Error creating and writing zap file",
 			err,
 			operations.SeverityCritical,
 			task,
-		)
+		); sendErr != nil {
+			shared.Logger.Warn("failed to report zap file creation error", "err", sendErr, "originalErr", err)
+		}
 	}
 
 	if err := processZapFile(zapFilePath, task, sendCrackedHashFunc); err != nil {
-		_ = cserrors.LogAndSendError(
+		if sendErr := cserrors.LogAndSendError(
 			"Error processing zap file",
 			err,
 			operations.SeverityCritical,
 			task,
-		)
+		); sendErr != nil {
+			shared.Logger.Warn("failed to report zap file processing error", "err", sendErr, "originalErr", err)
+		}
 	}
 
 	return nil
