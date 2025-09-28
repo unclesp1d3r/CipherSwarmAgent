@@ -6,7 +6,7 @@ set shell := ["pwsh.exe", "-NoLogo", "-Command"]
 
 # Serve documentation locally
 @docs:
-    .venv/Scripts/Activate.ps1; mkdocs serve
+    uv run mkdocs serve
 
 # Run the agent (development)
 dev:
@@ -15,17 +15,18 @@ dev:
 # Install all requirements and build the project
 install:
     cd {{justfile_dir()}}
-    python -m venv .venv
-    .venv/Scripts/Activate.ps1; pip install mkdocs-material
+    uv venv --no-project --clear
+    pipx install mkdocs-material --include-deps
+    pipx install pre-commit
     pnpm install
-    pre-commit install --hook-type commit-msg
+    uv run pre-commit install --hook-type commit-msg
     go mod tidy
 
 
 # Run pre-commit hooks and linting
 check: lint
     cd {{justfile_dir()}}
-    @pre-commit run -a # Runs all hooks on all files
+    @uv run pre-commit run -a # Runs all hooks on all files
     @goreleaser check --verbose
 
 # Lint the justfile itself
@@ -50,22 +51,14 @@ lint-golangci:
     golangci-lint run ./...
 
 # Run all Go linting
-lint-go:
-    @just fmt-go
-    @just vet-go
-    @just lint-gosec
-    @just lint-golangci
+lint-go: fmt-go vet-go lint-gosec lint-golangci
 
 # Run Go tests
 test-go:
     go test ./...
 
 # Run lint and code checks
-lint:
-    cd {{justfile_dir()}}
-    @golangci-lint fmt ./...
-    @golangci-lint run ./...
-    @go vet ./...
+lint: lint-go
 
 # Run tests
 test:
@@ -74,17 +67,12 @@ test:
 # Run all checks and tests (CI)
 ci-check:
     cd {{justfile_dir()}}
-    @pre-commit run # Same as just check, but only runs on staged files
+    @uv run pre-commit run # Same as just check, but only runs on staged files
     @just lint
     @just test
 
 # Run all checks and tests, and build the agent
-build:
-    cd {{justfile_dir()}}
-    just install
-    go mod tidy
-    just check
-    just test
+build: install check test
     goreleaser build --clean --auto-snapshot --single-target
 
 update-deps:
@@ -96,3 +84,4 @@ update-deps:
     go mod tidy
 
     pnpm update -r
+    uv run pre-commmit autoupdate
