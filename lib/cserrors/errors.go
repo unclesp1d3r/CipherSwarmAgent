@@ -16,10 +16,7 @@ func LogAndSendError(message string, err error, severity operations.Severity, ta
 	shared.ErrorLogger.Error(message, "error", err)
 
 	if task != nil {
-		var taskID *int64
-		if task != nil {
-			taskID = &task.ID
-		}
+		taskID := &task.ID
 
 		agentError := &operations.SubmitErrorAgentRequestBody{
 			AgentID:  shared.State.AgentID,

@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 
@@ -23,7 +24,7 @@ func getDevices() ([]string, error) {
 		OpenCLDevices:  "1,2,3",
 	}
 
-	sess, err := hashcat.NewHashcatSession("test", jobParams)
+	sess, err := hashcat.NewHashcatSession(context.Background(), "test", jobParams)
 	if err != nil {
 		return nil, cserrors.LogAndSendError("Failed to create test session", err, operations.SeverityMajor, nil)
 	}

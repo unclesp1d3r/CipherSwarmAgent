@@ -2,6 +2,7 @@ package hashcat
 
 import (
 	"bufio"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -45,6 +46,54 @@ type Session struct {
 	RestoreFilePath    string        // Path to the restore file
 	pStdout            io.ReadCloser // Pipe for stdout
 	pStderr            io.ReadCloser // Pipe for stderr
+}
+
+// NewHashcatSession creates a new Hashcat session with given id and parameters,
+// initializes the necessary files, arguments, and channels, and returns the session.
+func NewHashcatSession(ctx context.Context, id string, params Params) (*Session, error) {
+	binaryPath, err := cracker.FindHashcatBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create output file: %w", err)
+	}
+
+	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
+	if err != nil {
+		return nil, err
+	}
+
+	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(params.RestoreFilePath) != "" && func() bool {
+		_, err := os.Stat(params.RestoreFilePath)
+		return err == nil
+	}() {
+		args = params.toRestoreArgs(id)
+	}
+
+	return &Session{
+		proc: exec.CommandContext(ctx,
+			binaryPath,
+			args...),
+		hashFile:           params.HashFile,
+		outFile:            outFile,
+		charsetFiles:       charsetFiles,
+		shardedCharsetFile: nil,
+		CrackedHashes:      make(chan Result, channelBufferSize),
+		StatusUpdates:      make(chan Status, channelBufferSize),
+		StderrMessages:     make(chan string, channelBufferSize),
+		StdoutLines:        make(chan string, channelBufferSize),
+		DoneChan:           make(chan error),
+		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
+		RestoreFilePath:    params.RestoreFilePath,
+	}, nil
 }
 
 // Start initializes the session by attaching the necessary pipes and starting the hashcat process.
@@ -251,54 +300,6 @@ func (sess *Session) Cleanup() {
 // CmdLine returns the command line string used to start the hashcat process.
 func (sess *Session) CmdLine() string {
 	return sess.proc.String()
-}
-
-// NewHashcatSession creates a new Hashcat session with given id and parameters,
-// initializes the necessary files, arguments, and channels, and returns the session.
-func NewHashcatSession(id string, params Params) (*Session, error) {
-	binaryPath, err := cracker.FindHashcatBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create output file: %w", err)
-	}
-
-	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
-	if err != nil {
-		return nil, err
-	}
-
-	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	if strings.TrimSpace(params.RestoreFilePath) != "" && func() bool {
-		_, err := os.Stat(params.RestoreFilePath)
-		return err == nil
-	}() {
-		args = params.toRestoreArgs(id)
-	}
-
-	return &Session{
-		proc: exec.Command(
-			binaryPath,
-			args...),
-		hashFile:           params.HashFile,
-		outFile:            outFile,
-		charsetFiles:       charsetFiles,
-		shardedCharsetFile: nil,
-		CrackedHashes:      make(chan Result, channelBufferSize),
-		StatusUpdates:      make(chan Status, channelBufferSize),
-		StderrMessages:     make(chan string, channelBufferSize),
-		StdoutLines:        make(chan string, channelBufferSize),
-		DoneChan:           make(chan error),
-		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
-		RestoreFilePath:    params.RestoreFilePath,
-	}, nil
 }
 
 // createOutFile creates a new file with the specified directory, id, and permissions.

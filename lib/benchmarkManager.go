@@ -103,7 +103,7 @@ func UpdateBenchmarks() error {
 		EnableAdditionalHashTypes: false, // Disable --benchmark-all for testing
 	}
 
-	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
+	sess, err := hashcat.NewHashcatSession(context.Background(), "benchmark", jobParams)
 	if err != nil {
 		return cserrors.LogAndSendError("Failed to create benchmark session", err, operations.SeverityMajor, nil)
 	}

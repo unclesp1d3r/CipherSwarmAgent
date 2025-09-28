@@ -165,7 +165,7 @@ func UpdateAgentMetadata() error {
 // It checks the global state to determine if the legacy method should be used, then calls the appropriate function.
 func getDevicesList() ([]string, error) {
 	if shared.State.UseLegacyDeviceIdentificationMethod {
-		return arch.GetDevices()
+		return arch.GetDevices(context.Background())
 	}
 
 	return getDevices()
@@ -422,12 +422,14 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 			filePermissions,
 		)
 		if err != nil {
-			_ = cserrors.LogAndSendError(
+			if sendErr := cserrors.LogAndSendError(
 				"Error opening cracked hash file",
 				err,
 				operations.SeverityCritical,
 				task,
-			)
+			); sendErr != nil {
+				shared.Logger.Warn("failed to report file open error", "err", sendErr, "originalErr", err)
+			}
 			return
 		}
 
@@ -435,12 +437,14 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 
 		_, err = file.WriteString(fmt.Sprintf("%s:%s", hash, plaintext) + "\n")
 		if err != nil {
-			_ = cserrors.LogAndSendError(
+			if sendErr := cserrors.LogAndSendError(
 				"Error writing cracked hash to file",
 				err,
 				operations.SeverityCritical,
 				task,
-			)
+			); sendErr != nil {
+				shared.Logger.Warn("failed to report file write error", "err", sendErr, "originalErr", err)
+			}
 			return
 		}
 	}

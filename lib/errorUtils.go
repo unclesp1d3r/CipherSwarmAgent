@@ -117,12 +117,14 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	}
 
 	if err := os.Remove(newArchivePath); err != nil {
-		_ = cserrors.LogAndSendError(
+		if sendErr := cserrors.LogAndSendError(
 			"Error removing 7z file",
 			err,
 			operations.SeverityWarning,
 			nil,
-		)
+		); sendErr != nil {
+			shared.Logger.Warn("failed to report 7z removal error", "err", sendErr, "originalErr", err)
+		}
 	}
 
 	viper.Set("hashcat_path", path.Join(shared.State.CrackersPath, "hashcat", *update.GetExecName()))
@@ -190,12 +192,14 @@ func handleHeartbeatError(err error) {
 
 		switch {
 		case stderrors.As(err, &e):
-			_ = cserrors.LogAndSendError(
+			if sendErr := cserrors.LogAndSendError(
 				"Error sending heartbeat",
 				e,
 				operations.SeverityCritical,
 				nil,
-			)
+			); sendErr != nil {
+				shared.Logger.Warn("failed to report heartbeat error", "err", sendErr, "originalErr", e)
+			}
 		case stderrors.As(err, &e1):
 			shared.Logger.Error(
 				"Error sending heartbeat, unexpected error",
@@ -215,12 +219,14 @@ func handleHeartbeatError(err error) {
 func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Session) {
 	var eo *sdkerrors.ErrorObject
 	if stderrors.As(err, &eo) {
-		_ = cserrors.LogAndSendError(
+		if sendErr := cserrors.LogAndSendError(
 			"Error sending status update",
 			eo,
 			operations.SeverityCritical,
 			task,
-		)
+		); sendErr != nil {
+			shared.Logger.Warn("failed to report status update error", "err", sendErr, "originalErr", eo)
+		}
 
 		return
 	}
@@ -245,12 +251,14 @@ func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat
 		// Not an error, just log and pause the task
 		handleTaskGone(task, sess)
 	default:
-		_ = cserrors.LogAndSendError(
+		if sendErr := cserrors.LogAndSendError(
 			"Error connecting to the CipherSwarm API, unexpected error",
 			se,
 			operations.SeverityCritical,
 			task,
-		)
+		); sendErr != nil {
+			shared.Logger.Warn("failed to report SDK error", "err", sendErr, "originalErr", se)
+		}
 	}
 }
 
@@ -265,12 +273,14 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 	)
 
 	if err := sess.Kill(); err != nil {
-		_ = cserrors.LogAndSendError(
+		if sendErr := cserrors.LogAndSendError(
 			"Error killing task",
 			err,
 			operations.SeverityCritical,
 			task,
-		)
+		); sendErr != nil {
+			shared.Logger.Warn("failed to report task kill error", "err", sendErr, "originalErr", err)
+		}
 	}
 
 	sess.Cleanup()
@@ -281,12 +291,14 @@ func handleTaskGone(task *components.Task, sess *hashcat.Session) {
 	shared.Logger.Info("Pausing task", "task_id", task.GetID())
 
 	if err := sess.Kill(); err != nil {
-		_ = cserrors.LogAndSendError(
+		if sendErr := cserrors.LogAndSendError(
 			"Error pausing task",
 			err,
 			operations.SeverityFatal,
 			task,
-		)
+		); sendErr != nil {
+			shared.Logger.Warn("failed to report task pause error", "err", sendErr, "originalErr", err)
+		}
 	}
 }
 
