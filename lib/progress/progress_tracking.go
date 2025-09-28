@@ -79,6 +79,7 @@ func (cpb *progressBar) TrackProgress(src string, currentSize, totalSize int64, 
 
 type readCloser struct {
 	io.Reader
+
 	close func() error
 }
 

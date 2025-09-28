@@ -69,7 +69,15 @@ func FileExistsAndValid(filePath, checksum string) bool {
 		return true
 	}
 
-	shared.Logger.Warn("Checksums do not match", "path", filePath, "url_checksum", checksum, "file_checksum", fileChecksum)
+	shared.Logger.Warn(
+		"Checksums do not match",
+		"path",
+		filePath,
+		"url_checksum",
+		checksum,
+		"file_checksum",
+		fileChecksum,
+	)
 
 	if err := os.Remove(filePath); err != nil {
 		shared.Logger.Error("Error removing file with mismatched checksum", "path", filePath, "error", err)
@@ -207,7 +215,7 @@ func removeExistingFile(filePath string) error {
 // writeResponseToFile writes the data from an io.Reader (responseStream) to a file specified by the filePath.
 // Creates a new file at the given path, writes the response stream to it, and handles errors accordingly.
 func writeResponseToFile(responseStream io.Reader, filePath string) error {
-	file, err := os.Create(filePath) //nolint:gosec // File path is validated before this call
+	file, err := os.Create(filePath)
 	if err != nil {
 		return errors.Wrap(err, "error creating file")
 	}

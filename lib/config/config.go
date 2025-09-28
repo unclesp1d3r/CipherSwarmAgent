@@ -20,9 +20,7 @@ const (
 	defaultHeartbeatInterval = 10 * time.Second // Default heartbeat interval (10 seconds)
 )
 
-var (
-	scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // Configuration scope
-)
+var scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // Configuration scope
 
 // InitConfig initializes the configuration from various sources.
 func InitConfig(cfgFile string) {
@@ -69,26 +67,72 @@ func SetupSharedState() {
 	shared.State.URL = viper.GetString("api_url")
 	shared.State.APIToken = viper.GetString("api_token")
 
-	dataRoot := viper.GetString("data_path")                                                        // Get the data path from the configuration
-	shared.State.DataPath = dataRoot                                                                // Set the data path in the shared state
-	shared.State.PidFile = path.Join(dataRoot, "lock.pid")                                          // Set the default PID file path
-	shared.State.HashcatPidFile = path.Join(dataRoot, "hashcat.pid")                                // Set the default hashcat PID file path
-	shared.State.CrackersPath = path.Join(dataRoot, "crackers")                                     // Set the crackers path in the shared state
-	shared.State.FilePath = viper.GetString("files_path")                                           // Set the file path in the shared state
-	shared.State.HashlistPath = path.Join(dataRoot, "hashlists")                                    // Set the hashlist path in the shared state
-	shared.State.ZapsPath = viper.GetString("zap_path")                                             // Set the zaps path in the shared state
-	shared.State.PreprocessorsPath = path.Join(dataRoot, "preprocessors")                           // Set the preprocessors path in the shared state
-	shared.State.ToolsPath = path.Join(dataRoot, "tools")                                           // Set the tools path in the shared state
-	shared.State.OutPath = path.Join(dataRoot, "output")                                            // Set the output path in the shared state
-	shared.State.RestoreFilePath = path.Join(dataRoot, "restore")                                   // Set the restore file path in the shared state
-	shared.State.Debug = viper.GetBool("debug")                                                     // Set the debug flag in the shared state
-	shared.State.AlwaysTrustFiles = viper.GetBool("always_trust_files")                             // Set the always trust files flag in the shared state
-	shared.State.ExtraDebugging = viper.GetBool("extra_debugging")                                  // Set the extra debugging flag in the shared state
-	shared.State.StatusTimer = viper.GetInt("status_timer")                                         // Set the status timer in the shared state to 3 seconds
-	shared.State.WriteZapsToFile = viper.GetBool("write_zaps_to_file")                              // Set the write zaps to file flag in the shared state
-	shared.State.RetainZapsOnCompletion = viper.GetBool("retain_zaps_on_completion")                // Set the retain zaps on completion flag in the shared state
-	shared.State.EnableAdditionalHashTypes = viper.GetBool("enable_additional_hash_types")          // Set the enable additional hash types flag in the shared state
-	shared.State.UseLegacyDeviceIdentificationMethod = viper.GetBool("use_legacy_device_technique") // Set the use legacy device identification method flag in the shared state
+	dataRoot := viper.GetString(
+		"data_path",
+	) // Get the data path from the configuration
+	shared.State.DataPath = dataRoot // Set the data path in the shared state
+	shared.State.PidFile = path.Join(
+		dataRoot,
+		"lock.pid",
+	) // Set the default PID file path
+	shared.State.HashcatPidFile = path.Join(
+		dataRoot,
+		"hashcat.pid",
+	) // Set the default hashcat PID file path
+	shared.State.CrackersPath = path.Join(
+		dataRoot,
+		"crackers",
+	) // Set the crackers path in the shared state
+	shared.State.FilePath = viper.GetString(
+		"files_path",
+	) // Set the file path in the shared state
+	shared.State.HashlistPath = path.Join(
+		dataRoot,
+		"hashlists",
+	) // Set the hashlist path in the shared state
+	shared.State.ZapsPath = viper.GetString(
+		"zap_path",
+	) // Set the zaps path in the shared state
+	shared.State.PreprocessorsPath = path.Join(
+		dataRoot,
+		"preprocessors",
+	) // Set the preprocessors path in the shared state
+	shared.State.ToolsPath = path.Join(
+		dataRoot,
+		"tools",
+	) // Set the tools path in the shared state
+	shared.State.OutPath = path.Join(
+		dataRoot,
+		"output",
+	) // Set the output path in the shared state
+	shared.State.RestoreFilePath = path.Join(
+		dataRoot,
+		"restore",
+	) // Set the restore file path in the shared state
+	shared.State.Debug = viper.GetBool(
+		"debug",
+	) // Set the debug flag in the shared state
+	shared.State.AlwaysTrustFiles = viper.GetBool(
+		"always_trust_files",
+	) // Set the always trust files flag in the shared state
+	shared.State.ExtraDebugging = viper.GetBool(
+		"extra_debugging",
+	) // Set the extra debugging flag in the shared state
+	shared.State.StatusTimer = viper.GetInt(
+		"status_timer",
+	) // Set the status timer in the shared state to 3 seconds
+	shared.State.WriteZapsToFile = viper.GetBool(
+		"write_zaps_to_file",
+	) // Set the write zaps to file flag in the shared state
+	shared.State.RetainZapsOnCompletion = viper.GetBool(
+		"retain_zaps_on_completion",
+	) // Set the retain zaps on completion flag in the shared state
+	shared.State.EnableAdditionalHashTypes = viper.GetBool(
+		"enable_additional_hash_types",
+	) // Set the enable additional hash types flag in the shared state
+	shared.State.UseLegacyDeviceIdentificationMethod = viper.GetBool(
+		"use_legacy_device_technique",
+	) // Set the use legacy device identification method flag in the shared state
 }
 
 // SetDefaultConfigValues sets default configuration values.

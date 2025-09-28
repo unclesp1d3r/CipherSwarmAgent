@@ -36,7 +36,11 @@ func GetZaps(task *components.Task, sendCrackedHashFunc func(time.Time, string, 
 	}
 
 	if res.ResponseStream != nil {
-		_ = handleResponseStream(task, res.ResponseStream, sendCrackedHashFunc) //nolint:errcheck // Error already logged in function
+		_ = handleResponseStream(
+			task,
+			res.ResponseStream,
+			sendCrackedHashFunc,
+		)
 	}
 }
 
@@ -56,7 +60,9 @@ func removeExistingZapFile(zapFilePath string) error {
 // The task parameter is used for logging and error reporting in case of failures.
 // Returns an error if file creation, writing, or closing fails.
 func createAndWriteZapFile(zapFilePath string, responseStream io.Reader, task *components.Task) error {
-	outFile, err := os.Create(zapFilePath) //nolint:gosec // File path is constructed safely within application data directory
+	outFile, err := os.Create(
+		zapFilePath,
+	)
 	if err != nil {
 		return fmt.Errorf("error creating zap file: %w", err)
 	}
@@ -74,7 +80,11 @@ func createAndWriteZapFile(zapFilePath string, responseStream io.Reader, task *c
 
 // handleResponseStream processes the response stream from a zap request.
 // It creates a temporary file, writes the stream to it, and then processes the zap file.
-func handleResponseStream(task *components.Task, responseStream io.ReadCloser, sendCrackedHashFunc func(time.Time, string, string, *components.Task)) error {
+func handleResponseStream(
+	task *components.Task,
+	responseStream io.ReadCloser,
+	sendCrackedHashFunc func(time.Time, string, string, *components.Task),
+) error {
 	defer func(responseStream io.ReadCloser) {
 		err := responseStream.Close()
 		if err != nil {
@@ -84,15 +94,30 @@ func handleResponseStream(task *components.Task, responseStream io.ReadCloser, s
 
 	zapFilePath := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
-		_ = cserrors.LogAndSendError("Error removing existing zap file", err, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
+		_ = cserrors.LogAndSendError(
+			"Error removing existing zap file",
+			err,
+			operations.SeverityCritical,
+			task,
+		)
 	}
 
 	if err := createAndWriteZapFile(zapFilePath, responseStream, task); err != nil {
-		_ = cserrors.LogAndSendError("Error creating and writing zap file", err, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
+		_ = cserrors.LogAndSendError(
+			"Error creating and writing zap file",
+			err,
+			operations.SeverityCritical,
+			task,
+		)
 	}
 
 	if err := processZapFile(zapFilePath, task, sendCrackedHashFunc); err != nil {
-		_ = cserrors.LogAndSendError("Error processing zap file", err, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
+		_ = cserrors.LogAndSendError(
+			"Error processing zap file",
+			err,
+			operations.SeverityCritical,
+			task,
+		)
 	}
 
 	return nil
@@ -100,8 +125,14 @@ func handleResponseStream(task *components.Task, responseStream io.ReadCloser, s
 
 // processZapFile reads a zap file line by line, processes each line as a cracked hash,
 // and sends it to the server. It returns an error if the file cannot be opened or read.
-func processZapFile(zapFilePath string, task *components.Task, sendCrackedHashFunc func(time.Time, string, string, *components.Task)) error {
-	file, err := os.Open(zapFilePath) //nolint:gosec // File path is constructed safely within application data directory
+func processZapFile(
+	zapFilePath string,
+	task *components.Task,
+	sendCrackedHashFunc func(time.Time, string, string, *components.Task),
+) error {
+	file, err := os.Open(
+		zapFilePath,
+	)
 	if err != nil {
 		return err
 	}

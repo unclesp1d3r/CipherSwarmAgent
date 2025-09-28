@@ -1,8 +1,12 @@
 # Justfile for CipherSwarm Agent
 
+# Set PowerShell as the shell for Windows
+set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set shell := ["pwsh.exe", "-NoLogo", "-Command"]
+
 # Serve documentation locally
 @docs:
-    source .venv/bin/activate && mkdocs serve
+    .venv/Scripts/Activate.ps1; mkdocs serve
 
 # Run the agent (development)
 dev:
@@ -11,18 +15,17 @@ dev:
 # Install all requirements and build the project
 install:
     cd {{justfile_dir()}}
-    python3 -m venv .venv
-    source .venv/bin/activate && pip install mkdocs-material
+    python -m venv .venv
+    .venv/Scripts/Activate.ps1; pip install mkdocs-material
     pnpm install
     pre-commit install --hook-type commit-msg
     go mod tidy
 
 
 # Run pre-commit hooks and linting
-check:
+check: lint
     cd {{justfile_dir()}}
     @pre-commit run -a # Runs all hooks on all files
-    @just lint
     @goreleaser check --verbose
 
 # Run lint and code checks

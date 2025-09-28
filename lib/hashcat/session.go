@@ -284,7 +284,9 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}
 
 	return &Session{
-		proc:               exec.Command(binaryPath, args...), //nolint:gosec // Binary path is validated, args are constructed safely
+		proc: exec.Command(
+			binaryPath,
+			args...),
 		hashFile:           params.HashFile,
 		outFile:            outFile,
 		charsetFiles:       charsetFiles,
@@ -304,13 +306,15 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 func createOutFile(dir, id string, perm os.FileMode) (*os.File, error) {
 	outFilePath := filepath.Join(dir, id+".hcout")
 
-	file, err := os.Create(outFilePath) //nolint:gosec // File path is constructed safely within application data directory
+	file, err := os.Create(
+		outFilePath,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := file.Chmod(perm); err != nil {
-		_ = file.Close() //nolint:errcheck // We need to close the file if the permissions change fails
+		_ = file.Close()
 		return nil, err
 	}
 
