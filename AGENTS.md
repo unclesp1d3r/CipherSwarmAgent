@@ -1,6 +1,5 @@
----
-title: Gemini System Prompt
----
+
+# AGENTS
 
 This document outlines the formats, standards, and architecture for the CipherSwarmAgent project, tailored for the Gemini AI model.
 
