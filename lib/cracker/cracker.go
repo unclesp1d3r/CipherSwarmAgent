@@ -17,10 +17,8 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
-var (
-	// ErrHashcatBinaryNotFound is returned when the hashcat binary cannot be located.
-	ErrHashcatBinaryNotFound = errors.New("hashcat binary not found")
-)
+// ErrHashcatBinaryNotFound is returned when the hashcat binary cannot be located.
+var ErrHashcatBinaryNotFound = errors.New("hashcat binary not found")
 
 const emptyVersion = "0.0.0"
 
@@ -28,7 +26,7 @@ const emptyVersion = "0.0.0"
 // It checks directories specified by configuration, default locations, and the system's PATH environment variable.
 // The function returns an error if the binary is not found or not executable.
 func FindHashcatBinary() (string, error) {
-	var foundPath = ""
+	foundPath := ""
 
 	possiblePaths := []string{
 		viper.GetString("hashcat_path"),

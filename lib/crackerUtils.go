@@ -2,10 +2,9 @@ package lib
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path"
-
-	"net/http"
 
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
@@ -45,7 +44,11 @@ func UpdateCracker() {
 		return
 	}
 
-	response, err := shared.State.SdkClient.Crackers.CheckForCrackerUpdate(context.Background(), &agentPlatform, &currentVersion)
+	response, err := shared.State.SdkClient.Crackers.CheckForCrackerUpdate(
+		context.Background(),
+		&agentPlatform,
+		&currentVersion,
+	)
 	if err != nil {
 		handleAPIError("Error connecting to the CipherSwarm API", err)
 

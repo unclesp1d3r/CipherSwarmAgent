@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: 'lib/sdk/**/*.go'
+fileMatchPattern: lib/sdk/**/*.go
 ---
 
 # Go SDK Development Rules
@@ -8,9 +8,9 @@ fileMatchPattern: 'lib/sdk/**/*.go'
 ## 1. Project Structure & Layout
 
 - Follow Go module conventions ([go.dev](mdc:https:/go.dev/doc/modules/layout)):
-    - Place commands in `cmd/`, core packages in `pkg/` or root, and internal-only code in `internal/`.
-    - Use clear, idiomatic package names; avoid stutter (e.g., `sdk.Client`, not `sdk.SDKClient`).
-    - Keep public APIs minimal; prefer unexported helpers.
+  - Place commands in `cmd/`, core packages in `pkg/` or root, and internal-only code in `internal/`.
+  - Use clear, idiomatic package names; avoid stutter (e.g., `sdk.Client`, not `sdk.SDKClient`).
+  - Keep public APIs minimal; prefer unexported helpers.
 
 ## 2. Idiomatic Go & API Design
 

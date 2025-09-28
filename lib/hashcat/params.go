@@ -124,7 +124,12 @@ func validateHybridAttack(params Params) error {
 // Returns the constructed args slice or an error if validation fails.
 func (params Params) maskArgs() ([]string, error) {
 	if len(params.MaskCustomCharsets) > maxCharsets {
-		return nil, fmt.Errorf("%w (%d), the max is %d", ErrTooManyCustomCharsets, len(params.MaskCustomCharsets), maxCharsets)
+		return nil, fmt.Errorf(
+			"%w (%d), the max is %d",
+			ErrTooManyCustomCharsets,
+			len(params.MaskCustomCharsets),
+			maxCharsets,
+		)
 	}
 
 	args := make([]string, 0, len(params.MaskCustomCharsets)*2+maskArgsCapacity)

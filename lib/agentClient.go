@@ -416,17 +416,31 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 	if shared.State.WriteZapsToFile {
 		hashFile := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.GetID()))
 
-		file, err := os.OpenFile(hashFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, filePermissions) //nolint:gosec // File path is constructed safely within application data directory
+		file, err := os.OpenFile(
+			hashFile,
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+			filePermissions,
+		)
 		if err != nil {
-			_ = cserrors.LogAndSendError("Error opening cracked hash file", err, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
+			_ = cserrors.LogAndSendError(
+				"Error opening cracked hash file",
+				err,
+				operations.SeverityCritical,
+				task,
+			)
 			return
 		}
 
-		defer func() { _ = file.Close() }() //nolint:errcheck // Defer close, error not critical
+		defer func() { _ = file.Close() }()
 
 		_, err = file.WriteString(fmt.Sprintf("%s:%s", hash, plaintext) + "\n")
 		if err != nil {
-			_ = cserrors.LogAndSendError("Error writing cracked hash to file", err, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
+			_ = cserrors.LogAndSendError(
+				"Error writing cracked hash to file",
+				err,
+				operations.SeverityCritical,
+				task,
+			)
 			return
 		}
 	}

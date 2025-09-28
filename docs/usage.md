@@ -220,16 +220,16 @@ go run main.go --debug --extra_debugging
 
 3. **Configure basic settings**:
 
-    ```bash
-    export API_TOKEN="your_token"
-    export API_URL="https://your-server.com:3000"
-    ```
+   ```bash
+   export API_TOKEN="your_token"
+   export API_URL="https://your-server.com:3000"
+   ```
 
 4. **Test connection**:
 
-    ```bash
-    ./cipherswarm-agent --debug
-    ```
+   ```bash
+   ./cipherswarm-agent --debug
+   ```
 
 5. **Monitor initial benchmarking** (may take several minutes)
 
@@ -449,11 +449,11 @@ If you're still experiencing issues:
 1. **Check the logs** with debug mode enabled
 2. **Search existing issues** on [GitHub](https://github.com/unclesp1d3r/CipherSwarmAgent/issues)
 3. **Create a new issue** with:
-    - Agent version (`--version`)
-    - Operating system and architecture
-    - Configuration (sanitized, no tokens)
-    - Error logs
-    - Steps to reproduce
+   - Agent version (`--version`)
+   - Operating system and architecture
+   - Configuration (sanitized, no tokens)
+   - Error logs
+   - Steps to reproduce
 
 ## Production Deployment
 

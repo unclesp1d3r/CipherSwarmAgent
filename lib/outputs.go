@@ -101,7 +101,12 @@ func displayJobStatus(update hashcat.Status) {
 	relativeProgress := progress.CalculatePercentage(float64(update.Progress[0]), float64(update.Progress[1]))
 
 	if update.Guess.GuessBaseCount > 1 {
-		relativeProgress = fmt.Sprintf("%s for iteration %v of %v", relativeProgress, update.Guess.GuessBaseOffset, update.Guess.GuessBaseCount)
+		relativeProgress = fmt.Sprintf(
+			"%s for iteration %v of %v",
+			relativeProgress,
+			update.Guess.GuessBaseOffset,
+			update.Guess.GuessBaseCount,
+		)
 	}
 
 	progressText := relativeProgress

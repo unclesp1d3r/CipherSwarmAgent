@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-
 	"github.com/spf13/viper"
 	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"

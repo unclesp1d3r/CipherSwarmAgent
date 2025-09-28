@@ -64,7 +64,8 @@ func init() {
 	err = viper.BindPFlag("data_path", RootCmd.PersistentFlags().Lookup("data_path"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().IntP("gpu_temp_threshold", "g", defaultGPUTempThreshold, "Temperature threshold for the GPU in degrees Celsius")
+	RootCmd.PersistentFlags().
+		IntP("gpu_temp_threshold", "g", defaultGPUTempThreshold, "Temperature threshold for the GPU in degrees Celsius")
 	err = viper.BindPFlag("gpu_temp_threshold", RootCmd.PersistentFlags().Lookup("gpu_temp_threshold"))
 	cobra.CheckErr(err)
 
@@ -72,11 +73,13 @@ func init() {
 	err = viper.BindPFlag("always_use_native_hashcat", RootCmd.PersistentFlags().Lookup("always_use_native_hashcat"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().DurationP("sleep_on_failure", "s", defaultSleepOnFailure, "Duration of sleep after a task failure")
+	RootCmd.PersistentFlags().
+		DurationP("sleep_on_failure", "s", defaultSleepOnFailure, "Duration of sleep after a task failure")
 	err = viper.BindPFlag("sleep_on_failure", RootCmd.PersistentFlags().Lookup("sleep_on_failure"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().StringP("files_path", "f", "", "Path to the directory where the agent will store task files")
+	RootCmd.PersistentFlags().
+		StringP("files_path", "f", "", "Path to the directory where the agent will store task files")
 	err = viper.BindPFlag("files_path", RootCmd.PersistentFlags().Lookup("files_path"))
 	cobra.CheckErr(err)
 
@@ -84,19 +87,23 @@ func init() {
 	err = viper.BindPFlag("extra_debugging", RootCmd.PersistentFlags().Lookup("extra_debugging"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().IntP("status_timer", "t", defaultStatusTimer, "Interval in seconds for sending status updates to the server")
+	RootCmd.PersistentFlags().
+		IntP("status_timer", "t", defaultStatusTimer, "Interval in seconds for sending status updates to the server")
 	err = viper.BindPFlag("status_timer", RootCmd.PersistentFlags().Lookup("status_timer"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().DurationP("heartbeat_interval", "", defaultHeartbeatInterval, "Interval between heartbeat messages to the server")
+	RootCmd.PersistentFlags().
+		DurationP("heartbeat_interval", "", defaultHeartbeatInterval, "Interval between heartbeat messages to the server")
 	err = viper.BindPFlag("heartbeat_interval", RootCmd.PersistentFlags().Lookup("heartbeat_interval"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().BoolP("write_zaps_to_file", "w", false, "Write zap output to a file in the zaps directory")
+	RootCmd.PersistentFlags().
+		BoolP("write_zaps_to_file", "w", false, "Write zap output to a file in the zaps directory")
 	err = viper.BindPFlag("write_zaps_to_file", RootCmd.PersistentFlags().Lookup("write_zaps_to_file"))
 	cobra.CheckErr(err)
 
-	RootCmd.PersistentFlags().StringP("zap_path", "z", "", "Path to the directory where the agent will store zap output files")
+	RootCmd.PersistentFlags().
+		StringP("zap_path", "z", "", "Path to the directory where the agent will store zap output files")
 	err = viper.BindPFlag("zap_path", RootCmd.PersistentFlags().Lookup("zap_path"))
 	cobra.CheckErr(err)
 

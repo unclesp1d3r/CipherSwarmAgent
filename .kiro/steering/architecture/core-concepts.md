@@ -1,6 +1,7 @@
 ---
 inclusion: always
 ---
+
 # CipherSwarmAgent: Core Concepts & Structure
 
 ## Project Overview
@@ -14,13 +15,13 @@ inclusion: always
 
 - `cmd/` — CLI entrypoint and command registration (Cobra)
 - `lib/` — Core agent logic and utilities
-    - `agentClient.go` — Main agent logic, server communication, task lifecycle
-    - `benchmarkManager.go` — Benchmarking logic
-    - `clientUtils.go` — File, process, and environment utilities
-    - `dataTypes.go` — Core data structures (agent config, benchmark results)
-    - `hashcat/` — Hashcat session management, parameterization, and result parsing
-    - `arch/` — OS-specific abstractions (device detection, binary handling)
-    - `utils/` — Reusable utilities (e.g., progress tracking)
+  - `agentClient.go` — Main agent logic, server communication, task lifecycle
+  - `benchmarkManager.go` — Benchmarking logic
+  - `clientUtils.go` — File, process, and environment utilities
+  - `dataTypes.go` — Core data structures (agent config, benchmark results)
+  - `hashcat/` — Hashcat session management, parameterization, and result parsing
+  - `arch/` — OS-specific abstractions (device detection, binary handling)
+  - `utils/` — Reusable utilities (e.g., progress tracking)
 - `shared/` — Global state, logging, and shared types
 - `.github/` — Issue templates and CI workflows
 - `Dockerfile` — Container build for agent deployment

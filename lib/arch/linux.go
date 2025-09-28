@@ -84,7 +84,7 @@ func GetPlatform() string {
 //
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
-func Extract7z(srcFile string, destDir string) error {
+func Extract7z(srcFile, destDir string) error {
 	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output()
 	return err
 }

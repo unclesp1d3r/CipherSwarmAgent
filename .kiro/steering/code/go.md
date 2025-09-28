@@ -2,6 +2,7 @@
 inclusion: fileMatch
 fileMatchPattern: '*.go'
 ---
+
 # Go Best Practices for CipherSwarmAgent
 
 This document distills Go best practices for backend agent development, tailored to CipherSwarmAgent.
