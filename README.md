@@ -8,8 +8,13 @@ The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecos
 
 - **Command-Line Interface**: Utilizes the Cobra library for easy configuration and operation through command-line commands.
 - **Efficient Task Management**: Streamlines the distribution and execution of hash-cracking tasks across distributed systems.
+- **Enhanced Task Monitoring**: Real-time system metrics collection (CPU, memory, GPU temperature, disk space) with configurable thresholds.
+- **Automatic Recovery**: Built-in recovery mechanisms for network failures, process crashes, and resource threshold violations.
+- **Task State Persistence**: Robust task state management with automatic recovery on agent restart.
 - **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks efficiently.
 - **Secure Communication**: Ensures safe and reliable communication with the CipherSwarm server for task distribution and result submission.
+- **Cross-Platform Support**: Native support for Linux, macOS, and Windows with platform-specific optimizations.
+- **Idiomatic SDK**: Internal SDK implementation providing better control over API interactions and enhanced error handling.
 
 > [!CAUTION]
 > This project is currently under active development and is not ready for production. Please use it with caution. Do not trust anything until v1.0.0 is released since the API may change at any time.
@@ -20,7 +25,7 @@ Follow these instructions to set up and run the CipherSwarm Agent in your enviro
 
 ### Prerequisites
 
-- Go 1.22 or higher
+- Go 1.24 or higher
 - Git (for cloning the repository)
 - Docker (optional for running the agent in a container)
 - A [CipherSwarm](https://github.com/unclesp1d3r/CipherSwarm) server to connect to (e.g., a local or remote instance)
@@ -50,12 +55,15 @@ The easiest way to configure the agent is by providing the required parameters a
 Optional configuration options include:
 
 - `DATA_PATH`: The path to the directory where the agent will store data, such as task files and results. By default, this is set to "data" in the current directory.
-- `GPU_TEMP_THRESHOLD`: The temperature threshold for the GPU is degrees Celsius. If the GPU temperature exceeds this threshold, the agent will pause task execution until the temperature drops below the threshold. By default, this is set to 80 degrees Celsius.
+- `GPU_TEMP_THRESHOLD`: The temperature threshold for the GPU in degrees Celsius. If the GPU temperature exceeds this threshold, the agent will pause task execution until the temperature drops below the threshold. By default, this is set to 80 degrees Celsius.
 - `ALWAYS_USE_NATIVE_HASHCAT`: If set to true, the agent will always use the native hashcat binary on the local system for task execution, even if a custom binary is provided in the web interface. By default, this is set to false.
 - `SLEEP_ON_FAILURE`: A duration of sleep after a task failure. By default, this is set to 60 seconds.
 - `FILES_PATH`: The path to the directory where the agent will store task files. This is set to "files" in the data directory by default. These files include wordlists, rules, and masks. They can get pretty big, so make sure you have enough space.
 - `EXTRA_DEBUGGING`: The agent will print additional debugging information to the console if set to true. By default, this is set to false.
-- `STATUS_TIMER`: The interval in seconds at which the agent will send status updates to the server. By default, this is set to 3 seconds. This can be increased to reduce the load on the server, but it will also reduce the agent's responsiveness.
+- `STATUS_TIMER`: The interval in seconds at which the agent will send status updates to the server. By default, this is set to 10 seconds. This can be increased to reduce the load on the server, but it will also reduce the agent's responsiveness.
+- `HEARTBEAT_INTERVAL`: The interval between heartbeat messages to the server. By default, this is set to 10 seconds, but the server can override this value via the `agent_update_interval` configuration.
+- `ENABLE_ADDITIONAL_HASH_TYPES`: Enable support for additional hash types during benchmarking. By default, this is set to true.
+- `USE_LEGACY_DEVICE_TECHNIQUE`: Use legacy method for device identification. By default, this is set to false.
 
 Optional configuration options for using the ZAP feature with a shared directory:
 
@@ -78,6 +86,7 @@ The agent can also be configured using command line flags. The following flags a
 - `--files_path` or `-f`: The path to the directory where the agent will store task files.
 - `--extra_debugging` or `-e`: Enable additional debugging information.
 - `--status_timer` or `-t`: Interval in seconds for sending status updates to the server.
+- `--heartbeat_interval`: Interval between heartbeat messages to the server.
 - `--write_zaps_to_file` or `-w`: Write zap output to a file in the zaps directory.
 - `--zap_path` or `-z`: The path to the directory where the agent will store zap output files.
 - `--retain_zaps_on_completion` or `-r`: Retain zap files after completing a task.

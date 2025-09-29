@@ -61,10 +61,11 @@ The agent automatically creates a `cipherswarmagent.yaml` file on first run:
 api_token: your_api_token
 api_url: https://your-server.com:3000
 data_path: /opt/cipherswarm/data
-gpu_temp_threshold: 85
+gpu_temp_threshold: 80
 always_use_native_hashcat: false
 sleep_on_failure: 60s
 files_path: /opt/cipherswarm/data/files
+debug: false
 extra_debugging: false
 status_timer: 10
 heartbeat_interval: 10s  # Note: Server overrides this via agent_update_interval
@@ -73,6 +74,7 @@ zap_path: /opt/cipherswarm/data/zaps
 retain_zaps_on_completion: false
 enable_additional_hash_types: true
 use_legacy_device_technique: false
+always_trust_files: false
 ```
 
 You can specify a custom config file location:
@@ -214,9 +216,10 @@ You can specify a custom config file location:
 
 #### `always_trust_files` / `ALWAYS_TRUST_FILES`
 
+- **Flag**: `--always_trust_files`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Skip checksum verification for downloaded files (not recommended)
+- **Description**: Skip checksum verification for downloaded files (not recommended for security)
 
 ## Configuration Examples
 

@@ -1,0 +1,27 @@
+# CipherSwarmAgent
+
+> A distributed hash-cracking agent for the CipherSwarm ecosystem, built with Go. Manages and executes cryptographic tasks across Linux, macOS, and Windows with real-time monitoring, automatic recovery, and robust task state persistence.
+
+CipherSwarmAgent is a high-performance CLI client that connects to CipherSwarm servers to receive, execute, and report on password cracking tasks using hashcat. The agent features enhanced task monitoring with system metrics collection, automatic recovery mechanisms for network failures and process crashes, and comprehensive task state management for reliable distributed computing.
+
+## Documentation
+
+- [AGENTS](AGENTS.md): Architecture overview and core concepts for AI development assistance
+- [Configuration](docs/configuration.md): Multi-source configuration management with precedence rules and all available options
+- [Contributing](docs/contributing.md): Development workflow, commit standards, and contribution guidelines
+- [Installation](docs/installation.md): Installation methods including binary, Docker, and package manager options
+- [Project Structure](docs/project_structure.md): Codebase organization, module architecture, and development patterns
+- [README](README.md): Main project documentation with features, setup, and quick start guide
+- [Usage](docs/usage.md): Operational guide covering CLI commands, monitoring, troubleshooting, and production deployment
+
+## Specifications
+
+- [Enhanced Task Monitoring Tasks](/.kiro/specs/enhanced-task-monitoring/tasks.md): Implementation plan for monitoring system with metrics collection and recovery
+- [Phase 1 SDK Replacement](docs/v2_implementation_plan/phase_1_replace_sdk.md): SDK migration plan from external to internal implementation
+- [Testing Implementation](docs/v2_implementation_plan/sidequests/testing_implementation.md): Unit testing strategy and implementation checklist
+
+## Optional
+
+- [Cursor Rules](docs/cursorrules.md): Editor-specific development rules and configurations
+- [Documentation Index](docs/index.md): Documentation portal with project overview and feature highlights
+- [SDK Development Rules](.cursor/rules/code/sdk-go.mdc): Go SDK development standards and best practices for internal SDK implementation

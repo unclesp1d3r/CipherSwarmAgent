@@ -61,9 +61,10 @@ cipherswarm-agent.exe
 
 Requirements for building from source:
 
-- **Go 1.22 or higher**
+- **Go 1.24 or higher** (as specified in go.mod)
 - **Git**
 - **Just** command runner (optional but recommended)
+- **UV** (Python package manager for documentation and tooling)
 
 ```bash
 # Clone the repository
