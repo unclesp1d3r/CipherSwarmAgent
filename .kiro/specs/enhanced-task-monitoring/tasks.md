@@ -19,7 +19,7 @@
   - Create WithTimeout and WithRetryConfig option functions
   - _Requirements: 6.1, 6.2_
 
-- [ ] 1.3 Add service initialization to client
+- [x] 1.3 Add service initialization to client
 
   - Create service struct fields in Client (Agent, Task, Attack)
   - Initialize services in NewClient constructor
