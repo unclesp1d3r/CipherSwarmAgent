@@ -145,3 +145,34 @@ func TestSetTimeout(t *testing.T) {
 		t.Errorf("SetTimeout() timeout = %v, want %v", client.httpClient.Timeout, customTimeout)
 	}
 }
+
+func TestServiceInitialization(t *testing.T) {
+	client, err := NewClient("https://api.example.com", "test-token")
+	if err != nil {
+		t.Fatalf("NewClient() unexpected error: %v", err)
+	}
+
+	// Verify Agent service is initialized
+	if client.Agent == nil {
+		t.Error("NewClient() Agent service is nil, expected initialized service")
+	}
+	if client.Agent != nil && client.Agent.client != client {
+		t.Error("NewClient() Agent service client reference is incorrect")
+	}
+
+	// Verify Task service is initialized
+	if client.Task == nil {
+		t.Error("NewClient() Task service is nil, expected initialized service")
+	}
+	if client.Task != nil && client.Task.client != client {
+		t.Error("NewClient() Task service client reference is incorrect")
+	}
+
+	// Verify Attack service is initialized
+	if client.Attack == nil {
+		t.Error("NewClient() Attack service is nil, expected initialized service")
+	}
+	if client.Attack != nil && client.Attack.client != client {
+		t.Error("NewClient() Attack service client reference is incorrect")
+	}
+}

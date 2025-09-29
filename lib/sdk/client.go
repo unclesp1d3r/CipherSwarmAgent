@@ -32,10 +32,10 @@ type Client struct {
 	httpClient  *http.Client
 	retryConfig RetryConfig
 
-	// Service endpoints will be added in future tasks
-	// Agent  *AgentService
-	// Task   *TaskService
-	// Attack *AttackService
+	// Service endpoints
+	Agent  *AgentService
+	Task   *TaskService
+	Attack *AttackService
 }
 
 // NewClient creates a new CipherSwarm SDK client with the provided base URL and authentication token.
@@ -59,6 +59,11 @@ func NewClient(baseURL, token string, opts ...ClientOption) (*Client, error) {
 			Backoff:    DefaultRetryBackoff,
 		},
 	}
+
+	// Initialize services
+	client.Agent = &AgentService{client: client}
+	client.Task = &TaskService{client: client}
+	client.Attack = &AttackService{client: client}
 
 	// Apply all provided options
 	for _, opt := range opts {
@@ -108,4 +113,19 @@ func WithRetryConfig(maxRetries int, backoff time.Duration) ClientOption {
 			Backoff:    backoff,
 		}
 	}
+}
+
+// AgentService provides agent-specific operations.
+type AgentService struct {
+	client *Client
+}
+
+// TaskService provides task-specific operations.
+type TaskService struct {
+	client *Client
+}
+
+// AttackService provides attack-specific operations.
+type AttackService struct {
+	client *Client
 }
