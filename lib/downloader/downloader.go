@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/duke-git/lancet/v2/cryptor"
 	"github.com/duke-git/lancet/v2/strutil"
@@ -215,6 +216,37 @@ func removeExistingFile(filePath string) error {
 // writeResponseToFile writes the data from an io.Reader (responseStream) to a file specified by the filePath.
 // Creates a new file at the given path, writes the response stream to it, and handles errors accordingly.
 func writeResponseToFile(responseStream io.Reader, filePath string) error {
+	// Validate file path for security
+	if !path.IsAbs(filePath) {
+		return fmt.Errorf("file path must be absolute: %s", filePath)
+	}
+
+	// Ensure the file is within allowed directories
+	allowedDirs := []string{
+		shared.State.FilePath,
+		shared.State.CrackersPath,
+		shared.State.HashlistPath,
+		shared.State.ToolsPath,
+	}
+
+	isAllowed := false
+	for _, allowedDir := range allowedDirs {
+		if strings.HasPrefix(filePath, allowedDir) {
+			isAllowed = true
+			break
+		}
+	}
+
+	if !isAllowed {
+		return fmt.Errorf("file path not in allowed directory: %s", filePath)
+	}
+
+	// Check for directory traversal attempts
+	if strings.Contains(filePath, "..") {
+		return fmt.Errorf("directory traversal not allowed in file path: %s", filePath)
+	}
+
+	// #nosec G304 -- filePath is validated above to be absolute, within allowed directory, and free of directory traversal
 	file, err := os.Create(filePath)
 	if err != nil {
 		return errors.Wrap(err, "error creating file")
