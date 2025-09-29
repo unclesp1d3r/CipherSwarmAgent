@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/fileutil"
@@ -94,14 +95,21 @@ func CheckForExistingClient(pidFilePath string) bool {
 			return true
 		}
 
-		pidValue, err := convertor.ToInt(strutil.Trim(pidString))
+		// Use strconv.ParseInt to safely convert the PID string to an int32
+		pidInt64, err := strconv.ParseInt(strutil.Trim(pidString), 10, 32)
 		if err != nil {
-			shared.Logger.Error("Error converting PID to integer", "pid", pidString)
-
+			shared.Logger.Error(
+				"Error converting PID to integer, or PID is too large for int32",
+				"pid",
+				pidString,
+				"error",
+				err,
+			)
 			return true
 		}
+		pidValue := int32(pidInt64)
 
-		pidRunning, err := process.PidExists(int32(pidValue)) //nolint:gosec // PID conversion from file is safe
+		pidRunning, err := process.PidExists(pidValue)
 		if err != nil {
 			shared.Logger.Error("Error checking if process is running", "pid", pidValue)
 
