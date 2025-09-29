@@ -12,15 +12,27 @@ The CipherSwarm Agent is built with Go 1.22+ and follows a modular architecture 
 CipherSwarmAgent/
 ├── cmd/                    # CLI entrypoint and command registration
 ├── lib/                    # Core agent logic and utilities
+│   ├── agent/             # Agent lifecycle management
 │   ├── arch/              # OS-specific abstractions
-│   ├── hashcat/           # Hashcat integration
-│   └── utils/             # Reusable utilities
+│   ├── config/            # Configuration management
+│   ├── cracker/           # Hashcat binary management
+│   ├── cserrors/          # Structured error handling
+│   ├── downloader/        # File download management
+│   ├── hashcat/           # Hashcat integration and session management
+│   ├── progress/          # Progress tracking and monitoring
+│   ├── sdk/               # Internal CipherSwarm API SDK
+│   └── zap/               # Shared crack file management
 ├── shared/                 # Global state and shared types
 ├── docs/                   # Documentation (this directory)
 ├── .github/               # GitHub workflows and templates
 ├── .chglog/               # Changelog configuration
 ├── .cursor/               # Cursor editor configuration
 ├── .devcontainer/         # VS Code dev container
+├── .kiro/                 # Kiro AI assistant configuration
+│   ├── hooks/             # Agent hooks for automation
+│   ├── specs/             # Feature specifications
+│   │   └── enhanced-task-monitoring/  # Enhanced monitoring system spec
+│   └── steering/          # AI steering rules
 ├── Dockerfile             # Container build for agent
 ├── Dockerfile.releaser    # Container for releases
 ├── go.mod                 # Go module definition
@@ -28,6 +40,7 @@ CipherSwarmAgent/
 ├── justfile               # Command runner configuration
 ├── main.go                # Application entrypoint
 ├── mkdocs.yml             # Documentation configuration
+├── package.json           # Node.js dependencies for tooling
 └── README.md              # Project overview
 ```
 
@@ -35,15 +48,23 @@ CipherSwarmAgent/
 
 ### 1. Main Entrypoint (`main.go`)
 
-The application's entry point that delegates to the Cobra CLI framework.
+The application's entry point that uses Charmbracelet Fang for enhanced CLI execution.
 
 ```go
 package main
 
-import "github.com/unclesp1d3r/cipherswarmagent/cmd"
+import (
+    "context"
+    "os"
+    
+    "github.com/charmbracelet/fang"
+    "github.com/unclesp1d3r/cipherswarmagent/cmd"
+)
 
 func main() {
-    cmd.Execute()
+    if err := fang.Execute(context.Background(), cmd.RootCmd); err != nil {
+        os.Exit(1)
+    }
 }
 ```
 
@@ -112,13 +133,14 @@ The main business logic of the agent, organized by functional area:
   - `fileExistsAndValid()`: File validation
   - `writeCrackedHashToFile()`: Result file management
 
-#### `lib/clientUtils.go`
+#### `lib/agent/agent.go`
 
-- **Purpose**: System utilities and helper functions
+- **Purpose**: Agent lifecycle management and coordination
 - **Key Functions**:
-  - `findHashcatBinary()`: Locate Hashcat executable
-  - `CreateLockFile()`: Process management
-  - `CreateDataDirs()`: Directory structure setup
+  - `StartAgent()`: Main agent initialization and startup
+  - `startHeartbeatLoop()`: Heartbeat management
+  - `startAgentLoop()`: Main agent processing loop
+  - `processTask()`: Task processing coordination
 
 #### `lib/crackerUtils.go`
 
@@ -151,7 +173,73 @@ The main business logic of the agent, organized by functional area:
   - `benchmarkResult`: Performance data
   - Type conversion utilities
 
-### 4. Hashcat Integration (`lib/hashcat/`)
+### 4. SDK Implementation (`lib/sdk/`)
+
+Internal idiomatic SDK for CipherSwarm API interactions:
+
+#### `lib/sdk/client.go`
+
+- **Purpose**: Main SDK client with service-oriented design
+- **Key Types**:
+  - `Client`: Main client with Agent, Task, and Attack services
+  - `ClientOption`: Configuration options using functional options pattern
+- **Key Functions**:
+  - `NewClient()`: Create configured client with options
+  - `WithTimeout()`, `WithRetryConfig()`: Configuration options
+
+#### `lib/sdk/client_test.go`
+
+- **Purpose**: Comprehensive unit tests for SDK client
+- **Coverage**: Client creation, options, service initialization, error handling
+
+### 5. Configuration Management (`lib/config/`)
+
+Advanced configuration management system:
+
+#### `lib/config/config.go`
+
+- **Purpose**: Multi-source configuration management
+- **Key Functions**:
+  - `InitConfig()`: Initialize configuration from files, env vars, and CLI flags
+  - `SetupSharedState()`: Configure shared state from configuration
+  - `SetDefaultConfigValues()`: Set sensible defaults
+
+### 6. Agent Management (`lib/agent/`)
+
+Agent lifecycle and coordination:
+
+#### `lib/agent/agent.go`
+
+- **Purpose**: Main agent orchestration and lifecycle management
+- **Key Functions**:
+  - `StartAgent()`: Complete agent initialization and startup
+  - Signal handling and graceful shutdown
+  - Heartbeat and task processing loops
+
+### 7. Error Handling (`lib/cserrors/`)
+
+Structured error handling and reporting:
+
+#### `lib/cserrors/errors.go`
+
+- **Purpose**: Centralized error management with server reporting
+- **Features**: Structured error types, severity levels, context preservation
+
+### 8. File Management (`lib/downloader/`, `lib/cracker/`)
+
+Secure file operations and binary management:
+
+#### `lib/downloader/downloader.go`
+
+- **Purpose**: Secure file downloads with checksum verification
+- **Features**: Progress tracking, retry logic, integrity validation
+
+#### `lib/cracker/cracker.go`
+
+- **Purpose**: Hashcat binary management and updates
+- **Features**: Binary downloads, version management, platform detection
+
+### 9. Hashcat Integration (`lib/hashcat/`)
 
 Specialized module for Hashcat process management:
 
@@ -184,7 +272,29 @@ Specialized module for Hashcat process management:
   - `Result`: Cracked hash results
   - `StatusDevice`: GPU/CPU device status
 
-### 5. OS Abstractions (`lib/arch/`)
+### 10. Progress Tracking (`lib/progress/`)
+
+Real-time progress monitoring and tracking:
+
+#### `lib/progress/progress_tracking.go`
+
+- **Purpose**: Download and task progress monitoring
+- **Features**: Real-time progress bars, concurrent tracking, terminal-friendly display
+
+#### `lib/progress/utils.go`
+
+- **Purpose**: Progress tracking utilities and helpers
+
+### 11. ZAP Integration (`lib/zap/`)
+
+Shared crack file management:
+
+#### `lib/zap/zap.go`
+
+- **Purpose**: ZAP (Zero Application Performance) file management
+- **Features**: Shared crack file handling, multi-agent coordination
+
+### 12. OS Abstractions (`lib/arch/`)
 
 Platform-specific functionality for cross-platform support:
 
@@ -213,29 +323,41 @@ Platform-specific functionality for cross-platform support:
 - `Extract7z()`: Archive extraction
 - `GetDefaultHashcatBinaryName()`: Platform binary names
 
-### 6. Utilities (`lib/utils/`)
+### 13. Legacy Core Files
 
-#### `lib/utils/progress_tracking.go`
+#### `lib/agentClient.go`
 
-- **Purpose**: Download progress monitoring
-- **Key Types**:
-  - `progressBar`: Progress display management
-- **Features**:
-  - Real-time download progress
-  - Multiple concurrent progress bars
-  - Terminal-friendly display
+- **Purpose**: Primary agent logic and server communication (being enhanced)
+- **Key Functions**:
+  - `AuthenticateAgent()`: Server authentication using SDK
+  - `GetAgentConfiguration()`: Fetch server configuration
+  - `UpdateAgentMetadata()`: Send agent info to server
+  - `SendHeartBeat()`: Periodic health check with enhanced state handling
 
-### 7. Shared State (`shared/`)
+#### `lib/taskManager.go`
+
+- **Purpose**: Task lifecycle management (being enhanced with monitoring)
+- **Key Functions**:
+  - `GetNewTask()`: Poll for available tasks
+  - `AcceptTask()`: Accept and prepare task
+  - `RunTask()`: Execute task with enhanced monitoring
+
+#### `lib/benchmarkManager.go`
+
+- **Purpose**: Device benchmarking and capability detection
+- **Features**: Performance benchmarks, device detection, capability reporting
+
+### 14. Shared State (`shared/`)
 
 #### `shared/shared.go`
 
 - **Purpose**: Global application state and configuration
 - **Key Types**:
-  - `agentState`: Runtime state management
+  - `agentState`: Runtime state management with enhanced monitoring support
   - `activity`: Current agent activity enum
 - **Global Variables**:
-  - `State`: Shared agent state
-  - `Logger`: Application logger
+  - `State`: Shared agent state with enhanced configuration
+  - `Logger`: Application logger with structured logging
   - `ErrorLogger`: Error-specific logger
 
 ## Architecture Patterns
@@ -396,15 +518,23 @@ When adding platform-specific code:
 ### Core Dependencies
 
 - **Cobra**: CLI framework and command parsing
-- **Viper**: Configuration management
-- **Loguru**: Structured logging
-- **CipherSwarm SDK**: API client library
+- **Viper**: Configuration management with multi-source support
+- **Charmbracelet Log**: Structured logging with enhanced formatting
+- **Charmbracelet Fang**: Enhanced CLI execution framework
+- **Internal SDK**: Idiomatic CipherSwarm API client (replacing external SDK)
+- **Shirou gopsutil**: System and process utilities for cross-platform monitoring
+- **Hashicorp go-getter**: Secure file downloading with multiple protocols
+- **Cheggaaa pb**: Progress bar library for download tracking
 
 ### Build Dependencies
 
-- **GoReleaser**: Release automation
-- **Just**: Command runner
-- **MkDocs**: Documentation generation
+- **GoReleaser**: Release automation and cross-platform builds
+- **Just**: Command runner for development tasks
+- **MkDocs Material**: Documentation generation with enhanced theming
+- **UV**: Python package manager for documentation tooling
+- **Pre-commit**: Git hooks for code quality
+- **Commitlint**: Conventional commit message validation
+- **golangci-lint**: Comprehensive Go linting
 
 ### Optional Dependencies
 
@@ -425,6 +555,32 @@ When adding platform-specific code:
 - **Network Attacks**: TLS and authentication protect API communication
 - **File System Attacks**: Restricted file operations and validation
 - **Process Attacks**: Secure process management and cleanup
+
+## Current Development Status
+
+### Completed Features
+
+- ✅ **Basic Agent Functionality**: Core task processing and API communication
+- ✅ **Cross-Platform Support**: Linux, macOS, and Windows compatibility
+- ✅ **Configuration Management**: Multi-source configuration with Viper
+- ✅ **Hashcat Integration**: Process management and result parsing
+- ✅ **Docker Support**: Containerized deployment with pre-built images
+- ✅ **SDK Foundation**: Basic internal SDK structure implemented
+
+### In Progress (Enhanced Task Monitoring)
+
+- 🚧 **Idiomatic SDK**: Replacing external SDK with internal implementation
+- 🚧 **Real-time Monitoring**: System metrics collection and threshold management
+- 🚧 **Automatic Recovery**: Network failure and process crash recovery
+- 🚧 **State Persistence**: Task state management and recovery on restart
+- 🚧 **Enhanced Error Handling**: Structured error reporting with context
+
+### Planned Features
+
+- 📋 **Task History Analytics**: Performance tracking and trend analysis
+- 📋 **Advanced Monitoring**: Per-device thresholds and custom rules
+- 📋 **Configuration Reload**: Runtime configuration updates without restart
+- 📋 **Language Migration Support**: Preparation for future language migration
 
 ## Contributing
 

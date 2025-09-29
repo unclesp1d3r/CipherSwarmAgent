@@ -8,18 +8,22 @@ The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecos
 ## Features
 
 - **Command-Line Interface**: Utilizes the Cobra library for easy configuration and operation through command-line commands.
-- **Efficient Task Management**: Streamlines the distribution and execution of hash-cracking tasks across distributed systems.
+- **Enhanced Task Management**: Streamlines the distribution and execution of hash-cracking tasks with comprehensive monitoring and recovery capabilities.
+- **Real-Time Monitoring**: System metrics collection (CPU, memory, GPU temperature, disk space) with configurable thresholds and automatic throttling.
+- **Automatic Recovery**: Built-in recovery mechanisms for network failures, process crashes, and resource threshold violations with exponential backoff.
+- **Task State Persistence**: Robust task state management with JSON-based persistence and automatic recovery on agent restart.
 - **Scalable and High-Performance**: Optimized for performance and scalability, handling heavy computational tasks efficiently.
 - **Secure Communication**: Ensures safe and reliable communication with the CipherSwarm server for task distribution and result submission.
-- **Cross-Platform Support**: Designed for Linux, macOS, and Windows operation.
+- **Cross-Platform Support**: Native support for Linux, macOS, and Windows with platform-specific optimizations.
 - **Docker Support**: Pre-built Docker images with Hashcat and dependencies included.
-- **Flexible Configuration**: Environment variables, CLI flags, and YAML configuration file support.
+- **Flexible Configuration**: Environment variables, CLI flags, and YAML configuration file support with runtime reload capabilities.
+- **Idiomatic SDK**: Internal SDK implementation providing better control over API interactions and enhanced error handling.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.22 or higher
+- Go 1.24 or higher
 - Git (for cloning the repository)
 - Docker (optional for running the agent in a container)
 - A [CipherSwarm](https://github.com/unclesp1d3r/CipherSwarm) server to connect to
@@ -59,14 +63,20 @@ docker run -e API_TOKEN=your_api_token \
 
 ## Architecture Overview
 
-The CipherSwarm Agent follows a modular architecture:
+The CipherSwarm Agent follows a modular, enhanced architecture with comprehensive monitoring and recovery capabilities:
 
-- **CLI Interface** (`cmd/`): Command-line entrypoint using Cobra
-- **Core Logic** (`lib/`): Main agent functionality and utilities
-- **Hashcat Integration** (`lib/hashcat/`): Session management and result parsing
+- **CLI Interface** (`cmd/`): Command-line entrypoint using Cobra with enhanced configuration options
+- **Core Logic** (`lib/`): Main agent functionality and utilities with enhanced task management
+- **SDK Implementation** (`lib/sdk/`): Internal idiomatic SDK for CipherSwarm API interactions
+- **Agent Management** (`lib/agent/`): Agent lifecycle management and coordination
+- **Configuration** (`lib/config/`): Advanced configuration management with runtime reload
+- **Hashcat Integration** (`lib/hashcat/`): Session management, parameter handling, and result parsing
 - **OS Abstractions** (`lib/arch/`): Platform-specific device detection and binary handling
-- **Utilities** (`lib/utils/`): Reusable components like progress tracking
-- **Shared State** (`shared/`): Global configuration and logging
+- **Monitoring** (`lib/progress/`): Real-time progress tracking and system monitoring
+- **Error Handling** (`lib/cserrors/`): Structured error handling and reporting
+- **File Management** (`lib/downloader/`, `lib/cracker/`): Secure file operations and hashcat binary management
+- **ZAP Integration** (`lib/zap/`): Shared crack file management
+- **Shared State** (`shared/`): Global configuration and logging with enhanced state management
 
 ## Getting Help
 

@@ -89,25 +89,28 @@ During graceful shutdown, the agent:
 
 ### Agent States
 
-The agent operates in several states:
+The agent operates in several states with enhanced monitoring:
 
 - **Starting**: Initial startup and configuration loading
 - **Authenticating**: Connecting to and authenticating with server
-- **Benchmarking**: Running initial device benchmarks
-- **Waiting**: Idle, checking for new tasks
-- **Cracking**: Actively processing a hash-cracking task
+- **Benchmarking**: Running initial device benchmarks with performance tracking
+- **Waiting**: Idle, checking for new tasks with system monitoring
+- **Cracking**: Actively processing a hash-cracking task with real-time monitoring
 - **Updating**: Downloading updated Hashcat binaries
-- **Stopping**: Graceful shutdown in progress
-- **Error**: Encountered a fatal error
+- **Stopping**: Graceful shutdown in progress with cleanup
+- **Error**: Encountered a fatal error with detailed reporting
 
 ### Task Lifecycle
 
 1. **Task Discovery**: Agent polls server for available tasks
-2. **Task Acceptance**: Agent accepts a task and downloads required files
-3. **Task Execution**: Agent runs Hashcat with specified parameters
-4. **Progress Reporting**: Agent sends periodic status updates
-5. **Result Submission**: Agent reports cracked hashes as they're found
-6. **Task Completion**: Agent marks task as complete or exhausted
+2. **Task Acceptance**: Agent accepts a task and downloads required files with integrity verification
+3. **Task State Persistence**: Agent saves task state for recovery capabilities
+4. **Task Execution**: Agent runs Hashcat with specified parameters and monitoring
+5. **Real-time Monitoring**: Agent continuously monitors system resources and performance
+6. **Progress Reporting**: Agent sends periodic status updates with enhanced metrics
+7. **Result Submission**: Agent reports cracked hashes as they're found
+8. **Recovery Handling**: Agent automatically handles failures and resource threshold violations
+9. **Task Completion**: Agent marks task as complete or exhausted and cleans up state
 
 ## Monitoring and Observability
 
@@ -140,7 +143,7 @@ INFO [Task 123] Task completed successfully
 
 ### Monitoring File Structure
 
-The agent creates several files for monitoring:
+The agent creates several files for monitoring and state management:
 
 ```text
 data/
@@ -150,8 +153,39 @@ data/
 ├── hashlists/           # Downloaded hash lists
 ├── files/               # Attack files (wordlists, rules, masks)
 ├── zaps/                # Shared crack files (if enabled)
-└── restore/             # Hashcat restore files
+├── restore/             # Hashcat restore files
+├── states/              # Task state persistence (planned)
+├── crackers/            # Downloaded hashcat binaries
+├── preprocessors/       # Preprocessing tools
+└── tools/               # Additional tools and utilities
 ```
+
+### Enhanced Monitoring Features
+
+The agent includes comprehensive monitoring capabilities:
+
+#### System Metrics Collection
+
+- **CPU Usage**: Real-time CPU utilization monitoring
+- **Memory Usage**: RAM usage tracking with configurable thresholds
+- **GPU Temperature**: Continuous GPU temperature monitoring with automatic throttling
+- **GPU Utilization**: GPU usage percentage and memory consumption
+- **Disk Space**: Available disk space monitoring with alerts
+- **Hash Rate**: Real-time hash rate tracking and performance metrics
+
+#### Automatic Recovery
+
+- **Network Failures**: Exponential backoff retry logic for API connectivity issues
+- **Process Crashes**: Automatic hashcat process restart with state recovery
+- **Resource Thresholds**: Automatic task pausing when temperature/memory limits exceeded
+- **State Persistence**: Task state saved to disk for recovery after unexpected shutdowns
+
+#### Configurable Thresholds
+
+- **GPU Temperature**: Default 80°C, configurable per-device
+- **Memory Usage**: Configurable memory usage limits
+- **Disk Space**: Minimum free space requirements
+- **Custom Rules**: Per-device and per-task threshold configuration
 
 ### Health Checks
 
