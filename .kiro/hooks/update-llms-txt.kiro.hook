@@ -4,7 +4,7 @@
   "description": "Automatically updates the llms.txt file to reflect current documentation and specifications following the llms.txt specification at https://llmstxt.org/",
   "version": "1",
   "when": {
-    "type": "fileEdited",
+    "type": "userTriggered",
     "patterns": [
       "README.md",
       "AGENTS.md",
