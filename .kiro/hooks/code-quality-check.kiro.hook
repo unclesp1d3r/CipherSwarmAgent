@@ -1,0 +1,24 @@
+{
+  "enabled": true,
+  "name": "Code Quality Validator",
+  "description": "Automatically runs `just check` to validate formatting, linting, and basic compilation when code files are saved. If formatting changes are made on the first run, it will run again to ensure all issues are resolved.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "*.go",
+      "*.md",
+      "*.yml",
+      "*.yaml",
+      "*.json",
+      "*.js",
+      "*.ts",
+      "justfile",
+      "Dockerfile"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A code file has been saved. Run `just check` to validate formatting, linting, and basic compilation. If the first run makes formatting changes, run it again to ensure all issues are resolved. If there are still issues after the second run, fix them and run it again. Report the results and any issues that need attention."
+  }
+}

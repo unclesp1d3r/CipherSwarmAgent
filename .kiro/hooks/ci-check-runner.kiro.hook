@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+  "name": "CI Check Runner",
+  "description": "Automatically runs `just ci-check` when Go source files, configuration files, or build files are modified to ensure code quality, formatting, linting, compilation, tests, security audits, and license compliance",
+  "version": "1",
+  "when": {
+    "type": "userTriggered",
+    "patterns": [
+      "*.go",
+      "go.mod",
+      "go.sum",
+      "justfile",
+      ".golangci.yml",
+      ".pre-commit-config.yaml",
+      "Dockerfile",
+      "main.go",
+      "cmd/**/*.go",
+      "lib/**/*.go",
+      "shared/**/*.go"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run `just ci-check` to perform comprehensive CI checks including formatting, linting, compilation errors, test failures, security audits, and license compliance issues. Fix any failures that are reported."
+  }
+}

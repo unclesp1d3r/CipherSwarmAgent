@@ -1,0 +1,28 @@
+{
+  "enabled": true,
+  "name": "Manual Documentation Sync",
+  "description": "When manually triggered, examines all source files, configuration files, and project metadata for changes and updates the overview documentation in README.md and user-facing manual in docs/ folder to keep them synchronized with code changes",
+  "version": "1",
+  "when": {
+    "type": "userTriggered",
+    "patterns": [
+      "**/*.go",
+      "**/*.yml",
+      "**/*.yaml",
+      "**/*.json",
+      "**/*.md",
+      "go.mod",
+      "go.sum",
+      "Dockerfile",
+      "justfile",
+      "package.json",
+      "mkdocs.yml",
+      ".gitignore",
+      ".dockerignore"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Examine all source files (Go code in cmd/, lib/, shared/), configuration files (YAML, JSON, Docker, justfile, package.json, mkdocs.yml), and project metadata (go.mod, go.sum, .gitignore, etc.) for recent changes. Based on any code structure changes, new features, configuration updates, or architectural modifications, update the README.md overview documentation and the user-facing manual files in the docs/ folder (including docs/index.md, docs/usage.md, docs/configuration.md, docs/installation.md, docs/project_structure.md) to ensure they accurately reflect the current state of the CipherSwarmAgent project. Focus on keeping the documentation synchronized with actual implementation details, API changes, new CLI commands, configuration options, and project structure modifications."
+  }
+}
