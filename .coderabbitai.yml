@@ -1,15 +1,16 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: en-US
-tone_instructions: ''
-early_access: false
+tone_instructions: 'Focus on Go best practices, security, and performance. Be concise and technical.'
+early_access: true
 enable_free_tier: true
 reviews:
-  profile: chill
+  profile: assertive
   request_changes_workflow: false
   high_level_summary: true
   high_level_summary_placeholder: '@coderabbitai summary'
-  high_level_summary_in_walkthrough: false
+  high_level_summary_in_walkthrough: true
   auto_title_placeholder: '@coderabbitai'
-  auto_title_instructions: ''
+  auto_title_instructions: 'Generate concise titles focusing on Go changes, security, or performance. Use conventional commits format.'
   review_status: true
   commit_status: true
   fail_commit_status: false
@@ -21,20 +22,70 @@ reviews:
   related_issues: true
   related_prs: true
   suggested_labels: true
-  auto_apply_labels: false
+  auto_apply_labels: true
   suggested_reviewers: true
   auto_assign_reviewers: false
   in_progress_fortune: true
   poem: true
-  labeling_instructions: []
-  path_filters: []
-  path_instructions: []
+  labeling_instructions: 
+    - label: 'bug'
+      instructions: 'Apply when changes contain fixes for bugs, address error handling or edge cases, or fix security vulnerabilities'
+    - label: 'enhancement'
+      instructions: 'Apply when changes add new features, improve existing capabilities, or add new API endpoints or methods'
+    - label: 'documentation'
+      instructions: 'Apply when changes update README, docs, comments, improve code documentation, or add/update API documentation'
+    - label: 'refactoring'
+      instructions: 'Apply when changes involve code restructuring without changing functionality, improve code organization or readability, or remove code duplication'
+    - label: 'technical-debt'
+      instructions: 'Apply when changes address code quality issues, improve error handling patterns, or update deprecated dependencies'
+    - label: 'go'
+      instructions: 'Apply when changes affect Go source code, update Go dependencies, or include Go-specific improvements'
+    - label: 'github_actions'
+      instructions: 'Apply when changes update CI/CD workflows, modify .github/workflows files, or improve build/deployment processes'
+    - label: 'hashcat'
+      instructions: 'Apply when changes affect hashcat integration, update lib/hashcat directory, or improve hashcat process management'
+    - label: 'dependencies'
+      instructions: 'Apply when changes update go.mod or go.sum, add/remove dependencies, or update third-party libraries'
+    - label: 'security'
+      instructions: 'Apply when changes address security vulnerabilities, improve authentication/authorization, or enhance security measures'
+    - label: 'performance'
+      instructions: 'Apply when changes optimize performance, reduce memory usage, improve concurrency, or enhance execution speed'
+    - label: 'api'
+      instructions: 'Apply when changes affect API client interactions, server communication, HTTP requests, or API contract changes'
+    - label: 'testing'
+      instructions: 'Apply when changes add/improve tests, increase test coverage, fix test issues, or enhance test infrastructure'
+    - label: 'docker'
+      instructions: 'Apply when changes affect Dockerfiles, container configuration, build processes, or deployment containerization'
+  path_filters: 
+    - '**/*.go'
+    - '**/go.mod'
+    - '**/go.sum'
+    - '**/Dockerfile*'
+    - '**/justfile'
+    - '**/.github/workflows/*.yml'
+    - '**/docs/**/*.md'
+    - '**/AGENTS.md'
+    - '**/CHANGELOG.md'
+    - '**/README.md'
+  path_instructions: 
+    - path: '**/*.go'
+      instructions: 'Focus on Go best practices, error handling, concurrency patterns, and security. Check for proper context usage, resource cleanup, and goroutine safety.'
+    - path: '**/lib/hashcat/**'
+      instructions: 'Pay special attention to process management, resource cleanup, and error handling for hashcat integration.'
+    - path: '**/lib/agent/**'
+      instructions: 'Review agent lifecycle management, API interactions, and proper error handling for distributed systems.'
+    - path: '**/lib/arch/**'
+      instructions: 'Check platform-specific implementations for proper abstraction and cross-platform compatibility.'
+    - path: '**/Dockerfile*'
+      instructions: 'Review for security best practices, minimal attack surface, and proper Go build optimization.'
+    - path: '**/.github/workflows/*.yml'
+      instructions: 'Ensure CI/CD follows Go best practices and security scanning.'
   abort_on_close: true
   disable_cache: false
   auto_review:
     enabled: true
     auto_incremental_review: true
-    ignore_title_keywords: []
+    ignore_title_keywords: ['WIP']
     labels: []
     drafts: false
     base_branches: []
@@ -50,12 +101,22 @@ reviews:
       threshold: 80
     title:
       mode: warning
-      requirements: ''
+      requirements: 'Title must follow conventional commits format: <type>(<scope>): <description>. Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore. Scope should be a noun describing the affected part (e.g., cli, api, hashcat, agent, arch). Description should be concise and imperative mood.'
     description:
       mode: warning
     issue_assessment:
       mode: warning
-    custom_checks: []
+    custom_checks: 
+      - name: 'Go Error Handling Check'
+        instructions: 'Ensure proper error handling patterns: use fmt.Errorf with %w verb, return errors from functions that can fail, avoid ignoring errors with _, use context.Context for cancellation'
+      - name: 'Concurrency Safety & Effectiveness Check'
+        instructions: 'Verify safe and effective concurrent programming: protect shared state with mutexes/channels, avoid data races, use proper context cancellation, ensure resource cleanup in goroutines. Ensure agent remains responsive during long operations like file downloads by using goroutines for blocking I/O operations, implement proper progress reporting, and avoid blocking the main agent loop'
+      - name: 'API Contract Compliance'
+        instructions: 'Ensure API interactions follow v1 Agent API contract: use proper HTTP methods/endpoints, match request/response structures, implement exponential backoff, handle API failures'
+      - name: 'Resource Management Check'
+        instructions: 'Verify proper resource cleanup: use defer statements, close files/connections/processes properly, check for memory leaks, properly terminate hashcat processes'
+      - name: 'Security Best Practices'
+        instructions: 'Ensure security best practices: no hardcoded secrets, use secure HTTP clients, validate input parameters, implement proper authentication'
   tools:
     ast-grep:
       rule_dirs: []
@@ -65,7 +126,7 @@ reviews:
     shellcheck:
       enabled: true
     ruff:
-      enabled: true
+      enabled: false
     markdownlint:
       enabled: true
     github-checks:
@@ -80,18 +141,18 @@ reviews:
       enabled_only: false
       level: default
     biome:
-      enabled: true
+      enabled: false
     hadolint:
       enabled: true
     swiftlint:
-      enabled: true
+      enabled: false
     phpstan:
-      enabled: true
+      enabled: false
       level: default
     phpmd:
-      enabled: true
+      enabled: false
     phpcs:
-      enabled: true
+      enabled: false
     golangci-lint:
       enabled: true
     yamllint:
@@ -101,47 +162,47 @@ reviews:
     checkov:
       enabled: true
     detekt:
-      enabled: true
+      enabled: false
     eslint:
-      enabled: true
+      enabled: false
     flake8:
-      enabled: true
+      enabled: false
     rubocop:
-      enabled: true
+      enabled: false
     buf:
-      enabled: true
+      enabled: false
     regal:
-      enabled: true
+      enabled: false
     actionlint:
       enabled: true
     pmd:
-      enabled: true
+      enabled: false
     cppcheck:
-      enabled: true
+      enabled: false
     semgrep:
       enabled: true
     circleci:
       enabled: true
     clippy:
-      enabled: true
+      enabled: false
     sqlfluff:
-      enabled: true
+      enabled: false
     prismaLint:
-      enabled: true
+      enabled: false
     pylint:
-      enabled: true
+      enabled: false
     oxc:
-      enabled: true
+      enabled: false
     shopifyThemeCheck:
-      enabled: true
+      enabled: false
     luacheck:
-      enabled: true
+      enabled: false
     brakeman:
-      enabled: true
+      enabled: false
     dotenvLint:
       enabled: true
     htmlhint:
-      enabled: true
+      enabled: false
     checkmake:
       enabled: true
     osvScanner:
@@ -151,34 +212,42 @@ chat:
   auto_reply: true
   integrations:
     jira:
-      usage: auto
+      usage: disabled
     linear:
-      usage: auto
+      usage: disabled
 knowledge_base:
   opt_out: false
   web_search:
     enabled: true
   code_guidelines:
     enabled: true
-    filePatterns: []
+    filePatterns: 
+      - '**/*.go'
+      - '**/Dockerfile*'
+      - '**/justfile'
+      - '**/.github/workflows/*.yml'
   learnings:
     scope: auto
   issues:
     scope: auto
   jira:
-    usage: auto
+    usage: disabled
     project_keys: []
   linear:
-    usage: auto
+    usage: disabled
     team_keys: []
   pull_requests:
     scope: auto
   mcp:
-    usage: auto
+    usage: enabled
     disabled_servers: []
 code_generation:
   docstrings:
     language: en-US
-    path_instructions: []
+    path_instructions: 
+      - path: '**/*.go'
+        instructions: 'Generate Go-style docstrings following godoc conventions. Include parameter descriptions, return values, and examples where appropriate. Focus on exported functions and types.'
   unit_tests:
-    path_instructions: []
+    path_instructions: 
+      - path: '**/*.go'
+        instructions: 'Generate comprehensive Go unit tests using table-driven tests where appropriate. Include test cases for error conditions, edge cases, and concurrent scenarios. Use testify/assert for assertions and mock external dependencies.'
