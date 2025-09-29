@@ -7,7 +7,7 @@
   - Define idiomatic data types and error handling
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 1.1 Create basic SDK client structure
+- [x] 1.1 Create basic SDK client structure
 
   - Create `lib/sdk/client.go` with main Client struct definition
   - Add basic constructor function NewClient with baseURL and token parameters
