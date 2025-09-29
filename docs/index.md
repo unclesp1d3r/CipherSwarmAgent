@@ -1,13 +1,5 @@
 # CipherSwarm Agent
 
-![GitHub](https://img.shields.io/github/license/unclesp1d3r/CipherSwarmAgent)
-![GitHub issues](https://img.shields.io/github/issues/unclesp1d3r/CipherSwarmAgent)
-![GitHub last commit](https://img.shields.io/github/last-commit/unclesp1d3r/CipherSwarmAgent)
-![Maintenance](https://img.shields.io/maintenance/yes/2024)
-[![Maintainability](https://api.codeclimate.com/v1/badges/9c76ebe483ef3b1eff8d/maintainability)](https://codeclimate.com/github/unclesp1d3r/CipherSwarmAgent/maintainability)
-[![wakatime](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent.svg)](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent)
-[![Go Report Card](https://goreportcard.com/badge/github.com/unclesp1d3r/cipherswarmagent)](https://goreportcard.com/report/github.com/unclesp1d3r/cipherswarmagent)
-
 The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecosystem. It is designed to efficiently manage and execute distributed hash-cracking tasks. Built with Go, this agent provides a robust solution for scaling and managing cryptographic computations across the CipherSwarm network.
 
 > [!WARNING]
