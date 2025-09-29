@@ -13,7 +13,7 @@
   - Add basic constructor function NewClient with baseURL and token parameters
   - _Requirements: 6.1, 6.2_
 
-- [ ] 1.2 Implement client options pattern
+- [x] 1.2 Implement client options pattern
 
   - Add ClientOption function type and options application logic
   - Create WithTimeout and WithRetryConfig option functions

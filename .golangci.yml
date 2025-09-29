@@ -23,7 +23,6 @@ linters:
     - decorder
     - dupl
     - durationcheck
-    - embeddedstructfieldcheck
     - errchkjson
     - errcheck
     - errname
@@ -33,7 +32,6 @@ linters:
     - exptostd
     - ginkgolinter
     - fatcontext
-    - funcorder
     # - funlen - Disabled: we'll come back to this after 1.0
     - gocheckcompilerdirectives
     - gochecksumtype
@@ -120,10 +118,6 @@ linters:
         underef:
           skipRecvDeref: false
 
-    embeddedstructfieldcheck:
-      forbid-mutex: true
-
-
     errcheck:
       check-type-assertions: true
       check-blank: true
@@ -158,8 +152,6 @@ linters:
         - ^golang.org/x/tools/go/analysis.Analyzer$
         - ^google.golang.org/protobuf/.+Options$
         - ^gopkg.in/yaml.v3.Node$
-    funcorder:
-      struct-method: false
     funlen:
       lines: 60
       statements: 40

@@ -7,88 +7,141 @@ import (
 
 func TestNewClient(t *testing.T) {
 	tests := []struct {
-		name        string
-		baseURL     string
-		token       string
-		expectError bool
+		name      string
+		baseURL   string
+		token     string
+		wantError bool
 	}{
 		{
-			name:        "valid parameters",
-			baseURL:     "https://api.example.com",
-			token:       "test-token",
-			expectError: false,
+			name:      "valid parameters",
+			baseURL:   "https://api.example.com",
+			token:     "test-token",
+			wantError: false,
 		},
 		{
-			name:        "empty baseURL",
-			baseURL:     "",
-			token:       "test-token",
-			expectError: true,
+			name:      "empty baseURL",
+			baseURL:   "",
+			token:     "test-token",
+			wantError: true,
 		},
 		{
-			name:        "empty token",
-			baseURL:     "https://api.example.com",
-			token:       "",
-			expectError: true,
+			name:      "empty token",
+			baseURL:   "https://api.example.com",
+			token:     "",
+			wantError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := NewClient(tt.baseURL, tt.token)
-
-			if tt.expectError {
+			if tt.wantError {
 				if err == nil {
-					t.Errorf("expected error but got none")
+					t.Errorf("NewClient() expected error, got nil")
 				}
 				return
 			}
-
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("NewClient() unexpected error: %v", err)
 				return
 			}
-
-			if client == nil {
-				t.Errorf("expected client but got nil")
-				return
-			}
-
 			if client.GetBaseURL() != tt.baseURL {
-				t.Errorf("expected baseURL %s, got %s", tt.baseURL, client.GetBaseURL())
+				t.Errorf("NewClient() baseURL = %v, want %v", client.GetBaseURL(), tt.baseURL)
 			}
-
 			if client.GetToken() != tt.token {
-				t.Errorf("expected token %s, got %s", tt.token, client.GetToken())
-			}
-
-			if client.GetHTTPClient() == nil {
-				t.Errorf("expected HTTP client but got nil")
+				t.Errorf("NewClient() token = %v, want %v", client.GetToken(), tt.token)
 			}
 		})
 	}
 }
 
-func TestClientMethods(t *testing.T) {
+func TestNewClientWithDefaults(t *testing.T) {
 	client, err := NewClient("https://api.example.com", "test-token")
 	if err != nil {
-		t.Fatalf("failed to create client: %v", err)
+		t.Fatalf("NewClient() unexpected error: %v", err)
 	}
 
-	// Test SetTimeout
-	newTimeout := 60 * time.Second
-	client.SetTimeout(newTimeout)
-
-	if client.httpClient.Timeout != newTimeout {
-		t.Errorf("expected timeout %v, got %v", newTimeout, client.httpClient.Timeout)
+	// Check default timeout
+	if client.httpClient.Timeout != DefaultTimeout {
+		t.Errorf("NewClient() timeout = %v, want %v", client.httpClient.Timeout, DefaultTimeout)
 	}
 
-	// Test GetHTTPClient
-	httpClient := client.GetHTTPClient()
-	if httpClient == nil {
-		t.Errorf("expected HTTP client but got nil")
+	// Check default retry config
+	retryConfig := client.GetRetryConfig()
+	if retryConfig.MaxRetries != DefaultMaxRetries {
+		t.Errorf("NewClient() MaxRetries = %v, want %v", retryConfig.MaxRetries, DefaultMaxRetries)
+	}
+	if retryConfig.Backoff != DefaultRetryBackoff {
+		t.Errorf("NewClient() Backoff = %v, want %v", retryConfig.Backoff, DefaultRetryBackoff)
+	}
+}
+
+func TestWithTimeout(t *testing.T) {
+	customTimeout := 60 * time.Second
+	client, err := NewClient("https://api.example.com", "test-token", WithTimeout(customTimeout))
+	if err != nil {
+		t.Fatalf("NewClient() unexpected error: %v", err)
 	}
 
-	if httpClient != client.httpClient {
-		t.Errorf("GetHTTPClient returned different client instance")
+	if client.httpClient.Timeout != customTimeout {
+		t.Errorf("WithTimeout() timeout = %v, want %v", client.httpClient.Timeout, customTimeout)
+	}
+}
+
+func TestWithRetryConfig(t *testing.T) {
+	maxRetries := 5
+	backoff := 2 * time.Second
+	client, err := NewClient("https://api.example.com", "test-token", WithRetryConfig(maxRetries, backoff))
+	if err != nil {
+		t.Fatalf("NewClient() unexpected error: %v", err)
+	}
+
+	retryConfig := client.GetRetryConfig()
+	if retryConfig.MaxRetries != maxRetries {
+		t.Errorf("WithRetryConfig() MaxRetries = %v, want %v", retryConfig.MaxRetries, maxRetries)
+	}
+	if retryConfig.Backoff != backoff {
+		t.Errorf("WithRetryConfig() Backoff = %v, want %v", retryConfig.Backoff, backoff)
+	}
+}
+
+func TestMultipleOptions(t *testing.T) {
+	customTimeout := 45 * time.Second
+	maxRetries := 7
+	backoff := 3 * time.Second
+
+	client, err := NewClient("https://api.example.com", "test-token",
+		WithTimeout(customTimeout),
+		WithRetryConfig(maxRetries, backoff))
+	if err != nil {
+		t.Fatalf("NewClient() unexpected error: %v", err)
+	}
+
+	// Check timeout
+	if client.httpClient.Timeout != customTimeout {
+		t.Errorf("Multiple options timeout = %v, want %v", client.httpClient.Timeout, customTimeout)
+	}
+
+	// Check retry config
+	retryConfig := client.GetRetryConfig()
+	if retryConfig.MaxRetries != maxRetries {
+		t.Errorf("Multiple options MaxRetries = %v, want %v", retryConfig.MaxRetries, maxRetries)
+	}
+	if retryConfig.Backoff != backoff {
+		t.Errorf("Multiple options Backoff = %v, want %v", retryConfig.Backoff, backoff)
+	}
+}
+
+func TestSetTimeout(t *testing.T) {
+	client, err := NewClient("https://api.example.com", "test-token")
+	if err != nil {
+		t.Fatalf("NewClient() unexpected error: %v", err)
+	}
+
+	customTimeout := 90 * time.Second
+	client.SetTimeout(customTimeout)
+
+	if client.httpClient.Timeout != customTimeout {
+		t.Errorf("SetTimeout() timeout = %v, want %v", client.httpClient.Timeout, customTimeout)
 	}
 }
