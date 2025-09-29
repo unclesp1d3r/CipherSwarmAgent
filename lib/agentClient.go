@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/duke-git/lancet/v2/pointer"
@@ -416,6 +417,25 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 	if shared.State.WriteZapsToFile {
 		hashFile := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.GetID()))
 
+		// Validate file path for security
+		if !path.IsAbs(hashFile) {
+			shared.Logger.Error("Hash file path must be absolute", "path", hashFile)
+			return
+		}
+
+		// Ensure the file is within the allowed directory
+		if !strings.HasPrefix(hashFile, shared.State.ZapsPath) {
+			shared.Logger.Error("Hash file path must be within zaps directory", "path", hashFile)
+			return
+		}
+
+		// Check for directory traversal attempts
+		if strings.Contains(hashFile, "..") {
+			shared.Logger.Error("Directory traversal not allowed in hash file path", "path", hashFile)
+			return
+		}
+
+		// #nosec G304 -- hashFile is validated above to be absolute, within allowed directory, and free of directory traversal
 		file, err := os.OpenFile(
 			hashFile,
 			os.O_APPEND|os.O_CREATE|os.O_WRONLY,
