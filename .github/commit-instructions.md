@@ -1,0 +1,30 @@
+# Commit Message Style for CipherSwarmAgent
+
+- **Conventional Commits**: All commits must follow [Conventional Commits](https://www.conventionalcommits.org): `<type>(<scope>): <description>`
+- **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
+- **Scopes**: `(agent)`, `(cli)`, `(hashcat)`, `(api)`, `(config)`, `(arch)`, `(downloader)`, `(cracker)`, `(progress)`, `(benchmark)`, `(task)`, `(test)`, `(security)`, `(logging)`, `(shared)`, etc. Required for all commits.
+- **Description**:
+  - Imperative mood ("add", not "added")
+  - No period at the end
+  - ≤72 characters, capitalized, clear and specific
+- **Body (optional)**:
+  - Start after a blank line
+  - Use itemized lists for multiple changes
+  - Explain what/why, not how
+- **Footer (optional)**:
+  - Start after a blank line
+  - Use for issue refs (`Closes #123`) or breaking changes (`BREAKING CHANGE:`)
+- **Breaking Changes**:
+  - Add `!` after type/scope (e.g., `feat(api)!: ...`) or use `BREAKING CHANGE:` in footer
+- **Examples**:
+  - `feat(agent): add heartbeat mechanism for server communication`
+  - `fix(hashcat): prevent memory leaks in long-running sessions`
+  - `docs(installation): update setup instructions for Go 1.22+`
+  - `refactor(api): simplify task polling with exponential backoff`
+  - `test(cracker): add validation tests for hash format detection`
+  - `chore(deps): update hashcat to v6.2.6 for security patches`
+  - `perf(benchmark): optimize GPU detection for multi-device systems`
+  - `feat(arch): add Windows-specific device enumeration`
+- **CI Compatibility**:
+  - Use `chore:` for meta or maintenance changes
+  - Use `security:` scope for security-related changes
