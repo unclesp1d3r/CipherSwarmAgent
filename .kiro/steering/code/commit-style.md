@@ -4,8 +4,7 @@ inclusion: always
 
 # Commit Message Style for CipherSwarmAgent
 
-- **Conventional Commits:** All commits must follow [Conventional Commits](mdc:https:/www.conventionalcommits.org):
-  `<type>(<scope>): <description>`
+- **Conventional Commits:** All commits must follow [Conventional Commits](mdc:https:/www.conventionalcommits.org): `<type>(<scope>): <description>`
 - **Type:** One of: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`.
 - **Scope:** Use a noun in parentheses (e.g., `(cli)`, `(api)`, `(deps)`). Required for all commits.
 - **Description:**

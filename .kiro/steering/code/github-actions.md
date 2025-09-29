@@ -19,6 +19,7 @@ This guide provides comprehensive guidelines for developing efficient, reliable,
 
 - **Example Directory Structure:**
 
+```text
   .github/
   └── workflows/
   ├── main.yml
@@ -31,6 +32,7 @@ This guide provides comprehensive guidelines for developing efficient, reliable,
   scripts/
   ├── cleanup.sh
   └── build.py
+```
 
 ### 1.2 File Naming Conventions
 

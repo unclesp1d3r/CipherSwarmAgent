@@ -81,13 +81,13 @@ design:
 task_lifecycle:
 
 - Tasks must follow the state flow:
-  1\. `GET /tasks/new`
-  2\. If found, `POST /tasks/{id}/accept_task`
-  3\. Download and configure resources
-  4\. Start hashcat and begin periodic `submit_status`
-  5\. As hashes are cracked, `submit_crack`
-  6\. On success or keyspace exhaustion, call `/exhausted`
-  7\. If unrecoverable failure, call `/submit_error`
+  1. `GET /tasks/new`
+  2. If found, `POST /tasks/{id}/accept_task`
+  3. Download and configure resources
+  4. Start hashcat and begin periodic `submit_status`
+  5. As hashes are cracked, `submit_crack`
+  6. On success or keyspace exhaustion, call `/exhausted`
+  7. If unrecoverable failure, call `/submit_error`
 - Agent must skip tasks if it lacks benchmark support for the hash type (use local cache of benchmark map).
 
 ## === 8. Benchmarks ===
