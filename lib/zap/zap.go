@@ -62,6 +62,22 @@ func removeExistingZapFile(zapFilePath string) error {
 // The task parameter is used for logging and error reporting in case of failures.
 // Returns an error if file creation, writing, or closing fails.
 func createAndWriteZapFile(zapFilePath string, responseStream io.Reader, task *components.Task) error {
+	// Validate file path for security
+	if !path.IsAbs(zapFilePath) {
+		return fmt.Errorf("zap file path must be absolute: %s", zapFilePath)
+	}
+
+	// Ensure the file is within the allowed directory
+	if !strings.HasPrefix(zapFilePath, shared.State.ZapsPath) {
+		return fmt.Errorf("zap file path must be within zaps directory: %s", zapFilePath)
+	}
+
+	// Check for directory traversal attempts
+	if strings.Contains(zapFilePath, "..") {
+		return fmt.Errorf("directory traversal not allowed in zap file path: %s", zapFilePath)
+	}
+
+	// #nosec G304 -- zapFilePath is validated above to be absolute, within allowed directory, and free of directory traversal
 	outFile, err := os.Create(
 		zapFilePath,
 	)
@@ -138,6 +154,22 @@ func processZapFile(
 	task *components.Task,
 	sendCrackedHashFunc func(time.Time, string, string, *components.Task),
 ) error {
+	// Validate file path for security
+	if !path.IsAbs(zapFilePath) {
+		return fmt.Errorf("zap file path must be absolute: %s", zapFilePath)
+	}
+
+	// Ensure the file is within the allowed directory
+	if !strings.HasPrefix(zapFilePath, shared.State.ZapsPath) {
+		return fmt.Errorf("zap file path must be within zaps directory: %s", zapFilePath)
+	}
+
+	// Check for directory traversal attempts
+	if strings.Contains(zapFilePath, "..") {
+		return fmt.Errorf("directory traversal not allowed in zap file path: %s", zapFilePath)
+	}
+
+	// #nosec G304 -- zapFilePath is validated above to be absolute, within allowed directory, and free of directory traversal
 	file, err := os.Open(
 		zapFilePath,
 	)
