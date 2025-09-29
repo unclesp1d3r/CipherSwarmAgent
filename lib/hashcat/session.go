@@ -78,7 +78,33 @@ func NewHashcatSession(ctx context.Context, id string, params Params) (*Session,
 		args = params.toRestoreArgs(id)
 	}
 
+	// Validate binary path for security
+	if !filepath.IsAbs(binaryPath) {
+		return nil, fmt.Errorf("binary path must be absolute: %s", binaryPath)
+	}
+
+	// Additional security check: ensure the binary is in an allowed directory
+	allowedDirs := []string{
+		shared.State.CrackersPath,
+		"/usr/bin",
+		"/usr/local/bin",
+		filepath.Dir(os.Args[0]),
+	}
+
+	isAllowed := false
+	for _, allowedDir := range allowedDirs {
+		if strings.HasPrefix(binaryPath, allowedDir) {
+			isAllowed = true
+			break
+		}
+	}
+
+	if !isAllowed {
+		return nil, fmt.Errorf("binary path not in allowed directory: %s", binaryPath)
+	}
+
 	return &Session{
+		// #nosec G204 -- binaryPath is validated above to be absolute and in allowed directories
 		proc: exec.CommandContext(ctx,
 			binaryPath,
 			args...),
@@ -305,8 +331,37 @@ func (sess *Session) CmdLine() string {
 // createOutFile creates a new file with the specified directory, id, and permissions.
 // It returns the created file or an error if the creation or permission setting fails.
 func createOutFile(dir, id string, perm os.FileMode) (*os.File, error) {
+	// Validate directory path for security
+	if !filepath.IsAbs(dir) {
+		return nil, fmt.Errorf("directory path must be absolute: %s", dir)
+	}
+
+	// Ensure the directory is within allowed paths
+	allowedDirs := []string{
+		shared.State.OutPath,
+		shared.State.FilePath,
+	}
+
+	isAllowed := false
+	for _, allowedDir := range allowedDirs {
+		if strings.HasPrefix(dir, allowedDir) {
+			isAllowed = true
+			break
+		}
+	}
+
+	if !isAllowed {
+		return nil, fmt.Errorf("directory not in allowed path: %s", dir)
+	}
+
+	// Validate ID to prevent directory traversal
+	if strings.Contains(id, "..") || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+		return nil, fmt.Errorf("invalid characters in ID: %s", id)
+	}
+
 	outFilePath := filepath.Join(dir, id+".hcout")
 
+	// #nosec G304 -- outFilePath is validated above to be within allowed directory and ID is sanitized
 	file, err := os.Create(
 		outFilePath,
 	)
