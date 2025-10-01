@@ -1,3 +1,6 @@
+// Package hashcat provides types and constants for hashcat session management.
+// It defines the data structures used to communicate with hashcat processes and
+// track the status of hash cracking operations.
 package hashcat
 
 import (
@@ -6,61 +9,65 @@ import (
 
 // Attack mode constants define the different types of hashcat attacks.
 const (
-	attackModeDictionary = 0 // attackModeDictionary is the attack mode for dictionary attacks
+	attackModeDictionary = 0 // Dictionary attack mode
 	// AttackModeMask is the attack mode for mask attacks.
 	AttackModeMask     = 3
-	attackModeHybridDM = 6 // attackModeHybridDM is the attack mode for hybrid dictionary + mask attacks
-	attackModeHybridMD = 7 // attackModeHybridMD is the attack mode for hybrid mask + dictionary attacks
-	AttackBenchmark    = 9 // AttackBenchmark is the attack mode for benchmarking
+	attackModeHybridDM = 6 // Hybrid dictionary + mask attack mode
+	attackModeHybridMD = 7 // Hybrid mask + dictionary attack mode
+	// AttackBenchmark is the attack mode for benchmarking.
+	AttackBenchmark = 9
 )
 
 // statusGuess represents the state and statistics of the current guess in a password cracking attack.
-// It holds information regarding the base and modifier wordlists used, including their counts, offsets, and processing percentages.
-// It also encapsulates the attack mode being used.
+// It holds information about the base and modifier wordlists being used, including progress tracking
+// and the attack mode being employed.
 type statusGuess struct {
-	GuessBase        string  `json:"guess_base"`         // The base wordlist used for the attack
-	GuessBaseCount   int64   `json:"guess_base_count"`   // The number of words in the base wordlist
-	GuessBaseOffset  int64   `json:"guess_base_offset"`  // The offset into the base wordlist
-	GuessBasePercent float64 `json:"guess_base_percent"` // The percentage of the base wordlist that has been processed
-	GuessMod         string  `json:"guess_mod"`          // The modifier wordlist used for the attack
-	GuessModCount    int64   `json:"guess_mod_count"`    // The number of words in the modifier wordlist
-	GuessModOffset   int64   `json:"guess_mod_offset"`   // The offset into the modifier wordlist
-	GuessModPercent  float64 `json:"guess_mod_percent"`  // The percentage of the modifier wordlist that has been processed
-	GuessMode        int64   `json:"guess_mode"`         // The attack mode
+	GuessBase        string  `json:"guess_base"`         // Base wordlist path
+	GuessBaseCount   int64   `json:"guess_base_count"`   // Total words in base wordlist
+	GuessBaseOffset  int64   `json:"guess_base_offset"`  // Current position in base wordlist
+	GuessBasePercent float64 `json:"guess_base_percent"` // Percentage of base wordlist processed
+	GuessMod         string  `json:"guess_mod"`          // Modifier wordlist path
+	GuessModCount    int64   `json:"guess_mod_count"`    // Total words in modifier wordlist
+	GuessModOffset   int64   `json:"guess_mod_offset"`   // Current position in modifier wordlist
+	GuessModPercent  float64 `json:"guess_mod_percent"`  // Percentage of modifier wordlist processed
+	GuessMode        int64   `json:"guess_mode"`         // Active attack mode
 }
 
-// StatusDevice represents the state and statistics of a device involved in an operation.
-// It contains information such as the device ID, name, type, speed, utilization, and temperature.
+// StatusDevice represents a computing device (GPU/CPU) involved in a hash cracking operation.
+// It tracks device identification, performance metrics, and operational status.
 type StatusDevice struct {
-	DeviceID   int64  `json:"device_id"`   // The device ID
-	DeviceName string `json:"device_name"` // The device name
-	DeviceType string `json:"device_type"` // The device type
-	Speed      int64  `json:"speed"`       // The speed of the device
-	Util       int64  `json:"util"`        // The utilization of the device
-	Temp       int64  `json:"temp"`        // The temperature of the device
+	DeviceID   int64  `json:"device_id"`   // Unique device identifier
+	DeviceName string `json:"device_name"` // Human-readable device name
+	DeviceType string `json:"device_type"` // Device type (e.g., "GPU", "CPU")
+	Speed      int64  `json:"speed"`       // Current processing speed (hashes/second)
+	Util       int64  `json:"util"`        // Device utilization percentage (0-100)
+	Temp       int64  `json:"temp"`        // Device temperature in Celsius
 }
 
-// Status represents the current status of a hashcat operation.
+// Status represents the current operational status of a hashcat process.
+// It contains comprehensive information about the attack progress, performance,
+// and estimated completion time.
 type Status struct {
-	OriginalLine    string         `json:"original_line"`    // The original line from hashcat
-	Time            time.Time      `json:"time"`             // The time the status was received
-	Session         string         `json:"session"`          // The session ID
-	Guess           statusGuess    `json:"guess"`            // The current guess
-	Status          int64          `json:"status"`           // The status of the attack
-	Target          string         `json:"target"`           // The target hash
-	Progress        []int64        `json:"progress"`         // The progress of the attack
-	RestorePoint    int64          `json:"restore_point"`    // The restore point
-	RecoveredHashes []int64        `json:"recovered_hashes"` // The number of recovered hashes
-	RecoveredSalts  []int64        `json:"recovered_salts"`  // The number of recovered salts
-	Rejected        int64          `json:"rejected"`         // The number of rejected hashes
-	Devices         []StatusDevice `json:"devices"`          // The devices used for the attack
-	TimeStart       int64          `json:"time_start"`       // The start time of the attack
-	EstimatedStop   int64          `json:"estimated_stop"`   // The estimated stop time of the attack
+	OriginalLine    string         `json:"original_line"`    // Raw status line from hashcat
+	Time            time.Time      `json:"time"`             // Timestamp when status was captured
+	Session         string         `json:"session"`          // Unique session identifier
+	Guess           statusGuess    `json:"guess"`            // Current guess/wordlist state
+	Status          int64          `json:"status"`           // Hashcat status code
+	Target          string         `json:"target"`           // Target hash or hash list
+	Progress        []int64        `json:"progress"`         // Current and total progress values
+	RestorePoint    int64          `json:"restore_point"`    // Position for session restoration
+	RecoveredHashes []int64        `json:"recovered_hashes"` // Count of cracked hashes
+	RecoveredSalts  []int64        `json:"recovered_salts"`  // Count of recovered salts
+	Rejected        int64          `json:"rejected"`         // Number of rejected candidates
+	Devices         []StatusDevice `json:"devices"`          // Active compute devices
+	TimeStart       int64          `json:"time_start"`       // Attack start timestamp (Unix)
+	EstimatedStop   int64          `json:"estimated_stop"`   // Estimated completion timestamp (Unix)
 }
 
-// Result represents the outcome of a hashcat operation, including the timestamp, hash, and plaintext result.
+// Result represents a successfully cracked hash.
+// It contains the timestamp, original hash, and recovered plaintext.
 type Result struct {
-	Timestamp time.Time `json:"timestamp"` // The time the result was received
-	Hash      string    `json:"hash"`      // The hash
-	Plaintext string    `json:"plaintext"` // The plaintext
+	Timestamp time.Time `json:"timestamp"` // When the hash was cracked
+	Hash      string    `json:"hash"`      // Original hash value
+	Plaintext string    `json:"plaintext"` // Recovered plaintext password
 }
