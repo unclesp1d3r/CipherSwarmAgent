@@ -285,11 +285,11 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		return nil, err
 	}
 
-	if strings.TrimSpace(params.RestoreFilePath) != "" && func() bool {
-		_, err := os.Stat(params.RestoreFilePath)
-		return err == nil
-	}() {
-		args = params.toRestoreArgs(id)
+	// Use restore arguments if restore file exists
+	if strings.TrimSpace(params.RestoreFilePath) != "" {
+		if _, err := os.Stat(params.RestoreFilePath); err == nil {
+			args = params.toRestoreArgs(id)
+		}
 	}
 
 	return &Session{
