@@ -350,6 +350,110 @@ func (sess *Session) CmdLine() string {
 	return sess.proc.String()
 }
 
+<<<<<<< HEAD
+||||||| parent of dda4e7b (refactor(hashcat): simplify restore file check logic in session creation)
+// NewHashcatSession creates and initializes a new hashcat session.
+// It configures the hashcat command with the provided parameters, creates necessary
+// temporary files, and sets up channels for communication.
+// Returns an error if binary lookup, file creation, or argument validation fails.
+func NewHashcatSession(id string, params Params) (*Session, error) {
+	binaryPath, err := cracker.FindHashcatBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create output file: %w", err)
+	}
+
+	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
+	if err != nil {
+		return nil, err
+	}
+
+	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(params.RestoreFilePath) != "" && func() bool {
+		_, err := os.Stat(params.RestoreFilePath)
+		return err == nil
+	}() {
+		args = params.toRestoreArgs(id)
+	}
+
+	return &Session{
+		proc: exec.Command(
+			binaryPath,
+			args...),
+		hashFile:           params.HashFile,
+		outFile:            outFile,
+		charsetFiles:       charsetFiles,
+		shardedCharsetFile: nil,
+		CrackedHashes:      make(chan Result, channelBufferSize),
+		StatusUpdates:      make(chan Status, channelBufferSize),
+		StderrMessages:     make(chan string, channelBufferSize),
+		StdoutLines:        make(chan string, channelBufferSize),
+		DoneChan:           make(chan error),
+		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
+		RestoreFilePath:    params.RestoreFilePath,
+	}, nil
+}
+
+=======
+// NewHashcatSession creates and initializes a new hashcat session.
+// It configures the hashcat command with the provided parameters, creates necessary
+// temporary files, and sets up channels for communication.
+// Returns an error if binary lookup, file creation, or argument validation fails.
+func NewHashcatSession(id string, params Params) (*Session, error) {
+	binaryPath, err := cracker.FindHashcatBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create output file: %w", err)
+	}
+
+	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
+	if err != nil {
+		return nil, err
+	}
+
+	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	// Use restore arguments if restore file exists
+	if strings.TrimSpace(params.RestoreFilePath) != "" {
+		if _, err := os.Stat(params.RestoreFilePath); err == nil {
+			args = params.toRestoreArgs(id)
+		}
+	}
+
+	return &Session{
+		proc: exec.Command(
+			binaryPath,
+			args...),
+		hashFile:           params.HashFile,
+		outFile:            outFile,
+		charsetFiles:       charsetFiles,
+		shardedCharsetFile: nil,
+		CrackedHashes:      make(chan Result, channelBufferSize),
+		StatusUpdates:      make(chan Status, channelBufferSize),
+		StderrMessages:     make(chan string, channelBufferSize),
+		StdoutLines:        make(chan string, channelBufferSize),
+		DoneChan:           make(chan error),
+		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
+		RestoreFilePath:    params.RestoreFilePath,
+	}, nil
+}
+
+>>>>>>> dda4e7b (refactor(hashcat): simplify restore file check logic in session creation)
 // createOutFile creates the output file for cracked hashes.
 // The file is created with restrictive permissions in the specified directory.
 // Returns the created file handle or an error if creation or permission setting fails.
