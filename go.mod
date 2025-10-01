@@ -12,13 +12,16 @@ require (
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/nxadm/tail v1.4.11
 	github.com/pkg/errors v0.9.1
-	github.com/shirou/gopsutil/v3 v3.24.5
+	github.com/shirou/gopsutil/v4 v4.25.9
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.8.5
 )
 
-require github.com/duke-git/lancet/v2 v2.3.6
+require (
+	github.com/duke-git/lancet/v2 v2.3.6
+	github.com/shirou/gopsutil/v3 v3.24.5
+)
 
 require (
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta1 // indirect
@@ -118,7 +121,7 @@ require (
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.15.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/api v0.240.0 // indirect
