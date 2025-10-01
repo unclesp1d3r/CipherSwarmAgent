@@ -1,4 +1,6 @@
-// Package hashcat provides hashcat session management and parameter handling.
+// Package hashcat provides parameter validation and command-line argument generation
+// for hashcat operations. It handles configuration for various attack modes including
+// dictionary, mask, and hybrid attacks, with comprehensive validation and error handling.
 package hashcat
 
 import (
@@ -13,60 +15,63 @@ import (
 )
 
 const (
-	maxCharsets         = 4  // Maximum number of custom charsets allowed
-	defaultArgsCapacity = 32 // Default capacity for command arguments slice
-	maskArgsCapacity    = 6  // Default capacity for mask arguments
+	maxCharsets         = 4  // Maximum custom charsets allowed by hashcat
+	defaultArgsCapacity = 32 // Default slice capacity for command arguments
+	maskArgsCapacity    = 6  // Expected capacity for mask-specific arguments
 )
 
 var (
-	// ErrUnsupportedAttackMode is returned when an unsupported attack mode is specified.
+	// ErrUnsupportedAttackMode indicates an invalid or unsupported attack mode was specified.
 	ErrUnsupportedAttackMode = errors.New("unsupported attack mode")
-	// ErrDictionaryAttackWordlist is returned when a dictionary attack is missing a wordlist.
+	// ErrDictionaryAttackWordlist indicates a dictionary attack is missing its required wordlist.
 	ErrDictionaryAttackWordlist = errors.New("expected 1 wordlist for dictionary attack, but none given")
-	// ErrMaskAttackNoMask is returned when a mask attack is missing a mask.
+	// ErrMaskAttackNoMask indicates a mask attack is missing both mask and mask list.
 	ErrMaskAttackNoMask = errors.New("using mask attack, but no mask was given")
-	// ErrMaskAttackBothMaskAndList is returned when both mask and mask list are provided for a mask attack.
+	// ErrMaskAttackBothMaskAndList indicates both mask and mask list were provided (mutually exclusive).
 	ErrMaskAttackBothMaskAndList = errors.New("using mask attack, but both mask and mask list were given")
-	// ErrHybridAttackNoMask is returned when a hybrid attack is missing a mask.
+	// ErrHybridAttackNoMask indicates a hybrid attack is missing its required mask.
 	ErrHybridAttackNoMask = errors.New("using hybrid attack, but no mask was given")
-	// ErrHybridAttackNoWordlist is returned when a hybrid attack is missing a wordlist.
+	// ErrHybridAttackNoWordlist indicates a hybrid attack is missing its required wordlist.
 	ErrHybridAttackNoWordlist = errors.New("expected 1 wordlist for hybrid attack, but none given")
-	// ErrTooManyCustomCharsets is returned when too many custom charsets are provided.
+	// ErrTooManyCustomCharsets indicates more custom charsets were provided than supported.
 	ErrTooManyCustomCharsets = errors.New("too many custom charsets supplied")
-	// ErrWordlistNotOpened is returned when a wordlist file cannot be opened.
+	// ErrWordlistNotOpened indicates the specified wordlist file cannot be accessed.
 	ErrWordlistNotOpened = errors.New("provided word list couldn't be opened on filesystem")
-	// ErrRuleListNotOpened is returned when a rule list file cannot be opened.
+	// ErrRuleListNotOpened indicates the specified rule list file cannot be accessed.
 	ErrRuleListNotOpened = errors.New("provided rule list couldn't be opened on filesystem")
-	// ErrMaskListNotOpened is returned when a mask list file cannot be opened.
+	// ErrMaskListNotOpened indicates the specified mask list file cannot be accessed.
 	ErrMaskListNotOpened = errors.New("provided mask list couldn't be opened on filesystem")
 )
 
-// Params represents the configuration parameters for running a hash cracking attack using Hashcat.
+// Params represents the configuration parameters for a hashcat hash cracking attack.
+// It contains all settings needed to configure and execute an attack including attack mode,
+// hash type, input files, optimization flags, and device selection.
 type Params struct {
-	AttackMode                int64    `json:"attack_mode"`                  // Attack mode to use
-	HashType                  int64    `json:"hash_type"`                    // Hash type to crack
-	HashFile                  string   `json:"hash_file"`                    // Path to the file containing the hashes to crack
-	Mask                      string   `json:"mask,omitempty"`               // Mask to use for mask attack
-	MaskIncrement             bool     `json:"mask_increment,omitempty"`     // Whether to use mask increment
-	MaskIncrementMin          int64    `json:"mask_increment_min"`           // Min mask length for increment
-	MaskIncrementMax          int64    `json:"mask_increment_max"`           // Max mask length for increment
-	MaskCustomCharsets        []string `json:"mask_custom_charsets"`         // Custom charsets for mask attack
-	WordListFilename          string   `json:"wordlist_filename"`            // Wordlist to use for dictionary and hybrid attacks
-	RuleListFilename          string   `json:"rules_filename"`               // Rule list to use for dictionary attack
-	MaskListFilename          string   `json:"mask_list_filename"`           // Mask list to use for mask attack
-	AdditionalArgs            []string `json:"additional_args"`              // Additional arguments to pass to hashcat
-	OptimizedKernels          bool     `json:"optimized_kernels"`            // Whether to use optimized kernels
-	SlowCandidates            bool     `json:"slow_candidates"`              // Whether to use slow candidates
-	Skip                      int64    `json:"skip,omitempty"`               // Keyspace offset to start at
-	Limit                     int64    `json:"limit,omitempty"`              // Maximum keyspace to process
-	BackendDevices            string   `json:"backend_devices,omitempty"`    // Devices to use for the backend, comma-separated
-	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL devices to use, comma-separated
-	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Whether to enable additional hash types when benchmarking
-	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to the restore file
+	AttackMode                int64    `json:"attack_mode"`                  // Attack mode (0=dictionary, 3=mask, 6/7=hybrid, 9=benchmark)
+	HashType                  int64    `json:"hash_type"`                    // Hashcat hash type code
+	HashFile                  string   `json:"hash_file"`                    // Path to file containing target hashes
+	Mask                      string   `json:"mask,omitempty"`               // Mask pattern for mask/hybrid attacks
+	MaskIncrement             bool     `json:"mask_increment,omitempty"`     // Enable mask increment mode
+	MaskIncrementMin          int64    `json:"mask_increment_min"`           // Minimum mask length for increment mode
+	MaskIncrementMax          int64    `json:"mask_increment_max"`           // Maximum mask length for increment mode
+	MaskCustomCharsets        []string `json:"mask_custom_charsets"`         // Custom character sets for mask attacks
+	WordListFilename          string   `json:"wordlist_filename"`            // Path to wordlist file
+	RuleListFilename          string   `json:"rules_filename"`               // Path to rules file for dictionary attacks
+	MaskListFilename          string   `json:"mask_list_filename"`           // Path to mask list file
+	AdditionalArgs            []string `json:"additional_args"`              // Extra command-line arguments
+	OptimizedKernels          bool     `json:"optimized_kernels"`            // Use optimized kernels (-O flag)
+	SlowCandidates            bool     `json:"slow_candidates"`              // Enable slow candidate generators (-S flag)
+	Skip                      int64    `json:"skip,omitempty"`               // Skip N candidates from start
+	Limit                     int64    `json:"limit,omitempty"`              // Stop after processing N candidates
+	BackendDevices            string   `json:"backend_devices,omitempty"`    // Backend devices to use (comma-separated)
+	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL device types (comma-separated)
+	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Enable all hash types in benchmark mode
+	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to restore file for session resumption
 }
 
-// Validate checks the attack mode specified in the Params and calls corresponding validation methods.
-// It returns an error if the validation fails or if an unsupported attack mode is provided.
+// Validate verifies that the Params configuration is valid for the specified attack mode.
+// It delegates to attack-mode-specific validation functions and returns an error if
+// the configuration is invalid or if an unsupported attack mode is specified.
 func (params Params) Validate() error {
 	switch params.AttackMode {
 	case attackModeDictionary:
@@ -82,8 +87,7 @@ func (params Params) Validate() error {
 	}
 }
 
-// validateDictionaryAttack checks if the WordListFilename parameter is provided for a dictionary attack.
-// It returns an error if the parameter is missing or blank.
+// validateDictionaryAttack ensures a wordlist is specified for dictionary attacks.
 func validateDictionaryAttack(params Params) error {
 	if strings.TrimSpace(params.WordListFilename) == "" {
 		return ErrDictionaryAttackWordlist
@@ -92,7 +96,7 @@ func validateDictionaryAttack(params Params) error {
 	return nil
 }
 
-// validateMaskAttack validates the parameters for a mask attack. It checks if either Mask or MaskListFilename is provided but not both.
+// validateMaskAttack ensures either a mask or mask list is provided, but not both.
 func validateMaskAttack(params Params) error {
 	if strings.TrimSpace(params.Mask) == "" && strings.TrimSpace(params.MaskListFilename) == "" {
 		return ErrMaskAttackNoMask
@@ -105,8 +109,7 @@ func validateMaskAttack(params Params) error {
 	return nil
 }
 
-// validateHybridAttack validates the parameters for a hybrid attack mode.
-// It ensures that both a mask and a wordlist filename are provided.
+// validateHybridAttack ensures both a mask and wordlist are provided for hybrid attacks.
 func validateHybridAttack(params Params) error {
 	if strings.TrimSpace(params.Mask) == "" {
 		return ErrHybridAttackNoMask
@@ -119,9 +122,9 @@ func validateHybridAttack(params Params) error {
 	return nil
 }
 
-// maskArgs constructs command-line arguments for a mask attack configuration.
-// Validates the number of custom charsets, then appends charset and increment options to args slice.
-// Returns the constructed args slice or an error if validation fails.
+// maskArgs constructs command-line arguments for mask-based attacks.
+// It validates the number of custom charsets and generates arguments for charset
+// definitions and mask increment settings. Returns an error if validation fails.
 func (params Params) maskArgs() ([]string, error) {
 	if len(params.MaskCustomCharsets) > maxCharsets {
 		return nil, fmt.Errorf(
@@ -154,9 +157,10 @@ func (params Params) maskArgs() ([]string, error) {
 	return args, nil
 }
 
-// toCmdArgs converts a Params object into a slice of command-line arguments for the Hashcat command.
-// It includes several validation checks and conditional arguments based on the attack mode and presence of optional fields.
-// Returns the generated arguments slice or an error if validation fails.
+// toCmdArgs converts Params into a complete hashcat command-line argument slice.
+// It validates parameters, constructs base arguments, handles attack-mode-specific
+// arguments, and validates file paths. Returns the argument slice or an error if
+// validation fails or required files are missing.
 func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, error) {
 	if err := params.Validate(); err != nil {
 		return nil, err
@@ -171,7 +175,6 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			"--benchmark",
 		)
 
-		// Include additional arguments for benchmark mode (e.g., -m for specific hash type)
 		args = append(args, params.AdditionalArgs...)
 
 		if strings.TrimSpace(params.BackendDevices) != "" {
@@ -189,7 +192,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		return args, nil
 	}
 
-	// For full attack mode, we have many more arguments to add
+	// Standard attack mode arguments
 	args = append(
 		args,
 		"--quiet",
@@ -234,7 +237,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			return nil, fmt.Errorf("%w: %s", ErrWordlistNotOpened, wordList)
 		}
 
-		params.WordListFilename = wordList // Update the path to the word list
+		params.WordListFilename = wordList
 	}
 
 	if strings.TrimSpace(params.RuleListFilename) != "" {
@@ -243,17 +246,16 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			return nil, fmt.Errorf("%w: %s", ErrRuleListNotOpened, ruleList)
 		}
 
-		params.RuleListFilename = ruleList // Update the path to the rule list
+		params.RuleListFilename = ruleList
 	}
 
-	// If there's a mask list, use it instead of the mask
 	if strings.TrimSpace(params.MaskListFilename) != "" {
 		maskList := filepath.Join(shared.State.FilePath, filepath.Clean(params.MaskListFilename))
 		if _, err := os.Stat(maskList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrMaskListNotOpened, maskList)
 		}
 
-		params.Mask = maskList // Update the path to the mask list
+		params.Mask = maskList
 	}
 
 	args = append(args, hashFile)
@@ -297,8 +299,8 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	return args, nil
 }
 
-// toRestoreArgs constructs the command-line arguments needed to restore a Hashcat session using provided session details.
-// Takes a session string as input and returns a slice of strings with the necessary restore arguments.
+// toRestoreArgs constructs arguments for restoring a hashcat session.
+// It returns a minimal argument set for session restoration using the restore file.
 func (params Params) toRestoreArgs(session string) []string {
 	return []string{
 		"--session", "attack-" + session,
