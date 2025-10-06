@@ -5,6 +5,7 @@ package hashcat
 
 import (
 	"bufio"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -23,9 +24,9 @@ import (
 )
 
 const (
-	channelBufferSize = 5    // Buffer size for output channels
+	channelBufferSize = 5     // Buffer size for output channels
 	filePermissions   = 0o600 // Restrictive permissions for sensitive files
-	logParseMinParts  = 3    // Minimum expected parts when parsing output log lines
+	logParseMinParts  = 3     // Minimum expected parts when parsing output log lines
 )
 
 // Session represents a hashcat execution session with comprehensive process management.
@@ -46,6 +47,57 @@ type Session struct {
 	RestoreFilePath    string        // Path to session restore file
 	pStdout            io.ReadCloser // Stdout pipe from hashcat process
 	pStderr            io.ReadCloser // Stderr pipe from hashcat process
+}
+
+// NewHashcatSession creates and initializes a new hashcat session.
+// It configures the hashcat command with the provided parameters, creates necessary
+// temporary files, and sets up channels for communication.
+// Returns an error if binary lookup, file creation, or argument validation fails.
+func NewHashcatSession(id string, params Params) (*Session, error) {
+	binaryPath, err := cracker.FindHashcatBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create output file: %w", err)
+	}
+
+	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
+	if err != nil {
+		return nil, err
+	}
+
+	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	// Use restore arguments if restore file exists
+	if strings.TrimSpace(params.RestoreFilePath) != "" {
+		if _, err := os.Stat(params.RestoreFilePath); err == nil {
+			args = params.toRestoreArgs(id)
+		}
+	}
+
+	return &Session{
+		proc: exec.CommandContext(
+			context.Background(),
+			binaryPath,
+			args...),
+		hashFile:           params.HashFile,
+		outFile:            outFile,
+		charsetFiles:       charsetFiles,
+		shardedCharsetFile: nil,
+		CrackedHashes:      make(chan Result, channelBufferSize),
+		StatusUpdates:      make(chan Status, channelBufferSize),
+		StderrMessages:     make(chan string, channelBufferSize),
+		StdoutLines:        make(chan string, channelBufferSize),
+		DoneChan:           make(chan error),
+		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
+		RestoreFilePath:    params.RestoreFilePath,
+	}, nil
 }
 
 // Start initializes and starts the hashcat session.
@@ -258,56 +310,6 @@ func (sess *Session) Cleanup() {
 // CmdLine returns the command line string used to start the hashcat process.
 func (sess *Session) CmdLine() string {
 	return sess.proc.String()
-}
-
-// NewHashcatSession creates and initializes a new hashcat session.
-// It configures the hashcat command with the provided parameters, creates necessary
-// temporary files, and sets up channels for communication.
-// Returns an error if binary lookup, file creation, or argument validation fails.
-func NewHashcatSession(id string, params Params) (*Session, error) {
-	binaryPath, err := cracker.FindHashcatBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create output file: %w", err)
-	}
-
-	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
-	if err != nil {
-		return nil, err
-	}
-
-	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	// Use restore arguments if restore file exists
-	if strings.TrimSpace(params.RestoreFilePath) != "" {
-		if _, err := os.Stat(params.RestoreFilePath); err == nil {
-			args = params.toRestoreArgs(id)
-		}
-	}
-
-	return &Session{
-		proc: exec.Command(
-			binaryPath,
-			args...),
-		hashFile:           params.HashFile,
-		outFile:            outFile,
-		charsetFiles:       charsetFiles,
-		shardedCharsetFile: nil,
-		CrackedHashes:      make(chan Result, channelBufferSize),
-		StatusUpdates:      make(chan Status, channelBufferSize),
-		StderrMessages:     make(chan string, channelBufferSize),
-		StdoutLines:        make(chan string, channelBufferSize),
-		DoneChan:           make(chan error),
-		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
-		RestoreFilePath:    params.RestoreFilePath,
-	}, nil
 }
 
 // createOutFile creates the output file for cracked hashes.
