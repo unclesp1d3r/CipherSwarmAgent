@@ -422,6 +422,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 			filePermissions,
 		)
 		if err != nil {
+			//nolint:errcheck // Error already being handled
 			_ = cserrors.LogAndSendError(
 				"Error opening cracked hash file",
 				err,
@@ -435,6 +436,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 
 		_, err = file.WriteString(fmt.Sprintf("%s:%s", hash, plaintext) + "\n")
 		if err != nil {
+			//nolint:errcheck // Error already being handled
 			_ = cserrors.LogAndSendError(
 				"Error writing cracked hash to file",
 				err,
