@@ -117,6 +117,7 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	}
 
 	if err := os.Remove(newArchivePath); err != nil {
+		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error removing 7z file",
 			err,
@@ -190,6 +191,7 @@ func handleHeartbeatError(err error) {
 
 		switch {
 		case stderrors.As(err, &e):
+			//nolint:errcheck // Error already being handled
 			_ = cserrors.LogAndSendError(
 				"Error sending heartbeat",
 				e,
@@ -215,6 +217,7 @@ func handleHeartbeatError(err error) {
 func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Session) {
 	var eo *sdkerrors.ErrorObject
 	if stderrors.As(err, &eo) {
+		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error sending status update",
 			eo,
@@ -245,6 +248,7 @@ func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat
 		// Not an error, just log and pause the task
 		handleTaskGone(task, sess)
 	default:
+		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error connecting to the CipherSwarm API, unexpected error",
 			se,
@@ -265,6 +269,7 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 	)
 
 	if err := sess.Kill(); err != nil {
+		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error killing task",
 			err,
@@ -281,6 +286,7 @@ func handleTaskGone(task *components.Task, sess *hashcat.Session) {
 	shared.Logger.Info("Pausing task", "task_id", task.GetID())
 
 	if err := sess.Kill(); err != nil {
+		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error pausing task",
 			err,
