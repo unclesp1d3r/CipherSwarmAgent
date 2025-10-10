@@ -90,9 +90,10 @@ func GetPlatform() string {
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
 func Extract7z(srcFile, destDir string) error {
+	//nolint:gosec // srcFile and destDir are validated by caller
 	_, err := exec.CommandContext(context.Background(), "7z", "x", srcFile, "-o"+destDir).
 		Output()
-		//nolint:gosec // srcFile and destDir are validated by caller
+
 	return err
 }
 
