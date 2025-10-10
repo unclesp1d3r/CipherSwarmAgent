@@ -36,6 +36,7 @@ func GetZaps(task *components.Task, sendCrackedHashFunc func(time.Time, string, 
 	}
 
 	if res.ResponseStream != nil {
+		//nolint:errcheck // Error already being handled
 		_ = handleResponseStream(
 			task,
 			res.ResponseStream,
@@ -94,6 +95,7 @@ func handleResponseStream(
 
 	zapFilePath := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
+		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error removing existing zap file",
 			err,
@@ -103,6 +105,7 @@ func handleResponseStream(
 	}
 
 	if err := createAndWriteZapFile(zapFilePath, responseStream, task); err != nil {
+		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error creating and writing zap file",
 			err,
@@ -112,6 +115,7 @@ func handleResponseStream(
 	}
 
 	if err := processZapFile(zapFilePath, task, sendCrackedHashFunc); err != nil {
+		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error processing zap file",
 			err,

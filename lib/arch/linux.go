@@ -1,8 +1,12 @@
 //go:build linux
 
+// Package arch provides architecture-specific functionality for Linux systems.
+// It includes utilities for device detection, platform identification, and
+// execution of system-specific commands like hashcat and 7z.
 package arch
 
 import (
+	"context"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -20,7 +24,7 @@ import (
 //	error: An error object if there was an issue executing the command or parsing the output.
 func GetDevices() ([]string, error) {
 	shared.Logger.Debug("Getting GPU devices")
-	out, err := exec.Command("lspci").Output()
+	out, err := exec.CommandContext(context.Background(), "lspci").Output()
 	if err != nil {
 		shared.Logger.Error("Error executing lspci command", "error", err)
 		return nil, err
@@ -63,13 +67,14 @@ func GetDevices() ([]string, error) {
 //   - A string representing the Hashcat version.
 //   - An error if the command execution fails.
 func GetHashcatVersion(hashcatPath string) (string, error) {
-	out, err := exec.Command(hashcatPath, "--version", "--quiet").Output()
+	out, err := exec.CommandContext(context.Background(), hashcatPath, "--version", "--quiet").Output()
 	if err != nil {
 		return "0.0.0", err
 	}
 	return strings.TrimSpace(string(out)), nil
 }
 
+// GetPlatform returns the platform identifier for Linux systems.
 func GetPlatform() string {
 	return "linux"
 }
@@ -85,7 +90,9 @@ func GetPlatform() string {
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
 func Extract7z(srcFile, destDir string) error {
-	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output()
+	_, err := exec.CommandContext(context.Background(), "7z", "x", srcFile, "-o"+destDir).
+		Output()
+		//nolint:gosec // srcFile and destDir are validated by caller
 	return err
 }
 
