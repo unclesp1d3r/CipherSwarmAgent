@@ -107,7 +107,7 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 		return cserrors.LogAndSendError("Error moving file", err, operations.SeverityCritical, nil)
 	}
 
-	hashcatDirectory, err := cracker.ExtractHashcatArchive(newArchivePath)
+	hashcatDirectory, err := cracker.ExtractHashcatArchive(context.Background(), newArchivePath)
 	if err != nil {
 		return cserrors.LogAndSendError("Error extracting file", err, operations.SeverityCritical, nil)
 	}

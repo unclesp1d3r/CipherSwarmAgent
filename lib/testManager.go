@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 
@@ -14,7 +15,10 @@ import (
 
 // getDevices initializes a test Hashcat session and runs a test task, returning the names of available OpenCL devices.
 // An error is logged and returned if the session creation or test task execution fails.
-func getDevices() ([]string, error) {
+//
+//nolint:contextcheck // NewHashcatSession, LogAndSendError, and SendAgentError will be updated to accept context in a future refactor
+func getDevices(ctx context.Context) ([]string, error) {
+	_ = ctx // Context will be used when underlying functions are updated
 	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackModeMask,
 		AdditionalArgs: arch.GetAdditionalHashcatArgs(),
