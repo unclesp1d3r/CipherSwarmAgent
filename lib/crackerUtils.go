@@ -37,7 +37,7 @@ func setNativeHashcatPath() error {
 func UpdateCracker() {
 	shared.Logger.Info("Checking for updated cracker")
 
-	currentVersion, err := cracker.GetCurrentHashcatVersion()
+	currentVersion, err := cracker.GetCurrentHashcatVersion(context.Background())
 	if err != nil {
 		shared.Logger.Error("Error getting current hashcat version", "error", err)
 

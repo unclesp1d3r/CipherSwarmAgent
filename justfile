@@ -1,12 +1,19 @@
 # Justfile for CipherSwarm Agent
 
-# Set PowerShell as the shell for Windows
+# Use PowerShell on Windows, bash elsewhere
 set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
-set shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set shell := ["bash", "-lc"]
 
 # Serve documentation locally
 @docs:
-    .venv/Scripts/Activate.ps1; mkdocs serve
+    #!/usr/bin/env sh
+    if [ -f ".venv/Scripts/mkdocs.exe" ]; then
+        .venv/Scripts/mkdocs.exe serve
+    elif [ -f ".venv/Scripts/mkdocs" ]; then
+        .venv/Scripts/mkdocs serve
+    else
+        .venv/bin/mkdocs serve
+    fi
 
 # Run the agent (development)
 dev:
@@ -14,9 +21,16 @@ dev:
 
 # Install all requirements and build the project
 install:
+    #!/usr/bin/env sh
     cd {{justfile_dir()}}
     python -m venv .venv
-    .venv/Scripts/Activate.ps1; pip install mkdocs-material
+    if [ -f ".venv/Scripts/python.exe" ]; then
+        .venv/Scripts/python.exe -m pip install mkdocs-material
+    elif [ -f ".venv/Scripts/python" ]; then
+        .venv/Scripts/python -m pip install mkdocs-material
+    else
+        .venv/bin/python -m pip install mkdocs-material
+    fi
     pnpm install
     pre-commit install --hook-type commit-msg
     go mod tidy
@@ -40,19 +54,13 @@ test:
     go test ./...
 
 # Run all checks and tests (CI)
-ci-check:
-    cd {{justfile_dir()}}
-    @pre-commit run # Same as just check, but only runs on staged files
-    @just lint
-    @just test
+ci-check: check test
+
 
 # Run all checks and tests, and build the agent
-build:
+build: install check test
     cd {{justfile_dir()}}
-    just install
     go mod tidy
-    just check
-    just test
     goreleaser build --clean --auto-snapshot --single-target
 
 update-deps:
