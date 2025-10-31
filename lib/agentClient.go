@@ -119,7 +119,7 @@ func UpdateAgentMetadata() error {
 
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
-	devices, err := getDevicesList()
+	devices, err := getDevicesList(context.Background())
 	if err != nil {
 		return cserrors.LogAndSendError("Error getting devices", err, operations.SeverityCritical, nil)
 	}
@@ -163,12 +163,12 @@ func UpdateAgentMetadata() error {
 
 // getDevicesList retrieves a list of device names based on the configured device identification method.
 // It checks the global state to determine if the legacy method should be used, then calls the appropriate function.
-func getDevicesList() ([]string, error) {
+func getDevicesList(ctx context.Context) ([]string, error) {
 	if shared.State.UseLegacyDeviceIdentificationMethod {
-		return arch.GetDevices()
+		return arch.GetDevices(ctx)
 	}
 
-	return getDevices()
+	return getDevices(ctx)
 }
 
 // DownloadFiles downloads the necessary files for the provided attack.

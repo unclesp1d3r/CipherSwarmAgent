@@ -4,6 +4,7 @@
 package cracker
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -69,13 +70,13 @@ func FindHashcatBinary() (string, error) {
 // GetCurrentHashcatVersion retrieves the version string of the installed hashcat binary.
 // It first locates the binary, then queries it for version information.
 // Returns an empty version string if the binary cannot be found or queried.
-func GetCurrentHashcatVersion() (string, error) {
+func GetCurrentHashcatVersion(ctx context.Context) (string, error) {
 	hashcatPath, err := FindHashcatBinary()
 	if err != nil {
 		return emptyVersion, err
 	}
 
-	version, err := arch.GetHashcatVersion(hashcatPath)
+	version, err := arch.GetHashcatVersion(ctx, hashcatPath)
 	if err != nil {
 		return emptyVersion, err
 	}
@@ -179,7 +180,7 @@ func CreateDataDirs() error {
 // ExtractHashcatArchive extracts a new hashcat archive with backup management.
 // It removes any previous backup, backs up the current installation, and extracts
 // the new archive. Returns the path to the newly extracted hashcat directory.
-func ExtractHashcatArchive(newArchivePath string) (string, error) {
+func ExtractHashcatArchive(ctx context.Context, newArchivePath string) (string, error) {
 	hashcatDirectory := path.Join(shared.State.CrackersPath, "hashcat")
 	hashcatBackupDirectory := hashcatDirectory + "_old"
 
@@ -200,7 +201,7 @@ func ExtractHashcatArchive(newArchivePath string) (string, error) {
 	}
 
 	// Extract new hashcat archive
-	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
+	err = arch.Extract7z(ctx, newArchivePath, shared.State.CrackersPath)
 	if err != nil {
 		shared.Logger.Error("Error extracting file", "error", err)
 

@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nxadm/tail"
@@ -32,12 +33,17 @@ const (
 // Session represents a hashcat execution session with comprehensive process management.
 // It manages the hashcat process lifecycle, handles I/O streams, and provides channels
 // for real-time communication of results, status updates, and error messages.
+// The session stores a context.CancelFunc to enable graceful shutdown and cancellation
+// of session operations, allowing controlled termination of goroutines and resource cleanup
+// during lifecycle management.
 type Session struct {
-	proc               *exec.Cmd     // Hashcat process command
-	hashFile           string        // Path to hash input file
-	outFile            *os.File      // Output file for cracked hashes
-	charsetFiles       []*os.File    // Custom charset files for mask attacks
-	shardedCharsetFile *os.File      // Sharded charset file for distributed attacks
+	proc               *exec.Cmd  // Hashcat process command
+	hashFile           string     // Path to hash input file
+	outFile            *os.File   // Output file for cracked hashes
+	charsetFiles       []*os.File // Custom charset files for mask attacks
+	shardedCharsetFile *os.File   // Sharded charset file for distributed attacks
+	cancel             context.CancelFunc
+	cancelMu           sync.Mutex    // Protects cancel field from concurrent access
 	CrackedHashes      chan Result   // Channel for successfully cracked hashes
 	StatusUpdates      chan Status   // Channel for periodic status updates
 	StderrMessages     chan string   // Channel for error messages from hashcat
@@ -59,18 +65,33 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
 	if err != nil {
+		cancel()
+
 		return nil, fmt.Errorf("couldn't create output file: %w", err)
 	}
 
 	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
 	if err != nil {
+		cancel()
+		_ = outFile.Close()
+
 		return nil, err
 	}
 
 	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
 	if err != nil {
+		cancel()
+		_ = outFile.Close()
+		for _, f := range charsetFiles {
+			if f != nil {
+				_ = f.Close()
+			}
+		}
+
 		return nil, err
 	}
 
@@ -83,9 +104,10 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 
 	return &Session{
 		proc: exec.CommandContext(
-			context.Background(),
+			ctx,
 			binaryPath,
 			args...),
+		cancel:             cancel,
 		hashFile:           params.HashFile,
 		outFile:            outFile,
 		charsetFiles:       charsetFiles,
@@ -256,10 +278,24 @@ func (sess *Session) handleStderr() {
 	}
 }
 
+// Cancel requests cancellation of the running hashcat process via the session context.
+// This method is thread-safe and may be called concurrently from multiple goroutines.
+func (sess *Session) Cancel() {
+	sess.cancelMu.Lock()
+	defer sess.cancelMu.Unlock()
+
+	if sess.cancel != nil {
+		sess.cancel()
+		sess.cancel = nil
+	}
+}
+
 // Kill terminates the hashcat process.
 // Returns nil if no process is running or if the process was already terminated.
 // The os.ErrProcessDone error is treated as a success case.
 func (sess *Session) Kill() error {
+	sess.Cancel()
+
 	if sess.proc == nil || sess.proc.Process == nil {
 		return nil
 	}
@@ -276,6 +312,8 @@ func (sess *Session) Kill() error {
 // It attempts to remove the output file, charset files, and optionally the zaps directory.
 // Errors during cleanup are logged but don't halt the cleanup process.
 func (sess *Session) Cleanup() {
+	sess.Cancel()
+
 	shared.Logger.Info("Cleaning up session files")
 
 	removeFile := func(filePath string) {

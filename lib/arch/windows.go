@@ -3,6 +3,7 @@
 package arch
 
 import (
+	"context"
 	"os/exec"
 	"strings"
 
@@ -13,13 +14,16 @@ import (
 // It uses WMI to query the Win32_VideoController class and extracts the names
 // of the GPU devices.
 //
+// Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
+//
 // Returns:
 //
 //	[]string: A slice of strings containing the names of the GPU devices.
 //	error: An error object if there was an issue executing the command or parsing the output.
-func GetDevices() ([]string, error) {
+func GetDevices(ctx context.Context) ([]string, error) {
 	shared.Logger.Debug("Getting GPU devices")
-	cmd := exec.Command("wmic", "path", "win32_videocontroller", "get", "name")
+	cmd := exec.CommandContext(ctx, "wmic", "path", "win32_videocontroller", "get", "name")
 	out, err := cmd.Output()
 	if err != nil {
 		shared.Logger.Error("Error executing wmic command", "error", err)
@@ -49,13 +53,14 @@ func GetDevices() ([]string, error) {
 // and the error.
 //
 // Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
 //   - hashcatPath: The file path to the Hashcat executable.
 //
 // Returns:
 //   - A string representing the Hashcat version.
 //   - An error if the command execution fails.
-func GetHashcatVersion(hashcatPath string) (string, error) {
-	out, err := exec.Command(hashcatPath, "--version", "--quiet").Output()
+func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) {
+	out, err := exec.CommandContext(ctx, hashcatPath, "--version", "--quiet").Output()
 	if err != nil {
 		return "0.0.0", err
 	}
@@ -71,13 +76,14 @@ func GetPlatform() string {
 // where the contents should be extracted.
 //
 // Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
 //   - srcFile: The path to the 7z archive file.
 //   - destDir: The directory where the contents of the archive will be extracted.
 //
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
-func Extract7z(srcFile, destDir string) error {
-	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output()
+func Extract7z(ctx context.Context, srcFile, destDir string) error {
+	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).Output()
 	return err
 }
 

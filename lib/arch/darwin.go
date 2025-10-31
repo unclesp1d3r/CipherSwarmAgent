@@ -4,6 +4,7 @@
 package arch
 
 import (
+	"context"
 	"errors"
 	"os/exec"
 	"regexp"
@@ -21,11 +22,14 @@ var (
 // It executes the "system_profiler" command to get display information and parses the output
 // to extract the chipset model names.
 //
+// Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
+//
 // Returns:
 //   - []string: A slice containing the names of the display devices.
 //   - error: An error object if the command execution or parsing fails.
-func GetDevices() ([]string, error) {
-	out, err := exec.Command("system_profiler", "SPDisplaysDataType", "-detaillevel", "mini").Output()
+func GetDevices(ctx context.Context) ([]string, error) {
+	out, err := exec.CommandContext(ctx, "system_profiler", "SPDisplaysDataType", "-detaillevel", "mini").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -57,13 +61,14 @@ func GetDevices() ([]string, error) {
 // It runs the Hashcat executable with the "--version" and "--quiet" flags and returns the output as a string.
 //
 // Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
 //   - hashcatPath: The file path to the Hashcat executable.
 //
 // Returns:
 //   - A string representing the version of Hashcat.
 //   - An error if the command execution fails or if Hashcat is not found.
-func GetHashcatVersion(hashcatPath string) (string, error) {
-	out, err := exec.Command(hashcatPath, "--version", "--quiet").Output()
+func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) {
+	out, err := exec.CommandContext(ctx, hashcatPath, "--version", "--quiet").Output()
 	if err != nil {
 		return "0.0.0", err
 	}
@@ -75,13 +80,16 @@ func GetHashcatVersion(hashcatPath string) (string, error) {
 // It uses the `7z` command-line tool to perform the extraction.
 //
 // Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
 //   - srcFile: The path to the source 7z archive file.
 //   - destDir: The path to the destination directory where the contents will be extracted.
 //
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
-func Extract7z(srcFile, destDir string) error {
-	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output() //nolint:gosec // 7z command is safe here
+func Extract7z(ctx context.Context, srcFile, destDir string) error {
+	//nolint:gosec // Parameters validated upstream
+	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).
+		Output()
 
 	return err
 }
