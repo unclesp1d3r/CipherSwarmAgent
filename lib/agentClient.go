@@ -31,6 +31,9 @@ var (
 	agentPlatform string //nolint:gochecknoglobals // agentPlatform represents the platform on which the agent is running.
 	// Configuration represents the configuration of the agent.
 	Configuration agentConfiguration //nolint:gochecknoglobals // Global agent configuration
+
+	// setNativeHashcatPathFn allows stubbing setNativeHashcatPath for testing.
+	setNativeHashcatPathFn = setNativeHashcatPath //nolint:gochecknoglobals // Used for testing
 )
 
 // Define static errors.
@@ -80,7 +83,7 @@ func GetAgentConfiguration() error {
 	agentConfig := mapConfiguration(config)
 
 	if agentConfig.Config.UseNativeHashcat {
-		if err := setNativeHashcatPath(); err != nil {
+		if err := setNativeHashcatPathFn(); err != nil {
 			return err
 		}
 	} else {

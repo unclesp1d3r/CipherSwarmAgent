@@ -191,13 +191,8 @@ func handleHeartbeatError(err error) {
 
 		switch {
 		case stderrors.As(err, &e):
-			//nolint:errcheck // Error already being handled
-			_ = cserrors.LogAndSendError(
-				"Error sending heartbeat",
-				e,
-				operations.SeverityCritical,
-				nil,
-			)
+			shared.Logger.Error("Error sending heartbeat", "error", e.Error())
+			SendAgentError(e.Error(), nil, operations.SeverityCritical)
 		case stderrors.As(err, &e1):
 			shared.Logger.Error(
 				"Error sending heartbeat, unexpected error",
