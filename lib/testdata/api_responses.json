@@ -1,0 +1,75 @@
+{
+  "authentication_success": {
+    "authenticated": true,
+    "agent_id": 12345
+  },
+  "authentication_failure": {
+    "authenticated": false,
+    "error": "Invalid credentials"
+  },
+  "configuration": {
+    "api_version": 1,
+    "config": {
+      "use_native_hashcat": false,
+      "agent_update_interval": 300,
+      "backend_device": "",
+      "opencl_devices": ""
+    }
+  },
+  "configuration_native": {
+    "api_version": 1,
+    "config": {
+      "use_native_hashcat": true,
+      "agent_update_interval": 300,
+      "backend_device": "1,2",
+      "opencl_devices": "0"
+    }
+  },
+  "agent_metadata": {
+    "id": 12345,
+    "hostname": "test-agent",
+    "client_signature": "CipherSwarm Agent/1.0.0 Linux/x86_64",
+    "operating_system": "Linux",
+    "devices": [
+      "CPU",
+      "GPU 0"
+    ]
+  },
+  "heartbeat_pending": {
+    "state": "pending"
+  },
+  "heartbeat_stopped": {
+    "state": "stopped"
+  },
+  "heartbeat_error": {
+    "state": "error"
+  },
+  "task": {
+    "id": 100,
+    "attack_id": 50,
+    "start_date": "2024-01-01T00:00:00Z",
+    "status": "pending",
+    "skip": null,
+    "limit": null
+  },
+  "error_401": {
+    "error": "Unauthorized",
+    "code": 401,
+    "details": "Invalid or expired token"
+  },
+  "error_403": {
+    "error": "Forbidden",
+    "code": 403,
+    "details": "Insufficient permissions"
+  },
+  "error_404": {
+    "error": "Not Found",
+    "code": 404,
+    "details": "Resource not found"
+  },
+  "error_500": {
+    "error": "Internal Server Error",
+    "code": 500,
+    "details": "An internal server error occurred"
+  }
+}
