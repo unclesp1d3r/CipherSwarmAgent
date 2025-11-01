@@ -11,7 +11,7 @@ require (
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/nxadm/tail v1.4.11
 	github.com/pkg/errors v0.9.1
-	github.com/shirou/gopsutil/v3 v3.24.5
+	github.com/shirou/gopsutil/v4 v4.25.10
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
@@ -19,7 +19,10 @@ require (
 	go.uber.org/mock v0.4.0
 )
 
-require github.com/duke-git/lancet/v2 v2.3.7
+require (
+	github.com/duke-git/lancet/v2 v2.3.7
+	github.com/shirou/gopsutil/v3 v3.24.5
+)
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.39.5 // indirect
