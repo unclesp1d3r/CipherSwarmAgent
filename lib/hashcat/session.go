@@ -37,22 +37,22 @@ const (
 // of session operations, allowing controlled termination of goroutines and resource cleanup
 // during lifecycle management.
 type Session struct {
-	proc               *exec.Cmd        // Hashcat process command
-	hashFile           string           // Path to hash input file
-	outFile            *os.File        // Output file for cracked hashes
-	charsetFiles       []*os.File       // Custom charset files for mask attacks
-	shardedCharsetFile *os.File        // Sharded charset file for distributed attacks
+	proc               *exec.Cmd  // Hashcat process command
+	hashFile           string     // Path to hash input file
+	outFile            *os.File   // Output file for cracked hashes
+	charsetFiles       []*os.File // Custom charset files for mask attacks
+	shardedCharsetFile *os.File   // Sharded charset file for distributed attacks
 	cancel             context.CancelFunc
-	cancelMu           sync.Mutex      // Protects cancel field from concurrent access
-	CrackedHashes      chan Result     // Channel for successfully cracked hashes
-	StatusUpdates      chan Status     // Channel for periodic status updates
-	StderrMessages     chan string     // Channel for error messages from hashcat
-	StdoutLines        chan string     // Channel for stdout lines from hashcat
-	DoneChan           chan error      // Channel signaling process completion
-	SkipStatusUpdates  bool            // Flag to disable status update parsing
-	RestoreFilePath    string          // Path to session restore file
-	pStdout            io.ReadCloser   // Stdout pipe from hashcat process
-	pStderr            io.ReadCloser   // Stderr pipe from hashcat process
+	cancelMu           sync.Mutex    // Protects cancel field from concurrent access
+	CrackedHashes      chan Result   // Channel for successfully cracked hashes
+	StatusUpdates      chan Status   // Channel for periodic status updates
+	StderrMessages     chan string   // Channel for error messages from hashcat
+	StdoutLines        chan string   // Channel for stdout lines from hashcat
+	DoneChan           chan error    // Channel signaling process completion
+	SkipStatusUpdates  bool          // Flag to disable status update parsing
+	RestoreFilePath    string        // Path to session restore file
+	pStdout            io.ReadCloser // Stdout pipe from hashcat process
+	pStderr            io.ReadCloser // Stderr pipe from hashcat process
 }
 
 // NewHashcatSession creates and initializes a new hashcat session.
