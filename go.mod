@@ -16,7 +16,7 @@ require (
 )
 
 require (
-	github.com/duke-git/lancet/v2 v2.3.7
+	github.com/duke-git/lancet/v2 v2.3.8
 	github.com/shirou/gopsutil/v3 v3.24.5
 )
 
