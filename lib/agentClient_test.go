@@ -40,7 +40,7 @@ func stringPtr(s string) *string {
 // Returns a cleanup function to restore the original function.
 func stubGetDevicesList() func() {
 	original := getDevicesListFn
-	getDevicesListFn = func(ctx context.Context) ([]string, error) {
+	getDevicesListFn = func(_ context.Context) ([]string, error) {
 		return []string{"CPU", "GPU0"}, nil
 	}
 	return func() {
