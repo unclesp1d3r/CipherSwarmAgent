@@ -1,6 +1,7 @@
 package zap
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,9 +80,9 @@ func TestCreateAndWriteZapFile(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			zapFilePath := filepath.Join(tempDir, tt.name+".zap")
+			zapFilePath := filepath.Join(tempDir, fmt.Sprintf("test_%d.zap", i))
 			reader := strings.NewReader(tt.content)
 
 			err := createAndWriteZapFile(zapFilePath, reader, tt.task)
@@ -132,9 +133,9 @@ invalidline
 		},
 	}
 
-	for _, tt := range tests {
+	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			zapFilePath := filepath.Join(tempDir, tt.name+".zap")
+			zapFilePath := filepath.Join(tempDir, fmt.Sprintf("test_%d.zap", i))
 			err := os.WriteFile(zapFilePath, []byte(tt.content), 0o600)
 			require.NoError(t, err)
 
