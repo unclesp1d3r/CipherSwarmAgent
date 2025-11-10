@@ -9,19 +9,24 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+const channelBufferSize = 5 // Buffer size for mock session channels
+
 // NewMockSession creates a minimal hashcat.Session for testing without requiring the hashcat binary.
 // It creates a session object with initialized channels that can be used in tests.
 // The session is not started and does not execute hashcat.
 // Returns a session that can be used in tests that need a Session reference but don't actually
 // execute hashcat. The Cleanup method is a no-op since no process is started.
-func NewMockSession(sessionName string) (*hashcat.Session, error) {
+//
+// The sessionName parameter is currently unused but kept for API consistency with potential
+// future use cases where session naming might be needed.
+func NewMockSession(_ string) (*hashcat.Session, error) {
 	// Create a mock session with initialized channels
 	// This bypasses the need for the hashcat binary entirely
 	sess := &hashcat.Session{
-		CrackedHashes:     make(chan hashcat.Result, 5),
-		StatusUpdates:     make(chan hashcat.Status, 5),
-		StderrMessages:    make(chan string, 5),
-		StdoutLines:       make(chan string, 5),
+		CrackedHashes:     make(chan hashcat.Result, channelBufferSize),
+		StatusUpdates:     make(chan hashcat.Status, channelBufferSize),
+		StderrMessages:    make(chan string, channelBufferSize),
+		StdoutLines:       make(chan string, channelBufferSize),
 		DoneChan:          make(chan error),
 		SkipStatusUpdates: true,
 	}
