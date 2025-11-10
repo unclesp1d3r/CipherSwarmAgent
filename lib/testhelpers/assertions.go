@@ -12,6 +12,8 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
+const epsilon = 1e-4
+
 // AssertDeviceStatus compares two DeviceStatus objects field-by-field with clear error messages.
 // This is useful when testing the convertDeviceStatuses function in lib/agentClient.go.
 func AssertDeviceStatus(t *testing.T, expected, actual components.DeviceStatus) {
@@ -57,7 +59,7 @@ func AssertTaskStatus(t *testing.T, expected, actual components.TaskStatus) {
 		t,
 		expected.HashcatGuess.GuessBasePercentage,
 		actual.HashcatGuess.GuessBasePercentage,
-		0.0001,
+		epsilon,
 		"HashcatGuess.GuessBasePercentage mismatch",
 	)
 	assert.Equal(t, expected.HashcatGuess.GuessMod, actual.HashcatGuess.GuessMod, "HashcatGuess.GuessMod mismatch")
@@ -77,7 +79,7 @@ func AssertTaskStatus(t *testing.T, expected, actual components.TaskStatus) {
 		t,
 		expected.HashcatGuess.GuessModPercentage,
 		actual.HashcatGuess.GuessModPercentage,
-		0.0001,
+		epsilon,
 		"HashcatGuess.GuessModPercentage mismatch",
 	)
 	assert.Equal(t, expected.HashcatGuess.GuessMode, actual.HashcatGuess.GuessMode, "HashcatGuess.GuessMode mismatch")
@@ -85,9 +87,10 @@ func AssertTaskStatus(t *testing.T, expected, actual components.TaskStatus) {
 	// Compare DeviceStatuses
 	assert.Len(t, actual.DeviceStatuses, len(expected.DeviceStatuses), "DeviceStatuses length mismatch")
 	for i := range expected.DeviceStatuses {
-		if i < len(actual.DeviceStatuses) {
-			AssertDeviceStatus(t, expected.DeviceStatuses[i], actual.DeviceStatuses[i])
+		if i >= len(actual.DeviceStatuses) {
+			continue
 		}
+		AssertDeviceStatus(t, expected.DeviceStatuses[i], actual.DeviceStatuses[i])
 	}
 }
 
@@ -176,25 +179,26 @@ func AssertHashcatStatus(t *testing.T, expected, actual hashcat.Status) {
 	// Compare Devices
 	assert.Len(t, actual.Devices, len(expected.Devices), "Devices length mismatch")
 	for i := range expected.Devices {
-		if i < len(actual.Devices) {
-			assert.Equal(t, expected.Devices[i].DeviceID, actual.Devices[i].DeviceID, "Device[%d].DeviceID mismatch", i)
-			assert.Equal(
-				t,
-				expected.Devices[i].DeviceName,
-				actual.Devices[i].DeviceName,
-				"Device[%d].DeviceName mismatch",
-				i,
-			)
-			assert.Equal(
-				t,
-				expected.Devices[i].DeviceType,
-				actual.Devices[i].DeviceType,
-				"Device[%d].DeviceType mismatch",
-				i,
-			)
-			assert.Equal(t, expected.Devices[i].Speed, actual.Devices[i].Speed, "Device[%d].Speed mismatch", i)
-			assert.Equal(t, expected.Devices[i].Util, actual.Devices[i].Util, "Device[%d].Util mismatch", i)
-			assert.Equal(t, expected.Devices[i].Temp, actual.Devices[i].Temp, "Device[%d].Temp mismatch", i)
+		if i >= len(actual.Devices) {
+			continue
 		}
+		assert.Equal(t, expected.Devices[i].DeviceID, actual.Devices[i].DeviceID, "Device[%d].DeviceID mismatch", i)
+		assert.Equal(
+			t,
+			expected.Devices[i].DeviceName,
+			actual.Devices[i].DeviceName,
+			"Device[%d].DeviceName mismatch",
+			i,
+		)
+		assert.Equal(
+			t,
+			expected.Devices[i].DeviceType,
+			actual.Devices[i].DeviceType,
+			"Device[%d].DeviceType mismatch",
+			i,
+		)
+		assert.Equal(t, expected.Devices[i].Speed, actual.Devices[i].Speed, "Device[%d].Speed mismatch", i)
+		assert.Equal(t, expected.Devices[i].Util, actual.Devices[i].Util, "Device[%d].Util mismatch", i)
+		assert.Equal(t, expected.Devices[i].Temp, actual.Devices[i].Temp, "Device[%d].Temp mismatch", i)
 	}
 }

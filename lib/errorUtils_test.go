@@ -13,6 +13,29 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
+// withHTTPAndState sets up httpmock and shared state for tests and runs fn.
+func withHTTPAndState(t *testing.T, fn func()) {
+	t.Helper()
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+	// Mock SubmitErrorAgent endpoint to avoid recursion and enable call counting
+	testhelpers.MockSubmitErrorSuccess(123)
+	fn()
+}
+
+// assertSubmitErrorCalledIfSDK asserts submit_error was called when err is an SDK error type.
+func assertSubmitErrorCalledIfSDK(t *testing.T, err error) {
+	t.Helper()
+	var se *sdkerrors.SDKError
+	var eo *sdkerrors.ErrorObject
+	if errors.As(err, &se) || errors.As(err, &eo) {
+		callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
+		assert.Positive(t, callCount)
+	}
+}
+
 // TestHandleAuthenticationError tests the handleAuthenticationError function.
 func TestHandleAuthenticationError(t *testing.T) {
 	tests := []struct {
@@ -208,26 +231,11 @@ func TestHandleHeartbeatError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
-
-			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
-
-			// This function doesn't return an error
-			handleHeartbeatError(tt.err)
-
-			// Verify SubmitErrorAgent was called for SDK errors
-			// Use GetSubmitErrorCallCount helper to handle httpmock key format differences
-			var se *sdkerrors.SDKError
-			var eo *sdkerrors.ErrorObject
-			if errors.As(tt.err, &se) || errors.As(tt.err, &eo) {
-				callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
-				assert.Positive(t, callCount, "submit_error should be called for SDK error types")
-			}
+			withHTTPAndState(t, func() {
+				// This function doesn't return an error
+				handleHeartbeatError(tt.err)
+				assertSubmitErrorCalledIfSDK(t, tt.err)
+			})
 		})
 	}
 }
@@ -331,10 +339,10 @@ func TestHandleSDKError(t *testing.T) {
 			// This function doesn't return an error
 			handleSDKError(tt.sdkError, tt.task, sess)
 
-			// For 404 and 410, session should be killed
+			// For 404 and 410, session should be killed - ensure function completes
 			if tt.expectKill {
-				// Note: We can't easily verify Kill() was called without a mock,
-				// but the function should complete without error
+				// No direct assertion without deeper mocking; ensure branch is executed without panics
+				t.Log("kill path exercised")
 			}
 		})
 	}
@@ -486,27 +494,11 @@ func TestHandleSendError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
-
-			// Mock SubmitErrorAgent endpoint to prevent infinite recursion
-			testhelpers.MockSubmitErrorSuccess(123)
-
-			// This function doesn't return an error
-			handleSendError(tt.err)
-
-			// Verify SubmitErrorAgent was called (may be recursive)
-			var se *sdkerrors.SDKError
-			var eo *sdkerrors.ErrorObject
-			if errors.As(tt.err, &se) || errors.As(tt.err, &eo) {
-				// Should be called at least once (and potentially recursively)
-				// According to swagger.json, the endpoint is /api/v1/client/agents/{id}/submit_error
-				callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
-				assert.Positive(t, callCount, "submit_error endpoint should be called for SDK error types")
-			}
+			withHTTPAndState(t, func() {
+				// This function doesn't return an error
+				handleSendError(tt.err)
+				assertSubmitErrorCalledIfSDK(t, tt.err)
+			})
 		})
 	}
 }
@@ -533,25 +525,11 @@ func TestHandleAcceptTaskError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
-
-			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
-
-			// This function doesn't return an error
-			handleAcceptTaskError(tt.err)
-
-			// Verify SubmitErrorAgent was called
-			var se *sdkerrors.SDKError
-			var eo *sdkerrors.ErrorObject
-			if errors.As(tt.err, &se) || errors.As(tt.err, &eo) {
-				callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
-				assert.Positive(t, callCount)
-			}
+			withHTTPAndState(t, func() {
+				// This function doesn't return an error
+				handleAcceptTaskError(tt.err)
+				assertSubmitErrorCalledIfSDK(t, tt.err)
+			})
 		})
 	}
 }
@@ -633,25 +611,11 @@ func TestHandleSendCrackError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
-
-			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
-
-			// This function doesn't return an error
-			handleSendCrackError(tt.err)
-
-			// Verify SubmitErrorAgent was called
-			var se *sdkerrors.SDKError
-			var eo *sdkerrors.ErrorObject
-			if errors.As(tt.err, &se) || errors.As(tt.err, &eo) {
-				callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
-				assert.Positive(t, callCount)
-			}
+			withHTTPAndState(t, func() {
+				// This function doesn't return an error
+				handleSendCrackError(tt.err)
+				assertSubmitErrorCalledIfSDK(t, tt.err)
+			})
 		})
 	}
 }

@@ -9,13 +9,24 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
+const dirPerm os.FileMode = 0o755
+
+func mustMkdirAll(path string) {
+	if err := os.MkdirAll(path, dirPerm); err != nil {
+		panic(err)
+	}
+}
+
 // SetupTestState initializes shared.State with test values.
 // It creates temporary directories for all path fields, sets up the SDK client,
 // and returns a cleanup function that removes temporary directories and resets state.
 func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	// Create temporary directories for all path fields
 	tempDir := os.TempDir()
-	testDataDir, _ := os.MkdirTemp(tempDir, "cipherswarm-test-*")
+	testDataDir, err := os.MkdirTemp(tempDir, "cipherswarm-test-*")
+	if err != nil {
+		panic(err)
+	}
 
 	shared.State.AgentID = agentID
 	shared.State.URL = apiURL
@@ -34,15 +45,15 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	shared.State.SdkClient = NewTestSDKClient(apiURL)
 
 	// Create directories
-	_ = os.MkdirAll(shared.State.DataPath, 0o755)
-	_ = os.MkdirAll(shared.State.CrackersPath, 0o755)
-	_ = os.MkdirAll(shared.State.HashlistPath, 0o755)
-	_ = os.MkdirAll(shared.State.ZapsPath, 0o755)
-	_ = os.MkdirAll(shared.State.PreprocessorsPath, 0o755)
-	_ = os.MkdirAll(shared.State.ToolsPath, 0o755)
-	_ = os.MkdirAll(shared.State.OutPath, 0o755)
-	_ = os.MkdirAll(shared.State.FilePath, 0o755)
-	_ = os.MkdirAll(shared.State.RestoreFilePath, 0o755)
+	mustMkdirAll(shared.State.DataPath)
+	mustMkdirAll(shared.State.CrackersPath)
+	mustMkdirAll(shared.State.HashlistPath)
+	mustMkdirAll(shared.State.ZapsPath)
+	mustMkdirAll(shared.State.PreprocessorsPath)
+	mustMkdirAll(shared.State.ToolsPath)
+	mustMkdirAll(shared.State.OutPath)
+	mustMkdirAll(shared.State.FilePath)
+	mustMkdirAll(shared.State.RestoreFilePath)
 
 	return func() {
 		// Cleanup: remove temporary directories
@@ -116,7 +127,10 @@ func ResetTestState() {
 // for tests that don't need full initialization.
 func SetupMinimalTestState(agentID int64) {
 	tempDir := os.TempDir()
-	testDataDir, _ := os.MkdirTemp(tempDir, "cipherswarm-test-*")
+	testDataDir, err := os.MkdirTemp(tempDir, "cipherswarm-test-*")
+	if err != nil {
+		panic(err)
+	}
 
 	shared.State.AgentID = agentID
 	shared.State.DataPath = filepath.Join(testDataDir, "data")

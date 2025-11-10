@@ -46,9 +46,15 @@ func CreateTestHashcatParams() hashcat.Params {
 
 	hashFile := filepath.Join(tempDir, "test_hash.txt")
 	// Create an empty hash file
-	file, _ := os.Create(hashFile)
+	file, err := os.Create(hashFile)
+	if err != nil {
+		panic(err)
+	}
 	if file != nil {
-		_, _ = file.WriteString("testhash\n")
+		_, err = file.WriteString("testhash\n")
+		if err != nil {
+			panic(err)
+		}
 		_ = file.Close()
 	}
 

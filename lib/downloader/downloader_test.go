@@ -23,7 +23,7 @@ func TestFileExistsAndValid(t *testing.T) {
 			name: "file exists with matching checksum",
 			setupFile: func() string {
 				filePath := filepath.Join(tempDir, "test1.txt")
-				err := os.WriteFile(filePath, []byte("test content"), 0o644)
+				err := os.WriteFile(filePath, []byte("test content"), 0o600)
 				require.NoError(t, err)
 				return filePath
 			},
@@ -34,7 +34,7 @@ func TestFileExistsAndValid(t *testing.T) {
 			name: "file exists with no checksum provided",
 			setupFile: func() string {
 				filePath := filepath.Join(tempDir, "test2.txt")
-				err := os.WriteFile(filePath, []byte("test content"), 0o644)
+				err := os.WriteFile(filePath, []byte("test content"), 0o600)
 				require.NoError(t, err)
 				return filePath
 			},
@@ -45,7 +45,7 @@ func TestFileExistsAndValid(t *testing.T) {
 			name: "file exists with mismatched checksum",
 			setupFile: func() string {
 				filePath := filepath.Join(tempDir, "test3.txt")
-				err := os.WriteFile(filePath, []byte("test content"), 0o644)
+				err := os.WriteFile(filePath, []byte("test content"), 0o600)
 				require.NoError(t, err)
 				return filePath
 			},

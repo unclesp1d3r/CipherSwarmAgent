@@ -98,12 +98,15 @@ func TestAuthenticateAgent(t *testing.T) {
 		},
 		{
 			name: "authentication failure - not authenticated",
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				authResponse := operations.AuthenticateResponseBody{
 					Authenticated: false,
 				}
 				// Override with authentication response
-				jsonResponse, _ := json.Marshal(authResponse)
+				jsonResponse, err := json.Marshal(authResponse)
+				if err != nil {
+					panic(err)
+				}
 				responder := httpmock.ResponderFromResponse(&http.Response{
 					Status:     http.StatusText(http.StatusOK),
 					StatusCode: http.StatusOK,
@@ -119,7 +122,7 @@ func TestAuthenticateAgent(t *testing.T) {
 		},
 		{
 			name: "ErrorObject handling",
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				testhelpers.MockAuthenticationFailure(http.StatusUnauthorized, "authentication failed")
 			},
 			expectedError: &sdkerrors.ErrorObject{},
@@ -127,7 +130,7 @@ func TestAuthenticateAgent(t *testing.T) {
 		},
 		{
 			name: "SDKError handling",
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				// Note: This test may timeout due to SDK retry logic with exponential backoff.
 				// The SDK retries on 500 errors, which can cause long delays in tests.
 				// Using 400 Bad Request instead to avoid retries.
@@ -139,7 +142,7 @@ func TestAuthenticateAgent(t *testing.T) {
 		},
 		{
 			name: "nil response handling",
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				// Mock a response that returns nil object
 				responder := httpmock.ResponderFromResponse(&http.Response{
 					Status:     http.StatusText(http.StatusOK),
@@ -176,11 +179,12 @@ func TestAuthenticateAgent(t *testing.T) {
 				// Only check error type if it's an SDK error type, not for standard errors
 				errorObject := &sdkerrors.ErrorObject{}
 				sDKError := &sdkerrors.SDKError{}
-				if errors.As(tt.expectedError, &errorObject) {
+				switch {
+				case errors.As(tt.expectedError, &errorObject):
 					testhelpers.AssertErrorType(t, err, tt.expectedError)
-				} else if errors.As(tt.expectedError, &sDKError) {
+				case errors.As(tt.expectedError, &sDKError):
 					testhelpers.AssertErrorType(t, err, tt.expectedError)
-				} else {
+				default:
 					// For standard errors like ErrAuthenticationFailed, just check that an error was returned
 					require.Error(t, err)
 				}
@@ -301,7 +305,7 @@ func TestUpdateAgentMetadata(t *testing.T) {
 		},
 		{
 			name: "API error with ErrorObject",
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
 				// According to swagger.json, the endpoint is /api/v1/client/agents/{id}
 				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/agents/\d+$`, http.StatusBadRequest, *sdkErr)
@@ -408,7 +412,7 @@ func TestSendHeartBeat(t *testing.T) {
 		},
 		{
 			name: "heartbeat error with ErrorObject",
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
 				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/agents/\d+/heartbeat$`, http.StatusBadRequest, *sdkErr)
 			},
@@ -511,6 +515,8 @@ func TestSendStatusUpdate(t *testing.T) {
 }
 
 // TestSendCrackedHash tests the sendCrackedHash function.
+//
+
 func TestSendCrackedHash(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -542,7 +548,7 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "with nil task",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				// No mock needed, function returns early
 			},
 			task:              nil,
@@ -552,7 +558,7 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "ErrorObject error handling",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				errObj := testhelpers.NewErrorObject("task not found")
 				sdkErr := testhelpers.NewSDKError(http.StatusNotFound, errObj.Error())
 				// According to swagger.json, the endpoint is /api/v1/client/tasks/{id}/submit_crack
@@ -570,7 +576,7 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "SDKError error handling",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
 				// According to swagger.json, the endpoint is /api/v1/client/tasks/{id}/submit_crack
@@ -638,35 +644,33 @@ func TestSendCrackedHash(t *testing.T) {
 			switch tt.name {
 			case "file open error - non-writable directory":
 				// Create a temp directory with read-only permissions
-				tempDir, err := os.MkdirTemp("", "cipherswarm-test-readonly-*")
-				require.NoError(t, err)
+				tempDir := t.TempDir()
 				t.Cleanup(func() {
 					// Restore permissions before cleanup to avoid cleanup errors
-					_ = os.Chmod(tempDir, 0o755)
-					_ = os.RemoveAll(tempDir)
+					require.NoError(t, os.Chmod(tempDir, 0o755)) //nolint:gosec // adjusting temp dir perms for cleanup
 				})
 
 				// Make directory read-only (0500 = owner can read/execute, others nothing)
-				err = os.Chmod(tempDir, 0o500)
-				require.NoError(t, err)
+				require.NoError(
+					t,
+					os.Chmod(tempDir, 0o500), //nolint:gosec // test: set dir read-only to exercise error path
+				)
 
 				shared.State.ZapsPath = tempDir
 			case "file write error - read-only file":
 				// Create a temp directory
-				tempDir, err := os.MkdirTemp("", "cipherswarm-test-*")
-				require.NoError(t, err)
+				tempDir := t.TempDir()
 				t.Cleanup(func() {
 					// Restore permissions before cleanup to avoid cleanup errors
-					_ = os.Chmod(tempDir, 0o755)
-					_ = os.RemoveAll(tempDir)
+					require.NoError(t, os.Chmod(tempDir, 0o755)) //nolint:gosec // adjusting temp dir perms for cleanup
 				})
 
 				hashFile := path.Join(tempDir, fmt.Sprintf("%d_clientout.zap", tt.task.ID))
 
-				// Create the file normally first
-				file, err := os.Create(hashFile)
+				// Create the file normally first with secure permissions
+				file, err := os.OpenFile(hashFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 				require.NoError(t, err)
-				file.Close()
+				require.NoError(t, file.Close())
 
 				// Make the parent directory read-only. On Unix systems, you need write
 				// permission on the directory to append to files (O_APPEND requires directory
@@ -687,8 +691,7 @@ func TestSendCrackedHash(t *testing.T) {
 				//
 				// Given the complexity, we test that file errors (whether at OpenFile or WriteString)
 				// are properly handled and reported via submit_error endpoint.
-				err = os.Chmod(tempDir, 0o500) // Read-only directory
-				require.NoError(t, err)
+				require.NoError(t, os.Chmod(tempDir, 0o500)) //nolint:gosec // Read-only directory for error path
 
 				shared.State.ZapsPath = tempDir
 			}
@@ -998,6 +1001,8 @@ func TestMapConfiguration(t *testing.T) {
 }
 
 // TestConvertToTaskStatusAllFields tests convertToTaskStatus with all fields populated.
+const epsilon = 1e-4
+
 func TestConvertToTaskStatusAllFields(t *testing.T) {
 	data := `{
         "guess": {
@@ -1053,11 +1058,11 @@ func TestConvertToTaskStatusAllFields(t *testing.T) {
 	assert.Equal(t, update.Guess.GuessBase, status.HashcatGuess.GuessBase)
 	assert.Equal(t, update.Guess.GuessBaseCount, status.HashcatGuess.GuessBaseCount)
 	assert.Equal(t, update.Guess.GuessBaseOffset, status.HashcatGuess.GuessBaseOffset)
-	assert.InEpsilon(t, update.Guess.GuessBasePercent, status.HashcatGuess.GuessBasePercentage, 0.0001)
+	assert.InEpsilon(t, update.Guess.GuessBasePercent, status.HashcatGuess.GuessBasePercentage, epsilon)
 	assert.Equal(t, update.Guess.GuessMod, status.HashcatGuess.GuessMod)
 	assert.Equal(t, update.Guess.GuessModCount, status.HashcatGuess.GuessModCount)
 	assert.Equal(t, update.Guess.GuessModOffset, status.HashcatGuess.GuessModOffset)
-	assert.InEpsilon(t, update.Guess.GuessModPercent, status.HashcatGuess.GuessModPercentage, 0.0001)
+	assert.InEpsilon(t, update.Guess.GuessModPercent, status.HashcatGuess.GuessModPercentage, epsilon)
 	assert.Equal(t, update.Guess.GuessMode, status.HashcatGuess.GuessMode)
 }
 
@@ -1082,6 +1087,7 @@ func TestHandleSendStatusResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Helper()
 			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
 			defer cleanupState()
 
