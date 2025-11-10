@@ -9,15 +9,24 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
-// NewMockSession creates a minimal hashcat.Session for testing.
-// It uses hashcat.NewHashcatSession with test parameters (simple mask attack, test hash).
-// Sets SkipStatusUpdates to true to avoid status parsing.
-// Returns the session without starting it.
-// Document that this creates a real session object but doesn't execute hashcat.
-// Cleanup should be called after test.
+// NewMockSession creates a minimal hashcat.Session for testing without requiring the hashcat binary.
+// It creates a session object with initialized channels that can be used in tests.
+// The session is not started and does not execute hashcat.
+// Returns a session that can be used in tests that need a Session reference but don't actually
+// execute hashcat. The Cleanup method is a no-op since no process is started.
 func NewMockSession(sessionName string) (*hashcat.Session, error) {
-	params := CreateTestHashcatParams()
-	return hashcat.NewHashcatSession(sessionName, params)
+	// Create a mock session with initialized channels
+	// This bypasses the need for the hashcat binary entirely
+	sess := &hashcat.Session{
+		CrackedHashes:     make(chan hashcat.Result, 5),
+		StatusUpdates:     make(chan hashcat.Status, 5),
+		StderrMessages:    make(chan string, 5),
+		StdoutLines:       make(chan string, 5),
+		DoneChan:          make(chan error),
+		SkipStatusUpdates: true,
+	}
+
+	return sess, nil
 }
 
 // MockSessionWithChannels creates a session with pre-initialized channels for testing.
