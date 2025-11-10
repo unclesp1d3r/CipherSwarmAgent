@@ -26,7 +26,10 @@ func TestGetNewTask(t *testing.T) {
 			setupMock: func() {
 				task := testhelpers.NewTestTask(123, 456)
 				// According to swagger.json, the response is the Task object directly, not wrapped
-				jsonResponse, _ := json.Marshal(task)
+				jsonResponse, err := json.Marshal(task)
+				if err != nil {
+					panic(err)
+				}
 				responder := httpmock.ResponderFromResponse(&http.Response{
 					Status:     http.StatusText(http.StatusOK),
 					StatusCode: http.StatusOK,
@@ -63,6 +66,7 @@ func TestGetNewTask(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Helper()
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
@@ -103,7 +107,10 @@ func TestGetAttackParameters(t *testing.T) {
 			setupMock: func(attackID int64) {
 				attack := testhelpers.NewTestAttack(attackID, 0)
 				// According to swagger.json, the response is the Attack object directly, not wrapped
-				jsonResponse, _ := json.Marshal(attack)
+				jsonResponse, err := json.Marshal(attack)
+				if err != nil {
+					panic(err)
+				}
 				responder := httpmock.ResponderFromResponse(&http.Response{
 					Status:     http.StatusText(http.StatusOK),
 					StatusCode: http.StatusOK,
@@ -119,7 +126,7 @@ func TestGetAttackParameters(t *testing.T) {
 		{
 			name:     "attack not found - HTTP 404",
 			attackID: 999,
-			setupMock: func(attackID int64) {
+			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNotFound, "Not Found")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/attacks/\d+$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
@@ -131,6 +138,7 @@ func TestGetAttackParameters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Helper()
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
@@ -164,7 +172,7 @@ func TestAcceptTask(t *testing.T) {
 		{
 			name: "successful task acceptance",
 			task: testhelpers.NewTestTask(123, 456),
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
@@ -174,7 +182,7 @@ func TestAcceptTask(t *testing.T) {
 		{
 			name: "nil task",
 			task: nil,
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				// No mock needed for nil task
 			},
 			expectedError: true,
@@ -182,7 +190,7 @@ func TestAcceptTask(t *testing.T) {
 		{
 			name: "API error during acceptance",
 			task: testhelpers.NewTestTask(123, 456),
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusInternalServerError, "Internal Server Error")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
@@ -193,6 +201,7 @@ func TestAcceptTask(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Helper()
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
@@ -229,7 +238,7 @@ func TestAbandonTask(t *testing.T) {
 		{
 			name: "successful task abandonment",
 			task: testhelpers.NewTestTask(123, 456),
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/set_abandoned$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
@@ -238,14 +247,14 @@ func TestAbandonTask(t *testing.T) {
 		{
 			name: "nil task - should not panic",
 			task: nil,
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				// No mock needed for nil task
 			},
 		},
 		{
 			name: "API error during abandonment - should log but not return error",
 			task: testhelpers.NewTestTask(123, 456),
-			setupMock: func(taskID int64) {
+			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/set_abandoned$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
@@ -255,6 +264,7 @@ func TestAbandonTask(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Helper()
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 

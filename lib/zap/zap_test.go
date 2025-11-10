@@ -26,7 +26,7 @@ func TestRemoveExistingZapFile(t *testing.T) {
 			name: "remove existing file",
 			setupFile: func() string {
 				filePath := filepath.Join(tempDir, "test1.zap")
-				err := os.WriteFile(filePath, []byte("test content"), 0o644)
+				err := os.WriteFile(filePath, []byte("test content"), 0o600)
 				require.NoError(t, err)
 				return filePath
 			},
@@ -135,11 +135,11 @@ invalidline
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			zapFilePath := filepath.Join(tempDir, tt.name+".zap")
-			err := os.WriteFile(zapFilePath, []byte(tt.content), 0o644)
+			err := os.WriteFile(zapFilePath, []byte(tt.content), 0o600)
 			require.NoError(t, err)
 
 			callCount := 0
-			mockSendFunc := func(t2 time.Time, hash, plaintext string, task *components.Task) {
+			mockSendFunc := func(_ time.Time, hash, plaintext string, _ *components.Task) {
 				callCount++
 				assert.NotEmpty(t, hash)
 				assert.NotEmpty(t, plaintext)

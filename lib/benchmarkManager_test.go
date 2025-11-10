@@ -119,7 +119,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 					Device:    "2",
 				},
 			},
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
@@ -127,9 +127,9 @@ func TestSendBenchmarkResults(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "empty benchmark results",
+			name:    "empty benchmark results",
 			results: []benchmarkResult{},
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
@@ -146,9 +146,10 @@ func TestSendBenchmarkResults(t *testing.T) {
 					Device:    "1",
 				},
 			},
-			setupMock: func(agentID int64) {
-				responder := httpmock.NewStringResponder(http.StatusInternalServerError, "Internal Server Error")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
+			setupMock: func(_ int64) {
+				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
+				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
+				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\\d+/submit_benchmark$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
 			},
 			expectedError: true,
@@ -175,7 +176,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 					Device:    "3",
 				},
 			},
-			setupMock: func(agentID int64) {
+			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
