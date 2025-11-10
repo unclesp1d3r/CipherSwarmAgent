@@ -5,7 +5,7 @@ on:
   pull_request:
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
 jobs:
   build:
     strategy:
@@ -37,3 +37,29 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: Run coverage
+        run: |
+          # Test individual packages that don't hang
+          go test -race -coverprofile=coverage_progress.out -covermode=atomic ./lib/progress/... || true
+          go test -race -coverprofile=coverage_downloader.out -covermode=atomic ./lib/downloader/... || true
+          go test -race -coverprofile=coverage_zap.out -covermode=atomic ./lib/zap/... || true
+          # Merge coverage files
+          echo "mode: atomic" > coverage.out
+          tail -q -n +2 coverage_*.out >> coverage.out || true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

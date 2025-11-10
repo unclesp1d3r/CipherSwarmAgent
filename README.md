@@ -3,6 +3,7 @@
 ![GitHub last commit](https://img.shields.io/github/last-commit/unclesp1d3r/CipherSwarmAgent)
 ![Maintenance](https://img.shields.io/maintenance/yes/2024)
 [![Maintainability](https://api.codeclimate.com/v1/badges/9c76ebe483ef3b1eff8d/maintainability)](https://codeclimate.com/github/unclesp1d3r/CipherSwarmAgent/maintainability)
+[![codecov](https://codecov.io/gh/unclesp1d3r/CipherSwarmAgent/branch/main/graph/badge.svg)](https://codecov.io/gh/unclesp1d3r/CipherSwarmAgent)
 [![wakatime](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent.svg)](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent)
 [![Go Report Card](https://goreportcard.com/badge/github.com/unclesp1d3r/cipherswarmagent)](https://goreportcard.com/report/github.com/unclesp1d3r/cipherswarmagent)
 
