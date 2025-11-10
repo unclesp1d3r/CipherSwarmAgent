@@ -47,14 +47,20 @@ jobs:
         with:
           go-version: 'stable'
       - name: Run coverage
+        continue-on-error: true
         run: |
           # Test individual packages that don't hang
-          go test -race -coverprofile=coverage_progress.out -covermode=atomic ./lib/progress/... || true
-          go test -race -coverprofile=coverage_downloader.out -covermode=atomic ./lib/downloader/... || true
-          go test -race -coverprofile=coverage_zap.out -covermode=atomic ./lib/zap/... || true
+          go test -race -coverprofile=coverage_progress.out -covermode=atomic ./lib/progress/...
+          go test -race -coverprofile=coverage_downloader.out -covermode=atomic ./lib/downloader/...
+          go test -race -coverprofile=coverage_zap.out -covermode=atomic ./lib/zap/...
           # Merge coverage files
-          echo "mode: atomic" > coverage.out
-          tail -q -n +2 coverage_*.out >> coverage.out || true
+          if ls coverage_*.out 1>/dev/null 2>&1; then
+            echo "mode: atomic" > coverage.out
+            tail -q -n +2 coverage_*.out >> coverage.out
+          else
+            echo "No coverage files found. Coverage report will not be generated."
+            exit 1
+          fi
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
