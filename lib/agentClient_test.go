@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,18 @@ func boolPtr(b bool) *bool {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+// stubGetDevicesList replaces getDevicesListFn with a stub that returns mock devices.
+// Returns a cleanup function to restore the original function.
+func stubGetDevicesList() func() {
+	original := getDevicesListFn
+	getDevicesListFn = func(ctx context.Context) ([]string, error) {
+		return []string{"CPU", "GPU0"}, nil
+	}
+	return func() {
+		getDevicesListFn = original
+	}
 }
 
 func TestConvertToTaskStatusGuessBasePercentage(t *testing.T) {
@@ -344,6 +357,10 @@ func TestUpdateAgentMetadata(t *testing.T) {
 
 			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
 			defer cleanupState()
+
+			// Stub getDevicesList to avoid requiring hashcat binary
+			cleanupStub := stubGetDevicesList()
+			defer cleanupStub()
 
 			tt.setupMock(123)
 
