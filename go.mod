@@ -16,7 +16,6 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.8.5
-	go.uber.org/mock v0.4.0
 )
 
 require (
