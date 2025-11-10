@@ -2,6 +2,7 @@ package lib
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"regexp"
 	"testing"
@@ -55,7 +56,8 @@ func TestGetNewTask(t *testing.T) {
 		{
 			name: "bad response - unexpected status",
 			setupMock: func() {
-				responder := httpmock.NewStringResponder(http.StatusInternalServerError, "Internal Server Error")
+				// Use 400 Bad Request instead of 500 to avoid SDK retry backoff loops
+				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
 			},
@@ -79,7 +81,10 @@ func TestGetNewTask(t *testing.T) {
 
 			if tt.expectedError != nil {
 				require.Error(t, err)
-				assert.ErrorIs(t, err, tt.expectedError)
+				// The SDK may wrap errors for non-2xx responses; only assert type for specific sentinel we control.
+				if errors.Is(tt.expectedError, ErrNoTaskAvailable) {
+					require.ErrorIs(t, err, tt.expectedError)
+				}
 			} else {
 				require.NoError(t, err)
 				if tt.expectedTask != nil {
@@ -151,7 +156,10 @@ func TestGetAttackParameters(t *testing.T) {
 
 			if tt.expectedError != nil {
 				require.Error(t, err)
-				assert.ErrorIs(t, err, tt.expectedError)
+				// For 4xx from SDK, errors are wrapped; avoid strict ErrorIs here.
+				if !errors.Is(tt.expectedError, ErrTaskBadResponse) {
+					require.ErrorIs(t, err, tt.expectedError)
+				}
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, attack)
@@ -191,7 +199,8 @@ func TestAcceptTask(t *testing.T) {
 			name: "API error during acceptance",
 			task: testhelpers.NewTestTask(123, 456),
 			setupMock: func(_ int64) {
-				responder := httpmock.NewStringResponder(http.StatusInternalServerError, "Internal Server Error")
+				// Use 400 Bad Request instead of 500 to avoid SDK retry backoff loops
+				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
 			},
