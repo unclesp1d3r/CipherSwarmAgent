@@ -13,6 +13,15 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
 )
 
+// mustMarshal marshals v to JSON or panics in tests if it fails.
+func mustMarshal(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 // SetupHTTPMock initializes httpmock, activates it, and returns a cleanup function.
 // This ensures consistent setup/teardown across tests.
 func SetupHTTPMock() func() {
@@ -41,7 +50,7 @@ func MockAuthenticationSuccess(agentID int64) {
 		Authenticated: true,
 		AgentID:       agentID,
 	}
-	jsonResponse, _ := json.Marshal(authResponse)
+	jsonResponse := mustMarshal(authResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
@@ -62,7 +71,7 @@ func MockAuthenticationFailure(statusCode int, errorMessage string) {
 		"authenticated": false,
 		"error":         errorMessage,
 	}
-	jsonResponse, _ := json.Marshal(errorResponse)
+	jsonResponse := mustMarshal(errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,
@@ -78,7 +87,7 @@ func MockAuthenticationFailure(statusCode int, errorMessage string) {
 // that returns the provided configuration.
 // Uses a regex pattern to match any HTTP scheme and host.
 func MockConfigurationResponse(config operations.GetConfigurationResponseBody) {
-	jsonResponse, _ := json.Marshal(config)
+	jsonResponse := mustMarshal(config)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
@@ -97,7 +106,7 @@ func MockHeartbeatResponse(agentID int64, state operations.State) {
 	stateResponse := operations.SendHeartbeatResponseBody{
 		State: state,
 	}
-	jsonResponse, _ := json.Marshal(stateResponse)
+	jsonResponse := mustMarshal(stateResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
@@ -122,7 +131,7 @@ func MockAPIError(endpoint string, statusCode int, sdkError sdkerrors.SDKError) 
 		"code":    sdkError.StatusCode,
 		"details": nil,
 	}
-	jsonResponse, _ := json.Marshal(errorResponse)
+	jsonResponse := mustMarshal(errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,
@@ -155,7 +164,7 @@ func MockUpdateAgentSuccess(agentID int64, agent components.Agent) {
 	responseBody := map[string]interface{}{
 		"agent": agent,
 	}
-	jsonResponse, _ := json.Marshal(responseBody)
+	jsonResponse := mustMarshal(responseBody)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
@@ -250,7 +259,7 @@ func MockConfigurationError(statusCode int, errorMsg string) {
 	errorResponse := map[string]interface{}{
 		"error": errorMsg,
 	}
-	jsonResponse, _ := json.Marshal(errorResponse)
+	jsonResponse := mustMarshal(errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,

@@ -5,7 +5,9 @@ This directory contains static test fixtures used across the test suite. These f
 ## File Descriptions
 
 ### `api_responses.json`
+
 Sample API responses from the CipherSwarm server. Contains:
+
 - Authentication success/failure responses
 - Configuration responses (both native and non-native hashcat)
 - Agent metadata responses
@@ -14,7 +16,9 @@ Sample API responses from the CipherSwarm server. Contains:
 - Error responses with different status codes (401, 403, 404, 500)
 
 ### `hashcat_status.json`
+
 Sample hashcat status outputs in various states. Contains:
+
 - Running status - hashcat session in progress
 - Paused status - hashcat session paused
 - Exhausted status - keyspace exhausted, showing 100% progress
@@ -24,7 +28,9 @@ Sample hashcat status outputs in various states. Contains:
 - Mask attack status - attack mode 3 with mask-specific fields
 
 ### `sample_hashes.txt`
+
 Sample hash values for testing hash list operations. Contains:
+
 - MD5 hashes (32 hex characters each)
 - SHA256 hashes (64 hex characters each)
 - Salted hashes (format: `hash:salt`)
@@ -32,7 +38,9 @@ Sample hash values for testing hash list operations. Contains:
 These hashes are not real/crackable - they're provided solely for testing file operations and parsing logic.
 
 ### `sample_wordlist.txt`
+
 Small wordlist file for testing dictionary attack scenarios. Contains 24 common passwords (one per line). This file is used to test:
+
 - Resource file downloading in `lib/downloader/downloader.go`
 - File existence and validation checks
 - Hashcat parameter construction for dictionary attacks
@@ -76,6 +84,7 @@ func TestExample(t *testing.T) {
 ### Using Test Helpers
 
 The `lib/testhelpers` package provides utilities for working with test data:
+
 - `testhelpers.CreateHashListFile()` - Creates hash list files from arrays
 - `testhelpers.CreateTestFile()` - Creates test files with specified content
 - See `lib/testhelpers/README.md` for more details
