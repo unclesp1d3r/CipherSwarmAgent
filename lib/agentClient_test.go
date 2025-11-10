@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime"
 	"testing"
 	"time"
 
@@ -660,6 +661,12 @@ func TestSendCrackedHash(t *testing.T) {
 			// Handle file I/O error test cases
 			switch tt.name {
 			case "file open error - non-writable directory":
+				// Skip on Windows - Windows uses ACLs instead of Unix permissions,
+				// and os.Chmod doesn't prevent file creation the same way
+				if runtime.GOOS == "windows" {
+					t.Skip("Skipping Unix permission test on Windows")
+				}
+
 				// Create a temp directory with read-only permissions
 				tempDir := t.TempDir()
 				t.Cleanup(func() {
@@ -675,6 +682,12 @@ func TestSendCrackedHash(t *testing.T) {
 
 				shared.State.ZapsPath = tempDir
 			case "file write error - read-only file":
+				// Skip on Windows - Windows uses ACLs instead of Unix permissions,
+				// and os.Chmod doesn't prevent file operations the same way
+				if runtime.GOOS == "windows" {
+					t.Skip("Skipping Unix permission test on Windows")
+				}
+
 				// Create a temp directory
 				tempDir := t.TempDir()
 				t.Cleanup(func() {
