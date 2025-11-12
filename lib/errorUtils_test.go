@@ -473,6 +473,8 @@ func TestSendAgentError(t *testing.T) {
 }
 
 // TestHandleSendError tests the handleSendError function.
+// This function should only log errors and NOT attempt to send them again
+// to prevent infinite recursion when error sending itself fails.
 func TestHandleSendError(t *testing.T) {
 	tests := []struct {
 		name string
@@ -495,9 +497,20 @@ func TestHandleSendError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			withHTTPAndState(t, func() {
-				// This function doesn't return an error
+				// Get initial call count
+				initialCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
+
+				// This function should only log, not send
 				handleSendError(tt.err)
-				assertSubmitErrorCalledIfSDK(t, tt.err)
+
+				// Verify that SubmitErrorAgent was NOT called (to prevent recursion)
+				finalCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
+				assert.Equal(
+					t,
+					initialCount,
+					finalCount,
+					"handleSendError should not call SendAgentError to prevent infinite recursion",
+				)
 			})
 		})
 	}
