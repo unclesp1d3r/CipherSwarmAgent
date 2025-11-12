@@ -42,7 +42,7 @@ func MockSessionWithChannels(sessionName string) (*hashcat.Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Channels are already initialized by NewHashcatSession
+	// Channels are already initialized by NewMockSession
 	return sess, nil
 }
 
