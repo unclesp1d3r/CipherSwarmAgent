@@ -325,7 +325,8 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 }
 
 // handleSendError handles errors that occur during communication with the server.
-// It logs the error locally and attempts to send critical errors to the server.
+// It logs the error locally but does not attempt to send errors to the server again
+// to prevent infinite recursion if the error sending itself fails.
 func handleSendError(err error) {
 	{
 		var (
@@ -336,7 +337,7 @@ func handleSendError(err error) {
 		switch {
 		case stderrors.As(err, &e):
 			shared.Logger.Error("Error sending agent error to server", "error", e.Error())
-			SendAgentError(e.Error(), nil, operations.SeverityCritical)
+			// Do not call SendAgentError() here to prevent infinite recursion
 		case stderrors.As(err, &e1):
 			shared.Logger.Error(
 				"Error sending agent error to server, unexpected error",
@@ -345,7 +346,7 @@ func handleSendError(err error) {
 				"message",
 				e1.Message,
 			)
-			SendAgentError(e1.Error(), nil, operations.SeverityCritical)
+			// Do not call SendAgentError() here to prevent infinite recursion
 		default:
 			shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 		}
