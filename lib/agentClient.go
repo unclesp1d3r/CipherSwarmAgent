@@ -34,6 +34,8 @@ var (
 
 	// setNativeHashcatPathFn allows stubbing setNativeHashcatPath for testing.
 	setNativeHashcatPathFn = setNativeHashcatPath //nolint:gochecknoglobals // Used for testing
+	// getDevicesListFn allows stubbing getDevicesList for testing.
+	getDevicesListFn = getDevicesList //nolint:gochecknoglobals // Used for testing
 )
 
 // Define static errors.
@@ -122,7 +124,7 @@ func UpdateAgentMetadata() error {
 
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
-	devices, err := getDevicesList(context.Background())
+	devices, err := getDevicesListFn(context.Background())
 	if err != nil {
 		return cserrors.LogAndSendError("Error getting devices", err, operations.SeverityCritical, nil)
 	}

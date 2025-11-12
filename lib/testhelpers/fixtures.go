@@ -2,6 +2,7 @@
 package testhelpers
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -10,6 +11,21 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
+)
+
+const (
+	defaultSpeed               = 1_000_000
+	defaultUtil                = 50
+	defaultTemp                = 60
+	defaultUtilHigh            = 75
+	defaultTempHigh            = 65
+	defaultAgentInterval int64 = 300
+)
+
+const (
+	wordListID = 1
+	ruleListID = 2
+	maskListID = 3
 )
 
 // NewTestTask creates a minimal valid Task object with the specified IDs and reasonable defaults for other fields.
@@ -42,19 +58,19 @@ func NewTestAttack(id int64, attackMode int) *components.Attack {
 		HashListChecksum:  &checksum,
 		HashMode:          intPtr(0),
 		WordList: &components.AttackResourceFile{
-			ID:          1,
+			ID:          wordListID,
 			DownloadURL: wordListURL,
 			Checksum:    checksum,
 			FileName:    "wordlist.txt",
 		},
 		RuleList: &components.AttackResourceFile{
-			ID:          2,
+			ID:          ruleListID,
 			DownloadURL: ruleListURL,
 			Checksum:    checksum,
 			FileName:    "rules.txt",
 		},
 		MaskList: &components.AttackResourceFile{
-			ID:          3,
+			ID:          maskListID,
 			DownloadURL: maskListURL,
 			Checksum:    checksum,
 			FileName:    "masks.txt",
@@ -87,9 +103,9 @@ func NewTestHashcatStatus(sessionName string) hashcat.Status {
 				DeviceID:   0,
 				DeviceName: "CPU",
 				DeviceType: "CPU",
-				Speed:      1000000,
-				Util:       50,
-				Temp:       60,
+				Speed:      defaultSpeed,
+				Util:       defaultUtil,
+				Temp:       defaultTemp,
 			},
 		},
 		TimeStart:     now.Unix(),
@@ -105,15 +121,15 @@ func NewTestDeviceStatus(deviceID int64, deviceType string) hashcat.StatusDevice
 		DeviceID:   deviceID,
 		DeviceName: deviceType + " Device",
 		DeviceType: deviceType,
-		Speed:      1000000,
-		Util:       75,
-		Temp:       65,
+		Speed:      defaultSpeed,
+		Util:       defaultUtilHigh,
+		Temp:       defaultTempHigh,
 	}
 }
 
 // NewTestAgentConfiguration creates a test agent configuration with specified settings.
 func NewTestAgentConfiguration(useNativeHashcat bool) operations.GetConfigurationResponseBody {
-	interval := int64(300)
+	interval := defaultAgentInterval
 	return operations.GetConfigurationResponseBody{
 		APIVersion: 1,
 		Config: components.AdvancedAgentConfiguration{
@@ -169,9 +185,8 @@ func NewTestAgent(agentID int64, hostname string) components.Agent {
 // Tests using UpdateAgentMetadata should either use build tags or accept that real host info is used.
 func MockHostInfo() (*host.InfoStat, error) {
 	// This is a placeholder - actual tests should use build tags or accept real host.Info()
-	// For now, we return a simple mock structure
-	// Note: host.InfoStat is from gopsutil/v3/host package
-	return nil, nil
+	// Returning a sentinel error avoids returning nil, nil which linters disallow.
+	return nil, errors.New("mock not implemented")
 }
 
 // MockDevicesList returns a mock list of device names for testing device discovery.

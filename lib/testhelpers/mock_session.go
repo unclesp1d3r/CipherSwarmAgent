@@ -9,15 +9,29 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
-// NewMockSession creates a minimal hashcat.Session for testing.
-// It uses hashcat.NewHashcatSession with test parameters (simple mask attack, test hash).
-// Sets SkipStatusUpdates to true to avoid status parsing.
-// Returns the session without starting it.
-// Document that this creates a real session object but doesn't execute hashcat.
-// Cleanup should be called after test.
-func NewMockSession(sessionName string) (*hashcat.Session, error) {
-	params := CreateTestHashcatParams()
-	return hashcat.NewHashcatSession(sessionName, params)
+const channelBufferSize = 5 // Buffer size for mock session channels
+
+// NewMockSession creates a minimal hashcat.Session for testing without requiring the hashcat binary.
+// It creates a session object with initialized channels that can be used in tests.
+// The session is not started and does not execute hashcat.
+// Returns a session that can be used in tests that need a Session reference but don't actually
+// execute hashcat. The Cleanup method is a no-op since no process is started.
+//
+// The sessionName parameter is currently unused but kept for API consistency with potential
+// future use cases where session naming might be needed.
+func NewMockSession(_ string) (*hashcat.Session, error) {
+	// Create a mock session with initialized channels
+	// This bypasses the need for the hashcat binary entirely
+	sess := &hashcat.Session{
+		CrackedHashes:     make(chan hashcat.Result, channelBufferSize),
+		StatusUpdates:     make(chan hashcat.Status, channelBufferSize),
+		StderrMessages:    make(chan string, channelBufferSize),
+		StdoutLines:       make(chan string, channelBufferSize),
+		DoneChan:          make(chan error),
+		SkipStatusUpdates: true,
+	}
+
+	return sess, nil
 }
 
 // MockSessionWithChannels creates a session with pre-initialized channels for testing.
@@ -28,7 +42,7 @@ func MockSessionWithChannels(sessionName string) (*hashcat.Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Channels are already initialized by NewHashcatSession
+	// Channels are already initialized by NewMockSession
 	return sess, nil
 }
 
@@ -46,9 +60,15 @@ func CreateTestHashcatParams() hashcat.Params {
 
 	hashFile := filepath.Join(tempDir, "test_hash.txt")
 	// Create an empty hash file
-	file, _ := os.Create(hashFile)
+	file, err := os.Create(hashFile)
+	if err != nil {
+		panic(err)
+	}
 	if file != nil {
-		_, _ = file.WriteString("testhash\n")
+		_, err = file.WriteString("testhash\n")
+		if err != nil {
+			panic(err)
+		}
 		_ = file.Close()
 	}
 

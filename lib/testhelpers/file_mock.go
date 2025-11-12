@@ -16,7 +16,7 @@ import (
 // CreateTempTestDir creates a temporary directory for test file operations
 // and registers a cleanup function with t.Cleanup() to automatically remove it after the test completes.
 // Returns the directory path.
-func CreateTempTestDir(t *testing.T, prefix string) string {
+func CreateTempTestDir(t *testing.T, _ string) string {
 	t.Helper()
 	return t.TempDir()
 }
@@ -50,7 +50,10 @@ func MockDownloadServer(t *testing.T, baseDir string) *httptest.Server {
 		defer file.Close()
 
 		w.Header().Set("Content-Type", "application/octet-stream")
-		_, _ = io.Copy(w, file)
+		if _, err := io.Copy(w, file); err != nil {
+			http.Error(w, "copy failed", http.StatusInternalServerError)
+			return
+		}
 	}))
 
 	t.Cleanup(func() {
