@@ -99,4 +99,3 @@ The `lib/testhelpers` package provides utilities for working with test data:
 ## Build System
 
 The `testdata` directory is ignored by the Go build system by convention. Files in `testdata` directories are not included in builds but are accessible to tests via relative paths from the test file location.
-

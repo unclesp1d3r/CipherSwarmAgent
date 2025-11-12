@@ -1,5 +1,8 @@
 //go:build windows
 
+// Package arch provides architecture-specific functionality for Windows systems.
+// It includes utilities for device detection, platform identification, and
+// execution of system-specific commands like hashcat and 7z.
 package arch
 
 import (
@@ -67,6 +70,7 @@ func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) 
 	return strings.TrimSpace(string(out)), nil
 }
 
+// GetPlatform returns the platform identifier for Windows systems.
 func GetPlatform() string {
 	return "windows"
 }
@@ -83,7 +87,9 @@ func GetPlatform() string {
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
 func Extract7z(ctx context.Context, srcFile, destDir string) error {
-	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).Output()
+	//nolint:gosec // srcFile and destDir are validated by caller
+	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).
+		Output()
 	return err
 }
 
