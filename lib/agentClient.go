@@ -275,8 +275,8 @@ func handleStateResponse(stateResponse *operations.SendHeartbeatResponseBody) *o
 		return nil
 	}
 
-	state := stateResponse.GetState()
-	switch state {
+	agentState := stateResponse.GetState()
+	switch agentState {
 	case operations.StatePending:
 		if state.State.ExtraDebugging {
 			state.Logger.Debug("Agent is pending")
@@ -291,7 +291,7 @@ func handleStateResponse(stateResponse *operations.SendHeartbeatResponseBody) *o
 		}
 	}
 
-	return &state
+	return &agentState
 }
 
 // sendStatusUpdate sends a status update to the server for a given task and session.
