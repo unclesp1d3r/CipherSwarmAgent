@@ -241,13 +241,13 @@ func heartbeat(signChan chan os.Signal) {
 		state.Logger.Debug("Sending heartbeat")
 	}
 
-	state := lib.SendHeartBeat()
-	if state != nil {
+	agentState := lib.SendHeartBeat()
+	if agentState != nil {
 		if state.State.ExtraDebugging {
-			state.Logger.Debug("Received heartbeat response", "state", state)
+			state.Logger.Debug("Received heartbeat response", "state", agentState)
 		}
 
-		switch *state {
+		switch *agentState {
 		case operations.StatePending:
 			if state.State.CurrentActivity != state.CurrentActivityBenchmarking {
 				state.Logger.Info("Agent is pending, performing reload")
