@@ -17,7 +17,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 // ErrHashcatBinaryNotFound indicates the hashcat binary could not be located.
@@ -33,9 +33,9 @@ func FindHashcatBinary() (string, error) {
 
 	possiblePaths := []string{
 		viper.GetString("hashcat_path"),
-		path.Join(shared.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
+		path.Join(state.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
 		path.Join(filepath.Dir(os.Args[0]), arch.GetDefaultHashcatBinaryName()),
-		path.Join(shared.State.CrackersPath, "hashcat", "hashcat"),
+		path.Join(state.State.CrackersPath, "hashcat", "hashcat"),
 		path.Join(filepath.Dir(os.Args[0]), "hashcat"),
 		"/usr/bin/hashcat",
 		"/usr/local/bin/hashcat",
@@ -91,29 +91,29 @@ func CheckForExistingClient(pidFilePath string) bool {
 	if fileutil.IsExist(pidFilePath) {
 		pidString, err := fileutil.ReadFileToString(pidFilePath)
 		if err != nil {
-			shared.Logger.Error("Error reading PID file", "path", pidFilePath)
+			state.Logger.Error("Error reading PID file", "path", pidFilePath)
 
 			return true
 		}
 
 		pidValue, err := convertor.ToInt(strutil.Trim(pidString))
 		if err != nil {
-			shared.Logger.Error("Error converting PID to integer", "pid", pidString)
+			state.Logger.Error("Error converting PID to integer", "pid", pidString)
 
 			return true
 		}
 
 		pidRunning, err := process.PidExists(int32(pidValue)) //nolint:gosec // PID conversion from file is safe
 		if err != nil {
-			shared.Logger.Error("Error checking if process is running", "pid", pidValue)
+			state.Logger.Error("Error checking if process is running", "pid", pidValue)
 
 			return true
 		}
 
-		shared.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
+		state.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
 
 		if !pidRunning {
-			shared.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
+			state.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
 		}
 
 		return pidRunning
@@ -126,14 +126,14 @@ func CheckForExistingClient(pidFilePath string) bool {
 // This is used to prevent multiple hashcat instances from running simultaneously.
 // Returns an error if the file cannot be written.
 func CreateLockFile() error {
-	lockFilePath := shared.State.PidFile
+	lockFilePath := state.State.PidFile
 
 	pidValue := os.Getpid()
 	pidString := convertor.ToString(pidValue)
 
 	err := fileutil.WriteStringToFile(lockFilePath, pidString, false)
 	if err != nil {
-		shared.Logger.Error("Error writing PID to file", "path", lockFilePath)
+		state.Logger.Error("Error writing PID to file", "path", lockFilePath)
 
 		return err
 	}
@@ -146,31 +146,31 @@ func CreateLockFile() error {
 // Returns an error if any directory creation fails.
 func CreateDataDirs() error {
 	dataDirs := []string{
-		shared.State.FilePath,
-		shared.State.CrackersPath,
-		shared.State.HashlistPath,
-		shared.State.ZapsPath,
-		shared.State.PreprocessorsPath,
-		shared.State.ToolsPath,
-		shared.State.OutPath,
-		shared.State.RestoreFilePath,
+		state.State.FilePath,
+		state.State.CrackersPath,
+		state.State.HashlistPath,
+		state.State.ZapsPath,
+		state.State.PreprocessorsPath,
+		state.State.ToolsPath,
+		state.State.OutPath,
+		state.State.RestoreFilePath,
 	}
 
 	for _, dir := range dataDirs {
 		if strutil.IsBlank(dir) {
-			shared.Logger.Error("Data directory not set")
+			state.Logger.Error("Data directory not set")
 
 			continue
 		}
 
 		if !fileutil.IsDir(dir) {
 			if err := fileutil.CreateDir(dir); err != nil {
-				shared.Logger.Error("Error creating directory", "path", dir, "error", err)
+				state.Logger.Error("Error creating directory", "path", dir, "error", err)
 
 				return err
 			}
 
-			shared.Logger.Info("Created directory", "path", dir)
+			state.Logger.Info("Created directory", "path", dir)
 		}
 	}
 
@@ -181,13 +181,13 @@ func CreateDataDirs() error {
 // It removes any previous backup, backs up the current installation, and extracts
 // the new archive. Returns the path to the newly extracted hashcat directory.
 func ExtractHashcatArchive(ctx context.Context, newArchivePath string) (string, error) {
-	hashcatDirectory := path.Join(shared.State.CrackersPath, "hashcat")
+	hashcatDirectory := path.Join(state.State.CrackersPath, "hashcat")
 	hashcatBackupDirectory := hashcatDirectory + "_old"
 
 	// Remove old backup directory if it exists
 	err := os.RemoveAll(hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
-		shared.Logger.Error("Error removing old hashcat directory", "error", err)
+		state.Logger.Error("Error removing old hashcat directory", "error", err)
 
 		return "", err
 	}
@@ -195,15 +195,15 @@ func ExtractHashcatArchive(ctx context.Context, newArchivePath string) (string, 
 	// Back up current hashcat installation
 	err = os.Rename(hashcatDirectory, hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
-		shared.Logger.Error("Error moving old hashcat directory", "error", err)
+		state.Logger.Error("Error moving old hashcat directory", "error", err)
 
 		return "", err
 	}
 
 	// Extract new hashcat archive
-	err = arch.Extract7z(ctx, newArchivePath, shared.State.CrackersPath)
+	err = arch.Extract7z(ctx, newArchivePath, state.State.CrackersPath)
 	if err != nil {
-		shared.Logger.Error("Error extracting file", "error", err)
+		state.Logger.Error("Error extracting file", "error", err)
 
 		return "", err
 	}
@@ -215,16 +215,16 @@ func ExtractHashcatArchive(ctx context.Context, newArchivePath string) (string, 
 // It relocates the archive to the crackers path with a standard name.
 // Returns the new path or an error if the move fails.
 func MoveArchiveFile(tempArchivePath string) (string, error) {
-	newArchivePath := path.Join(shared.State.CrackersPath, "hashcat.7z")
+	newArchivePath := path.Join(state.State.CrackersPath, "hashcat.7z")
 
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
-		shared.Logger.Error("Error moving file", err)
+		state.Logger.Error("Error moving file", err)
 
 		return "", err
 	}
 
-	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
+	state.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
 
 	return newArchivePath, err
 }
