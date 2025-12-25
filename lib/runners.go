@@ -8,7 +8,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 // runAttackTask starts the attack session and handles real-time outputs and status updates.
@@ -16,7 +16,7 @@ import (
 func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
-		shared.Logger.Error("Failed to start attack session", "error", err)
+		state.Logger.Error("Failed to start attack session", "error", err)
 		SendAgentError(err.Error(), task, operations.SeverityFatal)
 
 		return
@@ -55,7 +55,7 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 
 		err := json.Unmarshal([]byte(stdoutLine), &update)
 		if err != nil {
-			shared.Logger.Error("Failed to parse status update", "error", err)
+			state.Logger.Error("Failed to parse status update", "error", err)
 		} else {
 			displayJobStatus(update)
 			sendStatusUpdate(update, task, sess)
@@ -103,11 +103,11 @@ func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session) {
 	if strings.Contains(err.Error(), "Cannot read "+sess.RestoreFilePath) {
 		if strings.TrimSpace(sess.RestoreFilePath) != "" {
-			shared.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
+			state.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
 
 			err := os.Remove(sess.RestoreFilePath)
 			if err != nil {
-				shared.Logger.Error("Failed to remove restore file", "error", err)
+				state.Logger.Error("Failed to remove restore file", "error", err)
 			}
 		}
 	} else {

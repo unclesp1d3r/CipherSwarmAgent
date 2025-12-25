@@ -18,7 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 const (
@@ -30,12 +30,12 @@ const (
 func DownloadFile(fileURL, filePath, checksum string) error {
 	parsedURL, err := url.Parse(fileURL)
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
-		shared.Logger.Error("Invalid URL", "url", fileURL)
+		state.Logger.Error("Invalid URL", "url", fileURL)
 		return errors.New("invalid URL")
 	}
 
 	if FileExistsAndValid(filePath, checksum) {
-		shared.Logger.Info("Download already exists", "path", filePath)
+		state.Logger.Info("Download already exists", "path", filePath)
 		return nil
 	}
 
@@ -60,7 +60,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 
 	fileChecksum, err := cryptor.Md5File(filePath)
 	if err != nil {
-		shared.Logger.Error("Error calculating file checksum", "path", filePath, "error", err)
+		state.Logger.Error("Error calculating file checksum", "path", filePath, "error", err)
 
 		return false
 	}
@@ -69,7 +69,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 		return true
 	}
 
-	shared.Logger.Warn(
+	state.Logger.Warn(
 		"Checksums do not match",
 		"path",
 		filePath,
@@ -80,7 +80,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 	)
 
 	if err := os.Remove(filePath); err != nil {
-		shared.Logger.Error("Error removing file with mismatched checksum", "path", filePath, "error", err)
+		state.Logger.Error("Error removing file with mismatched checksum", "path", filePath, "error", err)
 	}
 
 	return false
@@ -104,7 +104,7 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 		Ctx:      context.Background(),
 		Dst:      filePath,
 		Src:      fileURL,
-		Pwd:      shared.State.CrackersPath,
+		Pwd:      state.State.CrackersPath,
 		Insecure: true,
 		Mode:     getter.ClientModeFile,
 	}
@@ -115,7 +115,7 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 	)
 
 	if err := client.Get(); err != nil {
-		shared.Logger.Debug("Error downloading file", "error", err)
+		state.Logger.Debug("Error downloading file", "error", err)
 
 		return err
 	}
@@ -152,14 +152,14 @@ func DownloadHashList(attack *components.Attack) error {
 		return errors.New("attack is nil")
 	}
 
-	hashlistPath := path.Join(shared.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.GetID()))
-	shared.Logger.Debug("Downloading hash list", "url", attack.GetHashListURL(), "path", hashlistPath)
+	hashlistPath := path.Join(state.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.GetID()))
+	state.Logger.Debug("Downloading hash list", "url", attack.GetHashListURL(), "path", hashlistPath)
 
 	if err := removeExistingFile(hashlistPath); err != nil {
 		return err
 	}
 
-	response, err := shared.State.SdkClient.Attacks.GetHashList(context.Background(), attack.ID)
+	response, err := state.State.SdkClient.Attacks.GetHashList(context.Background(), attack.ID)
 	if err != nil {
 		return errors.Wrap(err, "error downloading hashlist from the CipherSwarm API")
 	}
@@ -180,7 +180,7 @@ func DownloadHashList(attack *components.Attack) error {
 		return errors.New("downloaded hash list is empty")
 	}
 
-	shared.Logger.Debug("Downloaded hash list", "path", hashlistPath)
+	state.Logger.Debug("Downloaded hash list", "path", hashlistPath)
 
 	return nil
 }
@@ -190,7 +190,7 @@ func DownloadHashList(attack *components.Attack) error {
 func Base64ToHex(b64 string) string {
 	data, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		shared.Logger.Error("Error decoding base64 string", "error", err)
+		state.Logger.Error("Error decoding base64 string", "error", err)
 
 		return ""
 	}
@@ -221,7 +221,7 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	}
 	defer func(f *os.File) {
 		if err := f.Close(); err != nil {
-			shared.Logger.Error("Error closing file", "error", err)
+			state.Logger.Error("Error closing file", "error", err)
 		}
 	}(file)
 
@@ -236,7 +236,7 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 // It logs any errors encountered during the removal process.
 func CleanupTempDir(tempDir string) error {
 	if err := os.RemoveAll(tempDir); err != nil {
-		shared.Logger.Error("Error removing temporary directory", "path", tempDir, "error", err)
+		state.Logger.Error("Error removing temporary directory", "path", tempDir, "error", err)
 		return err
 	}
 

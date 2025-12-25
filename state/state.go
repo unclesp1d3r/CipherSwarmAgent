@@ -1,5 +1,5 @@
-// Package shared provides common state and configuration structures used across the CipherSwarm Agent.
-package shared
+// Package state provides common state and configuration structures used across the CipherSwarm Agent.
+package state
 
 import (
 	"os"
