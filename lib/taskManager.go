@@ -13,7 +13,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 var (
@@ -30,7 +30,7 @@ var (
 // If the server responds with no content, it means no new task is available, and the function returns nil without error.
 // For any other unexpected response status, an error is returned.
 func GetNewTask() (*components.Task, error) {
-	response, err := shared.State.SdkClient.Tasks.GetNewTask(context.Background())
+	response, err := state.State.SdkClient.Tasks.GetNewTask(context.Background())
 	if err != nil {
 		handleAPIError("Error getting new task", err)
 
@@ -52,7 +52,7 @@ func GetNewTask() (*components.Task, error) {
 // GetAttackParameters retrieves the attack parameters for a given attackID via the SdkClient.
 // Returns an Attack object if the API call is successful and the response status is OK.
 func GetAttackParameters(attackID int64) (*components.Attack, error) {
-	response, err := shared.State.SdkClient.Attacks.GetAttack(context.Background(), attackID)
+	response, err := state.State.SdkClient.Attacks.GetAttack(context.Background(), attackID)
 	if err != nil {
 		handleAPIError("Error getting attack parameters", err)
 
@@ -98,7 +98,7 @@ func createJobParams(task *components.Task, attack *components.Attack) hashcat.P
 	return hashcat.Params{
 		AttackMode:       unwrapOr(attack.AttackModeHashcat),
 		HashType:         unwrapOr(attack.HashMode),
-		HashFile:         path.Join(shared.State.HashlistPath, strconv.FormatInt(attack.GetHashListID(), 10)+".txt"),
+		HashFile:         path.Join(state.State.HashlistPath, strconv.FormatInt(attack.GetHashListID(), 10)+".txt"),
 		Mask:             unwrapOrString(attack.GetMask()),
 		MaskIncrement:    unwrapOrBool(attack.GetIncrementMode(), false),
 		MaskIncrementMin: attack.GetIncrementMinimum(),
@@ -119,7 +119,7 @@ func createJobParams(task *components.Task, attack *components.Attack) hashcat.P
 		Limit:            unwrapOr(task.GetLimit()),
 		BackendDevices:   Configuration.Config.BackendDevices,
 		OpenCLDevices:    Configuration.Config.OpenCLDevices,
-		RestoreFilePath:  path.Join(shared.State.RestoreFilePath, strconv.FormatInt(attack.GetID(), 10)+".restore"),
+		RestoreFilePath:  path.Join(state.State.RestoreFilePath, strconv.FormatInt(attack.GetID(), 10)+".restore"),
 	}
 }
 
@@ -137,19 +137,19 @@ func resourceNameOrBlank(resource *components.AttackResourceFile) string {
 // In case of an error during task acceptance, it handles the error and returns it.
 func AcceptTask(task *components.Task) error {
 	if task == nil {
-		shared.Logger.Error("Task is nil")
+		state.Logger.Error("Task is nil")
 
 		return ErrTaskIsNil
 	}
 
-	_, err := shared.State.SdkClient.Tasks.SetTaskAccepted(context.Background(), task.GetID())
+	_, err := state.State.SdkClient.Tasks.SetTaskAccepted(context.Background(), task.GetID())
 	if err != nil {
 		handleAcceptTaskError(err)
 
 		return err
 	}
 
-	shared.Logger.Debug("Task accepted")
+	state.Logger.Debug("Task accepted")
 
 	return nil
 }
@@ -158,12 +158,12 @@ func AcceptTask(task *components.Task) error {
 // Logs an error if the task is nil or if notifying the server fails.
 func markTaskExhausted(task *components.Task) {
 	if task == nil {
-		shared.Logger.Error("Task is nil")
+		state.Logger.Error("Task is nil")
 
 		return
 	}
 
-	_, err := shared.State.SdkClient.Tasks.SetTaskExhausted(context.Background(), task.GetID())
+	_, err := state.State.SdkClient.Tasks.SetTaskExhausted(context.Background(), task.GetID())
 	if err != nil {
 		handleTaskError(err, "Error notifying server of task exhaustion")
 	}
@@ -173,12 +173,12 @@ func markTaskExhausted(task *components.Task) {
 // If the task is nil, it logs an error and returns immediately.
 func AbandonTask(task *components.Task) {
 	if task == nil {
-		shared.Logger.Error("Task is nil")
+		state.Logger.Error("Task is nil")
 
 		return
 	}
 
-	_, err := shared.State.SdkClient.Tasks.SetTaskAbandoned(context.Background(), task.GetID())
+	_, err := state.State.SdkClient.Tasks.SetTaskAbandoned(context.Background(), task.GetID())
 	if err != nil {
 		handleTaskError(err, "Error notifying server of task abandonment")
 	}

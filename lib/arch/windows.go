@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 // GetDevices retrieves a list of GPU devices available on a Windows system.
@@ -22,11 +22,11 @@ import (
 //	[]string: A slice of strings containing the names of the GPU devices.
 //	error: An error object if there was an issue executing the command or parsing the output.
 func GetDevices(ctx context.Context) ([]string, error) {
-	shared.Logger.Debug("Getting GPU devices")
+	state.Logger.Debug("Getting GPU devices")
 	cmd := exec.CommandContext(ctx, "wmic", "path", "win32_videocontroller", "get", "name")
 	out, err := cmd.Output()
 	if err != nil {
-		shared.Logger.Error("Error executing wmic command", "error", err)
+		state.Logger.Error("Error executing wmic command", "error", err)
 		return nil, err
 	}
 
@@ -40,7 +40,7 @@ func GetDevices(ctx context.Context) ([]string, error) {
 	}
 
 	if len(devices) == 0 {
-		shared.Logger.Warn("No GPU devices found")
+		state.Logger.Warn("No GPU devices found")
 		return nil, nil
 	}
 
