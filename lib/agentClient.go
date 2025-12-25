@@ -153,7 +153,7 @@ func UpdateAgentMetadata() error {
 	if response.Agent != nil {
 		displayAgentMetadataUpdated(response)
 	} else {
-		shared.ErrorLogger.Error("bad response: %v", response.RawResponse.Status)
+		shared.ErrorLogger.Error("bad response", "status", response.RawResponse.Status)
 
 		return fmt.Errorf("%w: %s", ErrBadResponse, response.RawResponse.Status)
 	}
