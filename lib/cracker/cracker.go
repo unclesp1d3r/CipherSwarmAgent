@@ -1,7 +1,10 @@
-// Package cracker provides hashcat binary management and execution utilities.
+// Package cracker provides hashcat binary management and process control utilities.
+// It handles binary discovery, version checking, process lifecycle management,
+// and archive extraction for distributed agent environments.
 package cracker
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -14,27 +17,25 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
-var (
-	// ErrHashcatBinaryNotFound is returned when the hashcat binary cannot be located.
-	ErrHashcatBinaryNotFound = errors.New("hashcat binary not found")
-)
+// ErrHashcatBinaryNotFound indicates the hashcat binary could not be located.
+var ErrHashcatBinaryNotFound = errors.New("hashcat binary not found")
 
 const emptyVersion = "0.0.0"
 
-// FindHashcatBinary searches for the Hashcat binary at several predefined locations and returns its path if found.
-// It checks directories specified by configuration, default locations, and the system's PATH environment variable.
-// The function returns an error if the binary is not found or not executable.
+// FindHashcatBinary searches for the hashcat binary in multiple locations.
+// It checks configuration paths, installation directories, and the system PATH.
+// Returns the path to the first executable binary found, or an error if none exist.
 func FindHashcatBinary() (string, error) {
-	var foundPath = ""
+	foundPath := ""
 
 	possiblePaths := []string{
 		viper.GetString("hashcat_path"),
-		path.Join(shared.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
+		path.Join(state.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
 		path.Join(filepath.Dir(os.Args[0]), arch.GetDefaultHashcatBinaryName()),
-		path.Join(shared.State.CrackersPath, "hashcat", "hashcat"),
+		path.Join(state.State.CrackersPath, "hashcat", "hashcat"),
 		path.Join(filepath.Dir(os.Args[0]), "hashcat"),
 		"/usr/bin/hashcat",
 		"/usr/local/bin/hashcat",
@@ -48,12 +49,12 @@ func FindHashcatBinary() (string, error) {
 		}
 	}
 
-	// Didn't find it on the predefined locations. Checking the user's `$PATH` for the default name on this architecture.
+	// Check system PATH for architecture-specific binary name
 	if hashcatPath, err := exec.LookPath(arch.GetDefaultHashcatBinaryName()); err == nil {
 		foundPath = hashcatPath
 	}
 
-	// Last try we'll check for the default name of just hashcat within the user's filePath.
+	// Final fallback: check system PATH for generic "hashcat"
 	if hashcatPath, err := exec.LookPath("hashcat"); err == nil {
 		foundPath = hashcatPath
 	}
@@ -66,17 +67,16 @@ func FindHashcatBinary() (string, error) {
 	return "", ErrHashcatBinaryNotFound
 }
 
-// GetCurrentHashcatVersion attempts to find the Hashcat binary and retrieve its version.
-// It first searches for the Hashcat binary using FindHashcatBinary. If found,
-// it calls arch.GetHashcatVersion with the binary's path. If any step fails,
-// it returns an empty version string and an error.
-func GetCurrentHashcatVersion() (string, error) {
+// GetCurrentHashcatVersion retrieves the version string of the installed hashcat binary.
+// It first locates the binary, then queries it for version information.
+// Returns an empty version string if the binary cannot be found or queried.
+func GetCurrentHashcatVersion(ctx context.Context) (string, error) {
 	hashcatPath, err := FindHashcatBinary()
 	if err != nil {
 		return emptyVersion, err
 	}
 
-	version, err := arch.GetHashcatVersion(hashcatPath)
+	version, err := arch.GetHashcatVersion(ctx, hashcatPath)
 	if err != nil {
 		return emptyVersion, err
 	}
@@ -84,35 +84,36 @@ func GetCurrentHashcatVersion() (string, error) {
 	return version, nil
 }
 
-// CheckForExistingClient checks if a client process is already running by examining a PID file at the specified path.
-// Returns true if the process is found or errors occur, otherwise false.
+// CheckForExistingClient checks if a hashcat process is already running.
+// It reads the PID file and verifies if the process is still active.
+// Returns true if a running process is found or if errors occur during checks.
 func CheckForExistingClient(pidFilePath string) bool {
 	if fileutil.IsExist(pidFilePath) {
 		pidString, err := fileutil.ReadFileToString(pidFilePath)
 		if err != nil {
-			shared.Logger.Error("Error reading PID file", "path", pidFilePath)
+			state.Logger.Error("Error reading PID file", "path", pidFilePath)
 
 			return true
 		}
 
 		pidValue, err := convertor.ToInt(strutil.Trim(pidString))
 		if err != nil {
-			shared.Logger.Error("Error converting PID to integer", "pid", pidString)
+			state.Logger.Error("Error converting PID to integer", "pid", pidString)
 
 			return true
 		}
 
 		pidRunning, err := process.PidExists(int32(pidValue)) //nolint:gosec // PID conversion from file is safe
 		if err != nil {
-			shared.Logger.Error("Error checking if process is running", "pid", pidValue)
+			state.Logger.Error("Error checking if process is running", "pid", pidValue)
 
 			return true
 		}
 
-		shared.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
+		state.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
 
 		if !pidRunning {
-			shared.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
+			state.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
 		}
 
 		return pidRunning
@@ -121,18 +122,18 @@ func CheckForExistingClient(pidFilePath string) bool {
 	return false
 }
 
-// CreateLockFile creates a lock file with the current process PID.
-// Writes the PID to the designated lock file in the shared state.
-// Logs an error and returns it if writing fails.
+// CreateLockFile creates a lock file containing the current process ID.
+// This is used to prevent multiple hashcat instances from running simultaneously.
+// Returns an error if the file cannot be written.
 func CreateLockFile() error {
-	lockFilePath := shared.State.PidFile
+	lockFilePath := state.State.PidFile
 
 	pidValue := os.Getpid()
 	pidString := convertor.ToString(pidValue)
 
 	err := fileutil.WriteStringToFile(lockFilePath, pidString, false)
 	if err != nil {
-		shared.Logger.Error("Error writing PID to file", "path", lockFilePath)
+		state.Logger.Error("Error writing PID to file", "path", lockFilePath)
 
 		return err
 	}
@@ -140,92 +141,90 @@ func CreateLockFile() error {
 	return nil
 }
 
-// CreateDataDirs creates required directories based on the paths set in shared.State. It checks for each path's existence,
-// ensures it's not blank, and creates the directory if it doesn't exist, logging any errors that occur. Returns an error
-// if any directory creation fails.
+// CreateDataDirs creates all required data directories for the agent.
+// It ensures each configured directory path exists, creating it if necessary.
+// Returns an error if any directory creation fails.
 func CreateDataDirs() error {
 	dataDirs := []string{
-		shared.State.FilePath,
-		shared.State.CrackersPath,
-		shared.State.HashlistPath,
-		shared.State.ZapsPath,
-		shared.State.PreprocessorsPath,
-		shared.State.ToolsPath,
-		shared.State.OutPath,
-		shared.State.RestoreFilePath,
+		state.State.FilePath,
+		state.State.CrackersPath,
+		state.State.HashlistPath,
+		state.State.ZapsPath,
+		state.State.PreprocessorsPath,
+		state.State.ToolsPath,
+		state.State.OutPath,
+		state.State.RestoreFilePath,
 	}
 
 	for _, dir := range dataDirs {
 		if strutil.IsBlank(dir) {
-			shared.Logger.Error("Data directory not set")
+			state.Logger.Error("Data directory not set")
 
 			continue
 		}
 
 		if !fileutil.IsDir(dir) {
 			if err := fileutil.CreateDir(dir); err != nil {
-				shared.Logger.Error("Error creating directory", "path", dir, "error", err)
+				state.Logger.Error("Error creating directory", "path", dir, "error", err)
 
 				return err
 			}
 
-			shared.Logger.Info("Created directory", "path", dir)
+			state.Logger.Info("Created directory", "path", dir)
 		}
 	}
 
 	return nil
 }
 
-// ExtractHashcatArchive extracts a new Hashcat archive, backing up and removing any old versions.
-// - Removes the previous backup directory if existent.
-// - Renames the current Hashcat directory for backup.
-// - Extracts the new Hashcat archive to the specified directory.
-// Returns the path to the new Hashcat directory and any error encountered.
-func ExtractHashcatArchive(newArchivePath string) (string, error) {
-	hashcatDirectory := path.Join(shared.State.CrackersPath, "hashcat")
+// ExtractHashcatArchive extracts a new hashcat archive with backup management.
+// It removes any previous backup, backs up the current installation, and extracts
+// the new archive. Returns the path to the newly extracted hashcat directory.
+func ExtractHashcatArchive(ctx context.Context, newArchivePath string) (string, error) {
+	hashcatDirectory := path.Join(state.State.CrackersPath, "hashcat")
 	hashcatBackupDirectory := hashcatDirectory + "_old"
-	// Get rid of the old hashcat backup directory
+
+	// Remove old backup directory if it exists
 	err := os.RemoveAll(hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
-		shared.Logger.Error("Error removing old hashcat directory: ", "error", err)
+		state.Logger.Error("Error removing old hashcat directory", "error", err)
 
-		return "", err // Don't continue if we can't remove the old directory
+		return "", err
 	}
 
-	// Move the old hashcat directory to a backup location
+	// Back up current hashcat installation
 	err = os.Rename(hashcatDirectory, hashcatBackupDirectory)
 	if err != nil && !os.IsNotExist(err) {
-		shared.Logger.Error("Error moving old hashcat directory: ", "error", err)
+		state.Logger.Error("Error moving old hashcat directory", "error", err)
 
-		return "", err // Don't continue if we can't move the old directory
+		return "", err
 	}
 
-	// Extract the new hashcat directory using the 7z command
-	err = arch.Extract7z(newArchivePath, shared.State.CrackersPath)
+	// Extract new hashcat archive
+	err = arch.Extract7z(ctx, newArchivePath, state.State.CrackersPath)
 	if err != nil {
-		shared.Logger.Error("Error extracting file: ", "error", err)
+		state.Logger.Error("Error extracting file", "error", err)
 
-		return "", err // Don't continue if we can't extract the file
+		return "", err
 	}
 
 	return hashcatDirectory, err
 }
 
-// MoveArchiveFile moves a temporary archive file to the designated CrackersPath directory and logs the operation.
-// Parameters:
-// - tempArchivePath: The path to the temporary archive file that needs to be moved.
-// Returns the new path of the moved archive and any error encountered during the move operation.
+// MoveArchiveFile moves a temporary archive file to its final location.
+// It relocates the archive to the crackers path with a standard name.
+// Returns the new path or an error if the move fails.
 func MoveArchiveFile(tempArchivePath string) (string, error) {
-	newArchivePath := path.Join(shared.State.CrackersPath, "hashcat.7z")
+	newArchivePath := path.Join(state.State.CrackersPath, "hashcat.7z")
 
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
-		shared.Logger.Error("Error moving file: ", err)
+		state.Logger.Error("Error moving file", err)
 
 		return "", err
 	}
 
-	shared.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
+	state.Logger.Debug("Moved file", "old_path", tempArchivePath, "new_path", newArchivePath)
 
 	return newArchivePath, err
 }

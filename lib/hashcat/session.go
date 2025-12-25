@@ -1,7 +1,11 @@
+// Package hashcat provides session management and execution control for hashcat processes.
+// It handles process lifecycle, I/O management, and result collection for hash cracking operations
+// in a distributed agent environment.
 package hashcat
 
 import (
 	"bufio"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,49 +16,121 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nxadm/tail"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 const (
-	// Channel buffer sizes.
-	channelBufferSize = 5
-	// File permissions.
-	filePermissions = 0o600
-	// Log parsing constants.
-	logParseMinParts = 3
+	channelBufferSize = 5     // Buffer size for output channels
+	filePermissions   = 0o600 // Restrictive permissions for sensitive files
+	logParseMinParts  = 3     // Minimum expected parts when parsing output log lines
 )
 
-// Session represents a hashcat session that manages the execution, I/O, and communication
-// with the hashcat process.
+// Session represents a hashcat execution session with comprehensive process management.
+// It manages the hashcat process lifecycle, handles I/O streams, and provides channels
+// for real-time communication of results, status updates, and error messages.
+// The session stores a context.CancelFunc to enable graceful shutdown and cancellation
+// of session operations, allowing controlled termination of goroutines and resource cleanup
+// during lifecycle management.
 type Session struct {
-	proc               *exec.Cmd     // The hashcat process
-	hashFile           string        // The path of the file containing the hashes to crack
-	outFile            *os.File      // The file to write cracked hashes to
-	charsetFiles       []*os.File    // Charset files for mask attacks
-	shardedCharsetFile *os.File      // Sharded charset file for mask attacks
-	CrackedHashes      chan Result   // Channel to send cracked hashes to
-	StatusUpdates      chan Status   // Channel to send status updates to
-	StderrMessages     chan string   // Channel to send stderr messages to
-	StdoutLines        chan string   // Channel to send stdout lines to
-	DoneChan           chan error    // Channel to send the done signal to
-	SkipStatusUpdates  bool          // Whether to skip sending status updates
-	RestoreFilePath    string        // Path to the restore file
-	pStdout            io.ReadCloser // Pipe for stdout
-	pStderr            io.ReadCloser // Pipe for stderr
+	proc               *exec.Cmd  // Hashcat process command
+	hashFile           string     // Path to hash input file
+	outFile            *os.File   // Output file for cracked hashes
+	charsetFiles       []*os.File // Custom charset files for mask attacks
+	shardedCharsetFile *os.File   // Sharded charset file for distributed attacks
+	cancel             context.CancelFunc
+	cancelMu           sync.Mutex    // Protects cancel field from concurrent access
+	CrackedHashes      chan Result   // Channel for successfully cracked hashes
+	StatusUpdates      chan Status   // Channel for periodic status updates
+	StderrMessages     chan string   // Channel for error messages from hashcat
+	StdoutLines        chan string   // Channel for stdout lines from hashcat
+	DoneChan           chan error    // Channel signaling process completion
+	SkipStatusUpdates  bool          // Flag to disable status update parsing
+	RestoreFilePath    string        // Path to session restore file
+	pStdout            io.ReadCloser // Stdout pipe from hashcat process
+	pStderr            io.ReadCloser // Stderr pipe from hashcat process
 }
 
-// Start initializes the session by attaching the necessary pipes and starting the hashcat process.
-// It also starts the tailer and handles the output from stdout and stderr concurrently.
+// NewHashcatSession creates and initializes a new hashcat session.
+// It configures the hashcat command with the provided parameters, creates necessary
+// temporary files, and sets up channels for communication.
+// Returns an error if binary lookup, file creation, or argument validation fails.
+func NewHashcatSession(id string, params Params) (*Session, error) {
+	binaryPath, err := cracker.FindHashcatBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	outFile, err := createOutFile(state.State.OutPath, id, filePermissions)
+	if err != nil {
+		cancel()
+
+		return nil, fmt.Errorf("couldn't create output file: %w", err)
+	}
+
+	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
+	if err != nil {
+		cancel()
+		_ = outFile.Close()
+
+		return nil, err
+	}
+
+	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
+	if err != nil {
+		cancel()
+		_ = outFile.Close()
+		for _, f := range charsetFiles {
+			if f != nil {
+				_ = f.Close()
+			}
+		}
+
+		return nil, err
+	}
+
+	// Use restore arguments if restore file exists
+	if strings.TrimSpace(params.RestoreFilePath) != "" {
+		if _, err := os.Stat(params.RestoreFilePath); err == nil {
+			args = params.toRestoreArgs(id)
+		}
+	}
+
+	return &Session{
+		proc: exec.CommandContext(
+			ctx,
+			binaryPath,
+			args...),
+		cancel:             cancel,
+		hashFile:           params.HashFile,
+		outFile:            outFile,
+		charsetFiles:       charsetFiles,
+		shardedCharsetFile: nil,
+		CrackedHashes:      make(chan Result, channelBufferSize),
+		StatusUpdates:      make(chan Status, channelBufferSize),
+		StderrMessages:     make(chan string, channelBufferSize),
+		StdoutLines:        make(chan string, channelBufferSize),
+		DoneChan:           make(chan error),
+		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
+		RestoreFilePath:    params.RestoreFilePath,
+	}, nil
+}
+
+// Start initializes and starts the hashcat session.
+// It attaches necessary I/O pipes, launches the hashcat process, and starts
+// goroutines to handle output streams. Returns an error if process startup fails.
 func (sess *Session) Start() error {
 	if err := sess.attachPipes(); err != nil {
 		return err
 	}
 
-	shared.Logger.Debug("Running hashcat command", "command", sess.proc.String())
+	state.Logger.Debug("Running hashcat command", "command", sess.proc.String())
 
 	if err := sess.proc.Start(); err != nil {
 		return fmt.Errorf("couldn't start hashcat: %w", err)
@@ -72,8 +148,8 @@ func (sess *Session) Start() error {
 	return nil
 }
 
-// attachPipes attaches stdout and stderr pipes to the session's process.
-// It returns an error if either the stdout or stderr pipe cannot be attached.
+// attachPipes attaches stdout and stderr pipes to the hashcat process.
+// Returns an error if pipe attachment fails.
 func (sess *Session) attachPipes() error {
 	pStdout, err := sess.proc.StdoutPipe()
 	if err != nil {
@@ -92,14 +168,14 @@ func (sess *Session) attachPipes() error {
 	return nil
 }
 
-// startTailer initiates a tail.Tail instance to follow the session output file.
-// In case of an error, it attempts to kill the session's process.
-// Returns the tail.Tail instance and an error if any occurred during the setup.
+// startTailer initiates a file tailer to monitor the hashcat output file.
+// The tailer follows the output file and sends new lines for processing.
+// If tailer creation fails, it attempts to kill the hashcat process before returning an error.
 func (sess *Session) startTailer() (*tail.Tail, error) {
-	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true, Logger: shared.Logger.StandardLog()})
+	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true, Logger: state.Logger.StandardLog()})
 	if err != nil {
 		if killErr := sess.Kill(); killErr != nil {
-			shared.Logger.Error("couldn't kill hashcat process", "error", killErr)
+			state.Logger.Error("couldn't kill hashcat process", "error", killErr)
 		}
 
 		return nil, fmt.Errorf("couldn't tail outfile %q: %w", sess.outFile.Name(), err)
@@ -108,15 +184,16 @@ func (sess *Session) startTailer() (*tail.Tail, error) {
 	return tailer, nil
 }
 
-// handleTailerOutput processes the lines read from a tail.Tail instance that monitors a log file,
-// extracts the relevant information, and sends it to the CrackedHashes channel for further processing.
+// handleTailerOutput processes lines from the hashcat output file.
+// It parses each line to extract timestamp, hash, and plaintext, then sends
+// the result through the CrackedHashes channel. Invalid lines are logged and skipped.
 func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 	for tailLine := range tailer.Lines {
 		line := tailLine.Text
 
 		values := strings.Split(line, ":")
 		if len(values) < logParseMinParts {
-			shared.Logger.Error("unexpected line contents", "line", line)
+			state.Logger.Error("unexpected line contents", "line", line)
 
 			continue
 		}
@@ -125,7 +202,7 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 
 		bs, err := hex.DecodeString(plainHex)
 		if err != nil {
-			shared.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
+			state.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
 
 			continue
 		}
@@ -136,7 +213,7 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 
 		timestampI, err := strconv.ParseInt(timestamp, 10, 64)
 		if err != nil {
-			shared.Logger.Error("couldn't parse hashcat timestamp.", "timestamp", timestamp, "error", err)
+			state.Logger.Error("couldn't parse hashcat timestamp", "timestamp", timestamp, "error", err)
 
 			continue
 		}
@@ -149,9 +226,10 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 	}
 }
 
-// handleStdout processes the standard output of the hashcat process, sending lines to StdoutLines channel.
-// If JSON is detected and SkipStatusUpdates is false, unmarshal it into a Status struct and sends to StatusUpdates.
-// Handles specific stdout messages like "starting in restore mode" and logs errors if unexpected lines appear.
+// handleStdout processes stdout from the hashcat process.
+// It sends all lines to the StdoutLines channel, parses JSON status updates
+// (unless SkipStatusUpdates is true), and handles special messages like restore mode.
+// This method blocks until the process completes and sends the exit status to DoneChan.
 func (sess *Session) handleStdout() {
 	scanner := bufio.NewScanner(sess.pStdout)
 	for scanner.Scan() {
@@ -166,7 +244,7 @@ func (sess *Session) handleStdout() {
 			if json.Valid([]byte(line)) {
 				var status Status
 				if err := json.Unmarshal([]byte(line), &status); err != nil {
-					shared.Logger.Error("WARN: couldn't unmarshal hashcat status", "error", err)
+					state.Logger.Error("couldn't unmarshal hashcat status", "error", err)
 
 					continue
 				}
@@ -174,9 +252,9 @@ func (sess *Session) handleStdout() {
 				sess.StatusUpdates <- status
 			} else {
 				if strings.Contains(line, "starting in restore mode") {
-					shared.Logger.Info("Hashcat is starting in restore mode")
+					state.Logger.Info("Hashcat is starting in restore mode")
 				} else {
-					shared.Logger.Error("Unexpected stdout line", "line", line)
+					state.Logger.Error("unexpected stdout line", "line", line)
 				}
 			}
 		}
@@ -189,19 +267,35 @@ func (sess *Session) handleStdout() {
 	sess.DoneChan <- done
 }
 
-// handleStderr processes the standard error output of the hashcat process and sends each line to StderrMessages channel.
+// handleStderr processes stderr output from the hashcat process.
+// Each line is logged and sent through the StderrMessages channel.
 func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
-		shared.Logger.Error("read stderr", "text", scanner.Text())
+		state.Logger.Error("read stderr", "text", scanner.Text())
 
 		sess.StderrMessages <- scanner.Text()
 	}
 }
 
-// Kill terminates the hashcat process associated with the session if it is running.
-// Returns nil if no process is running or if the process was already terminated successfully.
+// Cancel requests cancellation of the running hashcat process via the session context.
+// This method is thread-safe and may be called concurrently from multiple goroutines.
+func (sess *Session) Cancel() {
+	sess.cancelMu.Lock()
+	defer sess.cancelMu.Unlock()
+
+	if sess.cancel != nil {
+		sess.cancel()
+		sess.cancel = nil
+	}
+}
+
+// Kill terminates the hashcat process.
+// Returns nil if no process is running or if the process was already terminated.
+// The os.ErrProcessDone error is treated as a success case.
 func (sess *Session) Kill() error {
+	sess.Cancel()
+
 	if sess.proc == nil || sess.proc.Process == nil {
 		return nil
 	}
@@ -214,15 +308,18 @@ func (sess *Session) Kill() error {
 	return err
 }
 
-// Cleanup removes session-related temporary files and directories. It first attempts to remove output and charset files.
-// If zaps should not be retained, it deletes the zaps' directory. Finally, it clears the hashFile property.
+// Cleanup removes all session-related temporary files and directories.
+// It attempts to remove the output file, charset files, and optionally the zaps directory.
+// Errors during cleanup are logged but don't halt the cleanup process.
 func (sess *Session) Cleanup() {
-	shared.Logger.Info("Cleaning up session files")
+	sess.Cancel()
+
+	state.Logger.Info("Cleaning up session files")
 
 	removeFile := func(filePath string) {
 		if _, err := os.Stat(filePath); err == nil {
 			if err := os.Remove(filePath); err != nil {
-				shared.Logger.Error("couldn't remove file", "file", filePath, "error", err)
+				state.Logger.Error("couldn't remove file", "file", filePath, "error", err)
 			}
 		}
 	}
@@ -232,9 +329,9 @@ func (sess *Session) Cleanup() {
 		sess.outFile = nil
 	}
 
-	if !shared.State.RetainZapsOnCompletion {
-		if err := os.RemoveAll(shared.State.ZapsPath); err != nil {
-			shared.Logger.Error("couldn't remove zaps directory", "error", err)
+	if !state.State.RetainZapsOnCompletion {
+		if err := os.RemoveAll(state.State.ZapsPath); err != nil {
+			state.Logger.Error("couldn't remove zaps directory", "error", err)
 		}
 	}
 
@@ -253,80 +350,29 @@ func (sess *Session) CmdLine() string {
 	return sess.proc.String()
 }
 
-// NewHashcatSession creates a new Hashcat session with given id and parameters,
-// initializes the necessary files, arguments, and channels, and returns the session.
-func NewHashcatSession(id string, params Params) (*Session, error) {
-	binaryPath, err := cracker.FindHashcatBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	outFile, err := createOutFile(shared.State.OutPath, id, filePermissions)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create output file: %w", err)
-	}
-
-	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
-	if err != nil {
-		return nil, err
-	}
-
-	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	if strings.TrimSpace(params.RestoreFilePath) != "" && func() bool {
-		_, err := os.Stat(params.RestoreFilePath)
-		return err == nil
-	}() {
-		args = params.toRestoreArgs(id)
-	}
-
-	return &Session{
-		proc:               exec.Command(binaryPath, args...), //nolint:gosec // Binary path is validated, args are constructed safely
-		hashFile:           params.HashFile,
-		outFile:            outFile,
-		charsetFiles:       charsetFiles,
-		shardedCharsetFile: nil,
-		CrackedHashes:      make(chan Result, channelBufferSize),
-		StatusUpdates:      make(chan Status, channelBufferSize),
-		StderrMessages:     make(chan string, channelBufferSize),
-		StdoutLines:        make(chan string, channelBufferSize),
-		DoneChan:           make(chan error),
-		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
-		RestoreFilePath:    params.RestoreFilePath,
-	}, nil
-}
-
-// createOutFile creates a new file with the specified directory, id, and permissions.
-// It returns the created file or an error if the creation or permission setting fails.
+// createOutFile creates the output file for cracked hashes.
+// The file is created with restrictive permissions in the specified directory.
+// Returns the created file handle or an error if creation or permission setting fails.
 func createOutFile(dir, id string, perm os.FileMode) (*os.File, error) {
 	outFilePath := filepath.Join(dir, id+".hcout")
 
-	file, err := os.Create(outFilePath) //nolint:gosec // File path is constructed safely within application data directory
+	file, err := os.Create(
+		outFilePath,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := file.Chmod(perm); err != nil {
-		_ = file.Close() //nolint:errcheck // We need to close the file if the permissions change fails
+		_ = file.Close()
 		return nil, err
 	}
 
 	return file, nil
 }
 
-// createTempFile creates a temporary file in the specified directory with the given pattern and permissions.
-//
-// Parameters:
-//   - dir: The directory where the temporary file will be created.
-//   - pattern: The pattern to use when naming the temporary file.
-//   - perm: The file permissions to set for the temporary file.
-//
-// Returns:
-//   - *os.File: A pointer to the created temporary file.
-//   - error: An error object if file creation or permission setting fails.
+// createTempFile creates a temporary file with the specified pattern and permissions.
+// Returns the file handle or an error if creation or permission setting fails.
 func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 	file, err := os.CreateTemp(dir, pattern)
 	if err != nil {
@@ -340,9 +386,9 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 	return file, nil
 }
 
-// createCharsetFiles creates temporary files for provided charsets, writes each charset to a file, and returns the file pointers.
-// Each charset is checked if it is non-blank before creating and writing to a temporary file.
-// If an error occurs during file creation or writing, the function returns an error.
+// createCharsetFiles creates temporary files for custom charsets used in mask attacks.
+// Each charset string is written to a separate temporary file.
+// Empty charset strings are skipped. Returns file handles or an error if creation fails.
 func createCharsetFiles(charsets []string) ([]*os.File, error) {
 	charsetFiles := make([]*os.File, 0, len(charsets))
 
@@ -351,7 +397,7 @@ func createCharsetFiles(charsets []string) ([]*os.File, error) {
 			continue
 		}
 
-		charsetFile, err := createTempFile(shared.State.OutPath, "charset*", filePermissions)
+		charsetFile, err := createTempFile(state.State.OutPath, "charset*", filePermissions)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create charset file: %w", err)
 		}

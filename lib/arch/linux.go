@@ -1,28 +1,36 @@
 //go:build linux
 
+// Package arch provides architecture-specific functionality for Linux systems.
+// It includes utilities for device detection, platform identification, and
+// execution of system-specific commands like hashcat and 7z.
 package arch
 
 import (
+	"context"
 	"os/exec"
 	"regexp"
 	"strings"
 
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 // GetDevices retrieves a list of GPU devices available on a Linux system.
 // It executes the "lspci" command to list all PCI devices and filters out
 // the ones that are VGA compatible controllers (typically GPUs).
 //
+// Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
+//
 // Returns:
 //
 //	[]string: A slice of strings containing the names of the GPU devices.
 //	error: An error object if there was an issue executing the command or parsing the output.
-func GetDevices() ([]string, error) {
-	shared.Logger.Debug("Getting GPU devices")
-	out, err := exec.Command("lspci").Output()
+func GetDevices(ctx context.Context) ([]string, error) {
+	state.Logger.Debug("Getting GPU devices")
+
+	out, err := exec.CommandContext(ctx, "lspci").Output()
 	if err != nil {
-		shared.Logger.Error("Error executing lspci command", "error", err)
+		state.Logger.Error("Error executing lspci command", "error", err)
 		return nil, err
 	}
 
@@ -32,7 +40,7 @@ func GetDevices() ([]string, error) {
 	matches := re.FindAllStringSubmatch(commandResult, -1)
 
 	if matches == nil {
-		shared.Logger.Warn("No GPU devices found")
+		state.Logger.Warn("No GPU devices found")
 		return nil, nil
 	}
 
@@ -44,7 +52,7 @@ func GetDevices() ([]string, error) {
 	}
 
 	if len(devices) == 0 {
-		shared.Logger.Error("No GPU devices found after parsing")
+		state.Logger.Error("No GPU devices found after parsing")
 		return nil, nil
 	}
 
@@ -57,19 +65,21 @@ func GetDevices() ([]string, error) {
 // and the error.
 //
 // Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
 //   - hashcatPath: The file path to the Hashcat executable.
 //
 // Returns:
 //   - A string representing the Hashcat version.
 //   - An error if the command execution fails.
-func GetHashcatVersion(hashcatPath string) (string, error) {
-	out, err := exec.Command(hashcatPath, "--version", "--quiet").Output()
+func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) {
+	out, err := exec.CommandContext(ctx, hashcatPath, "--version", "--quiet").Output()
 	if err != nil {
 		return "0.0.0", err
 	}
 	return strings.TrimSpace(string(out)), nil
 }
 
+// GetPlatform returns the platform identifier for Linux systems.
 func GetPlatform() string {
 	return "linux"
 }
@@ -79,13 +89,17 @@ func GetPlatform() string {
 // where the contents should be extracted.
 //
 // Parameters:
+//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
 //   - srcFile: The path to the 7z archive file.
 //   - destDir: The directory where the contents of the archive will be extracted.
 //
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
-func Extract7z(srcFile string, destDir string) error {
-	_, err := exec.Command("7z", "x", srcFile, "-o"+destDir).Output()
+func Extract7z(ctx context.Context, srcFile, destDir string) error {
+	//nolint:gosec // srcFile and destDir are validated by caller
+	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).
+		Output()
+
 	return err
 }
 

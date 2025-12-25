@@ -1,0 +1,80 @@
+---
+inclusion: fileMatch
+fileMatchPattern: '*.go'
+---
+
+# Go Best Practices for CipherSwarmAgent
+
+This document distills Go best practices for backend agent development, tailored to CipherSwarmAgent.
+
+## 1. Project Structure
+
+- Use `cmd/` for CLI entrypoint (Cobra).
+- Place core logic and utilities in `lib/` (no `internal/` or `pkg/` needed for this agent).
+- Use subfolders for OS-specific (`arch/`), hashcat logic (`hashcat/`), and utilities (`utils/`).
+- Shared state and logging go in `shared/`.
+- CI, Docker, and documentation in root and `.github/`.
+
+## 2. Code Organization
+
+- Use lowercase, snake_case for files (e.g., `agent_client.go`).
+- Keep packages focused and small; group related logic.
+- Prefer explicit, minimal interfaces for testability.
+- Avoid global mutable state except for agent-wide config in `shared`.
+
+## 3. Error Handling
+
+- Always check and handle errors. Never ignore them.
+- Use `fmt.Errorf` with `%w` for error wrapping.
+- Use custom error types or sentinel errors for critical agent states.
+- Use `defer` for resource cleanup (files, processes).
+- Never use `panic` for normal control flow.
+
+## 4. Concurrency & State
+
+- Use goroutines and channels for async tasks (e.g., status updates, hashcat monitoring).
+- Protect shared state with mutexes if needed, but prefer channel-based design.
+- Use `context.Context` for cancellation and deadlines in long-running or networked operations.
+- Avoid data races; run with `-race` in CI.
+
+## 5. Configuration
+
+- Use `spf13/viper` for config: support env vars, CLI flags, and YAML.
+- Document all config options in README and code.
+- Validate config at startup; fail fast on missing/invalid values.
+
+## 6. Logging
+
+- Use structured logging (`charmbracelet/log` or similar).
+- Log at appropriate levels: Info for normal ops, Warn for recoverable issues, Error for failures.
+- Never log secrets or sensitive data.
+
+## 7. Security
+
+- Never trust external input (server, files, user config). Validate and sanitize.
+- Use parameterized queries and safe file handling.
+- Use TLS for all network communication.
+- Regularly audit dependencies (`govulncheck`).
+
+## 8. Testing
+
+- Use table-driven tests for core logic.
+- Place tests in the same package, with `_test.go` suffix.
+- Use `go test -cover` for coverage; aim for high coverage on agent logic.
+- Use mocks for network and OS interactions.
+- Run all tests and linters in CI (`just test`, `just ci-check`).
+
+## 9. CI/CD & Tooling
+
+- Use GitHub Actions for lint, test, and release.
+- Use `gofmt`, `golangci-lint`, and `staticcheck` for code quality.
+- Use GoReleaser and Docker for builds and releases.
+- Use Conventional Commits for changelogs and automation.
+
+## 10. Common Pitfalls
+
+- Avoid nil pointer dereferences; always check before use.
+- Avoid data races and deadlocks; prefer simple, flat concurrency.
+- Be careful with OS-specific code—test on all supported platforms.
+- Avoid magic numbers/strings; use constants.
+- Keep functions short and focused.

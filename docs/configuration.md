@@ -324,18 +324,18 @@ chmod 750 /var/lib/cipherswarm
 
 1. **Configuration not applied**:
 
-    - Check precedence order (CLI flags override env vars)
-    - Verify correct variable names (case-sensitive)
+   - Check precedence order (CLI flags override env vars)
+   - Verify correct variable names (case-sensitive)
 
 2. **File permission errors**:
 
-    - Ensure agent has write access to `data_path`
-    - Check parent directory permissions
+   - Ensure agent has write access to `data_path`
+   - Check parent directory permissions
 
 3. **API connection failures**:
 
-    - Verify API URL format and accessibility
-    - Test network connectivity: `curl https://your-server.com:3000/health`
+   - Verify API URL format and accessibility
+   - Test network connectivity: `curl https://your-server.com:3000/health`
 
 ### Debug Configuration Loading
 

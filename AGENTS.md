@@ -1,6 +1,4 @@
----
-title: Gemini System Prompt
----
+# AGENTS
 
 This document outlines the formats, standards, and architecture for the CipherSwarmAgent project, tailored for the Gemini AI model.
 
@@ -19,15 +17,15 @@ The agent operates as a long-lived CLI client that interacts with the CipherSwar
 1. **Registration & Heartbeat:** Registering itself with the server and sending regular heartbeats to signal it's online.
 2. **Polling for Tasks:** Periodically requesting new tasks from the `/api/v1/client/tasks/new` endpoint.
 3. **Task Execution:**
-    - Accepting a task (`POST /tasks/{id}/accept_task`).
-    - Downloading resources like hash lists (`GET /attacks/{id}/hash_list`).
-    - Launching and monitoring a hashcat process.
-    - Submitting status updates (`POST /tasks/{id}/submit_status`).
-    - Submitting cracked passwords (`POST /tasks/{id}/submit_crack`).
+   - Accepting a task (`POST /tasks/{id}/accept_task`).
+   - Downloading resources like hash lists (`GET /attacks/{id}/hash_list`).
+   - Launching and monitoring a hashcat process.
+   - Submitting status updates (`POST /tasks/{id}/submit_status`).
+   - Submitting cracked passwords (`POST /tasks/{id}/submit_crack`).
 4. **Completion & Error Handling:**
-    - Reporting task exhaustion (`POST /tasks/{id}/exhausted`).
-    - Submitting structured errors on failure (`POST /agents/{id}/submit_error`).
-    - Gracefully notifying the server on shutdown (`POST /agents/{id}/shutdown`).
+   - Reporting task exhaustion (`POST /tasks/{id}/exhausted`).
+   - Submitting structured errors on failure (`POST /agents/{id}/submit_error`).
+   - Gracefully notifying the server on shutdown (`POST /agents/{id}/shutdown`).
 
 - **API Specification:** All API interactions must strictly adhere to the v1 Agent API contract defined in `docs/swagger.json`.
 - **Reliability:** The agent must implement exponential backoff for failed API requests.
@@ -40,8 +38,8 @@ The project follows standard, idiomatic Go practices (version >=1.22).
 
 - `cmd/`: Main application entry points using the Cobra framework.
 - `lib/`: Core agent logic, including the agent client, task/benchmark managers, and utilities.
-    - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
-    - `arch/`: OS-specific abstractions for handling different platforms (Linux, macOS, Windows).
+  - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
+  - `arch/`: OS-specific abstractions for handling different platforms (Linux, macOS, Windows).
 - `shared/`: Global state, logging, and shared data types.
 - `docs/`: Project documentation, including the OpenAPI specification.
 
@@ -108,8 +106,8 @@ The `CHANGELOG.md` is automatically generated from commit messages using `git-ch
 
 - **GitHub Actions:** Workflows in `.github/workflows/` automate linting, testing, building, and releases.
 - **Docker:**
-    - `Dockerfile`: Used for building the main application container.
-    - `Dockerfile.releaser`: Used within the GoReleaser pipeline for creating releases.
+  - `Dockerfile`: Used for building the main application container.
+  - `Dockerfile.releaser`: Used within the GoReleaser pipeline for creating releases.
 
 ## Documentation
 

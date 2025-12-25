@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	stderrors "errors"
 	"net/http"
 	"os"
 	"path"
@@ -15,9 +16,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/downloader"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
-
-	stderrors "errors"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 // Static errors to comply with err113 linter.
@@ -30,21 +29,21 @@ var (
 func handleAuthenticationError(err error) error {
 	var eo *sdkerrors.ErrorObject
 	if stderrors.As(err, &eo) {
-		shared.Logger.Error("Error connecting to the CipherSwarm API", "error", eo.Error())
+		state.Logger.Error("Error connecting to the CipherSwarm API", "error", eo.Error())
 
 		return err
 	}
 
 	var se *sdkerrors.SDKError
 	if stderrors.As(err, &se) {
-		shared.Logger.Error("Error connecting to the CipherSwarm API, unexpected error",
+		state.Logger.Error("Error connecting to the CipherSwarm API, unexpected error",
 			"status_code", se.StatusCode,
 			"message", se.Message)
 
 		return err
 	}
 
-	shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+	state.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 
 	return err
 }
@@ -56,7 +55,7 @@ func handleAuthenticationError(err error) error {
 func handleConfigurationError(err error) error {
 	var eo *sdkerrors.ErrorObject
 	if stderrors.As(err, &eo) {
-		shared.Logger.Error("Error getting agent configuration", "error", eo.Error())
+		state.Logger.Error("Error getting agent configuration", "error", eo.Error())
 		SendAgentError(eo.Error(), nil, operations.SeverityCritical)
 
 		return err
@@ -64,7 +63,7 @@ func handleConfigurationError(err error) error {
 
 	var se *sdkerrors.SDKError
 	if stderrors.As(err, &se) {
-		shared.Logger.Error("Error getting agent configuration, unexpected error",
+		state.Logger.Error("Error getting agent configuration, unexpected error",
 			"status_code", se.StatusCode,
 			"message", se.Message)
 		SendAgentError(se.Error(), nil, operations.SeverityCritical)
@@ -72,7 +71,7 @@ func handleConfigurationError(err error) error {
 		return err
 	}
 
-	shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+	state.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 
 	return err
 }
@@ -108,7 +107,7 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 		return cserrors.LogAndSendError("Error moving file", err, operations.SeverityCritical, nil)
 	}
 
-	hashcatDirectory, err := cracker.ExtractHashcatArchive(newArchivePath)
+	hashcatDirectory, err := cracker.ExtractHashcatArchive(context.Background(), newArchivePath)
 	if err != nil {
 		return cserrors.LogAndSendError("Error extracting file", err, operations.SeverityCritical, nil)
 	}
@@ -118,10 +117,16 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	}
 
 	if err := os.Remove(newArchivePath); err != nil {
-		_ = cserrors.LogAndSendError("Error removing 7z file", err, operations.SeverityWarning, nil) //nolint:errcheck // Error already logged and sent
+		//nolint:errcheck // Error already being handled
+		_ = cserrors.LogAndSendError(
+			"Error removing 7z file",
+			err,
+			operations.SeverityWarning,
+			nil,
+		)
 	}
 
-	viper.Set("hashcat_path", path.Join(shared.State.CrackersPath, "hashcat", *update.GetExecName()))
+	viper.Set("hashcat_path", path.Join(state.State.CrackersPath, "hashcat", *update.GetExecName()))
 	_ = viper.WriteConfig() //nolint:errcheck // Config write failure not critical
 
 	return nil
@@ -142,32 +147,32 @@ func handleAPIError(message string, err error) {
 		case stderrors.As(err, &e):
 			// Enhanced logging for credential validation errors
 			if stderrors.Is(err, ErrCouldNotValidateCredentials) {
-				shared.Logger.Error(message+" - credentials validation failed",
+				state.Logger.Error(message+" - credentials validation failed",
 					"error", e.Error(),
-					"agent_id", shared.State.AgentID,
-					"api_url", shared.State.URL,
-					"has_token", shared.State.APIToken != "")
+					"agent_id", state.State.AgentID,
+					"api_url", state.State.URL,
+					"has_token", state.State.APIToken != "")
 			} else {
-				shared.Logger.Error(message, "error", e.Error())
+				state.Logger.Error(message, "error", e.Error())
 			}
 
 			SendAgentError(e.Error(), nil, operations.SeverityCritical)
 		case stderrors.As(err, &e1):
 			// Enhanced logging for HTTP status errors that might indicate auth issues
 			if e1.StatusCode == http.StatusUnauthorized || e1.StatusCode == http.StatusForbidden {
-				shared.Logger.Error(message+" - authentication/authorization error",
+				state.Logger.Error(message+" - authentication/authorization error",
 					"status_code", e1.StatusCode,
 					"message", e1.Message,
-					"agent_id", shared.State.AgentID,
-					"api_url", shared.State.URL,
-					"has_token", shared.State.APIToken != "")
+					"agent_id", state.State.AgentID,
+					"api_url", state.State.URL,
+					"has_token", state.State.APIToken != "")
 			} else {
-				shared.Logger.Error(message+", unexpected error", "status_code", e1.StatusCode, "message", e1.Message)
+				state.Logger.Error(message+", unexpected error", "status_code", e1.StatusCode, "message", e1.Message)
 			}
 
 			SendAgentError(e1.Error(), nil, operations.SeverityCritical)
 		default:
-			shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+			state.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 		}
 	}
 }
@@ -186,12 +191,24 @@ func handleHeartbeatError(err error) {
 
 		switch {
 		case stderrors.As(err, &e):
-			_ = cserrors.LogAndSendError("Error sending heartbeat", e, operations.SeverityCritical, nil) //nolint:errcheck // Error already logged and sent
+			//nolint:errcheck // Error already being handled
+			_ = cserrors.LogAndSendError(
+				"Error sending heartbeat",
+				e,
+				operations.SeverityCritical,
+				nil,
+			)
 		case stderrors.As(err, &e1):
-			shared.Logger.Error("Error sending heartbeat, unexpected error", "status_code", e1.StatusCode, "message", e1.Message)
+			state.Logger.Error(
+				"Error sending heartbeat, unexpected error",
+				"status_code",
+				e1.StatusCode,
+				"message",
+				e1.Message,
+			)
 			SendAgentError(e1.Error(), nil, operations.SeverityCritical)
 		default:
-			shared.ErrorLogger.Error("Error communicating with the CipherSwarm API", "error", err)
+			state.ErrorLogger.Error("Error communicating with the CipherSwarm API", "error", err)
 		}
 	}
 }
@@ -200,7 +217,13 @@ func handleHeartbeatError(err error) {
 func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Session) {
 	var eo *sdkerrors.ErrorObject
 	if stderrors.As(err, &eo) {
-		_ = cserrors.LogAndSendError("Error sending status update", eo, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
+		//nolint:errcheck // Error already being handled
+		_ = cserrors.LogAndSendError(
+			"Error sending status update",
+			eo,
+			operations.SeverityCritical,
+			task,
+		)
 
 		return
 	}
@@ -212,7 +235,7 @@ func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Ses
 		return
 	}
 
-	shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+	state.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 }
 
 // handleSDKError handles errors from the SDK by taking appropriate action based on the error's status code.
@@ -225,7 +248,13 @@ func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat
 		// Not an error, just log and pause the task
 		handleTaskGone(task, sess)
 	default:
-		_ = cserrors.LogAndSendError("Error connecting to the CipherSwarm API, unexpected error", se, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
+		//nolint:errcheck // Error already being handled
+		_ = cserrors.LogAndSendError(
+			"Error connecting to the CipherSwarm API, unexpected error",
+			se,
+			operations.SeverityCritical,
+			task,
+		)
 	}
 }
 
@@ -233,12 +262,20 @@ func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat
 // It logs an error message with the task ID, attempts to kill the session, and cleans up the session.
 // If killing the session fails, it logs and sends an error.
 func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
-	shared.Logger.Error("Task not found", "task_id", task.GetID())
-	shared.Logger.Info("Killing task", "task_id", task.GetID())
-	shared.Logger.Info("It is possible that multiple errors appear as the task takes some time to kill. This is expected.")
+	state.Logger.Error("Task not found", "task_id", task.GetID())
+	state.Logger.Info("Killing task", "task_id", task.GetID())
+	state.Logger.Info(
+		"It is possible that multiple errors appear as the task takes some time to kill. This is expected.",
+	)
 
 	if err := sess.Kill(); err != nil {
-		_ = cserrors.LogAndSendError("Error killing task", err, operations.SeverityCritical, task) //nolint:errcheck // Error already logged and sent
+		//nolint:errcheck // Error already being handled
+		_ = cserrors.LogAndSendError(
+			"Error killing task",
+			err,
+			operations.SeverityCritical,
+			task,
+		)
 	}
 
 	sess.Cleanup()
@@ -246,10 +283,16 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 
 // handleTaskGone handles the termination of a task when it is no longer needed, ensuring the session is appropriately killed.
 func handleTaskGone(task *components.Task, sess *hashcat.Session) {
-	shared.Logger.Info("Pausing task", "task_id", task.GetID())
+	state.Logger.Info("Pausing task", "task_id", task.GetID())
 
 	if err := sess.Kill(); err != nil {
-		_ = cserrors.LogAndSendError("Error pausing task", err, operations.SeverityFatal, task) //nolint:errcheck // Error already logged and sent
+		//nolint:errcheck // Error already being handled
+		_ = cserrors.LogAndSendError(
+			"Error pausing task",
+			err,
+			operations.SeverityFatal,
+			task,
+		)
 	}
 }
 
@@ -277,11 +320,11 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 		Message:  stdErrLine,
 		Metadata: metadata,
 		Severity: severity,
-		AgentID:  shared.State.AgentID,
+		AgentID:  state.State.AgentID,
 		TaskID:   taskID,
 	}
 
-	if _, err := shared.State.SdkClient.Agents.SubmitErrorAgent(context.Background(), shared.State.AgentID, agentError); err != nil {
+	if _, err := state.State.SdkClient.Agents.SubmitErrorAgent(context.Background(), state.State.AgentID, agentError); err != nil {
 		handleSendError(err)
 	}
 }
@@ -297,13 +340,19 @@ func handleSendError(err error) {
 
 		switch {
 		case stderrors.As(err, &e):
-			shared.Logger.Error("Error sending agent error to server", "error", e.Error())
+			state.Logger.Error("Error sending agent error to server", "error", e.Error())
 			SendAgentError(e.Error(), nil, operations.SeverityCritical)
 		case stderrors.As(err, &e1):
-			shared.Logger.Error("Error sending agent error to server, unexpected error", "status_code", e1.StatusCode, "message", e1.Message)
+			state.Logger.Error(
+				"Error sending agent error to server, unexpected error",
+				"status_code",
+				e1.StatusCode,
+				"message",
+				e1.Message,
+			)
 			SendAgentError(e1.Error(), nil, operations.SeverityCritical)
 		default:
-			shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+			state.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 		}
 	}
 }
@@ -322,13 +371,19 @@ func handleAcceptTaskError(err error) {
 
 		switch {
 		case stderrors.As(err, &e):
-			shared.Logger.Error("Error accepting task", "error", e.Error())
+			state.Logger.Error("Error accepting task", "error", e.Error())
 			SendAgentError(e.Error(), nil, operations.SeverityInfo)
 		case stderrors.As(err, &e1):
-			shared.Logger.Error("Error accepting task, unexpected error", "status_code", e1.StatusCode, "message", e1.Message)
+			state.Logger.Error(
+				"Error accepting task, unexpected error",
+				"status_code",
+				e1.StatusCode,
+				"message",
+				e1.Message,
+			)
 			SendAgentError(e1.Error(), nil, operations.SeverityCritical)
 		default:
-			shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+			state.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 		}
 	}
 }
@@ -345,16 +400,20 @@ func handleTaskError(err error, message string) {
 
 		switch {
 		case stderrors.As(err, &e):
-			shared.Logger.Error(message, "error", e.Error())
+			state.Logger.Error(message, "error", e.Error())
 			SendAgentError(e.Error(), nil, operations.SeverityCritical)
 		case stderrors.As(err, &e1):
-			shared.Logger.Error("Notified server of task abandonment, but it could not update the task properly", "error", e1.State)
+			state.Logger.Error(
+				"Notified server of task abandonment, but it could not update the task properly",
+				"error",
+				e1.State,
+			)
 			SendAgentError(e1.Error(), nil, operations.SeverityWarning)
 		case stderrors.As(err, &e2):
-			shared.Logger.Error(message, "status_code", e2.StatusCode, "message", e2.Message)
+			state.Logger.Error(message, "status_code", e2.StatusCode, "message", e2.Message)
 			SendAgentError(e2.Error(), nil, operations.SeverityCritical)
 		default:
-			shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+			state.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 		}
 	}
 }
@@ -370,13 +429,19 @@ func handleSendCrackError(err error) {
 
 		switch {
 		case stderrors.As(err, &e):
-			shared.Logger.Error("Error notifying server of cracked hash, task not found", "error", e.Error())
+			state.Logger.Error("Error notifying server of cracked hash, task not found", "error", e.Error())
 			SendAgentError(e.Error(), nil, operations.SeverityMajor)
 		case stderrors.As(err, &e1):
-			shared.Logger.Error("Error sending cracked hash to server, unexpected error", "status_code", e1.StatusCode, "message", e1.Message)
+			state.Logger.Error(
+				"Error sending cracked hash to server, unexpected error",
+				"status_code",
+				e1.StatusCode,
+				"message",
+				e1.Message,
+			)
 			SendAgentError(e1.Error(), nil, operations.SeverityCritical)
 		default:
-			shared.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+			state.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 		}
 	}
 }
