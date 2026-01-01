@@ -6,7 +6,7 @@ enable_free_tier: true
 inheritance: false
 reviews:
   profile: assertive
-  request_changes_workflow: true
+  request_changes_workflow: false
   high_level_summary: true
   high_level_summary_instructions: "Focus on technical impact: Go concurrency patterns, API reliability, hashcat integration, security implications, and architectural changes. Prioritize breaking changes, performance impacts, and testing coverage. Structure as: [Core Changes] → [Architecture Impact] → [Risks/Testing] → [Migration Notes]."
   high_level_summary_placeholder: "@coderabbitai summary"
@@ -49,7 +49,7 @@ reviews:
   in_progress_fortune: true
   poem: true
   enable_prompt_for_ai_agents: true
-  path_filters: ["swagger.json"]
+  path_filters: ["!swagger.json"]
   path_instructions:
     - path: "lib/hashcat/*.go"
       instructions: "Review hashcat integration carefully: session management, parameter validation, output parsing. Ensure proper error handling and resource cleanup."
