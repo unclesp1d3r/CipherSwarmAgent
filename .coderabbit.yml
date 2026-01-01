@@ -49,7 +49,7 @@ reviews:
   in_progress_fortune: true
   poem: true
   enable_prompt_for_ai_agents: true
-  path_filters: ["!swagger.json"]
+  path_filters: []
   path_instructions:
     - path: "lib/hashcat/*.go"
       instructions: "Review hashcat integration carefully: session management, parameter validation, output parsing. Ensure proper error handling and resource cleanup."
@@ -66,7 +66,7 @@ reviews:
     - path: "docs/*.md"
       instructions: "Review documentation: technical accuracy, adherence to project conventions, completeness for new features."
     - path: "swagger.json"
-      instructions: "Review API changes: backward compatibility, proper OpenAPI spec compliance, security implications."
+      instructions: "Use the swagger.json as reference for the API contract. Do not make changes to the swagger.json."
   abort_on_close: true
   disable_cache: false
   auto_review:
