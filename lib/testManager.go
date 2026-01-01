@@ -10,7 +10,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 // getDevices initializes a test Hashcat session and runs a test task, returning the names of available OpenCL devices.
@@ -54,7 +54,7 @@ func extractDeviceNames(deviceStatuses []hashcat.StatusDevice) []string {
 func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 	err := sess.Start()
 	if err != nil {
-		shared.Logger.Error("Failed to start hashcat startup test session", "error", err)
+		state.Logger.Error("Failed to start hashcat startup test session", "error", err)
 		SendAgentError(err.Error(), nil, operations.SeverityFatal)
 
 		return nil, err
@@ -104,7 +104,7 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 // handleTestStdOutLine processes a line of standard output from a test, logging an error if the line isn't valid JSON.
 func handleTestStdOutLine(stdoutLine string) {
 	if !json.Valid([]byte(stdoutLine)) {
-		shared.Logger.Error("Failed to parse status update", "output", stdoutLine)
+		state.Logger.Error("Failed to parse status update", "output", stdoutLine)
 	}
 }
 

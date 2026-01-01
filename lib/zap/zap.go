@@ -14,7 +14,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 const (
@@ -25,12 +25,12 @@ const (
 // Logs an error if the task is nil, displays job progress, and retrieves zaps from the SdkClient.
 func GetZaps(task *components.Task, sendCrackedHashFunc func(time.Time, string, string, *components.Task)) {
 	if task == nil {
-		shared.Logger.Error("Task is nil")
+		state.Logger.Error("Task is nil")
 
 		return
 	}
 
-	res, err := shared.State.SdkClient.Tasks.GetTaskZaps(context.Background(), task.GetID())
+	res, err := state.State.SdkClient.Tasks.GetTaskZaps(context.Background(), task.GetID())
 	if err != nil {
 		return
 	}
@@ -50,7 +50,7 @@ func GetZaps(task *components.Task, sendCrackedHashFunc func(time.Time, string, 
 func removeExistingZapFile(zapFilePath string) error {
 	err := os.Remove(zapFilePath)
 	if err != nil && !os.IsNotExist(err) {
-		shared.Logger.Debug("Error removing zap file", "path", zapFilePath, "error", err)
+		state.Logger.Debug("Error removing zap file", "path", zapFilePath, "error", err)
 		return err
 	}
 
@@ -89,11 +89,11 @@ func handleResponseStream(
 	defer func(responseStream io.ReadCloser) {
 		err := responseStream.Close()
 		if err != nil {
-			shared.Logger.Error("Error closing response stream", "error", err)
+			state.Logger.Error("Error closing response stream", "error", err)
 		}
 	}(responseStream)
 
-	zapFilePath := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
+	zapFilePath := path.Join(state.State.ZapsPath, fmt.Sprintf("%d.zap", task.GetID()))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
 		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
@@ -143,7 +143,7 @@ func processZapFile(
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			shared.Logger.Error("Error closing zap file", "error", err)
+			state.Logger.Error("Error closing zap file", "error", err)
 		}
 	}(file)
 

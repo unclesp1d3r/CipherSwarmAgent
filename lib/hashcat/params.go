@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 const (
@@ -201,10 +201,10 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		"--outfile", outFile,
 		"--status",
 		"--status-json",
-		"--status-timer", strconv.FormatInt(int64(shared.State.StatusTimer), 10),
+		"--status-timer", strconv.FormatInt(int64(state.State.StatusTimer), 10),
 		"--potfile-disable",
-		"--outfile-check-timer", strconv.FormatInt(int64(shared.State.StatusTimer), 10),
-		"--outfile-check-dir", shared.State.ZapsPath,
+		"--outfile-check-timer", strconv.FormatInt(int64(state.State.StatusTimer), 10),
+		"--outfile-check-dir", state.State.ZapsPath,
 		"-a", strconv.FormatInt(params.AttackMode, 10),
 		"-m", strconv.FormatInt(params.HashType, 10),
 	)
@@ -232,7 +232,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.WordListFilename) != "" {
-		wordList := filepath.Join(shared.State.FilePath, filepath.Clean(params.WordListFilename))
+		wordList := filepath.Join(state.State.FilePath, filepath.Clean(params.WordListFilename))
 		if _, err := os.Stat(wordList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrWordlistNotOpened, wordList)
 		}
@@ -241,7 +241,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.RuleListFilename) != "" {
-		ruleList := filepath.Join(shared.State.FilePath, filepath.Clean(params.RuleListFilename))
+		ruleList := filepath.Join(state.State.FilePath, filepath.Clean(params.RuleListFilename))
 		if _, err := os.Stat(ruleList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrRuleListNotOpened, ruleList)
 		}
@@ -250,7 +250,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.MaskListFilename) != "" {
-		maskList := filepath.Join(shared.State.FilePath, filepath.Clean(params.MaskListFilename))
+		maskList := filepath.Join(state.State.FilePath, filepath.Clean(params.MaskListFilename))
 		if _, err := os.Stat(maskList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrMaskListNotOpened, maskList)
 		}
