@@ -9,7 +9,7 @@ import (
 	gap "github.com/muesli/go-app-paths"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
 const (
@@ -24,7 +24,7 @@ var scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // C
 
 // InitConfig initializes the configuration from various sources.
 func InitConfig(cfgFile string) {
-	shared.ErrorLogger.SetReportCaller(true)
+	agentstate.ErrorLogger.SetReportCaller(true)
 
 	home, err := os.UserConfigDir()
 	cobra.CheckErr(err)
@@ -51,12 +51,12 @@ func InitConfig(cfgFile string) {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
-		shared.Logger.Info("Using config file", "config_file", viper.ConfigFileUsed())
+		agentstate.Logger.Info("Using config file", "config_file", viper.ConfigFileUsed())
 	} else {
-		shared.Logger.Warn("No config file found, attempting to write a new one")
+		agentstate.Logger.Warn("No config file found, attempting to write a new one")
 
 		if err := viper.SafeWriteConfig(); err != nil && err.Error() != "config file already exists" {
-			shared.Logger.Error("Error writing config file", "error", err)
+			agentstate.Logger.Error("Error writing config file", "error", err)
 		}
 	}
 }
@@ -64,73 +64,73 @@ func InitConfig(cfgFile string) {
 // SetupSharedState configures the shared state from configuration values.
 func SetupSharedState() {
 	// Set the API URL and token
-	shared.State.URL = viper.GetString("api_url")
-	shared.State.APIToken = viper.GetString("api_token")
+	agentstate.State.URL = viper.GetString("api_url")
+	agentstate.State.APIToken = viper.GetString("api_token")
 
 	dataRoot := viper.GetString(
 		"data_path",
 	) // Get the data path from the configuration
-	shared.State.DataPath = dataRoot // Set the data path in the shared state
-	shared.State.PidFile = path.Join(
+	agentstate.State.DataPath = dataRoot // Set the data path in the shared state
+	agentstate.State.PidFile = path.Join(
 		dataRoot,
 		"lock.pid",
 	) // Set the default PID file path
-	shared.State.HashcatPidFile = path.Join(
+	agentstate.State.HashcatPidFile = path.Join(
 		dataRoot,
 		"hashcat.pid",
 	) // Set the default hashcat PID file path
-	shared.State.CrackersPath = path.Join(
+	agentstate.State.CrackersPath = path.Join(
 		dataRoot,
 		"crackers",
 	) // Set the crackers path in the shared state
-	shared.State.FilePath = viper.GetString(
+	agentstate.State.FilePath = viper.GetString(
 		"files_path",
 	) // Set the file path in the shared state
-	shared.State.HashlistPath = path.Join(
+	agentstate.State.HashlistPath = path.Join(
 		dataRoot,
 		"hashlists",
 	) // Set the hashlist path in the shared state
-	shared.State.ZapsPath = viper.GetString(
+	agentstate.State.ZapsPath = viper.GetString(
 		"zap_path",
 	) // Set the zaps path in the shared state
-	shared.State.PreprocessorsPath = path.Join(
+	agentstate.State.PreprocessorsPath = path.Join(
 		dataRoot,
 		"preprocessors",
 	) // Set the preprocessors path in the shared state
-	shared.State.ToolsPath = path.Join(
+	agentstate.State.ToolsPath = path.Join(
 		dataRoot,
 		"tools",
 	) // Set the tools path in the shared state
-	shared.State.OutPath = path.Join(
+	agentstate.State.OutPath = path.Join(
 		dataRoot,
 		"output",
 	) // Set the output path in the shared state
-	shared.State.RestoreFilePath = path.Join(
+	agentstate.State.RestoreFilePath = path.Join(
 		dataRoot,
 		"restore",
 	) // Set the restore file path in the shared state
-	shared.State.Debug = viper.GetBool(
+	agentstate.State.Debug = viper.GetBool(
 		"debug",
 	) // Set the debug flag in the shared state
-	shared.State.AlwaysTrustFiles = viper.GetBool(
+	agentstate.State.AlwaysTrustFiles = viper.GetBool(
 		"always_trust_files",
 	) // Set the always trust files flag in the shared state
-	shared.State.ExtraDebugging = viper.GetBool(
+	agentstate.State.ExtraDebugging = viper.GetBool(
 		"extra_debugging",
 	) // Set the extra debugging flag in the shared state
-	shared.State.StatusTimer = viper.GetInt(
+	agentstate.State.StatusTimer = viper.GetInt(
 		"status_timer",
 	) // Set the status timer in the shared state to 3 seconds
-	shared.State.WriteZapsToFile = viper.GetBool(
+	agentstate.State.WriteZapsToFile = viper.GetBool(
 		"write_zaps_to_file",
 	) // Set the write zaps to file flag in the shared state
-	shared.State.RetainZapsOnCompletion = viper.GetBool(
+	agentstate.State.RetainZapsOnCompletion = viper.GetBool(
 		"retain_zaps_on_completion",
 	) // Set the retain zaps on completion flag in the shared state
-	shared.State.EnableAdditionalHashTypes = viper.GetBool(
+	agentstate.State.EnableAdditionalHashTypes = viper.GetBool(
 		"enable_additional_hash_types",
 	) // Set the enable additional hash types flag in the shared state
-	shared.State.UseLegacyDeviceIdentificationMethod = viper.GetBool(
+	agentstate.State.UseLegacyDeviceIdentificationMethod = viper.GetBool(
 		"use_legacy_device_technique",
 	) // Set the use legacy device identification method flag in the shared state
 }

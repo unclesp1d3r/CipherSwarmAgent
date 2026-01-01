@@ -19,9 +19,9 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
 // Helper functions for creating pointers.
@@ -187,7 +187,7 @@ func TestAuthenticateAgent(t *testing.T) {
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
-				assert.Equal(t, int64(123), shared.State.AgentID)
+				assert.Equal(t, int64(123), agentstate.State.AgentID)
 			} else {
 				require.Error(t, err)
 				// Only check error type if it's an SDK error type, not for standard errors
@@ -656,7 +656,7 @@ func TestSendCrackedHash(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(123)
 			initialCallCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 
-			shared.State.WriteZapsToFile = tt.writeZapsToFile
+			agentstate.State.WriteZapsToFile = tt.writeZapsToFile
 
 			// Handle file I/O error test cases
 			switch tt.name {
@@ -680,7 +680,7 @@ func TestSendCrackedHash(t *testing.T) {
 					os.Chmod(tempDir, 0o500), //nolint:gosec // test: set dir read-only to exercise error path
 				)
 
-				shared.State.ZapsPath = tempDir
+				agentstate.State.ZapsPath = tempDir
 			case "file write error - read-only file":
 				// Skip on Windows - Windows uses ACLs instead of Unix permissions,
 				// and os.Chmod doesn't prevent file operations the same way
@@ -723,7 +723,7 @@ func TestSendCrackedHash(t *testing.T) {
 				// are properly handled and reported via submit_error endpoint.
 				require.NoError(t, os.Chmod(tempDir, 0o500)) //nolint:gosec // Read-only directory for error path
 
-				shared.State.ZapsPath = tempDir
+				agentstate.State.ZapsPath = tempDir
 			}
 
 			if tt.task != nil {
@@ -749,7 +749,7 @@ func TestSendCrackedHash(t *testing.T) {
 
 			// Verify file was created if WriteZapsToFile is enabled and no errors expected
 			if tt.writeZapsToFile && tt.task != nil && !tt.expectSubmitError {
-				hashFile := path.Join(shared.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", tt.task.ID))
+				hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", tt.task.ID))
 				_, err := os.Stat(hashFile)
 				require.NoError(t, err, "zap file should be created")
 			}
@@ -1154,14 +1154,14 @@ func TestLogHeartbeatSent(t *testing.T) {
 			defer cleanupState()
 
 			// Set initial state
-			shared.State.ExtraDebugging = tt.extraDebugging
-			shared.State.JobCheckingStopped = true
+			agentstate.State.ExtraDebugging = tt.extraDebugging
+			agentstate.State.JobCheckingStopped = true
 
 			// Call logHeartbeatSent - should not panic
 			logHeartbeatSent()
 
 			// Verify JobCheckingStopped is set to false
-			assert.False(t, shared.State.JobCheckingStopped, "JobCheckingStopped should be set to false")
+			assert.False(t, agentstate.State.JobCheckingStopped, "JobCheckingStopped should be set to false")
 		})
 	}
 }
