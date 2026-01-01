@@ -35,7 +35,7 @@ repos:
           - mdformat-admon
           - mdformat-config
           - mdformat-footnote
-          - mdformat-front-matters
+          - mdformat-front-matters # Changed to mdformat-front-matters since mdformat-frontmatter appears to be abandoned
           - mdformat-simple-breaks
           - mdformat-web
           - mdformat-ruff
