@@ -126,7 +126,7 @@ func ResetTestState() {
 
 // SetupMinimalTestState sets up minimal state (just AgentID and basic paths)
 // for tests that don't need full initialization.
-func SetupMinimalTestState(agentID int64) {
+func SetupMinimalTestState(agentID int64) func() {
 	tempDir := os.TempDir()
 	testDataDir, err := os.MkdirTemp(tempDir, "cipherswarm-test-*")
 	if err != nil {
@@ -143,6 +143,33 @@ func SetupMinimalTestState(agentID int64) {
 	agentstate.State.OutPath = filepath.Join(testDataDir, "out")
 	agentstate.State.FilePath = filepath.Join(testDataDir, "files")
 	agentstate.State.RestoreFilePath = filepath.Join(testDataDir, "restore")
+
+	// Create directories
+	mustMkdirAll(agentstate.State.DataPath)
+	mustMkdirAll(agentstate.State.CrackersPath)
+	mustMkdirAll(agentstate.State.HashlistPath)
+	mustMkdirAll(agentstate.State.ZapsPath)
+	mustMkdirAll(agentstate.State.PreprocessorsPath)
+	mustMkdirAll(agentstate.State.ToolsPath)
+	mustMkdirAll(agentstate.State.OutPath)
+	mustMkdirAll(agentstate.State.FilePath)
+	mustMkdirAll(agentstate.State.RestoreFilePath)
+
+	return func() {
+		// Cleanup: remove temporary directories
+		_ = os.RemoveAll(testDataDir)
+		// Reset agentstate.State to zero values by setting each field individually
+		agentstate.State.AgentID = 0
+		agentstate.State.DataPath = ""
+		agentstate.State.CrackersPath = ""
+		agentstate.State.HashlistPath = ""
+		agentstate.State.ZapsPath = ""
+		agentstate.State.PreprocessorsPath = ""
+		agentstate.State.ToolsPath = ""
+		agentstate.State.OutPath = ""
+		agentstate.State.FilePath = ""
+		agentstate.State.RestoreFilePath = ""
+	}
 }
 
 // WithTestState is a convenience wrapper that sets up state, runs the test function,

@@ -12,7 +12,7 @@ reviews:
   high_level_summary_placeholder: "@coderabbitai summary"
   high_level_summary_in_walkthrough: true
   auto_title_placeholder: "@coderabbitai"
-  auto_title_instructions: "Use Conventional Commits format: type(scope): description. Types: feat, fix, refactor, perf, test, docs, ci. Scopes: cli, api, hashcat, agent, config, arch. Focus on technical changes: concurrency patterns, API reliability, security hardening, hashcat integration."
+  auto_title_instructions: "Use Conventional Commits format: type(scope): description. Types: feat, fix, refactor, perf, test, docs, ci, build, chore. Scopes: cli, api, hashcat, agent, config, arch. Focus on technical changes: concurrency patterns, API reliability, security hardening, hashcat integration."
   review_status: true
   commit_status: true
   fail_commit_status: false
@@ -78,10 +78,7 @@ reviews:
       - "draft"
       - "DO NOT MERGE"
       - "[skip review]"
-    labels:
-      - "dependencies"
-      - "github_actions"
-      - "documentation"
+    labels: []
     drafts: false
     base_branches:
       - "main"
