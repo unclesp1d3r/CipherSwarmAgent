@@ -23,9 +23,17 @@ func CreateTempTestDir(t *testing.T, _ string) string {
 
 // CreateTestFile creates a test file with the specified content in the given directory.
 // Returns the full file path. Useful for testing file download verification and hashcat input files.
+// Note: Validates that the filename does not escape the target directory.
 func CreateTestFile(t *testing.T, dir, filename string, content []byte) string {
 	t.Helper()
-	filePath := filepath.Join(dir, filename)
+
+	// Validate filename to prevent path traversal
+	baseFilename := filepath.Base(filename)
+	if baseFilename != filename || baseFilename == "." || baseFilename == ".." {
+		t.Fatalf("Invalid filename %q: must be a simple filename without path separators", filename)
+	}
+
+	filePath := filepath.Join(dir, baseFilename)
 	if err := os.WriteFile(filePath, content, 0o600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
