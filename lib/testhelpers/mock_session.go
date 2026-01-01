@@ -52,11 +52,11 @@ func MockSessionWithChannels(sessionName string) (*hashcat.Session, error) {
 // Mask: "?l" (simple lowercase mask)
 // Other fields set to reasonable defaults.
 // Accepts a testing.TB to handle failures and cleanup.
-func CreateTestHashcatParams(t testing.TB) hashcat.Params {
+func CreateTestHashcatParams(tb testing.TB) hashcat.Params {
 	// Create a temporary hash file for testing
 	tempDir := agentstate.State.OutPath
 	if tempDir == "" {
-		tempDir = os.TempDir()
+		tempDir = tb.TempDir()
 	}
 
 	// Create a temporary file instead of a fixed name
