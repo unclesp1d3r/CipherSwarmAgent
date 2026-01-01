@@ -3,7 +3,7 @@ package testhelpers
 
 import (
 	"os"
-	"path/filepath"
+	"testing"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
@@ -51,31 +51,41 @@ func MockSessionWithChannels(sessionName string) (*hashcat.Session, error) {
 // HashFile: path to test hash file (create in temp directory)
 // Mask: "?l" (simple lowercase mask)
 // Other fields set to reasonable defaults.
-func CreateTestHashcatParams() hashcat.Params {
+// Accepts a testing.TB to handle failures and cleanup.
+func CreateTestHashcatParams(t testing.TB) hashcat.Params {
 	// Create a temporary hash file for testing
 	tempDir := agentstate.State.OutPath
 	if tempDir == "" {
 		tempDir = os.TempDir()
 	}
 
-	hashFile := filepath.Join(tempDir, "test_hash.txt")
-	// Create an empty hash file
-	file, err := os.Create(hashFile)
+	// Create a temporary file instead of a fixed name
+	file, err := os.CreateTemp(tempDir, "test_hash_*.txt")
 	if err != nil {
-		panic(err)
+		t.Fatalf("Failed to create temp hash file: %v", err)
 	}
-	if file != nil {
-		_, err = file.WriteString("testhash\n")
-		if err != nil {
-			panic(err)
-		}
-		_ = file.Close()
+
+	// Ensure cleanup happens after test
+	t.Cleanup(func() {
+		_ = os.Remove(file.Name())
+	})
+
+	// Write test hash content
+	_, err = file.WriteString("testhash\n")
+	if err != nil {
+		_ = file.Close() // Close before cleanup
+		t.Fatalf("Failed to write to temp hash file: %v", err)
+	}
+
+	// Close the file
+	if err := file.Close(); err != nil {
+		t.Fatalf("Failed to close temp hash file: %v", err)
 	}
 
 	return hashcat.Params{
 		AttackMode:       hashcat.AttackModeMask,
 		HashType:         0, // MD5
-		HashFile:         hashFile,
+		HashFile:         file.Name(),
 		Mask:             "?l",
 		OptimizedKernels: false,
 		SlowCandidates:   false,
