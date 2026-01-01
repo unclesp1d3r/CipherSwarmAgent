@@ -5,7 +5,7 @@ early_access: true
 enable_free_tier: true
 inheritance: false
 reviews:
-  profile: chill
+  profile: assertive
   request_changes_workflow: true
   high_level_summary: true
   high_level_summary_instructions: "Focus on technical impact: Go concurrency patterns, API reliability, hashcat integration, security implications, and architectural changes. Prioritize breaking changes, performance impacts, and testing coverage. Structure as: [Core Changes] → [Architecture Impact] → [Risks/Testing] → [Migration Notes]."
