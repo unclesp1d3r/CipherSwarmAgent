@@ -72,7 +72,8 @@ func TestGetNewTask(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			tt.setupMock()
@@ -147,7 +148,8 @@ func TestGetAttackParameters(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			tt.setupMock(tt.attackID)
@@ -214,7 +216,8 @@ func TestAcceptTask(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint to handle error reporting
@@ -226,7 +229,7 @@ func TestAcceptTask(t *testing.T) {
 				tt.setupMock(0)
 			}
 
-			err := AcceptTask(tt.task)
+			err = AcceptTask(tt.task)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -277,7 +280,8 @@ func TestAbandonTask(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint to handle error reporting

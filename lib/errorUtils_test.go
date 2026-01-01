@@ -18,7 +18,8 @@ func withHTTPAndState(t *testing.T, fn func()) {
 	t.Helper()
 	cleanupHTTP := testhelpers.SetupHTTPMock()
 	defer cleanupHTTP()
-	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	require.NoError(t, err)
 	defer cleanupState()
 	// Mock SubmitErrorAgent endpoint to avoid recursion and enable call counting
 	testhelpers.MockSubmitErrorSuccess(123)
@@ -62,7 +63,8 @@ func TestHandleAuthenticationError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			result := handleAuthenticationError(tt.err)
@@ -109,7 +111,8 @@ func TestHandleConfigurationError(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
@@ -187,7 +190,8 @@ func TestHandleAPIError(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
@@ -269,7 +273,8 @@ func TestHandleStatusUpdateError(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
@@ -322,7 +327,8 @@ func TestHandleSDKError(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
@@ -365,7 +371,8 @@ func TestHandleTaskNotFound(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
@@ -402,7 +409,8 @@ func TestHandleTaskGone(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
@@ -455,7 +463,8 @@ func TestSendAgentError(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
@@ -581,7 +590,8 @@ func TestHandleTaskError(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
