@@ -21,11 +21,13 @@ Before contributing, set up your development environment to ensure code quality 
 ### Installing just
 
 **macOS:**
+
 ```bash
 brew install just
 ```
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 # Using snap
 sudo snap install just
@@ -38,6 +40,7 @@ curl -L https://github.com/casey/just/releases/latest/download/just-1.36.0-x86_6
 ```
 
 **Windows:**
+
 ```powershell
 # Using Chocolatey
 choco install just
@@ -52,17 +55,20 @@ winget install --id Casey.Just
 ### Setting Up the Development Environment
 
 1. Clone and enter the repository:
+
 ```bash
 git clone https://github.com/unclesp1d3r/cipherswarm-agent.git
 cd cipherswarm-agent
 ```
 
 2. Install development dependencies:
+
 ```bash
 just install
 ```
 
 This command will:
+
 - Install Python packages (mkdocs-material, pre-commit) using uv
 - Set up pre-commit hooks for commit message validation
 - Ensure Go modules are properly configured
@@ -76,6 +82,7 @@ just ci-check
 ```
 
 This runs:
+
 - Code formatting with `gofmt`
 - Linting with `golangci-lint`
 - Go vet checks
