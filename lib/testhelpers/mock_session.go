@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
 const channelBufferSize = 5 // Buffer size for mock session channels
@@ -53,7 +53,7 @@ func MockSessionWithChannels(sessionName string) (*hashcat.Session, error) {
 // Other fields set to reasonable defaults.
 func CreateTestHashcatParams() hashcat.Params {
 	// Create a temporary hash file for testing
-	tempDir := shared.State.OutPath
+	tempDir := agentstate.State.OutPath
 	if tempDir == "" {
 		tempDir = os.TempDir()
 	}

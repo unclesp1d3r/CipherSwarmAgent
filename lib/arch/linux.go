@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
 // GetDevices retrieves a list of GPU devices available on a Linux system.
@@ -26,11 +26,11 @@ import (
 //	[]string: A slice of strings containing the names of the GPU devices.
 //	error: An error object if there was an issue executing the command or parsing the output.
 func GetDevices(ctx context.Context) ([]string, error) {
-	shared.Logger.Debug("Getting GPU devices")
+	agentstate.Logger.Debug("Getting GPU devices")
 
 	out, err := exec.CommandContext(ctx, "lspci").Output()
 	if err != nil {
-		shared.Logger.Error("Error executing lspci command", "error", err)
+		agentstate.Logger.Error("Error executing lspci command", "error", err)
 		return nil, err
 	}
 
@@ -40,7 +40,7 @@ func GetDevices(ctx context.Context) ([]string, error) {
 	matches := re.FindAllStringSubmatch(commandResult, -1)
 
 	if matches == nil {
-		shared.Logger.Warn("No GPU devices found")
+		agentstate.Logger.Warn("No GPU devices found")
 		return nil, nil
 	}
 
@@ -52,7 +52,7 @@ func GetDevices(ctx context.Context) ([]string, error) {
 	}
 
 	if len(devices) == 0 {
-		shared.Logger.Error("No GPU devices found after parsing")
+		agentstate.Logger.Error("No GPU devices found after parsing")
 		return nil, nil
 	}
 

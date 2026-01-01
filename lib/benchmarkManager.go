@@ -9,10 +9,10 @@ import (
 
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-	"github.com/unclesp1d3r/cipherswarmagent/shared"
 )
 
 const (
@@ -40,7 +40,11 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 		HashcatBenchmarks: benchmarks,
 	}
 
-	res, err := shared.State.SdkClient.Agents.SubmitBenchmark(context.Background(), shared.State.AgentID, results)
+	res, err := agentstate.State.SdkClient.Agents.SubmitBenchmark(
+		context.Background(),
+		agentstate.State.AgentID,
+		results,
+	)
 	if err != nil {
 		return err
 	}
@@ -89,7 +93,7 @@ func createBenchmark(result benchmarkResult) (components.HashcatBenchmark, error
 // Logs the session start, runs the benchmark task, and updates the results.
 // If any errors occur during session creation or result sending, logs the errors and returns them.
 func UpdateBenchmarks() error {
-	shared.State.BenchmarksSubmitted = false
+	agentstate.State.BenchmarksSubmitted = false
 
 	// FOR TESTING: Only benchmark MD5 (hash type 0) instead of all hash types
 	additionalArgs := arch.GetAdditionalHashcatArgs()
@@ -108,7 +112,7 @@ func UpdateBenchmarks() error {
 		return cserrors.LogAndSendError("Failed to create benchmark session", err, operations.SeverityMajor, nil)
 	}
 
-	shared.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
+	agentstate.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
 
 	displayBenchmarkStarting()
 
@@ -123,8 +127,8 @@ func UpdateBenchmarks() error {
 		return cserrors.LogAndSendError("Error updating benchmarks", err, operations.SeverityCritical, nil)
 	}
 
-	shared.State.BenchmarksSubmitted = true
-	shared.Logger.Info("Benchmarks successfully submitted to server")
+	agentstate.State.BenchmarksSubmitted = true
+	agentstate.Logger.Info("Benchmarks successfully submitted to server")
 
 	return nil
 }
@@ -134,7 +138,7 @@ func UpdateBenchmarks() error {
 func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 	err := sess.Start()
 	if err != nil {
-		shared.Logger.Error("Failed to start benchmark session", "error", err)
+		agentstate.Logger.Error("Failed to start benchmark session", "error", err)
 
 		return nil, true
 	}
@@ -153,12 +157,12 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 			case stdErrLine := <-sess.StderrMessages:
 				handleBenchmarkStdErrLine(stdErrLine)
 			case statusUpdate := <-sess.StatusUpdates:
-				shared.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
+				agentstate.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
 			case crackedHash := <-sess.CrackedHashes:
-				shared.Logger.Debug("Benchmark cracked hash", "hash", crackedHash) // This should never happen
+				agentstate.Logger.Debug("Benchmark cracked hash", "hash", crackedHash) // This should never happen
 			case err := <-sess.DoneChan:
 				if err != nil {
-					shared.Logger.Error("Benchmark session failed", "error", err)
+					agentstate.Logger.Error("Benchmark session failed", "error", err)
 					SendAgentError(err.Error(), nil, operations.SeverityFatal)
 				}
 
@@ -176,7 +180,7 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 func handleBenchmarkStdOutLine(line string, results *[]benchmarkResult) {
 	fields := strings.Split(line, ":")
 	if len(fields) != benchmarkFieldCount {
-		shared.Logger.Debug("Unknown benchmark line", "line", line)
+		agentstate.Logger.Debug("Unknown benchmark line", "line", line)
 
 		return
 	}
