@@ -190,12 +190,13 @@ func TestSendBenchmarkResults(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			tt.setupMock(789)
 
-			err := sendBenchmarkResults(tt.results)
+			err = sendBenchmarkResults(tt.results)
 
 			if tt.expectedError {
 				assert.Error(t, err)

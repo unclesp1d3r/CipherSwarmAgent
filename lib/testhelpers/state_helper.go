@@ -4,6 +4,7 @@ package testhelpers
 import (
 	"os"
 	"path/filepath"
+	"testing"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -11,22 +12,23 @@ import (
 
 const dirPerm os.FileMode = 0o755
 
-func mustMkdirAll(path string) {
+func mustMkdirAll(path string) error {
 	if err := os.MkdirAll(path, dirPerm); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 // SetupTestState initializes agentstate.State with test values.
 // It creates temporary directories for all path fields, sets up the SDK client,
 // stubs device discovery to avoid requiring hashcat binary,
 // and returns a cleanup function that removes temporary directories and resets state.
-func SetupTestState(agentID int64, apiURL, apiToken string) func() {
+func SetupTestState(agentID int64, apiURL, apiToken string) (func(), error) {
 	// Create temporary directories for all path fields
 	tempDir := os.TempDir()
 	testDataDir, err := os.MkdirTemp(tempDir, "cipherswarm-test-*")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	agentstate.State.AgentID = agentID
@@ -46,15 +48,33 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	agentstate.State.SdkClient = NewTestSDKClient(apiURL)
 
 	// Create directories
-	mustMkdirAll(agentstate.State.DataPath)
-	mustMkdirAll(agentstate.State.CrackersPath)
-	mustMkdirAll(agentstate.State.HashlistPath)
-	mustMkdirAll(agentstate.State.ZapsPath)
-	mustMkdirAll(agentstate.State.PreprocessorsPath)
-	mustMkdirAll(agentstate.State.ToolsPath)
-	mustMkdirAll(agentstate.State.OutPath)
-	mustMkdirAll(agentstate.State.FilePath)
-	mustMkdirAll(agentstate.State.RestoreFilePath)
+	if err := mustMkdirAll(agentstate.State.DataPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.CrackersPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.HashlistPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.ZapsPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.PreprocessorsPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.ToolsPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.OutPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.FilePath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.RestoreFilePath); err != nil {
+		return nil, err
+	}
 
 	return func() {
 		// Cleanup: remove temporary directories
@@ -89,7 +109,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.SdkClient = nil
 		// Deactivate httpmock
 		httpmock.DeactivateAndReset()
-	}
+	}, nil
 }
 
 // ResetTestState resets agentstate.State to zero values without cleanup.
@@ -126,11 +146,11 @@ func ResetTestState() {
 
 // SetupMinimalTestState sets up minimal state (just AgentID and basic paths)
 // for tests that don't need full initialization.
-func SetupMinimalTestState(agentID int64) func() {
+func SetupMinimalTestState(agentID int64) (func(), error) {
 	tempDir := os.TempDir()
 	testDataDir, err := os.MkdirTemp(tempDir, "cipherswarm-test-*")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	agentstate.State.AgentID = agentID
@@ -145,15 +165,33 @@ func SetupMinimalTestState(agentID int64) func() {
 	agentstate.State.RestoreFilePath = filepath.Join(testDataDir, "restore")
 
 	// Create directories
-	mustMkdirAll(agentstate.State.DataPath)
-	mustMkdirAll(agentstate.State.CrackersPath)
-	mustMkdirAll(agentstate.State.HashlistPath)
-	mustMkdirAll(agentstate.State.ZapsPath)
-	mustMkdirAll(agentstate.State.PreprocessorsPath)
-	mustMkdirAll(agentstate.State.ToolsPath)
-	mustMkdirAll(agentstate.State.OutPath)
-	mustMkdirAll(agentstate.State.FilePath)
-	mustMkdirAll(agentstate.State.RestoreFilePath)
+	if err := mustMkdirAll(agentstate.State.DataPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.CrackersPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.HashlistPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.ZapsPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.PreprocessorsPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.ToolsPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.OutPath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.FilePath); err != nil {
+		return nil, err
+	}
+	if err := mustMkdirAll(agentstate.State.RestoreFilePath); err != nil {
+		return nil, err
+	}
 
 	return func() {
 		// Cleanup: remove temporary directories
@@ -169,13 +207,17 @@ func SetupMinimalTestState(agentID int64) func() {
 		agentstate.State.OutPath = ""
 		agentstate.State.FilePath = ""
 		agentstate.State.RestoreFilePath = ""
-	}
+	}, nil
 }
 
 // WithTestState is a convenience wrapper that sets up state, runs the test function,
 // and cleans up automatically.
-func WithTestState(agentID int64, apiURL, apiToken string, testFunc func()) {
-	cleanup := SetupTestState(agentID, apiURL, apiToken)
+func WithTestState(tb testing.TB, agentID int64, apiURL, apiToken string, testFunc func()) {
+	tb.Helper()
+	cleanup, err := SetupTestState(agentID, apiURL, apiToken)
+	if err != nil {
+		tb.Fatalf("failed to setup test state: %v", err)
+	}
 	defer cleanup()
 	testFunc()
 }

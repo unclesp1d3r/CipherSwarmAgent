@@ -178,12 +178,13 @@ func TestAuthenticateAgent(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(0, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(0, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			tt.setupMock(123)
 
-			err := AuthenticateAgent()
+			err = AuthenticateAgent()
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
@@ -282,12 +283,13 @@ func TestGetAgentConfiguration(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			tt.setupMock()
 
-			err := GetAgentConfiguration()
+			err = GetAgentConfiguration()
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
@@ -356,7 +358,8 @@ func TestUpdateAgentMetadata(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Stub getDevicesList to avoid requiring hashcat binary
@@ -365,7 +368,7 @@ func TestUpdateAgentMetadata(t *testing.T) {
 
 			tt.setupMock(123)
 
-			err := UpdateAgentMetadata()
+			err = UpdateAgentMetadata()
 
 			if tt.expectedError {
 				require.Error(t, err, "Expected an error but got nil")
@@ -444,7 +447,8 @@ func TestSendHeartBeat(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			tt.setupMock(123)
@@ -500,7 +504,8 @@ func TestSendStatusUpdate(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			task := testhelpers.NewTestTask(456, 789)
@@ -649,7 +654,8 @@ func TestSendCrackedHash(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
 			defer cleanupHTTP()
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Set up mock for submit_error before capturing initial count
@@ -931,7 +937,8 @@ func TestHandleStateResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			result := handleStateResponse(tt.response)
@@ -1118,7 +1125,8 @@ func TestHandleSendStatusResponse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Helper()
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Create a mock response
@@ -1150,7 +1158,8 @@ func TestLogHeartbeatSent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			cleanupState, err := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			require.NoError(t, err)
 			defer cleanupState()
 
 			// Set initial state
