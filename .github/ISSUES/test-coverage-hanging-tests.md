@@ -81,11 +81,16 @@ go test -timeout 120s -v ./lib
 
 ## Expected Outcome
 
-Once fixed, the workflow should be updated to include `./lib` in the coverage run. The workflow comment includes a TODO with instructions for updating:
+Once fixed, the workflow should be updated to include `./lib` in the coverage run. Update the coverage job in `.github/workflows/go.yml` to run coverage on all packages:
 
 ```yaml
-null
-...
+# After fixing hanging tests, update the coverage run command from:
+run: |
+  go test -coverprofile=coverage.out -covermode=set ./lib/progress ./lib/downloader ./lib/zap
+
+# To include the lib package:
+run: |
+  go test -coverprofile=coverage.out -covermode=set ./...
 ```
 
 ## Related Files

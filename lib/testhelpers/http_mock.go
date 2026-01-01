@@ -157,9 +157,9 @@ func MockHeartbeatNoContent(agentID int64) {
 	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
 }
 
-// MockUpdateAgentSuccess registers a mock responder for POST /api/v1/client/agents/{id}
+// MockUpdateAgentSuccess registers a mock responder for PUT /api/v1/client/agents/{id}
 // that returns a successful UpdateAgentResponse with the provided agent data.
-// According to swagger.json, the endpoint is /api/v1/client/agents/{id}.
+// According to swagger.json, the endpoint only supports GET and PUT methods.
 func MockUpdateAgentSuccess(agentID int64, agent components.Agent) {
 	responseBody := map[string]interface{}{
 		"agent": agent,
@@ -171,14 +171,9 @@ func MockUpdateAgentSuccess(agentID int64, agent components.Agent) {
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
-	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d$`, agentID))
-	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/agents/%d$`, agentID))
-	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
-	httpmock.RegisterRegexpResponder("PUT", pattern1, responder)
-	httpmock.RegisterRegexpResponder("PUT", pattern2, responder)
-	httpmock.RegisterRegexpResponder("PATCH", pattern1, responder)
-	httpmock.RegisterRegexpResponder("PATCH", pattern2, responder)
+	// According to swagger.json, the endpoint is /api/v1/client/agents/{id} with PUT method only
+	pattern := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d$`, agentID))
+	httpmock.RegisterRegexpResponder("PUT", pattern, responder)
 }
 
 // MockSendStatusSuccess registers a mock responder for POST /api/v1/client/tasks/{id}/submit_status

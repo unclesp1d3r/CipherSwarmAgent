@@ -36,11 +36,35 @@ func CreateTestFile(t *testing.T, dir, filename string, content []byte) string {
 // Accepts a baseDir parameter to serve files from that directory.
 // Returns the server instance which should be closed via t.Cleanup().
 // This will be used to test the downloader package without external dependencies.
+// Note: This function validates that the requested file path stays within baseDir
+// to prevent path traversal attacks in tests.
 func MockDownloadServer(t *testing.T, baseDir string) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Use filepath.Base to extract only the filename, preventing path traversal
 		filename := filepath.Base(r.URL.Path)
+		// Reject any filename that could still cause issues
+		if filename == "." || filename == ".." || strings.ContainsAny(filename, `/\`) {
+			http.Error(w, "Invalid filename", http.StatusBadRequest)
+			return
+		}
 		filePath := filepath.Join(baseDir, filename)
+
+		// Verify the resolved path is still within baseDir (defense in depth)
+		absBaseDir, err := filepath.Abs(baseDir)
+		if err != nil {
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		absFilePath, err := filepath.Abs(filePath)
+		if err != nil {
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		if !strings.HasPrefix(absFilePath, absBaseDir+string(filepath.Separator)) && absFilePath != absBaseDir {
+			http.Error(w, "Access denied", http.StatusForbidden)
+			return
+		}
 
 		file, err := os.Open(filePath)
 		if err != nil {
