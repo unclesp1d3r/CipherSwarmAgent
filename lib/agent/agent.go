@@ -112,7 +112,11 @@ func cleanupLockFile(pidFile string) {
 	agentstate.Logger.Debug("Cleaning up PID file", "path", pidFile)
 
 	if err := os.Remove(pidFile); err != nil {
-		agentstate.Logger.Fatal("Failed to remove PID file", "error", err)
+		if os.IsNotExist(err) {
+			// PID file is already gone, nothing to clean up
+			return
+		}
+		agentstate.Logger.Error("Failed to remove PID file", "error", err)
 	}
 }
 
