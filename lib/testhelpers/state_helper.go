@@ -4,6 +4,7 @@ package testhelpers
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/jarcoal/httpmock"
@@ -11,6 +12,10 @@ import (
 )
 
 const dirPerm os.FileMode = 0o755
+
+// setupTestStateMutex serializes SetupTestState to prevent data races when tests run in parallel.
+// TODO: Remove this mutex when agentstate.State is refactored to use instances instead of global state.
+var setupTestStateMutex sync.Mutex
 
 func mustMkdirAll(path string) error {
 	if err := os.MkdirAll(path, dirPerm); err != nil {
@@ -23,11 +28,14 @@ func mustMkdirAll(path string) error {
 // It creates temporary directories for all path fields, sets up the SDK client,
 // stubs device discovery to avoid requiring hashcat binary,
 // and returns a cleanup function that removes temporary directories and resets state.
+// Tests must not run in parallel until the global state is refactored to instances.
 func SetupTestState(agentID int64, apiURL, apiToken string) (func(), error) {
+	setupTestStateMutex.Lock()
 	// Create temporary directories for all path fields
 	tempDir := os.TempDir()
 	testDataDir, err := os.MkdirTemp(tempDir, "cipherswarm-test-*")
 	if err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 
@@ -49,30 +57,39 @@ func SetupTestState(agentID int64, apiURL, apiToken string) (func(), error) {
 
 	// Create directories
 	if err := mustMkdirAll(agentstate.State.DataPath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 	if err := mustMkdirAll(agentstate.State.CrackersPath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 	if err := mustMkdirAll(agentstate.State.HashlistPath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 	if err := mustMkdirAll(agentstate.State.ZapsPath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 	if err := mustMkdirAll(agentstate.State.PreprocessorsPath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 	if err := mustMkdirAll(agentstate.State.ToolsPath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 	if err := mustMkdirAll(agentstate.State.OutPath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 	if err := mustMkdirAll(agentstate.State.FilePath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 	if err := mustMkdirAll(agentstate.State.RestoreFilePath); err != nil {
+		setupTestStateMutex.Unlock()
 		return nil, err
 	}
 
@@ -109,6 +126,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) (func(), error) {
 		agentstate.State.SdkClient = nil
 		// Deactivate httpmock
 		httpmock.DeactivateAndReset()
+		setupTestStateMutex.Unlock()
 	}, nil
 }
 
