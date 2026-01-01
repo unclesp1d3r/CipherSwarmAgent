@@ -53,6 +53,7 @@ func MockSessionWithChannels(sessionName string) (*hashcat.Session, error) {
 // Other fields set to reasonable defaults.
 // Accepts a testing.TB to handle failures and cleanup.
 func CreateTestHashcatParams(tb testing.TB) hashcat.Params {
+	tb.Helper()
 	// Create a temporary hash file for testing
 	tempDir := agentstate.State.OutPath
 	if tempDir == "" {
@@ -62,11 +63,11 @@ func CreateTestHashcatParams(tb testing.TB) hashcat.Params {
 	// Create a temporary file instead of a fixed name
 	file, err := os.CreateTemp(tempDir, "test_hash_*.txt")
 	if err != nil {
-		t.Fatalf("Failed to create temp hash file: %v", err)
+		tb.Fatalf("Failed to create temp hash file: %v", err)
 	}
 
 	// Ensure cleanup happens after test
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		_ = os.Remove(file.Name())
 	})
 
@@ -74,12 +75,12 @@ func CreateTestHashcatParams(tb testing.TB) hashcat.Params {
 	_, err = file.WriteString("testhash\n")
 	if err != nil {
 		_ = file.Close() // Close before cleanup
-		t.Fatalf("Failed to write to temp hash file: %v", err)
+		tb.Fatalf("Failed to write to temp hash file: %v", err)
 	}
 
 	// Close the file
 	if err := file.Close(); err != nil {
-		t.Fatalf("Failed to close temp hash file: %v", err)
+		tb.Fatalf("Failed to close temp hash file: %v", err)
 	}
 
 	return hashcat.Params{

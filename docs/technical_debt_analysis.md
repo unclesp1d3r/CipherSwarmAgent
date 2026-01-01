@@ -7,14 +7,14 @@
 
 ## Executive Summary
 
-| Metric                       | Current State   | Target     | Risk Level |
-| ---------------------------- | --------------- | ---------- | ---------- |
-| **Overall Debt Score**       | 720 (High)      | <400 (Low) | High       |
-| **Test Coverage**            | 17.6% (overall) | 80%        | Critical   |
-| **Untested Packages**        | 8 of 14         | 0          | Critical   |
-| **External SDK Dependency**  | 1 critical      | 0          | Medium     |
-| **Duplicate Error Handling** | 7 patterns      | 1          | Medium     |
-| **Global State Usage**       | Heavy           | Minimal    | Medium     |
+| Metric                       | Current State   | Target      | Risk Level |
+| ---------------------------- | --------------- | ----------- | ---------- |
+| **Overall Debt Score**       | 720 (High)      | \<400 (Low) | High       |
+| **Test Coverage**            | 17.6% (overall) | 80%         | Critical   |
+| **Untested Packages**        | 8 of 14         | 0           | Critical   |
+| **External SDK Dependency**  | 1 critical      | 0           | Medium     |
+| **Duplicate Error Handling** | 7 patterns      | 1           | Medium     |
+| **Global State Usage**       | Heavy           | Minimal     | Medium     |
 
 ---
 
@@ -77,10 +77,10 @@ default: // log critical
 Debt Item: External SDK dependency
 Location: github.com/unclesp1d3r/cipherswarm-agent-sdk-go
 Impact:
-    - No control over breaking changes
-    - Version sync issues with API
-    - ~155 transitive dependencies (AWS SDK, GCP, OpenTelemetry)
-    - Current plan exists: docs/v2_implementation_plan/phase_1_replace_sdk.md
+  - No control over breaking changes
+  - Version sync issues with API
+  - ~155 transitive dependencies (AWS SDK, GCP, OpenTelemetry)
+  - Current plan exists: docs/v2_implementation_plan/phase_1_replace_sdk.md
 Status: Plan documented, 0% implemented
 ```
 
@@ -95,10 +95,10 @@ var ErrorLogger = Logger.With()
 
 **Problems:**
 
--   Impossible to unit test functions that depend on State
--   Race conditions possible (no mutex on most fields)
--   Makes dependency injection impossible
--   Couples all packages to `agentstate`
+- Impossible to unit test functions that depend on State
+- Race conditions possible (no mutex on most fields)
+- Makes dependency injection impossible
+- Couples all packages to `agentstate`
 
 #### **Missing Abstractions**
 
@@ -145,9 +145,9 @@ OVERALL:                     ~17.6%
 
 #### **Test Quality Issues**
 
--   CI workflow has `continue-on-error: true` and `timeout-minutes: 10` for coverage
--   Documented issue: `.github/ISSUES/test-coverage-hanging-tests.md`
--   Tests exist but some may hang
+- CI workflow has `continue-on-error: true` and `timeout-minutes: 10` for coverage
+- Documented issue: `.github/ISSUES/test-coverage-hanging-tests.md`
+- Tests exist but some may hang
 
 ### D. Documentation Debt
 
@@ -162,10 +162,10 @@ OVERALL:                     ~17.6%
 
 #### **Existing Documentation**
 
--   `README.md` - Good overview
--   `docs/` - MkDocs setup exists
--   `AGENTS.md` - Architecture for AI agents
--   `docs/swagger.json` - API specification
+- `README.md` - Good overview
+- `docs/` - MkDocs setup exists
+- `AGENTS.md` - Architecture for AI agents
+- `docs/swagger.json` - API specification
 
 ### E. Technology Debt
 
@@ -175,9 +175,9 @@ OVERALL:                     ~17.6%
 Direct Dependencies: 20
 Transitive Dependencies: 135+
 Notable Heavy Dependencies:
-    - AWS SDK v2: ~15 packages (unused directly)
-    - Google Cloud: ~10 packages (unused directly)
-    - OpenTelemetry: ~10 packages (via SDK)
+  - AWS SDK v2: ~15 packages (unused directly)
+  - Google Cloud: ~10 packages (unused directly)
+  - OpenTelemetry: ~10 packages (via SDK)
 ```
 
 These come from `cipherswarm-agent-sdk-go` and `hashicorp/go-getter`.
@@ -332,9 +332,9 @@ Requires APIClient interface first.
 
 **Effort:** 80-120 hours | **Benefits:** Full control, reduced dependencies
 
--   Already planned in `docs/v2_implementation_plan/phase_1_replace_sdk.md`
--   Remove 135+ transitive dependencies
--   Full control over API contract
+- Already planned in `docs/v2_implementation_plan/phase_1_replace_sdk.md`
+- Remove 135+ transitive dependencies
+- Full control over API contract
 
 #### 8. Refactor Global State
 
@@ -362,8 +362,8 @@ func NewAgent(opts ...Option) *Agent {
 
 ```yaml
 # .github/workflows/go.yml additions
-- name: Coverage Gate
-  run: |
+  - name: Coverage Gate
+    run: |
       go test -coverprofile=coverage.out ./...
       COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
       if [ $(echo "$COVERAGE < 60" | bc) -eq 1 ]; then
@@ -371,8 +371,8 @@ func NewAgent(opts ...Option) *Agent {
         exit 1
       fi
 
-- name: Cyclomatic Complexity
-  run: |
+  - name: Cyclomatic Complexity
+    run: |
       go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
       gocyclo -over 15 . && echo "All functions under complexity limit"
 ```
@@ -381,13 +381,13 @@ func NewAgent(opts ...Option) *Agent {
 
 ```yaml
 Monthly Debt Allowance:
-    new_debt: "+2% complexity maximum"
-    required_reduction: "-5% per quarter"
+  new_debt: +2% complexity maximum
+  required_reduction: -5% per quarter
 
 Tracking:
-    complexity: "golangci-lint"
-    coverage: "codecov"
-    dependencies: "go mod graph | wc -l"
+  complexity: golangci-lint
+  coverage: codecov
+  dependencies: go mod graph | wc -l
 ```
 
 ---
