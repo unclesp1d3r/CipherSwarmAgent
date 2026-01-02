@@ -233,8 +233,14 @@ func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Ses
 	agentstate.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
 }
 
+// SessionKiller defines the interface for session objects that can be killed.
+type SessionKiller interface {
+	Kill() error
+	Cleanup()
+}
+
 // handleSDKError handles errors from the SDK by taking appropriate action based on the error's status code.
-func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat.Session) {
+func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess SessionKiller) {
 	switch se.StatusCode {
 	case http.StatusNotFound:
 		// Not an error, just log and kill the task
@@ -256,7 +262,7 @@ func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat
 // handleTaskNotFound handles the scenario where a task is not found in the system.
 // It logs an error message with the task ID, attempts to kill the session, and cleans up the session.
 // If killing the session fails, it logs and sends an error.
-func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
+func handleTaskNotFound(task *components.Task, sess SessionKiller) {
 	agentstate.Logger.Error("Task not found", "task_id", task.GetID())
 	agentstate.Logger.Info("Killing task", "task_id", task.GetID())
 	agentstate.Logger.Info(
@@ -277,7 +283,7 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 }
 
 // handleTaskGone handles the termination of a task when it is no longer needed, ensuring the session is appropriately killed.
-func handleTaskGone(task *components.Task, sess *hashcat.Session) {
+func handleTaskGone(task *components.Task, sess SessionKiller) {
 	agentstate.Logger.Info("Pausing task", "task_id", task.GetID())
 
 	if err := sess.Kill(); err != nil {

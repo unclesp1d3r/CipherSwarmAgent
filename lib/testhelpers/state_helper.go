@@ -17,7 +17,7 @@ const dirPerm os.FileMode = 0o755
 // TODO: Remove this mutex when agentstate.State is refactored to use instances instead of global state.
 var setupTestStateMutex sync.Mutex
 
-func mkdirAll(path string) error {
+func mustMkdirAll(path string) error {
 	if err := os.MkdirAll(path, dirPerm); err != nil {
 		return err
 	}

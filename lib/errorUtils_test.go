@@ -10,8 +10,43 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
+
+// mockSession wraps a hashcat.Session to track Kill method calls.
+type mockSession struct {
+	session    *hashcat.Session
+	killCalled bool
+}
+
+// Kill records that the Kill method was called and delegates to the underlying session.
+func (m *mockSession) Kill() error {
+	m.killCalled = true
+	if m.session != nil {
+		return m.session.Kill()
+	}
+	return nil
+}
+
+// WasKillCalled returns true if the Kill method was invoked.
+func (m *mockSession) WasKillCalled() bool {
+	return m.killCalled
+}
+
+// Cleanup delegates to the underlying session.
+func (m *mockSession) Cleanup() {
+	if m.session != nil {
+		m.session.Cleanup()
+	}
+}
+
+// Cancel delegates to the underlying session.
+func (m *mockSession) Cancel() {
+	if m.session != nil {
+		m.session.Cancel()
+	}
+}
 
 // withHTTPAndState sets up httpmock and shared state for tests and runs fn.
 func withHTTPAndState(t *testing.T, fn func()) {
@@ -22,7 +57,7 @@ func withHTTPAndState(t *testing.T, fn func()) {
 	require.NoError(t, err)
 	defer cleanupState()
 	// Mock SubmitErrorAgent endpoint to avoid recursion and enable call counting
-	testhelpers.MockSubmitErrorSuccess(123)
+	testhelpers.MockSubmitErrorSuccess(t, 123)
 	fn()
 }
 
@@ -117,7 +152,7 @@ func TestHandleConfigurationError(t *testing.T) {
 
 			// Mock SubmitErrorAgent endpoint
 			initialCallCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 
 			result := handleConfigurationError(tt.err)
 
@@ -195,7 +230,7 @@ func TestHandleAPIError(t *testing.T) {
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 
 			// This function doesn't return an error
 			handleAPIError(tt.message, tt.err)
@@ -258,7 +293,7 @@ func TestHandleStatusUpdateError(t *testing.T) {
 		},
 		{
 			name: "SDKError",
-			err:  testhelpers.NewSDKError(http.StatusNotFound, "not found"),
+			err:  testhelpers.NewSDKError(http.StatusBadRequest, "bad request"),
 			task: testhelpers.NewTestTask(456, 789),
 		},
 		{
@@ -278,7 +313,7 @@ func TestHandleStatusUpdateError(t *testing.T) {
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 
 			// Create a mock session
 			sess, err := testhelpers.NewMockSession("test-session")
@@ -290,6 +325,9 @@ func TestHandleStatusUpdateError(t *testing.T) {
 
 			// This function doesn't return an error
 			handleStatusUpdateError(tt.err, tt.task, sess)
+
+			// Verify SubmitErrorAgent was called for SDK errors
+			assertSubmitErrorCalledIfSDK(t, tt.err)
 		})
 	}
 }
@@ -332,23 +370,25 @@ func TestHandleSDKError(t *testing.T) {
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 
-			// Create a mock session
-			sess, err := testhelpers.NewMockSession("test-session")
+			// Create a mock session that tracks Kill calls
+			baseSess, err := testhelpers.NewMockSession("test-session")
 			if err != nil {
 				t.Skipf("Skipping test: failed to create mock session: %v", err)
 				return
 			}
+			sess := &mockSession{session: baseSess}
 			defer sess.Cleanup()
 
 			// This function doesn't return an error
 			handleSDKError(tt.sdkError, tt.task, sess)
 
-			// For 404 and 410, session should be killed - ensure function completes
+			// Assert that Kill was called as expected
 			if tt.expectKill {
-				// No direct assertion without deeper mocking; ensure branch is executed without panics
-				t.Log("kill path exercised")
+				assert.True(t, sess.WasKillCalled(), "expected Kill to be called for %s", tt.name)
+			} else {
+				assert.False(t, sess.WasKillCalled(), "expected Kill not to be called for %s", tt.name)
 			}
 		})
 	}
@@ -376,7 +416,7 @@ func TestHandleTaskNotFound(t *testing.T) {
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 
 			// Create a mock session
 			sess, err := testhelpers.NewMockSession("test-session")
@@ -414,7 +454,7 @@ func TestHandleTaskGone(t *testing.T) {
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 
 			// Create a mock session
 			sess, err := testhelpers.NewMockSession("test-session")
@@ -468,7 +508,7 @@ func TestSendAgentError(t *testing.T) {
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 
 			// This function doesn't return an error
 			SendAgentError(tt.message, tt.task, tt.severity)
@@ -595,7 +635,7 @@ func TestHandleTaskError(t *testing.T) {
 			defer cleanupState()
 
 			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 
 			// This function doesn't return an error
 			handleTaskError(tt.err, tt.message)
