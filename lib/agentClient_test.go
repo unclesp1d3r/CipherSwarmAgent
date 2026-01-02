@@ -148,6 +148,7 @@ func TestAuthenticateAgent(t *testing.T) {
 		{
 			name: "SDKError handling",
 			setupMock: func(t *testing.T, _ int64) {
+				t.Helper()
 				// Note: This test may timeout due to SDK retry logic with exponential backoff.
 				// The SDK retries on 500 errors, which can cause long delays in tests.
 				// Using 400 Bad Request instead to avoid retries.
@@ -266,6 +267,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 		{
 			name: "configuration error with SDKError",
 			setupMock: func(t *testing.T) {
+				t.Helper()
 				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
 				testhelpers.MockAPIError(
@@ -660,6 +662,7 @@ func TestSendCrackedHash(t *testing.T) {
 		{
 			name: "file open error - non-writable directory",
 			setupMock: func(t *testing.T, taskID int64) {
+				t.Helper()
 				testhelpers.MockSendCrackSuccess(taskID)
 				testhelpers.MockSubmitErrorSuccess(t, 123) // Mock submit_error endpoint
 			},
@@ -671,6 +674,7 @@ func TestSendCrackedHash(t *testing.T) {
 		{
 			name: "file write error - read-only file",
 			setupMock: func(t *testing.T, taskID int64) {
+				t.Helper()
 				testhelpers.MockSendCrackSuccess(taskID)
 				testhelpers.MockSubmitErrorSuccess(t, 123) // Mock submit_error endpoint
 			},
