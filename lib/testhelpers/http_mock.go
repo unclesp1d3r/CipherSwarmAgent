@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"testing"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
@@ -13,11 +14,12 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
 )
 
-// mustMarshal marshals v to JSON or panics in tests if it fails.
-func mustMarshal(v any) []byte {
+// mustMarshal marshals v to JSON or calls t.Fatal in tests if it fails.
+func mustMarshal(t *testing.T, v any) []byte {
+	t.Helper()
 	b, err := json.Marshal(v)
 	if err != nil {
-		panic(err)
+		t.Fatalf("failed to marshal JSON: %v", err)
 	}
 	return b
 }
@@ -45,12 +47,13 @@ func SetupHTTPMockForClient(client *http.Client) func() {
 // that returns a successful authentication response with the provided agent ID.
 // Uses a regex pattern to match any HTTP scheme and host.
 // Note: The SDK uses GET for authentication, not POST.
-func MockAuthenticationSuccess(agentID int64) {
+func MockAuthenticationSuccess(t *testing.T, agentID int64) {
+	t.Helper()
 	authResponse := operations.AuthenticateResponseBody{
 		Authenticated: true,
 		AgentID:       agentID,
 	}
-	jsonResponse := mustMarshal(authResponse)
+	jsonResponse := mustMarshal(t, authResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
@@ -66,12 +69,13 @@ func MockAuthenticationSuccess(agentID int64) {
 // that returns an error response with the specified status code and error message.
 // Uses a regex pattern to match any HTTP scheme and host.
 // Note: The SDK uses GET for authentication, not POST.
-func MockAuthenticationFailure(statusCode int, errorMessage string) {
+func MockAuthenticationFailure(t *testing.T, statusCode int, errorMessage string) {
+	t.Helper()
 	errorResponse := map[string]interface{}{
 		"authenticated": false,
 		"error":         errorMessage,
 	}
-	jsonResponse := mustMarshal(errorResponse)
+	jsonResponse := mustMarshal(t, errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,
@@ -86,8 +90,9 @@ func MockAuthenticationFailure(statusCode int, errorMessage string) {
 // MockConfigurationResponse registers a mock responder for the configuration endpoint
 // that returns the provided configuration.
 // Uses a regex pattern to match any HTTP scheme and host.
-func MockConfigurationResponse(config operations.GetConfigurationResponseBody) {
-	jsonResponse := mustMarshal(config)
+func MockConfigurationResponse(t *testing.T, config operations.GetConfigurationResponseBody) {
+	t.Helper()
+	jsonResponse := mustMarshal(t, config)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
@@ -102,11 +107,12 @@ func MockConfigurationResponse(config operations.GetConfigurationResponseBody) {
 // that returns the specified agent state.
 // Accepts agentID and uses a regex pattern to match the path with the numeric agent ID.
 // According to swagger.json, the endpoint is /api/v1/client/agents/{id}/heartbeat.
-func MockHeartbeatResponse(agentID int64, state operations.State) {
+func MockHeartbeatResponse(t *testing.T, agentID int64, state operations.State) {
+	t.Helper()
 	stateResponse := operations.SendHeartbeatResponseBody{
 		State: state,
 	}
-	jsonResponse := mustMarshal(stateResponse)
+	jsonResponse := mustMarshal(t, stateResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
@@ -125,13 +131,14 @@ func MockHeartbeatResponse(agentID int64, state operations.State) {
 // useful for testing error handling across different API calls.
 // The endpoint parameter should be a regex pattern string (will be compiled to *regexp.Regexp).
 // Registers responders for multiple HTTP methods to handle different SDK implementations.
-func MockAPIError(endpoint string, statusCode int, sdkError sdkerrors.SDKError) {
+func MockAPIError(t *testing.T, endpoint string, statusCode int, sdkError sdkerrors.SDKError) {
+	t.Helper()
 	errorResponse := map[string]interface{}{
 		"error":   sdkError.Message,
 		"code":    sdkError.StatusCode,
 		"details": nil,
 	}
-	jsonResponse := mustMarshal(errorResponse)
+	jsonResponse := mustMarshal(t, errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,
@@ -160,11 +167,12 @@ func MockHeartbeatNoContent(agentID int64) {
 // MockUpdateAgentSuccess registers a mock responder for PUT /api/v1/client/agents/{id}
 // that returns a successful UpdateAgentResponse with the provided agent data.
 // According to swagger.json, the endpoint only supports GET and PUT methods.
-func MockUpdateAgentSuccess(agentID int64, agent components.Agent) {
+func MockUpdateAgentSuccess(t *testing.T, agentID int64, agent components.Agent) {
+	t.Helper()
 	responseBody := map[string]interface{}{
 		"agent": agent,
 	}
-	jsonResponse := mustMarshal(responseBody)
+	jsonResponse := mustMarshal(t, responseBody)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
@@ -224,7 +232,8 @@ func MockSendCrackComplete(taskID int64) {
 // that returns HTTP 200 OK with a proper JSON response body.
 // Note: The SDK uses /api/v1/client/agents/{id}/submit_error path.
 // Returns 204 No Content to avoid infinite recursion when handleSendError processes errors.
-func MockSubmitErrorSuccess(agentID int64) {
+func MockSubmitErrorSuccess(t *testing.T, agentID int64) {
+	t.Helper()
 	// Use 204 No Content to signal success without a body, which prevents the SDK from
 	// treating it as an error and triggering infinite recursion in handleSendError.
 	responder := httpmock.NewStringResponder(http.StatusNoContent, "")
@@ -250,11 +259,12 @@ func GetSubmitErrorCallCount(agentID int64, baseURL string) int {
 
 // MockConfigurationError registers a mock responder for configuration endpoint
 // that returns an error response.
-func MockConfigurationError(statusCode int, errorMsg string) {
+func MockConfigurationError(t *testing.T, statusCode int, errorMsg string) {
+	t.Helper()
 	errorResponse := map[string]interface{}{
 		"error": errorMsg,
 	}
-	jsonResponse := mustMarshal(errorResponse)
+	jsonResponse := mustMarshal(t, errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,

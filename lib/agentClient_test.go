@@ -98,28 +98,30 @@ func TestConvertToTaskStatusGuessBasePercentage(t *testing.T) {
 func TestAuthenticateAgent(t *testing.T) {
 	tests := []struct {
 		name          string
-		setupMock     func(agentID int64)
+		setupMock     func(t *testing.T, agentID int64)
 		expectedError error
 		expectedID    int64
 	}{
 		{
 			name: "successful authentication",
-			setupMock: func(agentID int64) {
-				testhelpers.MockAuthenticationSuccess(agentID)
+			setupMock: func(t *testing.T, agentID int64) {
+				t.Helper()
+				testhelpers.MockAuthenticationSuccess(t, agentID)
 			},
 			expectedError: nil,
 			expectedID:    123,
 		},
 		{
 			name: "authentication failure - not authenticated",
-			setupMock: func(_ int64) {
+			setupMock: func(t *testing.T, _ int64) {
+				t.Helper()
 				authResponse := operations.AuthenticateResponseBody{
 					Authenticated: false,
 				}
 				// Override with authentication response
 				jsonResponse, err := json.Marshal(authResponse)
 				if err != nil {
-					panic(err)
+					t.Fatalf("failed to marshal auth response: %v", err)
 				}
 				responder := httpmock.ResponderFromResponse(&http.Response{
 					Status:     http.StatusText(http.StatusOK),
@@ -136,27 +138,34 @@ func TestAuthenticateAgent(t *testing.T) {
 		},
 		{
 			name: "ErrorObject handling",
-			setupMock: func(_ int64) {
-				testhelpers.MockAuthenticationFailure(http.StatusUnauthorized, "authentication failed")
+			setupMock: func(t *testing.T, _ int64) {
+				t.Helper()
+				testhelpers.MockAuthenticationFailure(t, http.StatusUnauthorized, "authentication failed")
 			},
 			expectedError: &sdkerrors.ErrorObject{},
 			expectedID:    0,
 		},
 		{
 			name: "SDKError handling",
-			setupMock: func(_ int64) {
+			setupMock: func(t *testing.T, _ int64) {
 				// Note: This test may timeout due to SDK retry logic with exponential backoff.
 				// The SDK retries on 500 errors, which can cause long delays in tests.
 				// Using 400 Bad Request instead to avoid retries.
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
-				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/authenticate$`, http.StatusBadRequest, *sdkErr)
+				testhelpers.MockAPIError(
+					t,
+					`^https?://[^/]+/api/v1/client/authenticate$`,
+					http.StatusBadRequest,
+					*sdkErr,
+				)
 			},
 			expectedError: &sdkerrors.SDKError{},
 			expectedID:    0,
 		},
 		{
 			name: "nil response handling",
-			setupMock: func(_ int64) {
+			setupMock: func(t *testing.T, _ int64) {
+				t.Helper()
 				// Mock a response that returns nil object
 				responder := httpmock.ResponderFromResponse(&http.Response{
 					Status:     http.StatusText(http.StatusOK),
@@ -182,7 +191,7 @@ func TestAuthenticateAgent(t *testing.T) {
 			require.NoError(t, err)
 			defer cleanupState()
 
-			tt.setupMock(123)
+			tt.setupMock(t, 123)
 
 			err = AuthenticateAgent()
 
@@ -221,49 +230,58 @@ func TestGetAgentConfiguration(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		setupMock        func()
+		setupMock        func(t *testing.T)
 		useNativeHashcat bool
 		expectedError    error
 	}{
 		{
 			name: "successful configuration retrieval with native hashcat disabled",
-			setupMock: func() {
+			setupMock: func(t *testing.T) {
+				t.Helper()
 				config := testhelpers.NewTestAgentConfiguration(false)
-				testhelpers.MockConfigurationResponse(config)
+				testhelpers.MockConfigurationResponse(t, config)
 			},
 			useNativeHashcat: false,
 			expectedError:    nil,
 		},
 		{
 			name: "successful configuration with native hashcat enabled",
-			setupMock: func() {
+			setupMock: func(t *testing.T) {
+				t.Helper()
 				config := testhelpers.NewTestAgentConfiguration(true)
-				testhelpers.MockConfigurationResponse(config)
+				testhelpers.MockConfigurationResponse(t, config)
 			},
 			useNativeHashcat: true,
 			expectedError:    nil,
 		},
 		{
 			name: "configuration error with ErrorObject",
-			setupMock: func() {
-				testhelpers.MockConfigurationError(http.StatusBadRequest, "bad request")
-				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
+			setupMock: func(t *testing.T) {
+				t.Helper()
+				testhelpers.MockConfigurationError(t, http.StatusBadRequest, "bad request")
+				testhelpers.MockSubmitErrorSuccess(t, 123) // Mock submit_error endpoint
 			},
 			expectedError: &sdkerrors.SDKError{}, // SDK wraps ErrorObject in SDKError
 		},
 		{
 			name: "configuration error with SDKError",
-			setupMock: func() {
+			setupMock: func(t *testing.T) {
 				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
-				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/configuration$`, http.StatusBadRequest, *sdkErr)
-				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
+				testhelpers.MockAPIError(
+					t,
+					`^https?://[^/]+/api/v1/client/configuration$`,
+					http.StatusBadRequest,
+					*sdkErr,
+				)
+				testhelpers.MockSubmitErrorSuccess(t, 123) // Mock submit_error endpoint
 			},
 			expectedError: &sdkerrors.SDKError{},
 		},
 		{
 			name: "empty response handling",
-			setupMock: func() {
+			setupMock: func(t *testing.T) {
+				t.Helper()
 				// Mock a response that returns empty config object
 				// When SDK parses {} successfully, it creates an empty struct (not nil)
 				// So this test verifies that empty config is handled gracefully
@@ -271,7 +289,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 					APIVersion: 0,
 					Config:     components.AdvancedAgentConfiguration{},
 				}
-				testhelpers.MockConfigurationResponse(emptyConfig)
+				testhelpers.MockConfigurationResponse(t, emptyConfig)
 			},
 			expectedError:    nil, // Empty config is valid, just uses defaults
 			useNativeHashcat: false,
@@ -287,7 +305,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 			require.NoError(t, err)
 			defer cleanupState()
 
-			tt.setupMock()
+			tt.setupMock(t)
 
 			err = GetAgentConfiguration()
 
@@ -306,32 +324,35 @@ func TestGetAgentConfiguration(t *testing.T) {
 func TestUpdateAgentMetadata(t *testing.T) {
 	tests := []struct {
 		name          string
-		setupMock     func(agentID int64)
+		setupMock     func(t *testing.T, agentID int64)
 		expectedError bool
 		expectBadResp bool
 	}{
 		{
 			name: "successful metadata update",
-			setupMock: func(agentID int64) {
+			setupMock: func(t *testing.T, agentID int64) {
+				t.Helper()
 				agent := testhelpers.NewTestAgent(agentID, "test-host")
-				testhelpers.MockUpdateAgentSuccess(agentID, agent)
+				testhelpers.MockUpdateAgentSuccess(t, agentID, agent)
 			},
 			expectedError: false,
 			expectBadResp: false,
 		},
 		{
 			name: "API error with ErrorObject",
-			setupMock: func(_ int64) {
+			setupMock: func(t *testing.T, _ int64) {
+				t.Helper()
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
 				// According to swagger.json, the endpoint is /api/v1/client/agents/{id}
-				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/agents/\d+$`, http.StatusBadRequest, *sdkErr)
+				testhelpers.MockAPIError(t, `^https?://[^/]+/api/v1/client/agents/\d+$`, http.StatusBadRequest, *sdkErr)
 			},
 			expectedError: true,
 			expectBadResp: false,
 		},
 		{
 			name: "bad response - nil agent",
-			setupMock: func(agentID int64) {
+			setupMock: func(t *testing.T, agentID int64) {
+				t.Helper()
 				// The SDK unmarshals the response body directly into components.Agent,
 				// not from a wrapper object. When it receives {}, it creates an empty Agent struct,
 				// so response.Agent will be non-nil (just empty). To actually get nil Agent,
@@ -346,7 +367,7 @@ func TestUpdateAgentMetadata(t *testing.T) {
 					OperatingSystem: "",
 					Devices:         []string{},
 				}
-				testhelpers.MockUpdateAgentSuccess(agentID, agent)
+				testhelpers.MockUpdateAgentSuccess(t, agentID, agent)
 			},
 			expectedError: false, // Empty agent is valid, not an error
 			expectBadResp: false,
@@ -366,7 +387,7 @@ func TestUpdateAgentMetadata(t *testing.T) {
 			cleanupStub := stubGetDevicesList()
 			defer cleanupStub()
 
-			tt.setupMock(123)
+			tt.setupMock(t, 123)
 
 			err = UpdateAgentMetadata()
 
@@ -386,13 +407,13 @@ func TestUpdateAgentMetadata(t *testing.T) {
 func TestSendHeartBeat(t *testing.T) {
 	tests := []struct {
 		name          string
-		setupMock     func(agentID int64)
+		setupMock     func(t *testing.T, agentID int64)
 		expectedState *operations.State
 		expectedError bool
 	}{
 		{
 			name: "heartbeat with no content response",
-			setupMock: func(agentID int64) {
+			setupMock: func(_ *testing.T, agentID int64) {
 				testhelpers.MockHeartbeatNoContent(agentID)
 			},
 			expectedState: nil,
@@ -400,8 +421,9 @@ func TestSendHeartBeat(t *testing.T) {
 		},
 		{
 			name: "heartbeat with state response",
-			setupMock: func(agentID int64) {
-				testhelpers.MockHeartbeatResponse(agentID, operations.StatePending)
+			setupMock: func(t *testing.T, agentID int64) {
+				t.Helper()
+				testhelpers.MockHeartbeatResponse(t, agentID, operations.StatePending)
 			},
 			expectedState: func() *operations.State {
 				s := operations.StatePending
@@ -411,8 +433,9 @@ func TestSendHeartBeat(t *testing.T) {
 		},
 		{
 			name: "heartbeat with StateStopped",
-			setupMock: func(agentID int64) {
-				testhelpers.MockHeartbeatResponse(agentID, operations.StateStopped)
+			setupMock: func(t *testing.T, agentID int64) {
+				t.Helper()
+				testhelpers.MockHeartbeatResponse(t, agentID, operations.StateStopped)
 			},
 			expectedState: func() *operations.State {
 				s := operations.StateStopped
@@ -422,8 +445,9 @@ func TestSendHeartBeat(t *testing.T) {
 		},
 		{
 			name: "heartbeat with StateError",
-			setupMock: func(agentID int64) {
-				testhelpers.MockHeartbeatResponse(agentID, operations.StateError)
+			setupMock: func(t *testing.T, agentID int64) {
+				t.Helper()
+				testhelpers.MockHeartbeatResponse(t, agentID, operations.StateError)
 			},
 			expectedState: func() *operations.State {
 				s := operations.StateError
@@ -433,9 +457,15 @@ func TestSendHeartBeat(t *testing.T) {
 		},
 		{
 			name: "heartbeat error with ErrorObject",
-			setupMock: func(_ int64) {
+			setupMock: func(t *testing.T, _ int64) {
+				t.Helper()
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
-				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/agents/\d+/heartbeat$`, http.StatusBadRequest, *sdkErr)
+				testhelpers.MockAPIError(
+					t,
+					`^https?://[^/]+/api/v1/agents/\d+/heartbeat$`,
+					http.StatusBadRequest,
+					*sdkErr,
+				)
 			},
 			expectedState: nil,
 			expectedError: false, // function returns nil on error, doesn't return error
@@ -451,7 +481,7 @@ func TestSendHeartBeat(t *testing.T) {
 			require.NoError(t, err)
 			defer cleanupState()
 
-			tt.setupMock(123)
+			tt.setupMock(t, 123)
 
 			state := SendHeartBeat()
 
@@ -469,26 +499,26 @@ func TestSendHeartBeat(t *testing.T) {
 func TestSendStatusUpdate(t *testing.T) {
 	tests := []struct {
 		name      string
-		setupMock func(taskID int64)
+		setupMock func(t *testing.T, taskID int64)
 		status    hashcat.Status
 	}{
 		{
 			name: "successful status update",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ *testing.T, taskID int64) {
 				testhelpers.MockSendStatusSuccess(taskID)
 			},
 			status: testhelpers.NewTestHashcatStatus("test-session"),
 		},
 		{
 			name: "stale status update",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ *testing.T, taskID int64) {
 				testhelpers.MockSendStatusStale(taskID)
 			},
 			status: testhelpers.NewTestHashcatStatus("test-session"),
 		},
 		{
 			name: "status update with zero time",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ *testing.T, taskID int64) {
 				testhelpers.MockSendStatusSuccess(taskID)
 			},
 			status: func() hashcat.Status {
@@ -509,7 +539,7 @@ func TestSendStatusUpdate(t *testing.T) {
 			defer cleanupState()
 
 			task := testhelpers.NewTestTask(456, 789)
-			tt.setupMock(456)
+			tt.setupMock(t, 456)
 
 			// Create a mock session
 			sess, err := testhelpers.NewMockSession("test-session")
@@ -543,7 +573,7 @@ func TestSendStatusUpdate(t *testing.T) {
 func TestSendCrackedHash(t *testing.T) {
 	tests := []struct {
 		name              string
-		setupMock         func(taskID int64)
+		setupMock         func(t *testing.T, taskID int64)
 		task              *components.Task
 		writeZapsToFile   bool
 		expectedError     bool
@@ -551,7 +581,7 @@ func TestSendCrackedHash(t *testing.T) {
 	}{
 		{
 			name: "successful crack submission",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ *testing.T, taskID int64) {
 				testhelpers.MockSendCrackSuccess(taskID)
 			},
 			task:              testhelpers.NewTestTask(456, 789),
@@ -561,7 +591,7 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "hashlist completion",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ *testing.T, taskID int64) {
 				testhelpers.MockSendCrackComplete(taskID)
 			},
 			task:              testhelpers.NewTestTask(456, 789),
@@ -571,7 +601,7 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "with nil task",
-			setupMock: func(_ int64) {
+			setupMock: func(_ *testing.T, _ int64) {
 				// No mock needed, function returns early
 			},
 			task:              nil,
@@ -581,16 +611,17 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "ErrorObject error handling",
-			setupMock: func(_ int64) {
+			setupMock: func(t *testing.T, _ int64) {
+				t.Helper()
 				errObj := testhelpers.NewErrorObject("task not found")
 				sdkErr := testhelpers.NewSDKError(http.StatusNotFound, errObj.Error())
 				// According to swagger.json, the endpoint is /api/v1/client/tasks/{id}/submit_crack
-				testhelpers.MockAPIError(
+				testhelpers.MockAPIError(t,
 					`^https?://[^/]+/api/v1/client/tasks/\d+/submit_crack$`,
 					http.StatusNotFound,
 					*sdkErr,
 				)
-				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
+				testhelpers.MockSubmitErrorSuccess(t, 123) // Mock submit_error endpoint
 			},
 			task:              testhelpers.NewTestTask(456, 789),
 			writeZapsToFile:   false,
@@ -599,16 +630,17 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "SDKError error handling",
-			setupMock: func(_ int64) {
+			setupMock: func(t *testing.T, _ int64) {
+				t.Helper()
 				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
 				// According to swagger.json, the endpoint is /api/v1/client/tasks/{id}/submit_crack
-				testhelpers.MockAPIError(
+				testhelpers.MockAPIError(t,
 					`^https?://[^/]+/api/v1/client/tasks/\d+/submit_crack$`,
 					http.StatusBadRequest,
 					*sdkErr,
 				)
-				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
+				testhelpers.MockSubmitErrorSuccess(t, 123) // Mock submit_error endpoint
 			},
 			task:              testhelpers.NewTestTask(456, 789),
 			writeZapsToFile:   false,
@@ -617,7 +649,7 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "with WriteZapsToFile enabled",
-			setupMock: func(taskID int64) {
+			setupMock: func(_ *testing.T, taskID int64) {
 				testhelpers.MockSendCrackSuccess(taskID)
 			},
 			task:              testhelpers.NewTestTask(456, 789),
@@ -627,9 +659,9 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "file open error - non-writable directory",
-			setupMock: func(taskID int64) {
+			setupMock: func(t *testing.T, taskID int64) {
 				testhelpers.MockSendCrackSuccess(taskID)
-				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
+				testhelpers.MockSubmitErrorSuccess(t, 123) // Mock submit_error endpoint
 			},
 			task:              testhelpers.NewTestTask(456, 789),
 			writeZapsToFile:   true,
@@ -638,9 +670,9 @@ func TestSendCrackedHash(t *testing.T) {
 		},
 		{
 			name: "file write error - read-only file",
-			setupMock: func(taskID int64) {
+			setupMock: func(t *testing.T, taskID int64) {
 				testhelpers.MockSendCrackSuccess(taskID)
-				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
+				testhelpers.MockSubmitErrorSuccess(t, 123) // Mock submit_error endpoint
 			},
 			task:              testhelpers.NewTestTask(456, 789),
 			writeZapsToFile:   true,
@@ -659,7 +691,7 @@ func TestSendCrackedHash(t *testing.T) {
 			defer cleanupState()
 
 			// Set up mock for submit_error before capturing initial count
-			testhelpers.MockSubmitErrorSuccess(123)
+			testhelpers.MockSubmitErrorSuccess(t, 123)
 			initialCallCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 
 			agentstate.State.WriteZapsToFile = tt.writeZapsToFile
@@ -733,7 +765,7 @@ func TestSendCrackedHash(t *testing.T) {
 			}
 
 			if tt.task != nil {
-				tt.setupMock(tt.task.ID)
+				tt.setupMock(t, tt.task.ID)
 			}
 
 			// Call sendCrackedHash - it doesn't return errors, just logs
