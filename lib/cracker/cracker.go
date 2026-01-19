@@ -8,7 +8,6 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -33,10 +32,10 @@ func FindHashcatBinary() (string, error) {
 
 	possiblePaths := []string{
 		viper.GetString("hashcat_path"),
-		path.Join(agentstate.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
-		path.Join(filepath.Dir(os.Args[0]), arch.GetDefaultHashcatBinaryName()),
-		path.Join(agentstate.State.CrackersPath, "hashcat", "hashcat"),
-		path.Join(filepath.Dir(os.Args[0]), "hashcat"),
+		filepath.Join(agentstate.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
+		filepath.Join(filepath.Dir(os.Args[0]), arch.GetDefaultHashcatBinaryName()),
+		filepath.Join(agentstate.State.CrackersPath, "hashcat", "hashcat"),
+		filepath.Join(filepath.Dir(os.Args[0]), "hashcat"),
 		"/usr/bin/hashcat",
 		"/usr/local/bin/hashcat",
 	}
@@ -181,7 +180,7 @@ func CreateDataDirs() error {
 // It removes any previous backup, backs up the current installation, and extracts
 // the new archive. Returns the path to the newly extracted hashcat directory.
 func ExtractHashcatArchive(ctx context.Context, newArchivePath string) (string, error) {
-	hashcatDirectory := path.Join(agentstate.State.CrackersPath, "hashcat")
+	hashcatDirectory := filepath.Join(agentstate.State.CrackersPath, "hashcat")
 	hashcatBackupDirectory := hashcatDirectory + "_old"
 
 	// Remove old backup directory if it exists
@@ -215,7 +214,7 @@ func ExtractHashcatArchive(ctx context.Context, newArchivePath string) (string, 
 // It relocates the archive to the crackers path with a standard name.
 // Returns the new path or an error if the move fails.
 func MoveArchiveFile(tempArchivePath string) (string, error) {
-	newArchivePath := path.Join(agentstate.State.CrackersPath, "hashcat.7z")
+	newArchivePath := filepath.Join(agentstate.State.CrackersPath, "hashcat.7z")
 
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
