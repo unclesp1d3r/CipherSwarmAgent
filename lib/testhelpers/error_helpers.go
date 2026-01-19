@@ -10,9 +10,8 @@ import (
 // NewErrorObject creates a new ErrorObject with the specified message.
 // Wraps the error construction to make tests more readable.
 func NewErrorObject(message string) *sdkerrors.ErrorObject {
-	errMsg := message
 	return &sdkerrors.ErrorObject{
-		Error_: &errMsg,
+		Error_: message,
 	}
 }
 
@@ -30,7 +29,7 @@ func NewSDKError(statusCode int, message string) *sdkerrors.SDKError {
 // for testing task abandonment scenarios.
 func NewSetTaskAbandonedError(state string) *sdkerrors.SetTaskAbandonedResponseBody {
 	return &sdkerrors.SetTaskAbandonedResponseBody{
-		State: []string{state},
+		Details: []string{state},
 	}
 }
 
