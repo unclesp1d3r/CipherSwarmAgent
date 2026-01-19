@@ -40,7 +40,7 @@ jobs:
           cache: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
   coverage:
