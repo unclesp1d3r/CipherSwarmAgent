@@ -16,6 +16,10 @@ We welcome contributions! To contribute:
 - Scope: Use a noun (e.g., `(cli)`, `(api)`, `(deps)`)
 - Description: Imperative, ≤72 characters, no period
 
+## Tooling
+
+JavaScript tooling for commit hooks uses **Bun**. Install dependencies with `bun install` (or run `just install`, which does it for you).
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0. See [LICENSE](../LICENSE).

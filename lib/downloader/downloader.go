@@ -17,8 +17,8 @@ import (
 	"github.com/hashicorp/go-getter"
 	"github.com/pkg/errors"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
-	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 const (
@@ -30,12 +30,12 @@ const (
 func DownloadFile(fileURL, filePath, checksum string) error {
 	parsedURL, err := url.Parse(fileURL)
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
-		state.Logger.Error("Invalid URL", "url", fileURL)
+		agentstate.Logger.Error("Invalid URL", "url", fileURL)
 		return errors.New("invalid URL")
 	}
 
 	if FileExistsAndValid(filePath, checksum) {
-		state.Logger.Info("Download already exists", "path", filePath)
+		agentstate.Logger.Info("Download already exists", "path", filePath)
 		return nil
 	}
 
@@ -60,7 +60,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 
 	fileChecksum, err := cryptor.Md5File(filePath)
 	if err != nil {
-		state.Logger.Error("Error calculating file checksum", "path", filePath, "error", err)
+		agentstate.Logger.Error("Error calculating file checksum", "path", filePath, "error", err)
 
 		return false
 	}
@@ -69,7 +69,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 		return true
 	}
 
-	state.Logger.Warn(
+	agentstate.Logger.Warn(
 		"Checksums do not match",
 		"path",
 		filePath,
@@ -80,7 +80,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 	)
 
 	if err := os.Remove(filePath); err != nil {
-		state.Logger.Error("Error removing file with mismatched checksum", "path", filePath, "error", err)
+		agentstate.Logger.Error("Error removing file with mismatched checksum", "path", filePath, "error", err)
 	}
 
 	return false
@@ -104,7 +104,7 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 		Ctx:      context.Background(),
 		Dst:      filePath,
 		Src:      fileURL,
-		Pwd:      state.State.CrackersPath,
+		Pwd:      agentstate.State.CrackersPath,
 		Insecure: true,
 		Mode:     getter.ClientModeFile,
 	}
@@ -115,7 +115,7 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 	)
 
 	if err := client.Get(); err != nil {
-		state.Logger.Debug("Error downloading file", "error", err)
+		agentstate.Logger.Debug("Error downloading file", "error", err)
 
 		return err
 	}
@@ -152,14 +152,14 @@ func DownloadHashList(attack *components.Attack) error {
 		return errors.New("attack is nil")
 	}
 
-	hashlistPath := path.Join(state.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.GetID()))
-	state.Logger.Debug("Downloading hash list", "url", attack.GetHashListURL(), "path", hashlistPath)
+	hashlistPath := path.Join(agentstate.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.GetID()))
+	agentstate.Logger.Debug("Downloading hash list", "url", attack.GetHashListURL(), "path", hashlistPath)
 
 	if err := removeExistingFile(hashlistPath); err != nil {
 		return err
 	}
 
-	response, err := state.State.SdkClient.Attacks.GetHashList(context.Background(), attack.ID)
+	response, err := agentstate.State.APIClient.Attacks().GetHashList(context.Background(), attack.ID)
 	if err != nil {
 		return errors.Wrap(err, "error downloading hashlist from the CipherSwarm API")
 	}
@@ -176,11 +176,15 @@ func DownloadHashList(attack *components.Attack) error {
 		return err
 	}
 
-	if downloadSize, _ := os.Stat(hashlistPath); downloadSize.Size() == 0 { //nolint:errcheck // File size check, error not critical
+	downloadSize, err := os.Stat(hashlistPath)
+	if err != nil {
+		return fmt.Errorf("could not stat downloaded hash list: %w", err)
+	}
+	if downloadSize.Size() == 0 {
 		return errors.New("downloaded hash list is empty")
 	}
 
-	state.Logger.Debug("Downloaded hash list", "path", hashlistPath)
+	agentstate.Logger.Debug("Downloaded hash list", "path", hashlistPath)
 
 	return nil
 }
@@ -190,7 +194,7 @@ func DownloadHashList(attack *components.Attack) error {
 func Base64ToHex(b64 string) string {
 	data, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		state.Logger.Error("Error decoding base64 string", "error", err)
+		agentstate.Logger.Error("Error decoding base64 string", "error", err)
 
 		return ""
 	}
@@ -201,15 +205,25 @@ func Base64ToHex(b64 string) string {
 // removeExistingFile removes the file specified by filePath if it exists, logging and reporting an error if removal fails.
 // Parameters:
 // - filePath: The path to the file that needs to be removed.
-// Returns an error if file removal fails, otherwise returns nil.
+// Returns an error if file removal fails or if stat fails for reasons other than file not existing.
 func removeExistingFile(filePath string) error {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	_, err := os.Stat(filePath)
+	if err == nil {
+		// File exists, remove it
 		if err := os.Remove(filePath); err != nil {
 			return errors.Wrap(err, "error removing old file")
 		}
+
+		return nil
 	}
 
-	return nil
+	if os.IsNotExist(err) {
+		// File doesn't exist - nothing to remove
+		return nil
+	}
+
+	// Stat failed for other reasons (permission error, IO error, etc.)
+	return errors.Wrap(err, "error checking file existence")
 }
 
 // writeResponseToFile writes the data from an io.Reader (responseStream) to a file specified by the filePath.
@@ -221,7 +235,7 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	}
 	defer func(f *os.File) {
 		if err := f.Close(); err != nil {
-			state.Logger.Error("Error closing file", "error", err)
+			agentstate.Logger.Error("Error closing file", "error", err)
 		}
 	}(file)
 
@@ -236,7 +250,7 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 // It logs any errors encountered during the removal process.
 func CleanupTempDir(tempDir string) error {
 	if err := os.RemoveAll(tempDir); err != nil {
-		state.Logger.Error("Error removing temporary directory", "path", tempDir, "error", err)
+		agentstate.Logger.Error("Error removing temporary directory", "path", tempDir, "error", err)
 		return err
 	}
 

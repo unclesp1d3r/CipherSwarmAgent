@@ -76,6 +76,10 @@ The project follows standard, idiomatic Go practices (version >=1.22).
 - **Logging:** Use a structured logger (e.g., `charmbracelet/log`). Never log secrets or sensitive data.
 - **Configuration:** Use `spf13/viper` to manage configuration from files, environment variables, and CLI flags.
 
+### Tooling
+
+- **Dev Tool Management:** Use `mise` to install and manage development toolchains (e.g., Go, Bun) via `mise.toml`.
+
 ### Testing
 
 - Write table-driven tests for core logic and place them in `_test.go` files within the same package.

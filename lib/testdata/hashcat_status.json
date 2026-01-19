@@ -1,0 +1,251 @@
+{
+  "running": {
+    "original_line": "STATUS",
+    "time": "2024-01-01T12:00:00Z",
+    "session": "test_session",
+    "status": 1,
+    "target": "test.hsh",
+    "progress": [100, 1000],
+    "restore_point": 0,
+    "recovered_hashes": [0],
+    "recovered_salts": [0],
+    "rejected": 0,
+    "devices": [
+      {
+        "device_id": 0,
+        "device_name": "CPU",
+        "device_type": "CPU",
+        "speed": 1000000,
+        "util": 50,
+        "temp": 60
+      }
+    ],
+    "guess": {
+      "guess_base": "wordlist.txt",
+      "guess_base_count": 1000,
+      "guess_base_offset": 100,
+      "guess_base_percent": 10.0,
+      "guess_mod": "",
+      "guess_mod_count": 0,
+      "guess_mod_offset": 0,
+      "guess_mod_percent": 0.0,
+      "guess_mode": 0
+    },
+    "time_start": 1704110400,
+    "estimated_stop": 1704114000
+  },
+  "paused": {
+    "original_line": "STATUS",
+    "time": "2024-01-01T12:00:00Z",
+    "session": "test_session",
+    "status": 2,
+    "target": "test.hsh",
+    "progress": [500, 1000],
+    "restore_point": 500,
+    "recovered_hashes": [5],
+    "recovered_salts": [0],
+    "rejected": 10,
+    "devices": [],
+    "guess": {
+      "guess_base": "wordlist.txt",
+      "guess_base_count": 1000,
+      "guess_base_offset": 500,
+      "guess_base_percent": 50.0,
+      "guess_mod": "",
+      "guess_mod_count": 0,
+      "guess_mod_offset": 0,
+      "guess_mod_percent": 0.0,
+      "guess_mode": 0
+    },
+    "time_start": 1704110400,
+    "estimated_stop": 1704114000
+  },
+  "exhausted": {
+    "original_line": "STATUS",
+    "time": "2024-01-01T13:00:00Z",
+    "session": "test_session",
+    "status": 3,
+    "target": "test.hsh",
+    "progress": [1000, 1000],
+    "restore_point": 1000,
+    "recovered_hashes": [10],
+    "recovered_salts": [0],
+    "rejected": 50,
+    "devices": [
+      {
+        "device_id": 0,
+        "device_name": "CPU",
+        "device_type": "CPU",
+        "speed": 0,
+        "util": 0,
+        "temp": 40
+      }
+    ],
+    "guess": {
+      "guess_base": "wordlist.txt",
+      "guess_base_count": 1000,
+      "guess_base_offset": 1000,
+      "guess_base_percent": 100.0,
+      "guess_mod": "",
+      "guess_mod_count": 0,
+      "guess_mod_offset": 0,
+      "guess_mod_percent": 0.0,
+      "guess_mode": 0
+    },
+    "time_start": 1704110400,
+    "estimated_stop": 1704114000
+  },
+  "cracked": {
+    "original_line": "STATUS",
+    "time": "2024-01-01T12:30:00Z",
+    "session": "test_session",
+    "status": 4,
+    "target": "test.hsh",
+    "progress": [500, 1000],
+    "restore_point": 500,
+    "recovered_hashes": [1],
+    "recovered_salts": [0],
+    "rejected": 10,
+    "devices": [
+      {
+        "device_id": 0,
+        "device_name": "CPU",
+        "device_type": "CPU",
+        "speed": 1000000,
+        "util": 75,
+        "temp": 65
+      }
+    ],
+    "guess": {
+      "guess_base": "wordlist.txt",
+      "guess_base_count": 1000,
+      "guess_base_offset": 500,
+      "guess_base_percent": 50.0,
+      "guess_mod": "",
+      "guess_mod_count": 0,
+      "guess_mod_offset": 0,
+      "guess_mod_percent": 0.0,
+      "guess_mode": 0
+    },
+    "time_start": 1704110400,
+    "estimated_stop": 1704114000
+  },
+  "multiple_devices": {
+    "original_line": "STATUS",
+    "time": "2024-01-01T12:00:00Z",
+    "session": "test_session",
+    "status": 1,
+    "target": "test.hsh",
+    "progress": [200, 1000],
+    "restore_point": 0,
+    "recovered_hashes": [0],
+    "recovered_salts": [0],
+    "rejected": 5,
+    "devices": [
+      {
+        "device_id": 0,
+        "device_name": "CPU",
+        "device_type": "CPU",
+        "speed": 500000,
+        "util": 60,
+        "temp": 55
+      },
+      {
+        "device_id": 1,
+        "device_name": "NVIDIA GeForce RTX 3090",
+        "device_type": "GPU",
+        "speed": 50000000,
+        "util": 95,
+        "temp": 78
+      }
+    ],
+    "guess": {
+      "guess_base": "wordlist.txt",
+      "guess_base_count": 1000,
+      "guess_base_offset": 200,
+      "guess_base_percent": 20.0,
+      "guess_mod": "",
+      "guess_mod_count": 0,
+      "guess_mod_offset": 0,
+      "guess_mod_percent": 0.0,
+      "guess_mode": 0
+    },
+    "time_start": 1704110400,
+    "estimated_stop": 1704114000
+  },
+  "dictionary_attack": {
+    "original_line": "STATUS",
+    "time": "2024-01-01T12:00:00Z",
+    "session": "test_session",
+    "status": 1,
+    "target": "test.hsh",
+    "progress": [150, 1000],
+    "restore_point": 0,
+    "recovered_hashes": [0],
+    "recovered_salts": [0],
+    "rejected": 3,
+    "devices": [
+      {
+        "device_id": 0,
+        "device_name": "CPU",
+        "device_type": "CPU",
+        "speed": 1000000,
+        "util": 50,
+        "temp": 60
+      }
+    ],
+    "guess": {
+      "guess_base": "/path/to/wordlist.txt",
+      "guess_base_count": 1000,
+      "guess_base_offset": 150,
+      "guess_base_percent": 15.0,
+      "guess_mod": "",
+      "guess_mod_count": 0,
+      "guess_mod_offset": 0,
+      "guess_mod_percent": 0.0,
+      "guess_mode": 0
+    },
+    "time_start": 1704110400,
+    "estimated_stop": 1704114000
+  },
+  "mask_attack": {
+    "original_line": "STATUS",
+    "time": "2024-01-01T12:00:00Z",
+    "session": "test_session",
+    "status": 1,
+    "target": "test.hsh",
+    "progress": [250, 10000],
+    "restore_point": 0,
+    "recovered_hashes": [0],
+    "recovered_salts": [0],
+    "rejected": 8,
+    "devices": [
+      {
+        "device_id": 1,
+        "device_name": "NVIDIA GeForce RTX 3090",
+        "device_type": "GPU",
+        "speed": 50000000,
+        "util": 90,
+        "temp": 75
+      }
+    ],
+    "guess": {
+      "guess_base": "",
+      "guess_base_count": 0,
+      "guess_base_offset": 0,
+      "guess_base_percent": 0.0,
+      "guess_mod": "",
+      "guess_mod_count": 0,
+      "guess_mod_offset": 0,
+      "guess_mod_percent": 0.0,
+      "guess_mode": 3
+    },
+    "time_start": 1704110400,
+    "estimated_stop": 1704114000
+  }
+}
+
+
+
+
+
