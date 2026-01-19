@@ -15,6 +15,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 )
@@ -39,6 +40,8 @@ func StartAgent() {
 		sdk.WithSecurity(agentstate.State.APIToken),
 		sdk.WithServerURL(agentstate.State.URL),
 	)
+	// Wrap SDK client with interface for dependency injection support
+	agentstate.State.APIClient = api.NewSDKWrapper(agentstate.State.SdkClient)
 
 	lib.DisplayStartup()
 

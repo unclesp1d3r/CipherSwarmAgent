@@ -7,6 +7,7 @@ import (
 
 	"github.com/jarcoal/httpmock"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
 const dirPerm os.FileMode = 0o755
@@ -44,6 +45,8 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	agentstate.State.Debug = false
 	agentstate.State.ExtraDebugging = false
 	agentstate.State.SdkClient = NewTestSDKClient(apiURL)
+	// Wrap SDK client with interface for dependency injection support
+	agentstate.State.APIClient = api.NewSDKWrapper(agentstate.State.SdkClient)
 
 	// Create directories
 	mustMkdirAll(agentstate.State.DataPath)
@@ -87,6 +90,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.UseLegacyDeviceIdentificationMethod = false
 		agentstate.State.BenchmarksSubmitted = false
 		agentstate.State.SdkClient = nil
+		agentstate.State.APIClient = nil
 		// Deactivate httpmock
 		httpmock.DeactivateAndReset()
 	}
@@ -122,6 +126,7 @@ func ResetTestState() {
 	agentstate.State.UseLegacyDeviceIdentificationMethod = false
 	agentstate.State.BenchmarksSubmitted = false
 	agentstate.State.SdkClient = nil
+	agentstate.State.APIClient = nil
 }
 
 // SetupMinimalTestState sets up minimal state (just AgentID and basic paths)

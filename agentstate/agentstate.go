@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
 // State represents the configuration and runtime state of the agent.
@@ -40,6 +41,7 @@ type agentState struct {
 	UseLegacyDeviceIdentificationMethod bool                     // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
 	BenchmarksSubmitted                 bool                     // BenchmarksSubmitted indicates whether the agent has successfully submitted its benchmark data to the server.
 	SdkClient                           *sdk.CipherSwarmAgentSDK // SdkClient is the client for interacting with the CipherSwarm API.
+	APIClient                           api.Client               // APIClient is the interface-based client for API operations (enables dependency injection).
 	// Context should be passed as a parameter instead of stored in struct
 }
 

@@ -26,11 +26,11 @@ var (
 )
 
 // GetNewTask retrieves a new task from the server.
-// It sends a request using SdkClient, handles any errors, and returns the task if available.
+// It sends a request using the API client interface, handles any errors, and returns the task if available.
 // If the server responds with no content, it means no new task is available, and the function returns nil without error.
 // For any other unexpected response status, an error is returned.
 func GetNewTask() (*components.Task, error) {
-	response, err := agentstate.State.SdkClient.Tasks.GetNewTask(context.Background())
+	response, err := agentstate.State.APIClient.Tasks().GetNewTask(context.Background())
 	if err != nil {
 		handleAPIError("Error getting new task", err)
 
@@ -49,10 +49,10 @@ func GetNewTask() (*components.Task, error) {
 	}
 }
 
-// GetAttackParameters retrieves the attack parameters for a given attackID via the SdkClient.
+// GetAttackParameters retrieves the attack parameters for a given attackID via the API client interface.
 // Returns an Attack object if the API call is successful and the response status is OK.
 func GetAttackParameters(attackID int64) (*components.Attack, error) {
-	response, err := agentstate.State.SdkClient.Attacks.GetAttack(context.Background(), attackID)
+	response, err := agentstate.State.APIClient.Attacks().GetAttack(context.Background(), attackID)
 	if err != nil {
 		handleAPIError("Error getting attack parameters", err)
 
@@ -145,7 +145,7 @@ func AcceptTask(task *components.Task) error {
 		return ErrTaskIsNil
 	}
 
-	_, err := agentstate.State.SdkClient.Tasks.SetTaskAccepted(context.Background(), task.GetID())
+	_, err := agentstate.State.APIClient.Tasks().SetTaskAccepted(context.Background(), task.GetID())
 	if err != nil {
 		handleAcceptTaskError(err)
 
@@ -166,13 +166,13 @@ func markTaskExhausted(task *components.Task) {
 		return
 	}
 
-	_, err := agentstate.State.SdkClient.Tasks.SetTaskExhausted(context.Background(), task.GetID())
+	_, err := agentstate.State.APIClient.Tasks().SetTaskExhausted(context.Background(), task.GetID())
 	if err != nil {
 		handleTaskError(err, "Error notifying server of task exhaustion")
 	}
 }
 
-// AbandonTask sets the given task to an abandoned state using the SdkClient and logs any errors that occur.
+// AbandonTask sets the given task to an abandoned state using the API client interface and logs any errors that occur.
 // If the task is nil, it logs an error and returns immediately.
 func AbandonTask(task *components.Task) {
 	if task == nil {
@@ -181,7 +181,7 @@ func AbandonTask(task *components.Task) {
 		return
 	}
 
-	_, err := agentstate.State.SdkClient.Tasks.SetTaskAbandoned(context.Background(), task.GetID())
+	_, err := agentstate.State.APIClient.Tasks().SetTaskAbandoned(context.Background(), task.GetID())
 	if err != nil {
 		handleTaskError(err, "Error notifying server of task abandonment")
 	}
