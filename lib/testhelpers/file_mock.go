@@ -2,7 +2,7 @@
 package testhelpers
 
 import (
-	"crypto/sha256"
+	"crypto/md5" //nolint:gosec // MD5 used for checksum verification, not cryptographic security
 	"encoding/hex"
 	"io"
 	"net/http"
@@ -47,7 +47,11 @@ func MockDownloadServer(t *testing.T, baseDir string) *httptest.Server {
 			http.Error(w, "File not found", http.StatusNotFound)
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				t.Errorf("Failed to close file: %v", err)
+			}
+		}()
 
 		w.Header().Set("Content-Type", "application/octet-stream")
 		if _, err := io.Copy(w, file); err != nil {
@@ -63,11 +67,12 @@ func MockDownloadServer(t *testing.T, baseDir string) *httptest.Server {
 	return server
 }
 
-// CalculateTestChecksum calculates SHA256 checksum of provided content
+// CalculateTestChecksum calculates MD5 checksum of provided content
 // and returns it as a hex string. This mirrors the checksum verification logic
-// in lib/downloader/downloader.go and allows tests to generate valid checksums for test files.
+// in lib/downloader/downloader.go (which uses cryptor.Md5File) and allows tests
+// to generate valid checksums for test files.
 func CalculateTestChecksum(content []byte) string {
-	hash := sha256.Sum256(content)
+	hash := md5.Sum(content) //nolint:gosec // MD5 used for checksum verification, not cryptographic security
 	return hex.EncodeToString(hash[:])
 }
 

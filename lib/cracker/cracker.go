@@ -218,7 +218,7 @@ func MoveArchiveFile(tempArchivePath string) (string, error) {
 
 	err := os.Rename(tempArchivePath, newArchivePath)
 	if err != nil {
-		agentstate.Logger.Error("Error moving file", err)
+		agentstate.Logger.Error("Error moving file", "error", err)
 
 		return "", err
 	}

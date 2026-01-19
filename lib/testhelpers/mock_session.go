@@ -3,7 +3,6 @@ package testhelpers
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
@@ -58,19 +57,18 @@ func CreateTestHashcatParams() hashcat.Params {
 		tempDir = os.TempDir()
 	}
 
-	hashFile := filepath.Join(tempDir, "test_hash.txt")
-	// Create an empty hash file
-	file, err := os.Create(hashFile)
+	// Create a unique hash file to avoid collisions in parallel tests
+	file, err := os.CreateTemp(tempDir, "test_hash_*.txt")
 	if err != nil {
 		panic(err)
 	}
-	if file != nil {
-		_, err = file.WriteString("testhash\n")
-		if err != nil {
-			panic(err)
-		}
+	hashFile := file.Name()
+	_, err = file.WriteString("testhash\n")
+	if err != nil {
 		_ = file.Close()
+		panic(err)
 	}
+	_ = file.Close()
 
 	return hashcat.Params{
 		AttackMode:       hashcat.AttackModeMask,

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -27,17 +28,22 @@ var (
 
 // apiErrorHandler is the shared error handler instance.
 // It's initialized lazily to avoid circular dependency with SendAgentError.
-var apiErrorHandler *apierrors.Handler //nolint:gochecknoglobals // Singleton error handler
+// Uses sync.Once for thread-safe initialization.
+var (
+	apiErrorHandler     *apierrors.Handler //nolint:gochecknoglobals // Singleton error handler
+	apiErrorHandlerOnce sync.Once          //nolint:gochecknoglobals // Singleton initialization guard
+)
 
 // getErrorHandler returns the shared error handler, initializing it if needed.
+// Thread-safe via sync.Once.
 func getErrorHandler() *apierrors.Handler {
-	if apiErrorHandler == nil {
+	apiErrorHandlerOnce.Do(func() {
 		apiErrorHandler = &apierrors.Handler{
 			SendError: func(message string, severity operations.Severity) {
 				SendAgentError(message, nil, severity)
 			},
 		}
-	}
+	})
 	return apiErrorHandler
 }
 
@@ -107,7 +113,12 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	}
 
 	if !validateHashcatDirectory(hashcatDirectory, *update.GetExecName()) {
-		return nil
+		return cserrors.LogAndSendError(
+			"Hashcat directory validation failed after extraction",
+			stderrors.New("hashcat binary validation failed"),
+			operations.SeverityCritical,
+			nil,
+		)
 	}
 
 	if err := os.Remove(newArchivePath); err != nil {

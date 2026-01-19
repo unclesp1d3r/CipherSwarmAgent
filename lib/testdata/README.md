@@ -54,6 +54,7 @@ To load these fixtures in your tests, use relative paths:
 
 ```go
 import (
+    "encoding/json"
     "os"
     "path/filepath"
     "testing"

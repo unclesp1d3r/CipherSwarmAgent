@@ -162,7 +162,7 @@ func UpdateAgentMetadata() error {
 	if response.Agent != nil {
 		displayAgentMetadataUpdated(response)
 	} else {
-		agentstate.ErrorLogger.Error("bad response: %v", response.RawResponse.Status)
+		agentstate.ErrorLogger.Error("bad response", "status", response.RawResponse.Status)
 
 		return fmt.Errorf("%w: %s", ErrBadResponse, response.RawResponse.Status)
 	}
@@ -413,7 +413,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 		PlainText: plaintext,
 	}
 
-	agentstate.Logger.Info("Cracked hash", "hash", hash, "plaintext", plaintext)
+	agentstate.Logger.Info("Cracked hash", "hash", hash)
 
 	response, err := agentstate.State.SdkClient.Tasks.SendCrack(context.Background(), task.GetID(), hashcatResult)
 	if err != nil {

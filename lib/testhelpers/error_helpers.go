@@ -2,6 +2,8 @@
 package testhelpers
 
 import (
+	"fmt"
+
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
 )
 
@@ -20,7 +22,7 @@ func NewSDKError(statusCode int, message string) *sdkerrors.SDKError {
 	return &sdkerrors.SDKError{
 		StatusCode: statusCode,
 		Message:    message,
-		Body:       `{"error":"` + message + `"}`,
+		Body:       fmt.Sprintf(`{"error":%q}`, message),
 	}
 }
 

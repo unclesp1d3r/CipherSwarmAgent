@@ -207,11 +207,13 @@ func Base64ToHex(b64 string) string {
 // - filePath: The path to the file that needs to be removed.
 // Returns an error if file removal fails, otherwise returns nil.
 func removeExistingFile(filePath string) error {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); err == nil {
+		// File exists, remove it
 		if err := os.Remove(filePath); err != nil {
 			return errors.Wrap(err, "error removing old file")
 		}
 	}
+	// File doesn't exist or stat failed - nothing to remove
 
 	return nil
 }
