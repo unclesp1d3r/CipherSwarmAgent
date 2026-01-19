@@ -1,4 +1,16 @@
 
+<a name="v0.5.8"></a>
+
+## [v0.5.8](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.7...v0.5.8)
+
+> 2026-01-19
+
+### Maintenance Changes 🧹
+
+* Upgrade agent SDK from v0.8.5 to v0.9.0
+
+
+
 <a name="v0.5.7"></a>
 
 ## [v0.5.7](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.6...v0.5.7)
