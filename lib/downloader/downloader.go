@@ -205,17 +205,25 @@ func Base64ToHex(b64 string) string {
 // removeExistingFile removes the file specified by filePath if it exists, logging and reporting an error if removal fails.
 // Parameters:
 // - filePath: The path to the file that needs to be removed.
-// Returns an error if file removal fails, otherwise returns nil.
+// Returns an error if file removal fails or if stat fails for reasons other than file not existing.
 func removeExistingFile(filePath string) error {
-	if _, err := os.Stat(filePath); err == nil {
+	_, err := os.Stat(filePath)
+	if err == nil {
 		// File exists, remove it
 		if err := os.Remove(filePath); err != nil {
 			return errors.Wrap(err, "error removing old file")
 		}
-	}
-	// File doesn't exist or stat failed - nothing to remove
 
-	return nil
+		return nil
+	}
+
+	if os.IsNotExist(err) {
+		// File doesn't exist - nothing to remove
+		return nil
+	}
+
+	// Stat failed for other reasons (permission error, IO error, etc.)
+	return errors.Wrap(err, "error checking file existence")
 }
 
 // writeResponseToFile writes the data from an io.Reader (responseStream) to a file specified by the filePath.
