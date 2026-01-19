@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/nxadm/tail"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
-	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 const (
@@ -67,7 +67,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	outFile, err := createOutFile(state.State.OutPath, id, filePermissions)
+	outFile, err := createOutFile(agentstate.State.OutPath, id, filePermissions)
 	if err != nil {
 		cancel()
 
@@ -130,7 +130,7 @@ func (sess *Session) Start() error {
 		return err
 	}
 
-	state.Logger.Debug("Running hashcat command", "command", sess.proc.String())
+	agentstate.Logger.Debug("Running hashcat command", "command", sess.proc.String())
 
 	if err := sess.proc.Start(); err != nil {
 		return fmt.Errorf("couldn't start hashcat: %w", err)
@@ -172,10 +172,13 @@ func (sess *Session) attachPipes() error {
 // The tailer follows the output file and sends new lines for processing.
 // If tailer creation fails, it attempts to kill the hashcat process before returning an error.
 func (sess *Session) startTailer() (*tail.Tail, error) {
-	tailer, err := tail.TailFile(sess.outFile.Name(), tail.Config{Follow: true, Logger: state.Logger.StandardLog()})
+	tailer, err := tail.TailFile(
+		sess.outFile.Name(),
+		tail.Config{Follow: true, Logger: agentstate.Logger.StandardLog()},
+	)
 	if err != nil {
 		if killErr := sess.Kill(); killErr != nil {
-			state.Logger.Error("couldn't kill hashcat process", "error", killErr)
+			agentstate.Logger.Error("couldn't kill hashcat process", "error", killErr)
 		}
 
 		return nil, fmt.Errorf("couldn't tail outfile %q: %w", sess.outFile.Name(), err)
@@ -193,7 +196,7 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 
 		values := strings.Split(line, ":")
 		if len(values) < logParseMinParts {
-			state.Logger.Error("unexpected line contents", "line", line)
+			agentstate.Logger.Error("unexpected line contents", "line", line)
 
 			continue
 		}
@@ -202,7 +205,7 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 
 		bs, err := hex.DecodeString(plainHex)
 		if err != nil {
-			state.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
+			agentstate.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
 
 			continue
 		}
@@ -213,7 +216,7 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 
 		timestampI, err := strconv.ParseInt(timestamp, 10, 64)
 		if err != nil {
-			state.Logger.Error("couldn't parse hashcat timestamp", "timestamp", timestamp, "error", err)
+			agentstate.Logger.Error("couldn't parse hashcat timestamp", "timestamp", timestamp, "error", err)
 
 			continue
 		}
@@ -244,7 +247,7 @@ func (sess *Session) handleStdout() {
 			if json.Valid([]byte(line)) {
 				var status Status
 				if err := json.Unmarshal([]byte(line), &status); err != nil {
-					state.Logger.Error("couldn't unmarshal hashcat status", "error", err)
+					agentstate.Logger.Error("couldn't unmarshal hashcat status", "error", err)
 
 					continue
 				}
@@ -252,9 +255,9 @@ func (sess *Session) handleStdout() {
 				sess.StatusUpdates <- status
 			} else {
 				if strings.Contains(line, "starting in restore mode") {
-					state.Logger.Info("Hashcat is starting in restore mode")
+					agentstate.Logger.Info("Hashcat is starting in restore mode")
 				} else {
-					state.Logger.Error("unexpected stdout line", "line", line)
+					agentstate.Logger.Error("unexpected stdout line", "line", line)
 				}
 			}
 		}
@@ -272,7 +275,7 @@ func (sess *Session) handleStdout() {
 func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
-		state.Logger.Error("read stderr", "text", scanner.Text())
+		agentstate.Logger.Error("read stderr", "text", scanner.Text())
 
 		sess.StderrMessages <- scanner.Text()
 	}
@@ -314,12 +317,12 @@ func (sess *Session) Kill() error {
 func (sess *Session) Cleanup() {
 	sess.Cancel()
 
-	state.Logger.Info("Cleaning up session files")
+	agentstate.Logger.Info("Cleaning up session files")
 
 	removeFile := func(filePath string) {
 		if _, err := os.Stat(filePath); err == nil {
 			if err := os.Remove(filePath); err != nil {
-				state.Logger.Error("couldn't remove file", "file", filePath, "error", err)
+				agentstate.Logger.Error("couldn't remove file", "file", filePath, "error", err)
 			}
 		}
 	}
@@ -329,9 +332,9 @@ func (sess *Session) Cleanup() {
 		sess.outFile = nil
 	}
 
-	if !state.State.RetainZapsOnCompletion {
-		if err := os.RemoveAll(state.State.ZapsPath); err != nil {
-			state.Logger.Error("couldn't remove zaps directory", "error", err)
+	if !agentstate.State.RetainZapsOnCompletion {
+		if err := os.RemoveAll(agentstate.State.ZapsPath); err != nil {
+			agentstate.Logger.Error("couldn't remove zaps directory", "error", err)
 		}
 	}
 
@@ -397,7 +400,7 @@ func createCharsetFiles(charsets []string) ([]*os.File, error) {
 			continue
 		}
 
-		charsetFile, err := createTempFile(state.State.OutPath, "charset*", filePermissions)
+		charsetFile, err := createTempFile(agentstate.State.OutPath, "charset*", filePermissions)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create charset file: %w", err)
 		}
