@@ -81,12 +81,7 @@ go test -timeout 120s -v ./lib
 
 ## Expected Outcome
 
-Once fixed, the workflow should be updated to include `./lib` in the coverage run. The workflow comment includes a TODO with instructions for updating:
-
-```yaml
-null
-...
-```
+Once fixed, the workflow should be updated to include `./lib` in the coverage run. See the TODO comment in `.github/workflows/go.yml` (coverage job) for instructions on re-enabling `./lib` package coverage.
 
 ## Related Files
 

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
 // saveAndRestoreState saves the current agentstate and returns a cleanup function.
@@ -90,47 +92,9 @@ func TestHandleNewTask_BenchmarksNotSubmitted(t *testing.T) {
 	assert.False(t, agentstate.State.BenchmarksSubmitted)
 }
 
-func TestHandleCrackerUpdate_SetsActivity(t *testing.T) {
-	cleanup := saveAndRestoreState(t)
-	defer cleanup()
-
-	// Save original activity
-	originalActivity := agentstate.State.CurrentActivity
-
-	defer func() {
-		agentstate.State.CurrentActivity = originalActivity
-	}()
-
-	// Set up minimal state
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
-
-	// handleCrackerUpdate changes activity to Updating, then back to Starting
-	// Note: This will call lib.UpdateCracker() which may have side effects
-	// but should not crash with minimal state
-
-	// Just verify function signature is correct - actual behavior depends on lib package
-	assert.NotPanics(t, func() {
-		// We can't easily test this without mocking lib.UpdateCracker
-		// Just verify the activity constants are valid
-		assert.NotEmpty(t, string(agentstate.CurrentActivityUpdating))
-		assert.NotEmpty(t, string(agentstate.CurrentActivityStarting))
-	})
-}
-
-func TestHandleReload_SetsReloadFalse(t *testing.T) {
-	cleanup := saveAndRestoreState(t)
-	defer cleanup()
-
-	// Set up state for reload
-	agentstate.State.Reload = true
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
-
-	// handleReload depends on lib.* functions that require API client
-	// We can only verify the state structure here without full mocking
-
-	assert.True(t, agentstate.State.Reload)
-	// After handleReload(), State.Reload should be false
-	// But we can't call it without mocking the lib functions
+func TestActivityConstants_AreValid(t *testing.T) {
+	assert.NotEmpty(t, string(agentstate.CurrentActivityUpdating))
+	assert.NotEmpty(t, string(agentstate.CurrentActivityStarting))
 }
 
 func TestAgentActivityTransitions(t *testing.T) {
@@ -205,13 +169,36 @@ func TestExtraDebuggingFlag(t *testing.T) {
 	cleanup := saveAndRestoreState(t)
 	defer cleanup()
 
-	// Initial state
-	agentstate.State.ExtraDebugging = false
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
 
-	// Set to true
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+
+	// Mock heartbeat response so we don't hit the network
+	testhelpers.MockHeartbeatNoContent(123)
+
+	var buf bytes.Buffer
+	originalLevel := agentstate.Logger.GetLevel()
+	agentstate.Logger.SetLevel(log.DebugLevel)
+	agentstate.Logger.SetOutput(&buf)
+	defer func() {
+		agentstate.Logger.SetLevel(originalLevel)
+		agentstate.Logger.SetOutput(os.Stdout)
+	}()
+
+	signChan := make(chan os.Signal, 1)
+
 	agentstate.State.ExtraDebugging = true
-	assert.True(t, agentstate.State.ExtraDebugging)
+	heartbeat(signChan)
+	logOutput := buf.String()
+	assert.Contains(t, logOutput, "Sending heartbeat")
+	assert.Contains(t, logOutput, "Heartbeat sent")
 
-	// Verify it affects logging behavior in heartbeat
-	// (heartbeat logs extra debug info when ExtraDebugging is true)
+	buf.Reset()
+	agentstate.State.ExtraDebugging = false
+	heartbeat(signChan)
+	logOutput = buf.String()
+	assert.NotContains(t, logOutput, "Sending heartbeat")
+	assert.NotContains(t, logOutput, "Heartbeat sent")
 }

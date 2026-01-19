@@ -45,12 +45,15 @@ func MockSessionWithChannels(sessionName string) (*hashcat.Session, error) {
 	return sess, nil
 }
 
-// CreateTestHashcatParams returns minimal valid hashcat.Params for creating test sessions.
+// CreateTestHashcatParams returns minimal valid hashcat.Params for creating test sessions
+// along with a cleanup function to delete the temporary hash file.
 // AttackMode: hashcat.AttackModeMask
-// HashFile: path to test hash file (create in temp directory)
+// HashFile: path to test hash file (created in temp directory)
 // Mask: "?l" (simple lowercase mask)
 // Other fields set to reasonable defaults.
-func CreateTestHashcatParams() hashcat.Params {
+//
+//nolint:gocritic // Named returns conflict with nonamedreturns linter
+func CreateTestHashcatParams() (hashcat.Params, func()) {
 	// Create a temporary hash file for testing
 	tempDir := agentstate.State.OutPath
 	if tempDir == "" {
@@ -70,6 +73,12 @@ func CreateTestHashcatParams() hashcat.Params {
 	}
 	_ = file.Close()
 
+	cleanup := func() {
+		if hashFile != "" {
+			_ = os.Remove(hashFile)
+		}
+	}
+
 	return hashcat.Params{
 		AttackMode:       hashcat.AttackModeMask,
 		HashType:         0, // MD5
@@ -77,5 +86,5 @@ func CreateTestHashcatParams() hashcat.Params {
 		Mask:             "?l",
 		OptimizedKernels: false,
 		SlowCandidates:   false,
-	}
+	}, cleanup
 }

@@ -130,8 +130,9 @@ func ResetTestState() {
 }
 
 // SetupMinimalTestState sets up minimal state (just AgentID and basic paths)
-// for tests that don't need full initialization.
-func SetupMinimalTestState(agentID int64) {
+// for tests that don't need full initialization. It returns a cleanup function
+// to remove the temporary directory and reset the updated state fields.
+func SetupMinimalTestState(agentID int64) func() {
 	tempDir := os.TempDir()
 	testDataDir, err := os.MkdirTemp(tempDir, "cipherswarm-test-*")
 	if err != nil {
@@ -148,6 +149,20 @@ func SetupMinimalTestState(agentID int64) {
 	agentstate.State.OutPath = filepath.Join(testDataDir, "out")
 	agentstate.State.FilePath = filepath.Join(testDataDir, "files")
 	agentstate.State.RestoreFilePath = filepath.Join(testDataDir, "restore")
+
+	return func() {
+		_ = os.RemoveAll(testDataDir)
+		agentstate.State.AgentID = 0
+		agentstate.State.DataPath = ""
+		agentstate.State.CrackersPath = ""
+		agentstate.State.HashlistPath = ""
+		agentstate.State.ZapsPath = ""
+		agentstate.State.PreprocessorsPath = ""
+		agentstate.State.ToolsPath = ""
+		agentstate.State.OutPath = ""
+		agentstate.State.FilePath = ""
+		agentstate.State.RestoreFilePath = ""
+	}
 }
 
 // WithTestState is a convenience wrapper that sets up state, runs the test function,

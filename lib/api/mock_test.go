@@ -1,4 +1,4 @@
-package api
+package api //nolint:revive // Package name matches directory; required for white-box testing
 
 import (
 	"context"
@@ -82,6 +82,6 @@ func TestMockTasksClient_DefaultBehavior(t *testing.T) {
 
 	resp, err := mock.GetNewTask(context.Background())
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, resp)
 }
