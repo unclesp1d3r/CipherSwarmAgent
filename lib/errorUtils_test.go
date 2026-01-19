@@ -130,7 +130,12 @@ func TestHandleConfigurationError(t *testing.T) {
 			if tt.expectSubmitError {
 				assert.Greater(t, finalCallCount, initialCallCount, "submit_error should be called for SDK error types")
 			} else {
-				assert.Equal(t, finalCallCount, initialCallCount, "submit_error should not be called for generic errors")
+				assert.Equal(
+					t,
+					finalCallCount,
+					initialCallCount,
+					"submit_error should not be called for generic errors",
+				)
 			}
 		})
 	}

@@ -138,7 +138,12 @@ func AssertAgentConfiguration(t *testing.T, expected, actual operations.GetConfi
 			"AgentUpdateInterval mismatch",
 		)
 	} else {
-		assert.Equal(t, expectedConfig.AgentUpdateInterval, actualConfig.AgentUpdateInterval, "AgentUpdateInterval mismatch")
+		assert.Equal(
+			t,
+			expectedConfig.AgentUpdateInterval,
+			actualConfig.AgentUpdateInterval,
+			"AgentUpdateInterval mismatch",
+		)
 	}
 
 	if expectedConfig.BackendDevice != nil && actualConfig.BackendDevice != nil {

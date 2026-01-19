@@ -176,7 +176,11 @@ func DownloadHashList(attack *components.Attack) error {
 		return err
 	}
 
-	if downloadSize, _ := os.Stat(hashlistPath); downloadSize.Size() == 0 { //nolint:errcheck // File size check, error not critical
+	downloadSize, err := os.Stat(hashlistPath)
+	if err != nil {
+		return fmt.Errorf("could not stat downloaded hash list: %w", err)
+	}
+	if downloadSize.Size() == 0 {
 		return errors.New("downloaded hash list is empty")
 	}
 
