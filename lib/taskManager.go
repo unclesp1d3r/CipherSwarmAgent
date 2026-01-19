@@ -10,10 +10,10 @@ import (
 
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
-	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 var (
@@ -26,11 +26,11 @@ var (
 )
 
 // GetNewTask retrieves a new task from the server.
-// It sends a request using SdkClient, handles any errors, and returns the task if available.
+// It sends a request using the API client interface, handles any errors, and returns the task if available.
 // If the server responds with no content, it means no new task is available, and the function returns nil without error.
 // For any other unexpected response status, an error is returned.
 func GetNewTask() (*components.Task, error) {
-	response, err := state.State.SdkClient.Tasks.GetNewTask(context.Background())
+	response, err := agentstate.State.APIClient.Tasks().GetNewTask(context.Background())
 	if err != nil {
 		handleAPIError("Error getting new task", err)
 
@@ -49,10 +49,10 @@ func GetNewTask() (*components.Task, error) {
 	}
 }
 
-// GetAttackParameters retrieves the attack parameters for a given attackID via the SdkClient.
+// GetAttackParameters retrieves the attack parameters for a given attackID via the API client interface.
 // Returns an Attack object if the API call is successful and the response status is OK.
 func GetAttackParameters(attackID int64) (*components.Attack, error) {
-	response, err := state.State.SdkClient.Attacks.GetAttack(context.Background(), attackID)
+	response, err := agentstate.State.APIClient.Attacks().GetAttack(context.Background(), attackID)
 	if err != nil {
 		handleAPIError("Error getting attack parameters", err)
 
@@ -96,9 +96,12 @@ func createJobParams(task *components.Task, attack *components.Attack) hashcat.P
 	}
 
 	return hashcat.Params{
-		AttackMode:       unwrapOr(attack.AttackModeHashcat),
-		HashType:         unwrapOr(attack.HashMode),
-		HashFile:         path.Join(state.State.HashlistPath, strconv.FormatInt(attack.GetHashListID(), 10)+".txt"),
+		AttackMode: unwrapOr(attack.AttackModeHashcat),
+		HashType:   unwrapOr(attack.HashMode),
+		HashFile: path.Join(
+			agentstate.State.HashlistPath,
+			strconv.FormatInt(attack.GetHashListID(), 10)+".txt",
+		),
 		Mask:             unwrapOrString(attack.GetMask()),
 		MaskIncrement:    unwrapOrBool(attack.GetIncrementMode(), false),
 		MaskIncrementMin: attack.GetIncrementMinimum(),
@@ -119,7 +122,7 @@ func createJobParams(task *components.Task, attack *components.Attack) hashcat.P
 		Limit:            unwrapOr(task.GetLimit()),
 		BackendDevices:   Configuration.Config.BackendDevices,
 		OpenCLDevices:    Configuration.Config.OpenCLDevices,
-		RestoreFilePath:  path.Join(state.State.RestoreFilePath, strconv.FormatInt(attack.GetID(), 10)+".restore"),
+		RestoreFilePath:  path.Join(agentstate.State.RestoreFilePath, strconv.FormatInt(attack.GetID(), 10)+".restore"),
 	}
 }
 
@@ -137,19 +140,19 @@ func resourceNameOrBlank(resource *components.AttackResourceFile) string {
 // In case of an error during task acceptance, it handles the error and returns it.
 func AcceptTask(task *components.Task) error {
 	if task == nil {
-		state.Logger.Error("Task is nil")
+		agentstate.Logger.Error("Task is nil")
 
 		return ErrTaskIsNil
 	}
 
-	_, err := state.State.SdkClient.Tasks.SetTaskAccepted(context.Background(), task.GetID())
+	_, err := agentstate.State.APIClient.Tasks().SetTaskAccepted(context.Background(), task.GetID())
 	if err != nil {
 		handleAcceptTaskError(err)
 
 		return err
 	}
 
-	state.Logger.Debug("Task accepted")
+	agentstate.Logger.Debug("Task accepted")
 
 	return nil
 }
@@ -158,27 +161,27 @@ func AcceptTask(task *components.Task) error {
 // Logs an error if the task is nil or if notifying the server fails.
 func markTaskExhausted(task *components.Task) {
 	if task == nil {
-		state.Logger.Error("Task is nil")
+		agentstate.Logger.Error("Task is nil")
 
 		return
 	}
 
-	_, err := state.State.SdkClient.Tasks.SetTaskExhausted(context.Background(), task.GetID())
+	_, err := agentstate.State.APIClient.Tasks().SetTaskExhausted(context.Background(), task.GetID())
 	if err != nil {
 		handleTaskError(err, "Error notifying server of task exhaustion")
 	}
 }
 
-// AbandonTask sets the given task to an abandoned state using the SdkClient and logs any errors that occur.
+// AbandonTask sets the given task to an abandoned state using the API client interface and logs any errors that occur.
 // If the task is nil, it logs an error and returns immediately.
 func AbandonTask(task *components.Task) {
 	if task == nil {
-		state.Logger.Error("Task is nil")
+		agentstate.Logger.Error("Task is nil")
 
 		return
 	}
 
-	_, err := state.State.SdkClient.Tasks.SetTaskAbandoned(context.Background(), task.GetID())
+	_, err := agentstate.State.APIClient.Tasks().SetTaskAbandoned(context.Background(), task.GetID())
 	if err != nil {
 		handleTaskError(err, "Error notifying server of task abandonment")
 	}

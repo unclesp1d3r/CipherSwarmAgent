@@ -40,7 +40,7 @@ linters:
     # - gocognit - Disabled: we'll come back to this after 1.0
     - goconst
     - gocritic
-    - gocyclo
+    # - gocyclo # Disabled in favor of cyclop (see disable section)
     - godot
     - gomoddirectives
     - goprintffuncname
@@ -94,6 +94,11 @@ linters:
     presets:
       - common-false-positives
       - std-error-handling
+    rules:
+      # "api" is a meaningful, standard package name in Go - disable this false positive
+      - linters: [revive]
+        text: "var-naming: avoid meaningless package names"
+        path: lib/api/
   disable:
     - gomodguard # Disabled: maybe someday, but not important right now
     - gocyclo # Disabled in favor of cyclop

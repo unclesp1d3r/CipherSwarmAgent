@@ -1,5 +1,8 @@
 //go:build windows
 
+// Package arch provides architecture-specific functionality for Windows systems.
+// It includes utilities for device detection, platform identification, and
+// execution of system-specific commands like hashcat and 7z.
 package arch
 
 import (
@@ -7,7 +10,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/unclesp1d3r/cipherswarmagent/state"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
 // GetDevices retrieves a list of GPU devices available on a Windows system.
@@ -22,11 +25,11 @@ import (
 //	[]string: A slice of strings containing the names of the GPU devices.
 //	error: An error object if there was an issue executing the command or parsing the output.
 func GetDevices(ctx context.Context) ([]string, error) {
-	state.Logger.Debug("Getting GPU devices")
+	agentstate.Logger.Debug("Getting GPU devices")
 	cmd := exec.CommandContext(ctx, "wmic", "path", "win32_videocontroller", "get", "name")
 	out, err := cmd.Output()
 	if err != nil {
-		state.Logger.Error("Error executing wmic command", "error", err)
+		agentstate.Logger.Error("Error executing wmic command", "error", err)
 		return nil, err
 	}
 
@@ -40,7 +43,7 @@ func GetDevices(ctx context.Context) ([]string, error) {
 	}
 
 	if len(devices) == 0 {
-		state.Logger.Warn("No GPU devices found")
+		agentstate.Logger.Warn("No GPU devices found")
 		return nil, nil
 	}
 
@@ -67,6 +70,7 @@ func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) 
 	return strings.TrimSpace(string(out)), nil
 }
 
+// GetPlatform returns the platform identifier for Windows systems.
 func GetPlatform() string {
 	return "windows"
 }
@@ -83,7 +87,9 @@ func GetPlatform() string {
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
 func Extract7z(ctx context.Context, srcFile, destDir string) error {
-	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).Output()
+	//nolint:gosec // srcFile and destDir are validated by caller
+	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).
+		Output()
 	return err
 }
 

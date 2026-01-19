@@ -13,21 +13,22 @@ import (
 	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
-	"github.com/unclesp1d3r/cipherswarmagent/state"
 )
 
 // StartAgent initializes and starts the CipherSwarm agent.
 func StartAgent() {
 	// Ensure API URL and token are set
 	if viper.GetString("api_url") == "" {
-		state.Logger.Fatal("API URL not set")
+		agentstate.Logger.Fatal("API URL not set")
 	}
 
 	if viper.GetString("api_token") == "" {
-		state.Logger.Fatal("API token not set")
+		agentstate.Logger.Fatal("API token not set")
 	}
 
 	// Initialize shared state and logger
@@ -35,7 +36,12 @@ func StartAgent() {
 	initLogger()
 
 	// Initialize API client
-	state.State.SdkClient = sdk.New(sdk.WithSecurity(state.State.APIToken), sdk.WithServerURL(state.State.URL))
+	agentstate.State.SdkClient = sdk.New(
+		sdk.WithSecurity(agentstate.State.APIToken),
+		sdk.WithServerURL(agentstate.State.URL),
+	)
+	// Wrap SDK client with interface for dependency injection support
+	agentstate.State.APIClient = api.NewSDKWrapper(agentstate.State.SdkClient)
 
 	lib.DisplayStartup()
 
@@ -44,31 +50,31 @@ func StartAgent() {
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
 
 	// Check for an existing lock file to prevent multiple instances
-	if cracker.CheckForExistingClient(state.State.PidFile) {
-		state.Logger.Fatal("Aborting agent start, lock file found", "path", state.State.PidFile)
+	if cracker.CheckForExistingClient(agentstate.State.PidFile) {
+		agentstate.Logger.Fatal("Aborting agent start, lock file found", "path", agentstate.State.PidFile)
 	}
 
 	// Create necessary data directories and lock file
 	if err := cracker.CreateDataDirs(); err != nil {
-		state.Logger.Fatal("Error creating data directories", "error", err)
+		agentstate.Logger.Fatal("Error creating data directories", "error", err)
 	}
 
 	if err := cracker.CreateLockFile(); err != nil {
-		state.Logger.Fatal("Error creating lock file", "error", err)
+		agentstate.Logger.Fatal("Error creating lock file", "error", err)
 	}
 
-	defer cleanupLockFile(state.State.PidFile)
+	defer cleanupLockFile(agentstate.State.PidFile)
 
 	// Authenticate with the CipherSwarm API
 	if err := lib.AuthenticateAgent(); err != nil {
-		state.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
+		agentstate.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
 	}
 
 	lib.DisplayAuthenticated()
 
 	// Fetch agent configuration and update metadata
 	if err := fetchAgentConfig(); err != nil {
-		state.Logger.Fatal("Failed to fetch agent configuration", "error", err)
+		agentstate.Logger.Fatal("Failed to fetch agent configuration", "error", err)
 	}
 
 	err := lib.UpdateAgentMetadata()
@@ -76,22 +82,22 @@ func StartAgent() {
 		return // Error already logged
 	}
 
-	state.Logger.Info("Sent agent metadata to the CipherSwarm API")
+	agentstate.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Start heartbeat loop early so UI can see agent is connected
 	go startHeartbeatLoop(signChan)
 
 	// Submit initial benchmarks to the server
-	state.State.CurrentActivity = state.CurrentActivityBenchmarking
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
 	if err := lib.UpdateBenchmarks(); err != nil {
-		state.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
+		agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
 	}
 
-	state.State.CurrentActivity = state.CurrentActivityStarting
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
 
 	// Kill any dangling hashcat processes
-	if cracker.CheckForExistingClient(state.State.HashcatPidFile) {
-		state.Logger.Info("Killed dangling hashcat process")
+	if cracker.CheckForExistingClient(agentstate.State.HashcatPidFile) {
+		agentstate.Logger.Info("Killed dangling hashcat process")
 	}
 
 	// Start agent loop (heartbeat loop already started above)
@@ -99,17 +105,17 @@ func StartAgent() {
 
 	// Wait for termination signal
 	sig := <-signChan
-	state.Logger.Debug("Received signal", "signal", sig)
+	agentstate.Logger.Debug("Received signal", "signal", sig)
 	lib.SendAgentError("Received signal to terminate. Shutting down", nil, operations.SeverityInfo)
 	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
 }
 
 func cleanupLockFile(pidFile string) {
-	state.Logger.Debug("Cleaning up PID file", "path", pidFile)
+	agentstate.Logger.Debug("Cleaning up PID file", "path", pidFile)
 
 	if err := os.Remove(pidFile); err != nil {
-		state.Logger.Fatal("Failed to remove PID file", "error", err)
+		agentstate.Logger.Fatal("Failed to remove PID file", "error", err)
 	}
 }
 
@@ -124,7 +130,7 @@ func startHeartbeatLoop(signChan chan os.Signal) {
 
 func startAgentLoop() {
 	for {
-		if state.State.Reload {
+		if agentstate.State.Reload {
 			handleReload()
 		}
 
@@ -132,7 +138,7 @@ func startAgentLoop() {
 			handleCrackerUpdate()
 		}
 
-		if !state.State.JobCheckingStopped {
+		if !agentstate.State.JobCheckingStopped {
 			handleNewTask()
 		}
 
@@ -145,42 +151,42 @@ func startAgentLoop() {
 func handleReload() {
 	lib.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
 
-	state.State.CurrentActivity = state.CurrentActivityStarting
-	state.Logger.Info("Reloading agent")
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
+	agentstate.Logger.Info("Reloading agent")
 
 	if err := fetchAgentConfig(); err != nil {
-		state.Logger.Error("Failed to fetch agent configuration", "error", err)
+		agentstate.Logger.Error("Failed to fetch agent configuration", "error", err)
 		lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
 	}
 
-	state.State.CurrentActivity = state.CurrentActivityBenchmarking
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
 	_ = lib.UpdateBenchmarks() //nolint:errcheck // Ignore error, as it is already logged and we can continue
-	state.State.CurrentActivity = state.CurrentActivityStarting
-	state.State.Reload = false
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
+	agentstate.State.Reload = false
 }
 
 func handleCrackerUpdate() {
-	state.State.CurrentActivity = state.CurrentActivityUpdating
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityUpdating
 
 	lib.UpdateCracker()
 
-	state.State.CurrentActivity = state.CurrentActivityStarting
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
 }
 
 func handleNewTask() {
-	if !state.State.BenchmarksSubmitted {
-		state.Logger.Debug("Benchmarks not yet submitted, skipping task retrieval")
+	if !agentstate.State.BenchmarksSubmitted {
+		agentstate.Logger.Debug("Benchmarks not yet submitted, skipping task retrieval")
 		return
 	}
 
 	task, err := lib.GetNewTask()
 	if err != nil {
 		if errors.Is(err, lib.ErrNoTaskAvailable) {
-			state.Logger.Debug("No new task available")
+			agentstate.Logger.Debug("No new task available")
 			return
 		}
 
-		state.Logger.Error("Failed to get new task", "error", err)
+		agentstate.Logger.Error("Failed to get new task", "error", err)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
 
 		return
@@ -192,13 +198,13 @@ func handleNewTask() {
 }
 
 func processTask(task *components.Task) error {
-	state.State.CurrentActivity = state.CurrentActivityCracking
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityCracking
 
 	lib.DisplayNewTask(task)
 
 	attack, err := lib.GetAttackParameters(task.GetAttackID())
 	if err != nil || attack == nil {
-		state.Logger.Error("Failed to get attack parameters", "error", err)
+		agentstate.Logger.Error("Failed to get attack parameters", "error", err)
 		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
@@ -210,7 +216,7 @@ func processTask(task *components.Task) error {
 
 	err = lib.AcceptTask(task)
 	if err != nil {
-		state.Logger.Error("Failed to accept task", "task_id", task.GetID())
+		agentstate.Logger.Error("Failed to accept task", "task_id", task.GetID())
 
 		return err
 	}
@@ -218,7 +224,7 @@ func processTask(task *components.Task) error {
 	lib.DisplayRunTaskAccepted(task)
 
 	if err := lib.DownloadFiles(attack); err != nil {
-		state.Logger.Error("Failed to download files", "error", err)
+		agentstate.Logger.Error("Failed to download files", "error", err)
 		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
@@ -231,41 +237,43 @@ func processTask(task *components.Task) error {
 		return err
 	}
 
-	state.State.CurrentActivity = state.CurrentActivityWaiting
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
 
 	return nil
 }
 
 func heartbeat(signChan chan os.Signal) {
-	if state.State.ExtraDebugging {
-		state.Logger.Debug("Sending heartbeat")
+	if agentstate.State.ExtraDebugging {
+		agentstate.Logger.Debug("Sending heartbeat")
 	}
 
-	agentState := lib.SendHeartBeat()
-	if agentState != nil {
-		if state.State.ExtraDebugging {
-			state.Logger.Debug("Received heartbeat response", "state", agentState)
+	state := lib.SendHeartBeat()
+	if state != nil {
+		if agentstate.State.ExtraDebugging {
+			agentstate.Logger.Debug("Received heartbeat response", "state", state)
 		}
 
-		switch *agentState {
+		switch *state {
 		case operations.StatePending:
-			if state.State.CurrentActivity != state.CurrentActivityBenchmarking {
-				state.Logger.Info("Agent is pending, performing reload")
-				state.State.Reload = true
+			if agentstate.State.CurrentActivity != agentstate.CurrentActivityBenchmarking {
+				agentstate.Logger.Info("Agent is pending, performing reload")
+				agentstate.State.Reload = true
 			}
 		case operations.StateStopped:
-			if state.State.CurrentActivity != state.CurrentActivityCracking {
-				state.State.CurrentActivity = state.CurrentActivityStopping
-				state.Logger.Debug("Agent is stopped, stopping processing")
+			if agentstate.State.CurrentActivity != agentstate.CurrentActivityCracking {
+				agentstate.State.CurrentActivity = agentstate.CurrentActivityStopping
+				agentstate.Logger.Debug("Agent is stopped, stopping processing")
 
-				if !state.State.JobCheckingStopped {
-					state.Logger.Warn("Job checking stopped, per server directive. Waiting for further instructions.")
+				if !agentstate.State.JobCheckingStopped {
+					agentstate.Logger.Warn(
+						"Job checking stopped, per server directive. Waiting for further instructions.",
+					)
 				}
 
-				state.State.JobCheckingStopped = true
+				agentstate.State.JobCheckingStopped = true
 			}
 		case operations.StateError:
-			state.Logger.Info("Agent is in error state, stopping processing")
+			agentstate.Logger.Info("Agent is in error state, stopping processing")
 
 			signChan <- syscall.SIGTERM
 		}
@@ -275,7 +283,7 @@ func heartbeat(signChan chan os.Signal) {
 func fetchAgentConfig() error {
 	err := lib.GetAgentConfiguration()
 	if err != nil {
-		state.Logger.Fatal("Failed to get agent configuration from the CipherSwarm API", "error", err)
+		agentstate.Logger.Fatal("Failed to get agent configuration from the CipherSwarm API", "error", err)
 	}
 
 	if viper.GetBool("always_use_native_hashcat") {
@@ -286,10 +294,10 @@ func fetchAgentConfig() error {
 }
 
 func initLogger() {
-	if state.State.Debug {
-		state.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug
-		state.Logger.SetReportCaller(true)    // Report the caller for debugging
+	if agentstate.State.Debug {
+		agentstate.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug
+		agentstate.Logger.SetReportCaller(true)    // Report the caller for debugging
 	} else {
-		state.Logger.SetLevel(log.InfoLevel)
+		agentstate.Logger.SetLevel(log.InfoLevel)
 	}
 }
