@@ -64,6 +64,7 @@ Requirements for building from source:
 - **Go 1.22 or higher**
 - **Git**
 - **Just** command runner (optional but recommended)
+- **Bun** (for JavaScript tooling like commitlint/pre-commit hooks)
 
 ```bash
 # Clone the repository
