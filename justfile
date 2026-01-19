@@ -4,7 +4,7 @@
 set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
 set shell := ["bash", "-lc"]
 
-# Use mise to manage all dev tools (ruby, bun, pre-commit, etc.)
+# Use mise to manage all dev tools (pre-commit, etc.)
 # See .mise.toml for tool versions
 mise_exec := "mise exec --"
 
@@ -35,7 +35,6 @@ install:
     else
         .venv/bin/python -m pip install mkdocs-material
     fi
-    {{mise_exec}} bun install
     {{mise_exec}} pre-commit install --hook-type commit-msg
     {{mise_exec}} go mod tidy
 
@@ -106,4 +105,3 @@ update-deps:
     {{mise_exec}} go mod verify
     {{mise_exec}} go mod vendor
     {{mise_exec}} go mod tidy
-    {{mise_exec}} bun update

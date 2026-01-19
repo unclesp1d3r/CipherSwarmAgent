@@ -1,5 +1,4 @@
 [tools]
-bun                      = "latest"
 go                       = "latest"
 golangci-lint            = "2.8.0"
 golangci-lint-langserver = "latest"
