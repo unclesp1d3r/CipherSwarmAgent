@@ -257,7 +257,7 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 		TaskID:   taskID,
 	}
 
-	if _, err := agentstate.State.SdkClient.Agents.SubmitErrorAgent(
+	if _, err := agentstate.State.APIClient.Agents().SubmitErrorAgent(
 		context.Background(),
 		agentstate.State.AgentID,
 		agentError,

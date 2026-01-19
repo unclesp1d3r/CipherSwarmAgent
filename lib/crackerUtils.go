@@ -44,7 +44,7 @@ func UpdateCracker() {
 		return
 	}
 
-	response, err := agentstate.State.SdkClient.Crackers.CheckForCrackerUpdate(
+	response, err := agentstate.State.APIClient.Crackers().CheckForCrackerUpdate(
 		context.Background(),
 		&agentPlatform,
 		&currentVersion,

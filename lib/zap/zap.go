@@ -22,7 +22,7 @@ const (
 )
 
 // GetZaps fetches zap data for a given task, handles errors, and processes the response stream if available.
-// Logs an error if the task is nil, displays job progress, and retrieves zaps from the SdkClient.
+// Logs an error if the task is nil, displays job progress, and retrieves zaps via the API client interface.
 func GetZaps(task *components.Task, sendCrackedHashFunc func(time.Time, string, string, *components.Task)) {
 	if task == nil {
 		agentstate.Logger.Error("Task is nil")
@@ -30,7 +30,7 @@ func GetZaps(task *components.Task, sendCrackedHashFunc func(time.Time, string, 
 		return
 	}
 
-	res, err := agentstate.State.SdkClient.Tasks.GetTaskZaps(context.Background(), task.GetID())
+	res, err := agentstate.State.APIClient.Tasks().GetTaskZaps(context.Background(), task.GetID())
 	if err != nil {
 		return
 	}

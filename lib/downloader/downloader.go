@@ -159,7 +159,7 @@ func DownloadHashList(attack *components.Attack) error {
 		return err
 	}
 
-	response, err := agentstate.State.SdkClient.Attacks.GetHashList(context.Background(), attack.ID)
+	response, err := agentstate.State.APIClient.Attacks().GetHashList(context.Background(), attack.ID)
 	if err != nil {
 		return errors.Wrap(err, "error downloading hashlist from the CipherSwarm API")
 	}

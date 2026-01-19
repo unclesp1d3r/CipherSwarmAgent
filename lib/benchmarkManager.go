@@ -22,7 +22,7 @@ const (
 // sendBenchmarkResults sends the collected benchmark results to a server endpoint.
 // It converts each benchmarkResult into a HashcatBenchmark and appends them to a slice.
 // If the conversion fails for a result, it continues to the next result.
-// Creates a SubmitBenchmarkRequestBody with the HashcatBenchmarks slice and submits it via SdkClient.
+// Creates a SubmitBenchmarkRequestBody with the HashcatBenchmarks slice and submits it via the API client interface.
 // Returns an error if submission or the response received is not successful.
 func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 	var benchmarks []components.HashcatBenchmark //nolint:prealloc // Size unknown until after parsing
@@ -40,7 +40,7 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 		HashcatBenchmarks: benchmarks,
 	}
 
-	res, err := agentstate.State.SdkClient.Agents.SubmitBenchmark(
+	res, err := agentstate.State.APIClient.Agents().SubmitBenchmark(
 		context.Background(),
 		agentstate.State.AgentID,
 		results,

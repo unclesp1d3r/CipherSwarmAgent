@@ -45,12 +45,12 @@ var (
 	ErrBadResponse          = errors.New("bad response from server")
 )
 
-// AuthenticateAgent authenticates the agent with the CipherSwarm API using the SDK client.
+// AuthenticateAgent authenticates the agent with the CipherSwarm API using the API client interface.
 // It sends an authentication request to the API, processes the response, and updates the shared state.
 // On error, it logs the error and returns it. If the response is nil or indicates a failed authentication,
 // an error is logged and returned.
 func AuthenticateAgent() error {
-	response, err := agentstate.State.SdkClient.Client.Authenticate(context.Background())
+	response, err := agentstate.State.APIClient.Auth().Authenticate(context.Background())
 	if err != nil {
 		return handleAuthenticationError(err)
 	}
@@ -70,7 +70,7 @@ func AuthenticateAgent() error {
 // It updates the global Configuration variable with the fetched configuration.
 // If UseNativeHashcat is true in the configuration, it sets the native Hashcat path.
 func GetAgentConfiguration() error {
-	response, err := agentstate.State.SdkClient.Client.GetConfiguration(context.Background())
+	response, err := agentstate.State.APIClient.Auth().GetConfiguration(context.Background())
 	if err != nil {
 		return handleConfigurationError(err)
 	}
@@ -148,7 +148,7 @@ func UpdateAgentMetadata() error {
 		"api_url", agentstate.State.URL,
 		"has_token", agentstate.State.APIToken != "")
 
-	response, err := agentstate.State.SdkClient.Agents.UpdateAgent(
+	response, err := agentstate.State.APIClient.Agents().UpdateAgent(
 		context.Background(),
 		agentstate.State.AgentID,
 		agentUpdate,
@@ -245,7 +245,7 @@ func downloadResourceFile(resource *components.AttackResourceFile) error {
 // It handles different response status codes and logs relevant messages.
 // It returns the agent's state object or nil if an error occurs or if the response status is http.StatusNoContent.
 func SendHeartBeat() *operations.State {
-	resp, err := agentstate.State.SdkClient.Agents.SendHeartbeat(context.Background(), agentstate.State.AgentID)
+	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(context.Background(), agentstate.State.AgentID)
 	if err != nil {
 		handleHeartbeatError(err)
 
@@ -320,7 +320,7 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	taskStatus := convertToTaskStatus(update, deviceStatuses)
 
 	// Send status update to the server
-	resp, err := agentstate.State.SdkClient.Tasks.SendStatus(context.Background(), task.GetID(), taskStatus)
+	resp, err := agentstate.State.APIClient.Tasks().SendStatus(context.Background(), task.GetID(), taskStatus)
 	if err != nil {
 		handleStatusUpdateError(err, task, sess)
 		return
@@ -388,7 +388,7 @@ func handleSendStatusResponse(resp *operations.SendStatusResponse, task *compone
 
 // SendAgentShutdown notifies the server of the agent shutdown and handles any errors during the API call.
 func SendAgentShutdown() {
-	_, err := agentstate.State.SdkClient.Agents.SetAgentShutdown(context.Background(), agentstate.State.AgentID)
+	_, err := agentstate.State.APIClient.Agents().SetAgentShutdown(context.Background(), agentstate.State.AgentID)
 	if err != nil {
 		handleAPIError("Error notifying server of agent shutdown", err)
 	}
@@ -396,7 +396,7 @@ func SendAgentShutdown() {
 
 // sendCrackedHash sends a cracked hash result to the task server and logs relevant information.
 // If the task pointer is nil, it logs an error and returns early.
-// Constructs a HashcatResult object and sends it to the server via the SDK client.
+// Constructs a HashcatResult object and sends it to the server via the API client interface.
 // Logs and handles any errors encountered during the sending process.
 // If configured, writes the cracked hash to a file.
 // Logs additional information based on the HTTP response status.
@@ -415,7 +415,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 
 	agentstate.Logger.Info("Cracked hash", "hash", hash)
 
-	response, err := agentstate.State.SdkClient.Tasks.SendCrack(context.Background(), task.GetID(), hashcatResult)
+	response, err := agentstate.State.APIClient.Tasks().SendCrack(context.Background(), task.GetID(), hashcatResult)
 	if err != nil {
 		handleSendCrackError(err)
 

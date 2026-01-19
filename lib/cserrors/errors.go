@@ -25,13 +25,13 @@ func LogAndSendError(message string, err error, severity operations.Severity, ta
 			TaskID:   taskID,
 		}
 
-		_, err := agentstate.State.SdkClient.Agents.SubmitErrorAgent(
+		_, apiErr := agentstate.State.APIClient.Agents().SubmitErrorAgent(
 			context.Background(),
 			agentstate.State.AgentID,
 			agentError,
 		)
-		if err != nil {
-			agentstate.Logger.Error("Error sending error to server", "error", err)
+		if apiErr != nil {
+			agentstate.Logger.Error("Error sending error to server", "error", apiErr)
 		}
 	}
 
