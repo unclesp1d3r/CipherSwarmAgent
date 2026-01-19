@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"reflect"
 	"sync"
 	"time"
 
@@ -299,22 +298,9 @@ func handleTaskError(err error, message string) {
 	var e1 *sdkerrors.SetTaskAbandonedResponseBody
 	if stderrors.As(err, &e1) {
 		details := e1.Details
-		errorText := ""
-		if len(details) == 0 {
-			errorValue := reflect.ValueOf(e1.Error_)
-			if errorValue.IsValid() {
-				switch errorValue.Kind() {
-				case reflect.String:
-					errorText = errorValue.String()
-				case reflect.Pointer:
-					if !errorValue.IsNil() && errorValue.Elem().Kind() == reflect.String {
-						errorText = errorValue.Elem().String()
-					}
-				}
-			}
-		}
-		if len(details) == 0 && errorText != "" {
-			details = []string{errorText}
+		// If Details is empty, fall back to Error_ field
+		if len(details) == 0 && e1.Error_ != nil && *e1.Error_ != "" {
+			details = []string{*e1.Error_}
 		}
 		agentstate.Logger.Error(
 			"Notified server of task abandonment, but it could not update the task properly",

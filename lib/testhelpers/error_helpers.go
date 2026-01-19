@@ -33,6 +33,24 @@ func NewSetTaskAbandonedError(state string) *sdkerrors.SetTaskAbandonedResponseB
 	}
 }
 
+// NewSetTaskAbandonedErrorWithErrorField creates a SetTaskAbandonedResponseBody error
+// with empty Details but a populated Error_ field for testing fallback extraction.
+func NewSetTaskAbandonedErrorWithErrorField(errorMsg string) *sdkerrors.SetTaskAbandonedResponseBody {
+	return &sdkerrors.SetTaskAbandonedResponseBody{
+		Error_:  &errorMsg,
+		Details: []string{},
+	}
+}
+
+// NewSetTaskAbandonedErrorWithNilError creates a SetTaskAbandonedResponseBody error
+// with empty Details and nil Error_ for testing edge case handling.
+func NewSetTaskAbandonedErrorWithNilError() *sdkerrors.SetTaskAbandonedResponseBody {
+	return &sdkerrors.SetTaskAbandonedResponseBody{
+		Error_:  nil,
+		Details: []string{},
+	}
+}
+
 // WrapAsErrorObject wraps a standard error as an ErrorObject for testing error type assertions.
 func WrapAsErrorObject(err error) error {
 	if err == nil {
