@@ -67,7 +67,7 @@ This guide provides comprehensive guidelines for developing efficient, reliable,
 
 ### 2.2 Recommended Approaches for Common Tasks
 
-- **Dependency Caching:** Use the `actions/cache` action to cache dependencies (e.g., npm packages, Maven artifacts) to speed up subsequent workflow runs.
+- **Dependency Caching:** Use the `actions/cache` action to cache dependencies (e.g., Bun packages, Maven artifacts) to speed up subsequent workflow runs.
 - **Secret Management:** Store sensitive information (e.g., API keys, passwords) as GitHub Secrets and access them in your workflows using the `${{ secrets.SECRET_NAME }}` syntax. Never hardcode secrets in your workflow files.
 - **Artifact Storage:** Use the `actions/upload-artifact` and `actions/download-artifact` actions to store and retrieve build artifacts (e.g., compiled binaries, test reports).
 - **Environment Variables:** Use environment variables to configure workflows and steps. Set environment variables at the workflow, job, or step level.
@@ -80,7 +80,7 @@ This guide provides comprehensive guidelines for developing efficient, reliable,
 - **Overly Complex Workflows:** Avoid creating overly complex workflows that are difficult to understand and maintain. Break them down into smaller, reusable workflows.
 - **Lack of Testing:** Don't skip testing your workflows. Implement unit tests, integration tests, and end-to-end tests to ensure they function correctly.
 - **Unnecessary Dependencies:** Avoid including unnecessary dependencies in your workflows. This can increase build times and introduce security vulnerabilities.
-- **Directly Modifying `GITHUB_PATH` or `GITHUB_ENV`:** While these environment variables exist, using the recommended step outputs is preferred for cleaner, more robust interaction with other steps.
+- **Misusing `GITHUB_PATH` or `GITHUB_ENV`:** These are the supported mechanisms for adding to PATH or exporting env vars within a job, but prefer step outputs for passing data between steps and avoid the deprecated `::set-output::` command.
 
 ### 2.4 State Management Best Practices
 
@@ -96,7 +96,7 @@ This guide provides comprehensive guidelines for developing efficient, reliable,
 - **`continue-on-error: true`:** Allows a job to continue even if a step fails. This is useful for non-critical steps or when you want to collect information about multiple failures before failing the workflow.
 - **`try...catch...finally` (within Scripts):** Use `try...catch...finally` blocks in your scripts to handle exceptions and ensure proper cleanup.
 - **Notifications:** Send notifications (e.g., email, Slack) when workflows fail or succeed to keep stakeholders informed.
-- **Workflow Retries:** Consider using the `retry:` keyword to automatically retry failed jobs.
+- **Workflow Retries:** GitHub Actions does not provide a built-in `retry:` keyword. Use retry logic in scripts, or wrap flaky steps with a retry action (e.g., a dedicated retry step/action) when necessary.
 
 ## 3. Performance Considerations
 
@@ -106,7 +106,7 @@ This guide provides comprehensive guidelines for developing efficient, reliable,
 - **Concurrency:** Use concurrency to prevent multiple workflows from running at the same time.
 - **Parallel Execution:** Run jobs in parallel to reduce overall execution time.
 - **Optimized Images:** Optimize images before uploading them to your repository to reduce their size.
-- **Minify Code:** Minify JavaScript and CSS files to reduce their size.
+- **Minify Code:** If your workflow builds frontend assets, minify JavaScript and CSS to reduce bundle size.
 
 ### 3.2 Memory Management
 
@@ -257,6 +257,13 @@ This guide provides comprehensive guidelines for developing efficient, reliable,
 - **Continuous Integration (CI):** Run automated tests on every commit to ensure code quality.
 - **Continuous Delivery (CD):** Automate the deployment process to deliver new features and bug fixes to users quickly.
 - **Automated Releases:** Automate the release process to create and publish releases automatically.
+
+### 7.6 Repository Conventions (CipherSwarmAgent)
+
+- **Toolchain Management:** Prefer `jdx/mise-action` for installing toolchains (Go, Bun) and enabling caching in workflows.
+- **Go CI:** Use matrix builds across `ubuntu-latest`, `macos-latest`, and `windows-latest` with `actions/setup-go` and `go build`/`go test`.
+- **Linting:** Prefer `golangci/golangci-lint-action` for Go linting.
+- **Coverage:** Upload coverage to Codecov, and avoid failing PRs for transient upload issues (e.g., `fail_ci_if_error: false`).
 
 ## Conclusion
 
