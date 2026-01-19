@@ -15,4 +15,3 @@ jobs:
         with:
           next_version: 1.0.0
           config_dir: .chglog
-
