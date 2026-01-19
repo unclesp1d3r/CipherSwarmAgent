@@ -51,13 +51,25 @@ type AgentsClient interface {
 	SendHeartbeat(ctx context.Context, id int64) (*operations.SendHeartbeatResponse, error)
 
 	// UpdateAgent updates agent metadata.
-	UpdateAgent(ctx context.Context, id int64, body *operations.UpdateAgentRequestBody) (*operations.UpdateAgentResponse, error)
+	UpdateAgent(
+		ctx context.Context,
+		id int64,
+		body *operations.UpdateAgentRequestBody,
+	) (*operations.UpdateAgentResponse, error)
 
 	// SubmitBenchmark submits benchmark results.
-	SubmitBenchmark(ctx context.Context, id int64, body operations.SubmitBenchmarkRequestBody) (*operations.SubmitBenchmarkResponse, error)
+	SubmitBenchmark(
+		ctx context.Context,
+		id int64,
+		body operations.SubmitBenchmarkRequestBody,
+	) (*operations.SubmitBenchmarkResponse, error)
 
 	// SubmitErrorAgent reports an error to the server.
-	SubmitErrorAgent(ctx context.Context, id int64, body *operations.SubmitErrorAgentRequestBody) (*operations.SubmitErrorAgentResponse, error)
+	SubmitErrorAgent(
+		ctx context.Context,
+		id int64,
+		body *operations.SubmitErrorAgentRequestBody,
+	) (*operations.SubmitErrorAgentResponse, error)
 
 	// SetAgentShutdown notifies the server of agent shutdown.
 	SetAgentShutdown(ctx context.Context, id int64) (*operations.SetAgentShutdownResponse, error)

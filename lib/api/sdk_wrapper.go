@@ -79,19 +79,33 @@ func (w *sdkTasksWrapper) SetTaskAccepted(ctx context.Context, id int64) (*opera
 	return w.sdk.Tasks.SetTaskAccepted(ctx, id)
 }
 
-func (w *sdkTasksWrapper) SetTaskExhausted(ctx context.Context, id int64) (*operations.SetTaskExhaustedResponse, error) {
+func (w *sdkTasksWrapper) SetTaskExhausted(
+	ctx context.Context,
+	id int64,
+) (*operations.SetTaskExhaustedResponse, error) {
 	return w.sdk.Tasks.SetTaskExhausted(ctx, id)
 }
 
-func (w *sdkTasksWrapper) SetTaskAbandoned(ctx context.Context, id int64) (*operations.SetTaskAbandonedResponse, error) {
+func (w *sdkTasksWrapper) SetTaskAbandoned(
+	ctx context.Context,
+	id int64,
+) (*operations.SetTaskAbandonedResponse, error) {
 	return w.sdk.Tasks.SetTaskAbandoned(ctx, id)
 }
 
-func (w *sdkTasksWrapper) SendStatus(ctx context.Context, id int64, status components.TaskStatus) (*operations.SendStatusResponse, error) {
+func (w *sdkTasksWrapper) SendStatus(
+	ctx context.Context,
+	id int64,
+	status components.TaskStatus,
+) (*operations.SendStatusResponse, error) {
 	return w.sdk.Tasks.SendStatus(ctx, id, status)
 }
 
-func (w *sdkTasksWrapper) SendCrack(ctx context.Context, id int64, result *components.HashcatResult) (*operations.SendCrackResponse, error) {
+func (w *sdkTasksWrapper) SendCrack(
+	ctx context.Context,
+	id int64,
+	result *components.HashcatResult,
+) (*operations.SendCrackResponse, error) {
 	return w.sdk.Tasks.SendCrack(ctx, id, result)
 }
 
@@ -121,19 +135,34 @@ func (w *sdkAgentsWrapper) SendHeartbeat(ctx context.Context, id int64) (*operat
 	return w.sdk.Agents.SendHeartbeat(ctx, id)
 }
 
-func (w *sdkAgentsWrapper) UpdateAgent(ctx context.Context, id int64, body *operations.UpdateAgentRequestBody) (*operations.UpdateAgentResponse, error) {
+func (w *sdkAgentsWrapper) UpdateAgent(
+	ctx context.Context,
+	id int64,
+	body *operations.UpdateAgentRequestBody,
+) (*operations.UpdateAgentResponse, error) {
 	return w.sdk.Agents.UpdateAgent(ctx, id, body)
 }
 
-func (w *sdkAgentsWrapper) SubmitBenchmark(ctx context.Context, id int64, body operations.SubmitBenchmarkRequestBody) (*operations.SubmitBenchmarkResponse, error) {
+func (w *sdkAgentsWrapper) SubmitBenchmark(
+	ctx context.Context,
+	id int64,
+	body operations.SubmitBenchmarkRequestBody,
+) (*operations.SubmitBenchmarkResponse, error) {
 	return w.sdk.Agents.SubmitBenchmark(ctx, id, body)
 }
 
-func (w *sdkAgentsWrapper) SubmitErrorAgent(ctx context.Context, id int64, body *operations.SubmitErrorAgentRequestBody) (*operations.SubmitErrorAgentResponse, error) {
+func (w *sdkAgentsWrapper) SubmitErrorAgent(
+	ctx context.Context,
+	id int64,
+	body *operations.SubmitErrorAgentRequestBody,
+) (*operations.SubmitErrorAgentResponse, error) {
 	return w.sdk.Agents.SubmitErrorAgent(ctx, id, body)
 }
 
-func (w *sdkAgentsWrapper) SetAgentShutdown(ctx context.Context, id int64) (*operations.SetAgentShutdownResponse, error) {
+func (w *sdkAgentsWrapper) SetAgentShutdown(
+	ctx context.Context,
+	id int64,
+) (*operations.SetAgentShutdownResponse, error) {
 	return w.sdk.Agents.SetAgentShutdown(ctx, id)
 }
 
@@ -155,6 +184,9 @@ type sdkCrackersWrapper struct {
 	sdk *sdk.CipherSwarmAgentSDK
 }
 
-func (w *sdkCrackersWrapper) CheckForCrackerUpdate(ctx context.Context, operatingSystem, version *string) (*operations.CheckForCrackerUpdateResponse, error) {
+func (w *sdkCrackersWrapper) CheckForCrackerUpdate(
+	ctx context.Context,
+	operatingSystem, version *string,
+) (*operations.CheckForCrackerUpdateResponse, error) {
 	return w.sdk.Crackers.CheckForCrackerUpdate(ctx, operatingSystem, version)
 }

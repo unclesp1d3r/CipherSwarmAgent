@@ -36,13 +36,13 @@ func (m *MockClient) Crackers() CrackersClient { return m.CrackersImpl }
 // MockTasksClient is a configurable mock for TasksClient.
 // Set the function fields to control mock behavior.
 type MockTasksClient struct {
-	GetNewTaskFunc      func(ctx context.Context) (*operations.GetNewTaskResponse, error)
-	SetTaskAcceptedFunc func(ctx context.Context, id int64) (*operations.SetTaskAcceptedResponse, error)
+	GetNewTaskFunc       func(ctx context.Context) (*operations.GetNewTaskResponse, error)
+	SetTaskAcceptedFunc  func(ctx context.Context, id int64) (*operations.SetTaskAcceptedResponse, error)
 	SetTaskExhaustedFunc func(ctx context.Context, id int64) (*operations.SetTaskExhaustedResponse, error)
 	SetTaskAbandonedFunc func(ctx context.Context, id int64) (*operations.SetTaskAbandonedResponse, error)
-	SendStatusFunc      func(ctx context.Context, id int64, status components.TaskStatus) (*operations.SendStatusResponse, error)
-	SendCrackFunc       func(ctx context.Context, id int64, result *components.HashcatResult) (*operations.SendCrackResponse, error)
-	GetTaskZapsFunc     func(ctx context.Context, id int64) (*operations.GetTaskZapsResponse, error)
+	SendStatusFunc       func(ctx context.Context, id int64, status components.TaskStatus) (*operations.SendStatusResponse, error)
+	SendCrackFunc        func(ctx context.Context, id int64, result *components.HashcatResult) (*operations.SendCrackResponse, error)
+	GetTaskZapsFunc      func(ctx context.Context, id int64) (*operations.GetTaskZapsResponse, error)
 }
 
 func (m *MockTasksClient) GetNewTask(ctx context.Context) (*operations.GetNewTaskResponse, error) {
@@ -59,28 +59,42 @@ func (m *MockTasksClient) SetTaskAccepted(ctx context.Context, id int64) (*opera
 	return nil, nil
 }
 
-func (m *MockTasksClient) SetTaskExhausted(ctx context.Context, id int64) (*operations.SetTaskExhaustedResponse, error) {
+func (m *MockTasksClient) SetTaskExhausted(
+	ctx context.Context,
+	id int64,
+) (*operations.SetTaskExhaustedResponse, error) {
 	if m.SetTaskExhaustedFunc != nil {
 		return m.SetTaskExhaustedFunc(ctx, id)
 	}
 	return nil, nil
 }
 
-func (m *MockTasksClient) SetTaskAbandoned(ctx context.Context, id int64) (*operations.SetTaskAbandonedResponse, error) {
+func (m *MockTasksClient) SetTaskAbandoned(
+	ctx context.Context,
+	id int64,
+) (*operations.SetTaskAbandonedResponse, error) {
 	if m.SetTaskAbandonedFunc != nil {
 		return m.SetTaskAbandonedFunc(ctx, id)
 	}
 	return nil, nil
 }
 
-func (m *MockTasksClient) SendStatus(ctx context.Context, id int64, status components.TaskStatus) (*operations.SendStatusResponse, error) {
+func (m *MockTasksClient) SendStatus(
+	ctx context.Context,
+	id int64,
+	status components.TaskStatus,
+) (*operations.SendStatusResponse, error) {
 	if m.SendStatusFunc != nil {
 		return m.SendStatusFunc(ctx, id, status)
 	}
 	return nil, nil
 }
 
-func (m *MockTasksClient) SendCrack(ctx context.Context, id int64, result *components.HashcatResult) (*operations.SendCrackResponse, error) {
+func (m *MockTasksClient) SendCrack(
+	ctx context.Context,
+	id int64,
+	result *components.HashcatResult,
+) (*operations.SendCrackResponse, error) {
 	if m.SendCrackFunc != nil {
 		return m.SendCrackFunc(ctx, id, result)
 	}
@@ -130,28 +144,43 @@ func (m *MockAgentsClient) SendHeartbeat(ctx context.Context, id int64) (*operat
 	return nil, nil
 }
 
-func (m *MockAgentsClient) UpdateAgent(ctx context.Context, id int64, body *operations.UpdateAgentRequestBody) (*operations.UpdateAgentResponse, error) {
+func (m *MockAgentsClient) UpdateAgent(
+	ctx context.Context,
+	id int64,
+	body *operations.UpdateAgentRequestBody,
+) (*operations.UpdateAgentResponse, error) {
 	if m.UpdateAgentFunc != nil {
 		return m.UpdateAgentFunc(ctx, id, body)
 	}
 	return nil, nil
 }
 
-func (m *MockAgentsClient) SubmitBenchmark(ctx context.Context, id int64, body operations.SubmitBenchmarkRequestBody) (*operations.SubmitBenchmarkResponse, error) {
+func (m *MockAgentsClient) SubmitBenchmark(
+	ctx context.Context,
+	id int64,
+	body operations.SubmitBenchmarkRequestBody,
+) (*operations.SubmitBenchmarkResponse, error) {
 	if m.SubmitBenchmarkFunc != nil {
 		return m.SubmitBenchmarkFunc(ctx, id, body)
 	}
 	return nil, nil
 }
 
-func (m *MockAgentsClient) SubmitErrorAgent(ctx context.Context, id int64, body *operations.SubmitErrorAgentRequestBody) (*operations.SubmitErrorAgentResponse, error) {
+func (m *MockAgentsClient) SubmitErrorAgent(
+	ctx context.Context,
+	id int64,
+	body *operations.SubmitErrorAgentRequestBody,
+) (*operations.SubmitErrorAgentResponse, error) {
 	if m.SubmitErrorAgentFunc != nil {
 		return m.SubmitErrorAgentFunc(ctx, id, body)
 	}
 	return nil, nil
 }
 
-func (m *MockAgentsClient) SetAgentShutdown(ctx context.Context, id int64) (*operations.SetAgentShutdownResponse, error) {
+func (m *MockAgentsClient) SetAgentShutdown(
+	ctx context.Context,
+	id int64,
+) (*operations.SetAgentShutdownResponse, error) {
 	if m.SetAgentShutdownFunc != nil {
 		return m.SetAgentShutdownFunc(ctx, id)
 	}
@@ -183,7 +212,10 @@ type MockCrackersClient struct {
 	CheckForCrackerUpdateFunc func(ctx context.Context, os, version *string) (*operations.CheckForCrackerUpdateResponse, error)
 }
 
-func (m *MockCrackersClient) CheckForCrackerUpdate(ctx context.Context, os, version *string) (*operations.CheckForCrackerUpdateResponse, error) {
+func (m *MockCrackersClient) CheckForCrackerUpdate(
+	ctx context.Context,
+	os, version *string,
+) (*operations.CheckForCrackerUpdateResponse, error) {
 	if m.CheckForCrackerUpdateFunc != nil {
 		return m.CheckForCrackerUpdateFunc(ctx, os, version)
 	}
