@@ -60,7 +60,7 @@ func TestHandler_Handle_ErrorObject(t *testing.T) {
 	}
 
 	errObj := &sdkerrors.ErrorObject{
-		Error_: func() *string { s := testErrorMessage; return &s }(),
+		Error_: testErrorMessage,
 	}
 
 	opts := Options{
@@ -181,7 +181,7 @@ func TestHandler_Handle_NoSendToServer(t *testing.T) {
 	}
 
 	errObj := &sdkerrors.ErrorObject{
-		Error_: func() *string { s := testErrorMessage; return &s }(),
+		Error_: testErrorMessage,
 	}
 
 	opts := Options{
@@ -205,7 +205,7 @@ func TestHandler_Handle_NilSendError(t *testing.T) {
 	}
 
 	errObj := &sdkerrors.ErrorObject{
-		Error_: func() *string { s := testErrorMessage; return &s }(),
+		Error_: testErrorMessage,
 	}
 
 	opts := Options{
@@ -250,7 +250,7 @@ func TestHandler_HandleWithSeverity(t *testing.T) {
 	}
 
 	errObj := &sdkerrors.ErrorObject{
-		Error_: func() *string { s := testErrorMessage; return &s }(),
+		Error_: testErrorMessage,
 	}
 
 	//nolint:errcheck,gosec // Intentionally ignoring return in test
@@ -375,7 +375,7 @@ func TestHandler_Handle_WithAuthContext(t *testing.T) {
 	}
 
 	errObj := &sdkerrors.ErrorObject{
-		Error_: func() *string { s := testErrorMessage; return &s }(),
+		Error_: testErrorMessage,
 	}
 
 	opts := Options{

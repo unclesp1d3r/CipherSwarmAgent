@@ -570,6 +570,16 @@ func TestHandleTaskError(t *testing.T) {
 			message: "Task error occurred",
 		},
 		{
+			name:    "SetTaskAbandonedResponseBody_with_Error_fallback",
+			err:     testhelpers.NewSetTaskAbandonedErrorWithErrorField("fallback error message"),
+			message: "Task error occurred",
+		},
+		{
+			name:    "SetTaskAbandonedResponseBody_with_nil_Error",
+			err:     testhelpers.NewSetTaskAbandonedErrorWithNilError(),
+			message: "Task error occurred",
+		},
+		{
 			name:    "SDKError",
 			err:     testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
 			message: "Task error occurred",

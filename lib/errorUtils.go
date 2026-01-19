@@ -297,10 +297,15 @@ func handleTaskError(err error, message string) {
 	// Handle SetTaskAbandonedResponseBody specially
 	var e1 *sdkerrors.SetTaskAbandonedResponseBody
 	if stderrors.As(err, &e1) {
+		details := e1.Details
+		// If Details is empty, fall back to Error_ field
+		if len(details) == 0 && e1.Error_ != nil && *e1.Error_ != "" {
+			details = []string{*e1.Error_}
+		}
 		agentstate.Logger.Error(
 			"Notified server of task abandonment, but it could not update the task properly",
-			"error",
-			e1.State,
+			"details",
+			details,
 		)
 		SendAgentError(e1.Error(), nil, operations.SeverityWarning)
 		return
