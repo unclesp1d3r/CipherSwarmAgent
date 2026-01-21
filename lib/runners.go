@@ -108,6 +108,9 @@ func handleCrackedHash(crackedHash hashcat.Result, task *components.Task) {
 
 // handleDoneChan handles the completion of a task, classifying the exit code
 // and taking appropriate action based on the error category.
+// Note: When hashcat completes successfully with exit code 0, proc.Wait() returns nil,
+// so the err != nil block only handles non-zero exit codes. Successful completion
+// (nil error) proceeds directly to cleanup.
 func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 	if err != nil {
 		exitCode := parseExitCode(err.Error())
@@ -118,8 +121,10 @@ func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 			displayJobExhausted()
 			markTaskExhausted(task)
 		case hashcat.IsSuccess(exitCode):
-			// Success case - hash was cracked, nothing special to do
-			agentstate.Logger.Info("Task completed successfully")
+			// Success case - hashcat process exited cleanly
+			// Note: This branch is reached when exit code 0 is returned as an error,
+			// which may happen in some edge cases.
+			agentstate.Logger.Info("Hashcat process completed successfully")
 		default:
 			handleNonExhaustedError(err, task, sess, exitInfo)
 		}
@@ -129,6 +134,9 @@ func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 }
 
 // parseExitCode extracts the exit code from an error message like "exit status N".
+// Returns -1 (general error) for non-standard error formats, including:
+// - Signal-based terminations (e.g., "signal: killed", "signal: terminated")
+// - Any other error format that doesn't match "exit status N".
 func parseExitCode(errMsg string) int {
 	var exitCode int
 
@@ -137,7 +145,8 @@ func parseExitCode(errMsg string) int {
 		return exitCode
 	}
 
-	// Default to -1 (general error) if we can't parse
+	// Default to -1 (general error) for non-standard formats
+	// This includes signal-based terminations like "signal: killed"
 	return -1
 }
 

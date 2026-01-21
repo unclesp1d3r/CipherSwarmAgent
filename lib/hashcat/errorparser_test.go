@@ -240,6 +240,7 @@ func TestErrorCategory_String(t *testing.T) {
 		expected string
 	}{
 		{ErrorCategoryUnknown, "unknown"},
+		{ErrorCategorySuccess, "success"},
 		{ErrorCategoryInfo, "info"},
 		{ErrorCategoryWarning, "warning"},
 		{ErrorCategoryRetryable, "retryable"},
