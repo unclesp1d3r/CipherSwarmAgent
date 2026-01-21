@@ -14,6 +14,8 @@ type ErrorCategory int
 const (
 	// ErrorCategoryUnknown is for unrecognized error patterns.
 	ErrorCategoryUnknown ErrorCategory = iota
+	// ErrorCategorySuccess is for normal completion states (not actual errors).
+	ErrorCategorySuccess
 	// ErrorCategoryInfo is for informational messages (not actual errors).
 	ErrorCategoryInfo
 	// ErrorCategoryWarning is for warnings that don't stop operation.
@@ -37,6 +39,8 @@ func (c ErrorCategory) String() string {
 	switch c {
 	case ErrorCategoryUnknown:
 		return "unknown"
+	case ErrorCategorySuccess:
+		return "success"
 	case ErrorCategoryInfo:
 		return "info"
 	case ErrorCategoryWarning:
@@ -76,6 +80,9 @@ type errorPattern struct {
 
 // Compile all patterns at init time for performance.
 //
+// NOTE: Pattern order matters: more specific patterns must appear before more general ones,
+// because matching is performed in slice order and the first matching pattern is used.
+//
 //nolint:gochecknoglobals // Patterns are intentionally global for performance
 var errorPatterns = []errorPattern{
 	// Hash format errors (non-retryable, critical)
@@ -102,15 +109,17 @@ var errorPatterns = []errorPattern{
 	{regexp.MustCompile(`(?i)Hash-file exception`), ErrorCategoryHashFormat, operations.SeverityCritical, false},
 
 	// Device memory errors (non-retryable, fatal)
+	// Using non-greedy .*? to prevent catastrophic backtracking on long lines
 	{
-		regexp.MustCompile(`Device #\d+:.*(?i)(out of memory|memory allocation|MEMORY)`),
+		regexp.MustCompile(`Device #\d+:.*?(?i)(out of memory|memory allocation|MEMORY)`),
 		ErrorCategoryDevice,
 		operations.SeverityFatal,
 		false,
 	},
 
 	// Device warnings (retryable)
-	{regexp.MustCompile(`Device #\d+:.*WARNING`), ErrorCategoryDevice, operations.SeverityWarning, true},
+	// Using non-greedy .*? to prevent performance issues on long lines
+	{regexp.MustCompile(`Device #\d+:.*?WARNING`), ErrorCategoryDevice, operations.SeverityWarning, true},
 	{regexp.MustCompile(`(?i)hwmon.*temperature`), ErrorCategoryDevice, operations.SeverityWarning, true},
 
 	// File access errors (non-retryable, critical)
