@@ -178,7 +178,12 @@ func ClassifyStderr(line string) ErrorInfo {
 		}
 	}
 
-	// Default: unknown error, minor severity, retryable
+	// Default: unknown message, minor severity, retryable.
+	// Design decision: We use Minor severity for unrecognized stderr because hashcat
+	// often emits informational or progress messages to stderr that aren't actual errors.
+	// The ERROR: prefix check above catches explicit errors with Critical severity.
+	// If a serious unrecognized error occurs, it will likely be accompanied by a
+	// non-zero exit code which is classified separately with appropriate severity.
 	return ErrorInfo{
 		Category:  ErrorCategoryUnknown,
 		Severity:  operations.SeverityMinor,

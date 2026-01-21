@@ -42,6 +42,14 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 
 				if err := sess.Kill(); err != nil {
 					agentstate.Logger.Error("Failed to kill session on timeout", "error", err)
+					// Report kill failure with higher severity - session may still be running
+					SendAgentError(
+						"Task timed out; failed to kill session: "+err.Error(),
+						task,
+						operations.SeverityFatal,
+					)
+
+					return
 				}
 
 				SendAgentError("Task timed out", task, operations.SeverityWarning)
@@ -74,6 +82,14 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 		err := json.Unmarshal([]byte(stdoutLine), &update)
 		if err != nil {
 			agentstate.Logger.Error("Failed to parse status update", "error", err)
+			// Notify server of parse failure so it has visibility into agent issues
+			SendClassifiedError(
+				"Failed to parse hashcat status update: "+err.Error(),
+				task,
+				operations.SeverityWarning,
+				"parse_error",
+				true, // Retryable - this is likely a transient or version mismatch issue
+			)
 		} else {
 			displayJobStatus(update)
 			sendStatusUpdate(update, task, sess)
@@ -153,14 +169,14 @@ func parseExitCode(errMsg string) int {
 // handleNonExhaustedError handles errors which are not related to exhaustion
 // by performing specific actions based on the error category and message.
 func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session, exitInfo hashcat.ExitCodeInfo) {
-	// Handle restore file issues specially
-	if strings.Contains(err.Error(), "Cannot read "+sess.RestoreFilePath) {
-		if strings.TrimSpace(sess.RestoreFilePath) != "" {
-			agentstate.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
+	// Handle restore file issues specially.
+	// Check path is non-empty first to avoid matching unrelated "Cannot read " errors.
+	if strings.TrimSpace(sess.RestoreFilePath) != "" &&
+		strings.Contains(err.Error(), "Cannot read "+sess.RestoreFilePath) {
+		agentstate.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
 
-			if removeErr := os.Remove(sess.RestoreFilePath); removeErr != nil {
-				agentstate.Logger.Error("Failed to remove restore file", "error", removeErr)
-			}
+		if removeErr := os.Remove(sess.RestoreFilePath); removeErr != nil {
+			agentstate.Logger.Error("Failed to remove restore file", "error", removeErr)
 		}
 
 		// Report the restore-file failure before returning so the server is aware
