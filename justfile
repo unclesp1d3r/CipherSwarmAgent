@@ -10,14 +10,7 @@ mise_exec := "mise exec --"
 
 # Serve documentation locally
 @docs:
-    #!/usr/bin/env sh
-    if [ -f ".venv/Scripts/mkdocs.exe" ]; then
-        .venv/Scripts/mkdocs.exe serve
-    elif [ -f ".venv/Scripts/mkdocs" ]; then
-        .venv/Scripts/mkdocs serve
-    else
-        .venv/bin/mkdocs serve
-    fi
+    {{mise_exec}} pipx run --spec mkdocs-material mkdocs serve
 
 # Run the agent (development)
 dev:
@@ -25,16 +18,9 @@ dev:
 
 # Install all requirements and build the project
 install:
-    #!/usr/bin/env sh
     cd {{justfile_dir()}}
-    python -m venv .venv
-    if [ -f ".venv/Scripts/python.exe" ]; then
-        .venv/Scripts/python.exe -m pip install mkdocs-material
-    elif [ -f ".venv/Scripts/python" ]; then
-        .venv/Scripts/python -m pip install mkdocs-material
-    else
-        .venv/bin/python -m pip install mkdocs-material
-    fi
+    {{mise_exec}} pipx install mkdocs --force
+    {{mise_exec}} pipx inject mkdocs mkdocs-material
     {{mise_exec}} pre-commit install --hook-type commit-msg
     {{mise_exec}} go mod tidy
 
@@ -62,25 +48,8 @@ test-coverage:
 # Generate and open HTML coverage report (macOS/Linux)
 # Note: For Windows, use `just test-coverage-html-win` instead
 test-coverage-html: test-coverage
-    #!/usr/bin/env sh
     {{mise_exec}} go tool cover -html=coverage.out -o coverage.html
-    case $(uname -s) in
-        Darwin)
-            open coverage.html
-            ;;
-        Linux)
-            xdg-open coverage.html
-            ;;
-        *)
-            echo "Coverage report generated at: coverage.html"
-            ;;
-    esac
 
-# Generate and open HTML coverage report (Windows PowerShell)
-# Note: This recipe uses PowerShell native commands and works when Just runs under pwsh.exe
-test-coverage-html-win: test-coverage
-    {{mise_exec}} go tool cover -html=coverage.out -o coverage.html
-    Start-Process coverage.html
 
 # Display function-level coverage in terminal
 test-coverage-func: test-coverage
