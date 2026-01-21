@@ -5,20 +5,23 @@ import (
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 )
 
-// Hashcat exit codes as documented in hashcat documentation.
+// Hashcat exit codes.
+// Codes 0-4 and -1 are documented in hashcat source (types.h).
+// Negative codes -2 through -7 are observed from specific failure modes
+// and may vary by hashcat version; they are not officially documented.
 const (
-	ExitCodeSuccess        = 0  // Success/Cracked
-	ExitCodeExhausted      = 1  // Exhausted
-	ExitCodeAborted        = 2  // Aborted
-	ExitCodeCheckpoint     = 3  // Aborted by checkpoint
-	ExitCodeRuntimeLimit   = 4  // Aborted by runtime limit
-	ExitCodeGeneralError   = -1 // General error
-	ExitCodeGPUWatchdog    = -2 // GPU watchdog alarm
-	ExitCodeBackendAbort   = -3 // Backend abort
-	ExitCodeBackendChkpt   = -4 // Backend checkpoint abort
-	ExitCodeBackendRuntime = -5 // Backend runtime abort
-	ExitCodeSelftestFail   = -6 // Backend selftest fail
-	ExitCodeAutotuneFail   = -7 // Backend autotune fail
+	ExitCodeSuccess        = 0  // Success/Cracked (official: RC_FINAL_OK)
+	ExitCodeExhausted      = 1  // Exhausted (official: RC_FINAL_EXHAUSTED)
+	ExitCodeAborted        = 2  // Aborted (official: RC_FINAL_ABORT)
+	ExitCodeCheckpoint     = 3  // Aborted by checkpoint (official: RC_FINAL_ABORT_CHECKPOINT)
+	ExitCodeRuntimeLimit   = 4  // Aborted by runtime limit (official: RC_FINAL_ABORT_RUNTIME)
+	ExitCodeGeneralError   = -1 // General error (official: RC_FINAL_ERROR)
+	ExitCodeGPUWatchdog    = -2 // GPU watchdog alarm (observed, not official)
+	ExitCodeBackendAbort   = -3 // Backend abort (observed, not official)
+	ExitCodeBackendChkpt   = -4 // Backend checkpoint abort (observed, not official)
+	ExitCodeBackendRuntime = -5 // Backend runtime abort (observed, not official)
+	ExitCodeSelftestFail   = -6 // Backend selftest fail (observed, not official)
+	ExitCodeAutotuneFail   = -7 // Backend autotune fail (observed, not official)
 )
 
 // ExitCodeInfo contains information about a hashcat exit code.
