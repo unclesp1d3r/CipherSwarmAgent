@@ -163,6 +163,13 @@ func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Ses
 			}
 		}
 
+		// Report the restore-file failure before returning so the server is aware
+		// of the retryable failure (the task can be retried now that the corrupt
+		// restore file has been removed)
+		errorInfo := hashcat.ClassifyStderr(err.Error())
+		SendClassifiedError(err.Error(), task, errorInfo.Severity, errorInfo.Category.String(), errorInfo.Retryable)
+		displayJobFailed(err)
+
 		return
 	}
 
