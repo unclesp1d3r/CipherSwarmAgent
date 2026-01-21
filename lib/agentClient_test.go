@@ -449,7 +449,10 @@ func TestSendHeartBeat(t *testing.T) {
 
 			tt.setupMock(123)
 
-			state := SendHeartBeat()
+			state, err := SendHeartBeat()
+
+			// For now we don't check error in existing tests as they don't expect errors
+			_ = err
 
 			if tt.expectedState == nil {
 				assert.Nil(t, state)

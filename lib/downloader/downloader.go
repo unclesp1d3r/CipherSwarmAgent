@@ -11,11 +11,13 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"time"
 
 	"github.com/duke-git/lancet/v2/cryptor"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/hashicorp/go-getter"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
@@ -88,7 +90,8 @@ func FileExistsAndValid(filePath, checksum string) bool {
 
 // downloadAndVerifyFile downloads a file from the given URL and saves it to the specified path, verifying the checksum if provided.
 // If a checksum is given, it is appended to the URL before download. The function then configures a client for secure file transfer.
-// The file is downloaded using the configured client. After downloading, the file's checksum is verified, if provided, to ensure integrity.
+// The file is downloaded using the configured client with retry logic for transient failures.
+// After downloading, the file's checksum is verified, if provided, to ensure integrity.
 // If the checksum does not match, an error is returned, indicating the downloaded file is corrupt.
 func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 	if strutil.IsNotBlank(checksum) {
@@ -105,7 +108,7 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 		Dst:      filePath,
 		Src:      fileURL,
 		Pwd:      agentstate.State.CrackersPath,
-		Insecure: true,
+		Insecure: viper.GetBool("insecure_downloads"),
 		Mode:     getter.ClientModeFile,
 	}
 
@@ -114,9 +117,10 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 		getter.WithUmask(os.FileMode(defaultUmask)),
 	)
 
-	if err := client.Get(); err != nil {
-		agentstate.Logger.Debug("Error downloading file", "error", err)
+	maxRetries := viper.GetInt("download_max_retries")
+	baseDelay := viper.GetDuration("download_retry_delay")
 
+	if err := downloadWithRetry(client, maxRetries, baseDelay); err != nil {
 		return err
 	}
 
@@ -125,6 +129,34 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 	}
 
 	return nil
+}
+
+// downloadWithRetry attempts to download a file with exponential backoff retry logic.
+// It retries up to maxRetries times, with delays doubling after each failed attempt.
+func downloadWithRetry(client *getter.Client, maxRetries int, baseDelay time.Duration) error {
+	var lastErr error
+
+	for attempt := range maxRetries {
+		if attempt > 0 {
+			// Exponential backoff: baseDelay * 2^(attempt-1)
+			delay := baseDelay * time.Duration(1<<(attempt-1))
+			agentstate.Logger.Debug("Retrying download", "attempt", attempt+1, "delay", delay)
+			time.Sleep(delay)
+		}
+
+		if err := client.Get(); err != nil {
+			lastErr = err
+			agentstate.Logger.Warn("Download attempt failed", "attempt", attempt+1, "error", err)
+
+			continue
+		}
+
+		return nil
+	}
+
+	agentstate.Logger.Debug("All download attempts failed", "error", lastErr)
+
+	return lastErr
 }
 
 // appendChecksumToURL appends a checksum to the URL query string.

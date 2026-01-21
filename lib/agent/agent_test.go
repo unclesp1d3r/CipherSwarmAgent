@@ -190,14 +190,16 @@ func TestExtraDebuggingFlag(t *testing.T) {
 	signChan := make(chan os.Signal, 1)
 
 	agentstate.State.ExtraDebugging = true
-	heartbeat(signChan)
+	err := heartbeat(signChan)
+	require.NoError(t, err)
 	logOutput := buf.String()
 	assert.Contains(t, logOutput, "Sending heartbeat")
 	assert.Contains(t, logOutput, "Heartbeat sent")
 
 	buf.Reset()
 	agentstate.State.ExtraDebugging = false
-	heartbeat(signChan)
+	err = heartbeat(signChan)
+	require.NoError(t, err)
 	logOutput = buf.String()
 	assert.NotContains(t, logOutput, "Sending heartbeat")
 	assert.NotContains(t, logOutput, "Heartbeat sent")

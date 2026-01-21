@@ -243,28 +243,28 @@ func downloadResourceFile(resource *components.AttackResourceFile) error {
 
 // SendHeartBeat sends a heartbeat signal to the server and processes the server's response.
 // It handles different response status codes and logs relevant messages.
-// It returns the agent's state object or nil if an error occurs or if the response status is http.StatusNoContent.
-func SendHeartBeat() *operations.State {
+// It returns the agent's state object (or nil for no state change) and an error if the heartbeat failed.
+func SendHeartBeat() (*operations.State, error) {
 	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(context.Background(), agentstate.State.AgentID)
 	if err != nil {
 		handleHeartbeatError(err)
 
-		return nil
+		return nil, err
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
 		logHeartbeatSent()
 
-		return nil
+		return nil, nil //nolint:nilnil // nil state with nil error means successful heartbeat with no state change
 	}
 
 	if resp.StatusCode == http.StatusOK {
 		logHeartbeatSent()
 
-		return handleStateResponse(resp.GetObject())
+		return handleStateResponse(resp.GetObject()), nil
 	}
 
-	return nil
+	return nil, nil //nolint:nilnil // nil state with nil error means successful heartbeat with no state change
 }
 
 // logHeartbeatSent logs a debug message indicating a heartbeat was sent if extra debugging is enabled.
