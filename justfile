@@ -18,12 +18,12 @@ dev:
 
 # Install all requirements and build the project
 install:
-    cd {{justfile_dir()}}
-    {{mise_exec}} pipx install mkdocs --force
-    {{mise_exec}} pipx inject mkdocs mkdocs-material
     {{mise_exec}} pre-commit install --hook-type commit-msg
     {{mise_exec}} go mod tidy
 
+install-docs:
+    {{mise_exec}} pipx install mkdocs --force
+    {{mise_exec}} pipx inject mkdocs mkdocs-material
 
 # Run pre-commit hooks and linting
 check: lint
