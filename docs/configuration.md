@@ -73,6 +73,13 @@ zap_path: /opt/cipherswarm/data/zaps
 retain_zaps_on_completion: false
 enable_additional_hash_types: true
 use_legacy_device_technique: false
+
+# Fault tolerance settings
+task_timeout: 24h
+download_max_retries: 3
+download_retry_delay: 2s
+insecure_downloads: false
+max_heartbeat_backoff: 6
 ```
 
 You can specify a custom config file location:
@@ -198,6 +205,49 @@ You can specify a custom config file location:
 - **Default**: `false`
 - **Description**: Keep ZAP files after task completion instead of deleting them
 
+### Fault Tolerance Settings
+
+These settings control retry behavior, timeouts, and circuit breakers for improved resilience.
+
+#### `task_timeout` / `TASK_TIMEOUT`
+
+- **Flag**: `--task_timeout`
+- **Type**: Duration
+- **Default**: `24h`
+- **Description**: Maximum time allowed for a single task before it's forcefully terminated. Long-running tasks are expected, so this is set high by default.
+- **Examples**: `12h`, `48h`, `6h30m`
+
+#### `download_max_retries` / `DOWNLOAD_MAX_RETRIES`
+
+- **Flag**: `--download_max_retries`
+- **Type**: Integer
+- **Default**: `3`
+- **Description**: Maximum number of retry attempts for file downloads (wordlists, rules, etc.) when transient errors occur.
+- **Range**: 1-10
+
+#### `download_retry_delay` / `DOWNLOAD_RETRY_DELAY`
+
+- **Flag**: `--download_retry_delay`
+- **Type**: Duration
+- **Default**: `2s`
+- **Description**: Base delay between download retry attempts. Uses exponential backoff (2s, 4s, 8s, etc.).
+- **Examples**: `1s`, `5s`, `500ms`
+
+#### `insecure_downloads` / `INSECURE_DOWNLOADS`
+
+- **Flag**: `--insecure_downloads`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Skip TLS certificate verification for file downloads. **Warning**: Only use in trusted networks or development environments.
+
+#### `max_heartbeat_backoff` / `MAX_HEARTBEAT_BACKOFF`
+
+- **Flag**: `--max_heartbeat_backoff`
+- **Type**: Integer
+- **Default**: `6`
+- **Description**: Maximum multiplier for heartbeat backoff on consecutive failures. With default value of 6, the backoff caps at 64x the normal interval (2^6). The agent uses exponential backoff when heartbeats fail, automatically recovering when connectivity is restored.
+- **Range**: 1-10
+
 ### Advanced Settings
 
 #### `enable_additional_hash_types` / `ENABLE_ADDITIONAL_HASH_TYPES`
@@ -245,6 +295,12 @@ always_use_native_hashcat: true
 write_zaps_to_file: true
 zap_path: /mnt/shared/zaps
 retain_zaps_on_completion: true
+
+# Robust fault tolerance for production
+task_timeout: 48h  # Allow longer tasks
+download_max_retries: 5  # More retries for network issues
+download_retry_delay: 5s  # Longer delay between retries
+max_heartbeat_backoff: 8  # Allow more backoff during network issues
 ```
 
 ### Development/Debug Setup
@@ -272,6 +328,11 @@ environment:
   - GPU_TEMP_THRESHOLD=80
   - ALWAYS_USE_NATIVE_HASHCAT=true
   - EXTRA_DEBUGGING=false
+  # Fault tolerance settings
+  - TASK_TIMEOUT=24h
+  - DOWNLOAD_MAX_RETRIES=3
+  - DOWNLOAD_RETRY_DELAY=2s
+  - MAX_HEARTBEAT_BACKOFF=6
 ```
 
 ## Configuration Validation

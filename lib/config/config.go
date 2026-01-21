@@ -14,10 +14,15 @@ import (
 
 const (
 	// Default configuration values.
-	defaultGPUTempThreshold  = 80               // Default GPU temperature threshold in Celsius
-	defaultSleepOnFailure    = 60 * time.Second // Default sleep duration after task failure
-	defaultStatusTimer       = 10               // Default status update interval in seconds (10 seconds)
-	defaultHeartbeatInterval = 10 * time.Second // Default heartbeat interval (10 seconds)
+	defaultGPUTempThreshold    = 80               // Default GPU temperature threshold in Celsius
+	defaultSleepOnFailure      = 60 * time.Second // Default sleep duration after task failure
+	defaultStatusTimer         = 10               // Default status update interval in seconds (10 seconds)
+	defaultHeartbeatInterval   = 10 * time.Second // Default heartbeat interval (10 seconds)
+	defaultTaskTimeout         = 24 * time.Hour   // Default task timeout (long-running tasks are expected)
+	defaultDownloadMaxRetries  = 3                // Default max download retry attempts
+	defaultDownloadRetryDelay  = 2 * time.Second  // Default base delay between download retries
+	defaultInsecureDownloads   = false            // Default to secure TLS verification for downloads
+	defaultMaxHeartbeatBackoff = 6                // Default max heartbeat backoff multiplier (caps at 64x)
 )
 
 var scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // Configuration scope
@@ -154,4 +159,9 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("retain_zaps_on_completion", false)
 	viper.SetDefault("enable_additional_hash_types", true)
 	viper.SetDefault("use_legacy_device_technique", false)
+	viper.SetDefault("task_timeout", defaultTaskTimeout)
+	viper.SetDefault("download_max_retries", defaultDownloadMaxRetries)
+	viper.SetDefault("download_retry_delay", defaultDownloadRetryDelay)
+	viper.SetDefault("insecure_downloads", defaultInsecureDownloads)
+	viper.SetDefault("max_heartbeat_backoff", defaultMaxHeartbeatBackoff)
 }

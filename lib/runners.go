@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -13,6 +15,7 @@ import (
 
 // runAttackTask starts the attack session and handles real-time outputs and status updates.
 // It processes stdout, stderr, status updates, cracked hashes, and handles session completion.
+// A configurable timeout (task_timeout) prevents indefinite blocking if hashcat hangs.
 func runAttackTask(sess *hashcat.Session, task *components.Task) {
 	err := sess.Start()
 	if err != nil {
@@ -22,6 +25,10 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 		return
 	}
 
+	// Create timeout channel with configurable duration
+	taskTimeout := viper.GetDuration("task_timeout")
+	timeoutChan := time.After(taskTimeout)
+
 	waitChan := make(chan int)
 
 	go func() {
@@ -29,6 +36,16 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 
 		for {
 			select {
+			case <-timeoutChan:
+				agentstate.Logger.Warn("Task timeout reached, killing session", "timeout", taskTimeout)
+
+				if err := sess.Kill(); err != nil {
+					agentstate.Logger.Error("Failed to kill session on timeout", "error", err)
+				}
+
+				SendAgentError("Task timed out", task, operations.SeverityWarning)
+
+				return
 			case stdoutLine := <-sess.StdoutLines:
 				handleStdOutLine(stdoutLine, task, sess)
 			case stdErrLine := <-sess.StderrMessages:
