@@ -134,6 +134,11 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 // downloadWithRetry attempts to download a file with exponential backoff retry logic.
 // It retries up to maxRetries times, with delays doubling after each failed attempt.
 func downloadWithRetry(client *getter.Client, maxRetries int, baseDelay time.Duration) error {
+	// Ensure at least one download attempt is made
+	if maxRetries < 1 {
+		maxRetries = 1
+	}
+
 	var lastErr error
 
 	for attempt := range maxRetries {
@@ -154,7 +159,7 @@ func downloadWithRetry(client *getter.Client, maxRetries int, baseDelay time.Dur
 		return nil
 	}
 
-	agentstate.Logger.Debug("All download attempts failed", "error", lastErr)
+	agentstate.Logger.Error("All download attempts failed", "attempts", maxRetries, "error", lastErr)
 
 	return lastErr
 }
