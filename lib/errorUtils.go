@@ -266,6 +266,47 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 	}
 }
 
+// SendClassifiedError sends a classified error message to the server with enhanced metadata.
+// It includes the error category and retryable flag for better error handling on the server side.
+func SendClassifiedError(
+	message string,
+	task *components.Task,
+	severity operations.Severity,
+	category string,
+	retryable bool,
+) {
+	var taskID *int64
+	if task != nil {
+		taskID = &task.ID
+	}
+
+	metadata := &operations.Metadata{
+		ErrorDate: time.Now(),
+		Other: map[string]any{
+			"platform":  agentPlatform,
+			"version":   AgentVersion,
+			"category":  category,
+			"retryable": retryable,
+		},
+	}
+
+	agentError := &operations.SubmitErrorAgentRequestBody{
+		Message:  message,
+		Metadata: metadata,
+		Severity: severity,
+		AgentID:  agentstate.State.AgentID,
+		TaskID:   taskID,
+	}
+
+	if _, err := agentstate.State.APIClient.Agents().SubmitErrorAgent(
+		context.Background(),
+		agentstate.State.AgentID,
+		agentError,
+	); err != nil {
+		handleSendError(err)
+	}
+}
+
 // handleSendError handles errors that occur during communication with the server.
 // It logs the error locally but does not attempt to send errors to the server again
 // to prevent infinite recursion if the error sending itself fails.

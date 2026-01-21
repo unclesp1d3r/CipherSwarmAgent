@@ -2,6 +2,7 @@ package lib
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -80,12 +81,15 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 	}
 }
 
-// handleStdErrLine handles a single line of standard error output by displaying and sending the error to the server.
+// handleStdErrLine handles a single line of standard error output by classifying it
+// and sending it to the server with the appropriate severity level.
 func handleStdErrLine(stdErrLine string, task *components.Task) {
 	displayJobError(stdErrLine)
 
 	if strings.TrimSpace(stdErrLine) != "" {
-		SendAgentError(stdErrLine, task, operations.SeverityMinor)
+		// Classify the stderr line to determine appropriate severity
+		errorInfo := hashcat.ClassifyStderr(stdErrLine)
+		SendClassifiedError(stdErrLine, task, errorInfo.Severity, errorInfo.Category.String(), errorInfo.Retryable)
 	}
 }
 
@@ -102,33 +106,64 @@ func handleCrackedHash(crackedHash hashcat.Result, task *components.Task) {
 	sendCrackedHash(crackedHash.Timestamp, crackedHash.Hash, crackedHash.Plaintext, task)
 }
 
-// handleDoneChan handles the completion of a task, marking it exhausted on specific error, handling other errors, and cleaning up the session.
+// handleDoneChan handles the completion of a task, classifying the exit code
+// and taking appropriate action based on the error category.
 func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
 	if err != nil {
-		if err.Error() == "exit status 1" {
+		exitCode := parseExitCode(err.Error())
+		exitInfo := hashcat.ClassifyExitCode(exitCode)
+
+		switch {
+		case hashcat.IsExhausted(exitCode):
 			displayJobExhausted()
 			markTaskExhausted(task)
-		} else {
-			handleNonExhaustedError(err, task, sess)
+		case hashcat.IsSuccess(exitCode):
+			// Success case - hash was cracked, nothing special to do
+			agentstate.Logger.Info("Task completed successfully")
+		default:
+			handleNonExhaustedError(err, task, sess, exitInfo)
 		}
 	}
 
 	sess.Cleanup()
 }
 
-// handleNonExhaustedError handles errors which are not related to exhaustion by performing specific actions based on the error message.
-func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session) {
+// parseExitCode extracts the exit code from an error message like "exit status N".
+func parseExitCode(errMsg string) int {
+	var exitCode int
+
+	// Try to parse "exit status N" format
+	if _, err := fmt.Sscanf(errMsg, "exit status %d", &exitCode); err == nil {
+		return exitCode
+	}
+
+	// Default to -1 (general error) if we can't parse
+	return -1
+}
+
+// handleNonExhaustedError handles errors which are not related to exhaustion
+// by performing specific actions based on the error category and message.
+func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session, exitInfo hashcat.ExitCodeInfo) {
+	// Handle restore file issues specially
 	if strings.Contains(err.Error(), "Cannot read "+sess.RestoreFilePath) {
 		if strings.TrimSpace(sess.RestoreFilePath) != "" {
 			agentstate.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
 
-			err := os.Remove(sess.RestoreFilePath)
-			if err != nil {
-				agentstate.Logger.Error("Failed to remove restore file", "error", err)
+			if removeErr := os.Remove(sess.RestoreFilePath); removeErr != nil {
+				agentstate.Logger.Error("Failed to remove restore file", "error", removeErr)
 			}
 		}
-	} else {
-		SendAgentError(err.Error(), task, operations.SeverityCritical)
-		displayJobFailed(err)
+
+		return
 	}
+
+	// Send error with classified severity and metadata
+	SendClassifiedError(
+		err.Error(),
+		task,
+		exitInfo.Severity,
+		exitInfo.Category.String(),
+		exitInfo.Retryable,
+	)
+	displayJobFailed(err)
 }
