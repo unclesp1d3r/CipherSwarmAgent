@@ -1,0 +1,6 @@
+{
+  "go.goroot": "${workspaceFolder}/.vscode/mise-tools/goRoot",
+  "go.alternateTools": {
+    "go": "${workspaceFolder}/.vscode/mise-tools/go"
+  }
+}
