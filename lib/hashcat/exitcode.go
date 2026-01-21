@@ -35,7 +35,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	switch exitCode {
 	case ExitCodeSuccess:
 		return ExitCodeInfo{
-			Category:  ErrorCategoryUnknown,
+			Category:  ErrorCategorySuccess,
 			Severity:  operations.SeverityInfo,
 			Retryable: false,
 			Status:    "cracked",
@@ -43,7 +43,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 		}
 	case ExitCodeExhausted:
 		return ExitCodeInfo{
-			Category:  ErrorCategoryUnknown,
+			Category:  ErrorCategorySuccess,
 			Severity:  operations.SeverityInfo,
 			Retryable: false,
 			Status:    "exhausted",

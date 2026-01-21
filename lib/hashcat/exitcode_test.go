@@ -19,7 +19,7 @@ func TestClassifyExitCode_SuccessAndExhausted(t *testing.T) {
 		{
 			name:             "exit code 0 - success/cracked",
 			exitCode:         0,
-			expectedCategory: ErrorCategoryUnknown,
+			expectedCategory: ErrorCategorySuccess,
 			expectedSeverity: operations.SeverityInfo,
 			expectedRetry:    false,
 			expectedStatus:   "cracked",
@@ -27,7 +27,7 @@ func TestClassifyExitCode_SuccessAndExhausted(t *testing.T) {
 		{
 			name:             "exit code 1 - exhausted",
 			exitCode:         1,
-			expectedCategory: ErrorCategoryUnknown,
+			expectedCategory: ErrorCategorySuccess,
 			expectedSeverity: operations.SeverityInfo,
 			expectedRetry:    false,
 			expectedStatus:   "exhausted",
