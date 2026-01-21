@@ -95,16 +95,14 @@ func createBenchmark(result benchmarkResult) (components.HashcatBenchmark, error
 func UpdateBenchmarks() error {
 	agentstate.State.BenchmarksSubmitted = false
 
-	// FOR TESTING: Only benchmark MD5 (hash type 0) instead of all hash types
 	additionalArgs := arch.GetAdditionalHashcatArgs()
-	additionalArgs = append(additionalArgs, "-m", "0") // Add MD5 hash type for testing
 
 	jobParams := hashcat.Params{
 		AttackMode:                hashcat.AttackBenchmark,
 		AdditionalArgs:            additionalArgs,
 		BackendDevices:            Configuration.Config.BackendDevices,
 		OpenCLDevices:             Configuration.Config.OpenCLDevices,
-		EnableAdditionalHashTypes: false, // Disable --benchmark-all for testing
+		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
 	}
 
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)

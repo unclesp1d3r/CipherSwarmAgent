@@ -119,12 +119,38 @@ func cleanupLockFile(pidFile string) {
 	}
 }
 
+// startHeartbeatLoop runs the heartbeat loop with circuit breaker pattern.
+// On consecutive failures, it backs off exponentially up to a maximum multiplier.
 func startHeartbeatLoop(signChan chan os.Signal) {
+	consecutiveFailures := 0
+	maxBackoffMultiplier := viper.GetInt("max_heartbeat_backoff")
+
 	for {
-		heartbeat(signChan)
-		// Use the same interval as the agent update interval from server configuration
-		sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
-		time.Sleep(sleepTime)
+		err := heartbeat(signChan)
+		baseInterval := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
+
+		if err != nil {
+			consecutiveFailures++
+			// Cap the multiplier to prevent overflow
+			multiplier := consecutiveFailures
+			if multiplier > maxBackoffMultiplier {
+				multiplier = maxBackoffMultiplier
+			}
+			// Exponential backoff: baseInterval * 2^multiplier
+			backoff := baseInterval * time.Duration(1<<multiplier)
+			agentstate.Logger.Warn("Heartbeat failed, backing off",
+				"failures", consecutiveFailures, "next_retry", backoff)
+			time.Sleep(backoff)
+
+			continue
+		}
+
+		if consecutiveFailures > 0 {
+			agentstate.Logger.Info("Heartbeat recovered after failures", "failures", consecutiveFailures)
+		}
+
+		consecutiveFailures = 0
+		time.Sleep(baseInterval)
 	}
 }
 
@@ -242,42 +268,53 @@ func processTask(task *components.Task) error {
 	return nil
 }
 
-func heartbeat(signChan chan os.Signal) {
+// heartbeat sends a heartbeat to the server and processes the response.
+// It returns an error if the heartbeat failed.
+func heartbeat(signChan chan os.Signal) error {
 	if agentstate.State.ExtraDebugging {
 		agentstate.Logger.Debug("Sending heartbeat")
 	}
 
-	state := lib.SendHeartBeat()
-	if state != nil {
-		if agentstate.State.ExtraDebugging {
-			agentstate.Logger.Debug("Received heartbeat response", "state", state)
-		}
-
-		switch *state {
-		case operations.StatePending:
-			if agentstate.State.CurrentActivity != agentstate.CurrentActivityBenchmarking {
-				agentstate.Logger.Info("Agent is pending, performing reload")
-				agentstate.State.Reload = true
-			}
-		case operations.StateStopped:
-			if agentstate.State.CurrentActivity != agentstate.CurrentActivityCracking {
-				agentstate.State.CurrentActivity = agentstate.CurrentActivityStopping
-				agentstate.Logger.Debug("Agent is stopped, stopping processing")
-
-				if !agentstate.State.JobCheckingStopped {
-					agentstate.Logger.Warn(
-						"Job checking stopped, per server directive. Waiting for further instructions.",
-					)
-				}
-
-				agentstate.State.JobCheckingStopped = true
-			}
-		case operations.StateError:
-			agentstate.Logger.Info("Agent is in error state, stopping processing")
-
-			signChan <- syscall.SIGTERM
-		}
+	state, err := lib.SendHeartBeat()
+	if err != nil {
+		return err
 	}
+
+	if state == nil {
+		// No state change needed (HTTP 204 or similar)
+		return nil
+	}
+
+	if agentstate.State.ExtraDebugging {
+		agentstate.Logger.Debug("Received heartbeat response", "state", state)
+	}
+
+	switch *state {
+	case operations.StatePending:
+		if agentstate.State.CurrentActivity != agentstate.CurrentActivityBenchmarking {
+			agentstate.Logger.Info("Agent is pending, performing reload")
+			agentstate.State.Reload = true
+		}
+	case operations.StateStopped:
+		if agentstate.State.CurrentActivity != agentstate.CurrentActivityCracking {
+			agentstate.State.CurrentActivity = agentstate.CurrentActivityStopping
+			agentstate.Logger.Debug("Agent is stopped, stopping processing")
+
+			if !agentstate.State.JobCheckingStopped {
+				agentstate.Logger.Warn(
+					"Job checking stopped, per server directive. Waiting for further instructions.",
+				)
+			}
+
+			agentstate.State.JobCheckingStopped = true
+		}
+	case operations.StateError:
+		agentstate.Logger.Info("Agent is in error state, stopping processing")
+
+		signChan <- syscall.SIGTERM
+	}
+
+	return nil
 }
 
 func fetchAgentConfig() error {

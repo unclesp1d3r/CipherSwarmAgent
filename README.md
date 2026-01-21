@@ -96,6 +96,14 @@ Optional configuration options for using the ZAP feature with a shared directory
 - `RETAIN_ZAPS_ON_COMPLETION`: If set to true, the agent will retain the zap files after completing a task. Otherwise,
   the zap path contents are deleted upon completion of each task. By default, this is set to false.
 
+Optional fault tolerance configuration options:
+
+- `TASK_TIMEOUT`: Maximum time for a single task before timeout (default: `24h`). Long-running tasks are expected.
+- `DOWNLOAD_MAX_RETRIES`: Maximum number of download retry attempts (default: `3`).
+- `DOWNLOAD_RETRY_DELAY`: Base delay between download retries with exponential backoff (default: `2s`).
+- `INSECURE_DOWNLOADS`: Skip TLS certificate verification for downloads (default: `false`). Use with caution.
+- `MAX_HEARTBEAT_BACKOFF`: Maximum heartbeat backoff multiplier on consecutive failures (default: `6`).
+
 The agent will automatically create a configuration file in the same directory as the agent (`cipherswarmagent.yaml`)
 with the provided configuration options and default options that can be modified.
 
@@ -115,6 +123,11 @@ The agent can also be configured using command line flags. The following flags a
 - `--write_zaps_to_file` or `-w`: Write zap output to a file in the zaps directory.
 - `--zap_path` or `-z`: The path to the directory where the agent will store zap output files.
 - `--retain_zaps_on_completion` or `-r`: Retain zap files after completing a task.
+- `--task_timeout`: Maximum time for a single task before timeout (default: `24h`).
+- `--download_max_retries`: Maximum number of download retry attempts (default: `3`).
+- `--download_retry_delay`: Base delay between download retries (default: `2s`).
+- `--insecure_downloads`: Skip TLS certificate verification for downloads.
+- `--max_heartbeat_backoff`: Maximum heartbeat backoff multiplier (default: `6`).
 - `--help` or `-h`: Show help information.
 - `--version` or `-v`: Show the version of the agent.
 
