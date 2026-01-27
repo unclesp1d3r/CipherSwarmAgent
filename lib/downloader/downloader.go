@@ -119,10 +119,13 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 		Mode:     getter.ClientModeFile,
 	}
 
-	_ = client.Configure( //nolint:errcheck // Client configuration errors are not critical
+	if err := client.Configure(
 		getter.WithProgress(progress.DefaultProgressBar),
 		getter.WithUmask(os.FileMode(defaultUmask)),
-	)
+	); err != nil {
+		agentstate.Logger.Warn("Download client configuration failed, proceeding with defaults",
+			"error", err)
+	}
 
 	maxRetries := viper.GetInt("download_max_retries")
 	baseDelay := viper.GetDuration("download_retry_delay")
@@ -143,6 +146,8 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 func downloadWithRetry(client Getter, maxRetries int, baseDelay time.Duration) error {
 	// Ensure at least one download attempt is made
 	if maxRetries < 1 {
+		agentstate.Logger.Debug("maxRetries value < 1, defaulting to 1 attempt",
+			"configured_value", maxRetries)
 		maxRetries = 1
 	}
 
