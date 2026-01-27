@@ -126,6 +126,13 @@ func calculateHeartbeatBackoff(
 	baseInterval time.Duration,
 	consecutiveFailures, maxBackoffMultiplier int,
 ) time.Duration {
+	// Guard against negative values to prevent bit shift panic
+	if maxBackoffMultiplier < 0 {
+		maxBackoffMultiplier = 0
+	}
+	if consecutiveFailures < 0 {
+		consecutiveFailures = 0
+	}
 	// Cap the multiplier to prevent overflow
 	multiplier := consecutiveFailures
 	if multiplier > maxBackoffMultiplier {

@@ -27,7 +27,9 @@ const (
 	defaultUmask = 0o022 // Default umask for file permissions
 )
 
-// Getter is an interface for download operations, allowing for easier testing.
+// Getter is an interface that abstracts the download operation of go-getter's Client.Get() method,
+// allowing for easier testing through mocks without requiring actual network downloads or the
+// hashicorp/go-getter dependency in tests.
 type Getter interface {
 	Get() error
 }
