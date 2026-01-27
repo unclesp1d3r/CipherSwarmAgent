@@ -451,9 +451,9 @@ func TestSendHeartBeat(t *testing.T) {
 
 			state, err := SendHeartBeat()
 			if tt.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if tt.expectedState == nil {

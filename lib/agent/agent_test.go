@@ -239,13 +239,13 @@ func TestCalculateHeartbeatBackoff(t *testing.T) {
 			name:                 "failures at max multiplier cap",
 			consecutiveFailures:  6,
 			maxBackoffMultiplier: 6,
-			expectedBackoff:      640 * time.Second, // 10 * 2^6 = 640
+			expectedBackoff:      640 * time.Second,
 		},
 		{
 			name:                 "failures exceed max multiplier - capped",
 			consecutiveFailures:  10,
 			maxBackoffMultiplier: 6,
-			expectedBackoff:      640 * time.Second, // capped at 10 * 2^6 = 640
+			expectedBackoff:      640 * time.Second,
 		},
 		{
 			name:                 "zero failures returns base interval",
