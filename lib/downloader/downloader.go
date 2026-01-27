@@ -27,6 +27,11 @@ const (
 	defaultUmask = 0o022 // Default umask for file permissions
 )
 
+// Getter is an interface for download operations, allowing for easier testing.
+type Getter interface {
+	Get() error
+}
+
 // DownloadFile downloads a file from a given URL and saves it to the specified path with optional checksum verification.
 // If the URL is invalid, it returns an error. If the file already exists and the checksum matches, the download is skipped.
 func DownloadFile(fileURL, filePath, checksum string) error {
@@ -133,7 +138,7 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 
 // downloadWithRetry attempts to download a file with exponential backoff retry logic.
 // It retries up to maxRetries times, with delays doubling after each failed attempt.
-func downloadWithRetry(client *getter.Client, maxRetries int, baseDelay time.Duration) error {
+func downloadWithRetry(client Getter, maxRetries int, baseDelay time.Duration) error {
 	// Ensure at least one download attempt is made
 	if maxRetries < 1 {
 		maxRetries = 1
