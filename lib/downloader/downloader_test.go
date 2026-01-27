@@ -241,9 +241,9 @@ func TestDownloadWithRetry(t *testing.T) {
 			err := downloadWithRetry(mock, tt.maxRetries, 1*time.Millisecond)
 
 			if tt.expectSuccess {
-				assert.NoError(t, err, "expected successful download")
+				require.NoError(t, err, "expected successful download")
 			} else {
-				assert.Error(t, err, "expected download to fail")
+				require.Error(t, err, "expected download to fail")
 			}
 
 			assert.Equal(t, tt.expectedCalls, mock.getCallCount(),
@@ -275,6 +275,6 @@ func TestDownloadWithRetryNegativeRetries(t *testing.T) {
 
 	err := downloadWithRetry(mock, -5, 1*time.Millisecond)
 
-	assert.NoError(t, err, "should succeed with 1 attempt when maxRetries is negative")
+	require.NoError(t, err, "should succeed with 1 attempt when maxRetries is negative")
 	assert.Equal(t, 1, mock.getCallCount(), "should make exactly 1 call when maxRetries is negative")
 }
