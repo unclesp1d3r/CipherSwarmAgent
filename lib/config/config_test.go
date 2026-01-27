@@ -26,38 +26,38 @@ func TestSetDefaultConfigValues(t *testing.T) {
 		tests := []struct {
 			name     string
 			key      string
-			expected interface{}
-			getter   func(string) interface{}
+			expected any
+			getter   func(string) any
 		}{
 			{
 				name:     "task_timeout defaults to 24 hours",
 				key:      "task_timeout",
 				expected: 24 * time.Hour,
-				getter:   func(k string) interface{} { return viper.GetDuration(k) },
+				getter:   func(k string) any { return viper.GetDuration(k) },
 			},
 			{
 				name:     "download_max_retries defaults to 3",
 				key:      "download_max_retries",
 				expected: 3,
-				getter:   func(k string) interface{} { return viper.GetInt(k) },
+				getter:   func(k string) any { return viper.GetInt(k) },
 			},
 			{
 				name:     "download_retry_delay defaults to 2 seconds",
 				key:      "download_retry_delay",
 				expected: 2 * time.Second,
-				getter:   func(k string) interface{} { return viper.GetDuration(k) },
+				getter:   func(k string) any { return viper.GetDuration(k) },
 			},
 			{
 				name:     "insecure_downloads defaults to false",
 				key:      "insecure_downloads",
 				expected: false,
-				getter:   func(k string) interface{} { return viper.GetBool(k) },
+				getter:   func(k string) any { return viper.GetBool(k) },
 			},
 			{
 				name:     "max_heartbeat_backoff defaults to 6",
 				key:      "max_heartbeat_backoff",
 				expected: 6,
-				getter:   func(k string) interface{} { return viper.GetInt(k) },
+				getter:   func(k string) any { return viper.GetInt(k) },
 			},
 		}
 
@@ -73,74 +73,74 @@ func TestSetDefaultConfigValues(t *testing.T) {
 		tests := []struct {
 			name     string
 			key      string
-			expected interface{}
-			getter   func(string) interface{}
+			expected any
+			getter   func(string) any
 		}{
 			{
 				name:     "gpu_temp_threshold defaults to 80",
 				key:      "gpu_temp_threshold",
 				expected: 80,
-				getter:   func(k string) interface{} { return viper.GetInt(k) },
+				getter:   func(k string) any { return viper.GetInt(k) },
 			},
 			{
 				name:     "always_use_native_hashcat defaults to false",
 				key:      "always_use_native_hashcat",
 				expected: false,
-				getter:   func(k string) interface{} { return viper.GetBool(k) },
+				getter:   func(k string) any { return viper.GetBool(k) },
 			},
 			{
 				name:     "sleep_on_failure defaults to 60 seconds",
 				key:      "sleep_on_failure",
 				expected: 60 * time.Second,
-				getter:   func(k string) interface{} { return viper.GetDuration(k) },
+				getter:   func(k string) any { return viper.GetDuration(k) },
 			},
 			{
 				name:     "always_trust_files defaults to false",
 				key:      "always_trust_files",
 				expected: false,
-				getter:   func(k string) interface{} { return viper.GetBool(k) },
+				getter:   func(k string) any { return viper.GetBool(k) },
 			},
 			{
 				name:     "extra_debugging defaults to false",
 				key:      "extra_debugging",
 				expected: false,
-				getter:   func(k string) interface{} { return viper.GetBool(k) },
+				getter:   func(k string) any { return viper.GetBool(k) },
 			},
 			{
 				name:     "status_timer defaults to 10",
 				key:      "status_timer",
 				expected: 10,
-				getter:   func(k string) interface{} { return viper.GetInt(k) },
+				getter:   func(k string) any { return viper.GetInt(k) },
 			},
 			{
 				name:     "heartbeat_interval defaults to 10 seconds",
 				key:      "heartbeat_interval",
 				expected: 10 * time.Second,
-				getter:   func(k string) interface{} { return viper.GetDuration(k) },
+				getter:   func(k string) any { return viper.GetDuration(k) },
 			},
 			{
 				name:     "write_zaps_to_file defaults to false",
 				key:      "write_zaps_to_file",
 				expected: false,
-				getter:   func(k string) interface{} { return viper.GetBool(k) },
+				getter:   func(k string) any { return viper.GetBool(k) },
 			},
 			{
 				name:     "retain_zaps_on_completion defaults to false",
 				key:      "retain_zaps_on_completion",
 				expected: false,
-				getter:   func(k string) interface{} { return viper.GetBool(k) },
+				getter:   func(k string) any { return viper.GetBool(k) },
 			},
 			{
 				name:     "enable_additional_hash_types defaults to true",
 				key:      "enable_additional_hash_types",
 				expected: true,
-				getter:   func(k string) interface{} { return viper.GetBool(k) },
+				getter:   func(k string) any { return viper.GetBool(k) },
 			},
 			{
 				name:     "use_legacy_device_technique defaults to false",
 				key:      "use_legacy_device_technique",
 				expected: false,
-				getter:   func(k string) interface{} { return viper.GetBool(k) },
+				getter:   func(k string) any { return viper.GetBool(k) },
 			},
 		}
 
