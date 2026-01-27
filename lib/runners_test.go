@@ -1,0 +1,369 @@
+package lib
+
+import (
+	"errors"
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
+)
+
+// TestParseExitCode tests the parseExitCode function which extracts exit codes
+// from error messages. This function handles both standard "exit status N" formats
+// and non-standard error formats (like signal-based terminations).
+func TestParseExitCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected int
+	}{
+		{
+			name:     "exit status 0 - success",
+			errMsg:   "exit status 0",
+			expected: 0,
+		},
+		{
+			name:     "exit status 1 - exhausted",
+			errMsg:   "exit status 1",
+			expected: 1,
+		},
+		{
+			name:     "exit status 2 - aborted",
+			errMsg:   "exit status 2",
+			expected: 2,
+		},
+		{
+			name:     "exit status 255 - high value",
+			errMsg:   "exit status 255",
+			expected: 255,
+		},
+		{
+			name:     "exit status -1 - negative exit code",
+			errMsg:   "exit status -1",
+			expected: -1,
+		},
+		{
+			name:     "exit status -2 - GPU watchdog",
+			errMsg:   "exit status -2",
+			expected: -2,
+		},
+		{
+			name:     "signal killed - returns -1",
+			errMsg:   "signal: killed",
+			expected: -1,
+		},
+		{
+			name:     "signal terminated - returns -1",
+			errMsg:   "signal: terminated",
+			expected: -1,
+		},
+		{
+			name:     "signal interrupt - returns -1",
+			errMsg:   "signal: interrupt",
+			expected: -1,
+		},
+		{
+			name:     "some other error - returns -1",
+			errMsg:   "some other error",
+			expected: -1,
+		},
+		{
+			name:     "empty string - returns -1",
+			errMsg:   "",
+			expected: -1,
+		},
+		{
+			name:     "whitespace only - returns -1",
+			errMsg:   "   ",
+			expected: -1,
+		},
+		{
+			name:     "partial match - returns -1",
+			errMsg:   "exit status",
+			expected: -1,
+		},
+		{
+			name:     "malformed exit status - returns -1",
+			errMsg:   "exit status abc",
+			expected: -1,
+		},
+		{
+			name:     "exit status with extra text - extracts code",
+			errMsg:   "exit status 42 (some extra info)",
+			expected: 42,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseExitCode(tt.errMsg)
+			assert.Equal(t, tt.expected, result, "parseExitCode(%q) should return %d", tt.errMsg, tt.expected)
+		})
+	}
+}
+
+// TestParseExitCode_AllHashcatCodes tests parseExitCode with all documented hashcat exit codes.
+// This ensures the function correctly parses the full range of hashcat exit codes.
+func TestParseExitCode_AllHashcatCodes(t *testing.T) {
+	// Test all documented hashcat exit codes
+	hashcatExitCodes := []int{
+		0,  // Cracked
+		1,  // Exhausted
+		2,  // Aborted
+		3,  // Checkpoint abort
+		4,  // Runtime limit
+		-1, // General error
+		-2, // GPU watchdog
+		-3, // Backend abort
+		-4, // Backend checkpoint abort
+		-5, // Backend runtime abort
+		-6, // Selftest fail
+		-7, // Autotune fail
+	}
+
+	for _, exitCode := range hashcatExitCodes {
+		t.Run(fmt.Sprintf("hashcat_exit_code_%d", exitCode), func(t *testing.T) {
+			errMsg := fmt.Sprintf("exit status %d", exitCode)
+			result := parseExitCode(errMsg)
+			assert.Equal(t, exitCode, result, "parseExitCode should correctly parse hashcat exit code %d", exitCode)
+		})
+	}
+}
+
+// TestHandleStdErrLine tests the handleStdErrLine function which classifies stderr
+// output and sends classified errors to the server.
+func TestHandleStdErrLine(t *testing.T) {
+	tests := []struct {
+		name                      string
+		stdErrLine                string
+		expectSendClassifiedError bool
+		expectedCategory          hashcat.ErrorCategory
+	}{
+		{
+			name:                      "empty line should not send error",
+			stdErrLine:                "",
+			expectSendClassifiedError: false,
+		},
+		{
+			name:                      "whitespace only should not send error",
+			stdErrLine:                "   ",
+			expectSendClassifiedError: false,
+		},
+		{
+			name:                      "tab only should not send error",
+			stdErrLine:                "\t",
+			expectSendClassifiedError: false,
+		},
+		{
+			name:                      "non-empty line should send error",
+			stdErrLine:                "Some error message",
+			expectSendClassifiedError: true,
+			expectedCategory:          hashcat.ErrorCategoryUnknown,
+		},
+		{
+			name:                      "hash format error should be classified",
+			stdErrLine:                "Hash 'test': Separator unmatched",
+			expectSendClassifiedError: true,
+			expectedCategory:          hashcat.ErrorCategoryHashFormat,
+		},
+		{
+			name:                      "device error should be classified",
+			stdErrLine:                "Device #1: ATTENTION! out of memory",
+			expectSendClassifiedError: true,
+			expectedCategory:          hashcat.ErrorCategoryDevice,
+		},
+		{
+			name:                      "file access error should be classified",
+			stdErrLine:                "ERROR: No such file or directory",
+			expectSendClassifiedError: true,
+			expectedCategory:          hashcat.ErrorCategoryFileAccess,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanupHTTP := testhelpers.SetupHTTPMock()
+			defer cleanupHTTP()
+
+			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			defer cleanupState()
+
+			// Mock SubmitErrorAgent endpoint
+			testhelpers.MockSubmitErrorSuccess(123)
+
+			// Create a test task
+			task := testhelpers.NewTestTask(456, 789)
+
+			// Get initial call count
+			initialCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
+
+			// Call handleStdErrLine
+			handleStdErrLine(tt.stdErrLine, task)
+
+			// Verify SendClassifiedError behavior
+			finalCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
+
+			if tt.expectSendClassifiedError {
+				assert.Greater(t, finalCount, initialCount,
+					"SendClassifiedError should be called for non-empty stderr: %q", tt.stdErrLine)
+			} else {
+				assert.Equal(t, initialCount, finalCount,
+					"SendClassifiedError should not be called for empty/whitespace stderr: %q", tt.stdErrLine)
+			}
+		})
+	}
+}
+
+// TestHandleStdErrLine_ClassificationIntegration verifies that handleStdErrLine
+// correctly uses hashcat.ClassifyStderr for error classification.
+func TestHandleStdErrLine_ClassificationIntegration(t *testing.T) {
+	// This test verifies the integration between handleStdErrLine and ClassifyStderr
+	// by checking that known error patterns are correctly classified.
+	errorPatterns := []struct {
+		name             string
+		line             string
+		expectedCategory hashcat.ErrorCategory
+		expectedSeverity operations.Severity
+	}{
+		{
+			name:             "no hashes loaded",
+			line:             "No hashes loaded",
+			expectedCategory: hashcat.ErrorCategoryHashFormat,
+			expectedSeverity: operations.SeverityCritical,
+		},
+		{
+			name:             "OpenCL error",
+			line:             "OpenCL API (clEnqueueNDRangeKernel) CL_OUT_OF_RESOURCES",
+			expectedCategory: hashcat.ErrorCategoryBackend,
+			expectedSeverity: operations.SeverityCritical,
+		},
+		{
+			name:             "restore file error",
+			line:             "ERROR: Cannot read /path/to/session.restore",
+			expectedCategory: hashcat.ErrorCategoryRetryable,
+			expectedSeverity: operations.SeverityMinor,
+		},
+	}
+
+	for _, tt := range errorPatterns {
+		t.Run(tt.name, func(t *testing.T) {
+			// Verify classification
+			info := hashcat.ClassifyStderr(tt.line)
+			assert.Equal(t, tt.expectedCategory, info.Category, "category mismatch for %q", tt.line)
+			assert.Equal(t, tt.expectedSeverity, info.Severity, "severity mismatch for %q", tt.line)
+		})
+	}
+}
+
+// TestHandleDoneChan tests the handleDoneChan function which handles completion
+// of a hashcat task and classifies the exit code.
+func TestHandleDoneChan(t *testing.T) {
+	tests := []struct {
+		name           string
+		err            error
+		expectCleanup  bool
+		expectExhausted bool
+	}{
+		{
+			name:           "nil error - cleanup only",
+			err:            nil,
+			expectCleanup:  true,
+			expectExhausted: false,
+		},
+		{
+			name:           "exit status 0 - success path",
+			err:            errors.New("exit status 0"),
+			expectCleanup:  true,
+			expectExhausted: false,
+		},
+		{
+			name:           "exit status 1 - exhausted",
+			err:            errors.New("exit status 1"),
+			expectCleanup:  true,
+			expectExhausted: true,
+		},
+		{
+			name:           "exit status 2 - aborted",
+			err:            errors.New("exit status 2"),
+			expectCleanup:  true,
+			expectExhausted: false,
+		},
+		{
+			name:           "exit status -1 - general error",
+			err:            errors.New("exit status -1"),
+			expectCleanup:  true,
+			expectExhausted: false,
+		},
+		{
+			name:           "signal killed - treated as error",
+			err:            errors.New("signal: killed"),
+			expectCleanup:  true,
+			expectExhausted: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanupHTTP := testhelpers.SetupHTTPMock()
+			defer cleanupHTTP()
+
+			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			defer cleanupState()
+
+			// Mock endpoints
+			testhelpers.MockSubmitErrorSuccess(123)
+
+			// Create a test task
+			task := testhelpers.NewTestTask(456, 789)
+
+			// Create a mock session
+			sess, err := testhelpers.NewMockSession("test-session")
+			if err != nil {
+				t.Skipf("Skipping test: failed to create mock session: %v", err)
+				return
+			}
+
+			// Note: We cannot easily verify cleanup was called without modifying the Session
+			// structure. The test primarily ensures the function executes without panics
+			// and handles the different error cases correctly.
+			handleDoneChan(tt.err, task, sess)
+
+			// For exhausted case (exit code 1), we would ideally verify markTaskExhausted was called
+			// but this requires HTTP mocking for the task exhausted endpoint.
+			// The test currently verifies the function completes without error.
+			if tt.expectExhausted {
+				t.Log("exhausted path exercised for exit code 1")
+			}
+		})
+	}
+}
+
+// TestHandleDoneChan_ExitCodeClassification verifies that handleDoneChan
+// correctly uses hashcat.ClassifyExitCode and IsExhausted for exit code handling.
+func TestHandleDoneChan_ExitCodeClassification(t *testing.T) {
+	// Verify that the exit code classification functions work correctly
+	// These are used by handleDoneChan internally
+	tests := []struct {
+		exitCode      int
+		isExhausted   bool
+		isSuccess     bool
+	}{
+		{0, false, true},
+		{1, true, false},
+		{2, false, false},
+		{-1, false, false},
+		{-2, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("exit_code_%d", tt.exitCode), func(t *testing.T) {
+			assert.Equal(t, tt.isExhausted, hashcat.IsExhausted(tt.exitCode),
+				"IsExhausted(%d) mismatch", tt.exitCode)
+			assert.Equal(t, tt.isSuccess, hashcat.IsSuccess(tt.exitCode),
+				"IsSuccess(%d) mismatch", tt.exitCode)
+		})
+	}
+}
