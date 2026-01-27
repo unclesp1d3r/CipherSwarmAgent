@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/stretchr/testify/assert"
@@ -203,4 +204,151 @@ func TestExtraDebuggingFlag(t *testing.T) {
 	logOutput = buf.String()
 	assert.NotContains(t, logOutput, "Sending heartbeat")
 	assert.NotContains(t, logOutput, "Heartbeat sent")
+}
+
+// TestCalculateHeartbeatBackoff tests the exponential backoff calculation
+// used by the heartbeat loop circuit breaker pattern.
+func TestCalculateHeartbeatBackoff(t *testing.T) {
+	baseInterval := 10 * time.Second
+
+	tests := []struct {
+		name                 string
+		consecutiveFailures  int
+		maxBackoffMultiplier int
+		expectedBackoff      time.Duration
+	}{
+		{
+			name:                 "first failure doubles interval",
+			consecutiveFailures:  1,
+			maxBackoffMultiplier: 6,
+			expectedBackoff:      20 * time.Second, // 10 * 2^1 = 20
+		},
+		{
+			name:                 "second failure quadruples interval",
+			consecutiveFailures:  2,
+			maxBackoffMultiplier: 6,
+			expectedBackoff:      40 * time.Second, // 10 * 2^2 = 40
+		},
+		{
+			name:                 "third failure 8x interval",
+			consecutiveFailures:  3,
+			maxBackoffMultiplier: 6,
+			expectedBackoff:      80 * time.Second, // 10 * 2^3 = 80
+		},
+		{
+			name:                 "failures at max multiplier cap",
+			consecutiveFailures:  6,
+			maxBackoffMultiplier: 6,
+			expectedBackoff:      640 * time.Second, // 10 * 2^6 = 640
+		},
+		{
+			name:                 "failures exceed max multiplier - capped",
+			consecutiveFailures:  10,
+			maxBackoffMultiplier: 6,
+			expectedBackoff:      640 * time.Second, // capped at 10 * 2^6 = 640
+		},
+		{
+			name:                 "zero failures returns base interval",
+			consecutiveFailures:  0,
+			maxBackoffMultiplier: 6,
+			expectedBackoff:      10 * time.Second, // 10 * 2^0 = 10
+		},
+		{
+			name:                 "max multiplier of 1 caps early",
+			consecutiveFailures:  5,
+			maxBackoffMultiplier: 1,
+			expectedBackoff:      20 * time.Second, // capped at 10 * 2^1 = 20
+		},
+		{
+			name:                 "max multiplier of 0 means no exponential growth",
+			consecutiveFailures:  5,
+			maxBackoffMultiplier: 0,
+			expectedBackoff:      10 * time.Second, // capped at 10 * 2^0 = 10
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateHeartbeatBackoff(baseInterval, tt.consecutiveFailures, tt.maxBackoffMultiplier)
+			assert.Equal(t, tt.expectedBackoff, result,
+				"calculateHeartbeatBackoff(%v, %d, %d) = %v, want %v",
+				baseInterval, tt.consecutiveFailures, tt.maxBackoffMultiplier, result, tt.expectedBackoff)
+		})
+	}
+}
+
+// TestCalculateHeartbeatBackoff_DifferentBaseIntervals verifies the formula
+// works correctly with various base intervals.
+func TestCalculateHeartbeatBackoff_DifferentBaseIntervals(t *testing.T) {
+	tests := []struct {
+		name            string
+		baseInterval    time.Duration
+		failures        int
+		maxMultiplier   int
+		expectedBackoff time.Duration
+	}{
+		{
+			name:            "1 second base with 3 failures",
+			baseInterval:    1 * time.Second,
+			failures:        3,
+			maxMultiplier:   6,
+			expectedBackoff: 8 * time.Second, // 1 * 2^3 = 8
+		},
+		{
+			name:            "5 second base with 2 failures",
+			baseInterval:    5 * time.Second,
+			failures:        2,
+			maxMultiplier:   6,
+			expectedBackoff: 20 * time.Second, // 5 * 2^2 = 20
+		},
+		{
+			name:            "30 second base with 4 failures",
+			baseInterval:    30 * time.Second,
+			failures:        4,
+			maxMultiplier:   6,
+			expectedBackoff: 480 * time.Second, // 30 * 2^4 = 480 (8 minutes)
+		},
+		{
+			name:            "100ms base for fast retry scenarios",
+			baseInterval:    100 * time.Millisecond,
+			failures:        3,
+			maxMultiplier:   6,
+			expectedBackoff: 800 * time.Millisecond, // 100ms * 2^3 = 800ms
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateHeartbeatBackoff(tt.baseInterval, tt.failures, tt.maxMultiplier)
+			assert.Equal(t, tt.expectedBackoff, result)
+		})
+	}
+}
+
+// TestCalculateHeartbeatBackoff_DefaultConfig verifies the backoff calculation
+// works correctly with the default configuration values (max_heartbeat_backoff=6).
+func TestCalculateHeartbeatBackoff_DefaultConfig(t *testing.T) {
+	// Default config: max_heartbeat_backoff = 6
+	// Default heartbeat_interval = 10 seconds
+	baseInterval := 10 * time.Second
+	maxBackoff := 6
+
+	// Verify the progression: 20s, 40s, 80s, 160s, 320s, 640s, 640s (capped)
+	expectedProgression := []time.Duration{
+		10 * time.Second,  // 0 failures (not really used, but formula gives base)
+		20 * time.Second,  // 1 failure
+		40 * time.Second,  // 2 failures
+		80 * time.Second,  // 3 failures
+		160 * time.Second, // 4 failures
+		320 * time.Second, // 5 failures
+		640 * time.Second, // 6 failures (max)
+		640 * time.Second, // 7 failures (capped)
+		640 * time.Second, // 8 failures (capped)
+	}
+
+	for failures, expected := range expectedProgression {
+		result := calculateHeartbeatBackoff(baseInterval, failures, maxBackoff)
+		assert.Equal(t, expected, result,
+			"failure %d: expected %v, got %v", failures, expected, result)
+	}
 }
