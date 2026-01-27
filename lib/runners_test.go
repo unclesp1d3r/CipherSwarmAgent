@@ -262,45 +262,45 @@ func TestHandleStdErrLine_ClassificationIntegration(t *testing.T) {
 // of a hashcat task and classifies the exit code.
 func TestHandleDoneChan(t *testing.T) {
 	tests := []struct {
-		name           string
-		err            error
-		expectCleanup  bool
+		name            string
+		err             error
+		expectCleanup   bool
 		expectExhausted bool
 	}{
 		{
-			name:           "nil error - cleanup only",
-			err:            nil,
-			expectCleanup:  true,
+			name:            "nil error - cleanup only",
+			err:             nil,
+			expectCleanup:   true,
 			expectExhausted: false,
 		},
 		{
-			name:           "exit status 0 - success path",
-			err:            errors.New("exit status 0"),
-			expectCleanup:  true,
+			name:            "exit status 0 - success path",
+			err:             errors.New("exit status 0"),
+			expectCleanup:   true,
 			expectExhausted: false,
 		},
 		{
-			name:           "exit status 1 - exhausted",
-			err:            errors.New("exit status 1"),
-			expectCleanup:  true,
+			name:            "exit status 1 - exhausted",
+			err:             errors.New("exit status 1"),
+			expectCleanup:   true,
 			expectExhausted: true,
 		},
 		{
-			name:           "exit status 2 - aborted",
-			err:            errors.New("exit status 2"),
-			expectCleanup:  true,
+			name:            "exit status 2 - aborted",
+			err:             errors.New("exit status 2"),
+			expectCleanup:   true,
 			expectExhausted: false,
 		},
 		{
-			name:           "exit status -1 - general error",
-			err:            errors.New("exit status -1"),
-			expectCleanup:  true,
+			name:            "exit status -1 - general error",
+			err:             errors.New("exit status -1"),
+			expectCleanup:   true,
 			expectExhausted: false,
 		},
 		{
-			name:           "signal killed - treated as error",
-			err:            errors.New("signal: killed"),
-			expectCleanup:  true,
+			name:            "signal killed - treated as error",
+			err:             errors.New("signal: killed"),
+			expectCleanup:   true,
 			expectExhausted: false,
 		},
 	}
@@ -347,9 +347,9 @@ func TestHandleDoneChan_ExitCodeClassification(t *testing.T) {
 	// Verify that the exit code classification functions work correctly
 	// These are used by handleDoneChan internally
 	tests := []struct {
-		exitCode      int
-		isExhausted   bool
-		isSuccess     bool
+		exitCode    int
+		isExhausted bool
+		isSuccess   bool
 	}{
 		{0, false, true},
 		{1, true, false},
