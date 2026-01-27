@@ -435,7 +435,7 @@ func TestSendHeartBeat(t *testing.T) {
 				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/agents/\d+/heartbeat$`, http.StatusBadRequest, *sdkErr)
 			},
 			expectedState: nil,
-			expectedError: false, // function returns nil on error, doesn't return error
+			expectedError: true,
 		},
 	}
 
@@ -450,9 +450,11 @@ func TestSendHeartBeat(t *testing.T) {
 			tt.setupMock(123)
 
 			state, err := SendHeartBeat()
-
-			// For now we don't check error in existing tests as they don't expect errors
-			_ = err
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 
 			if tt.expectedState == nil {
 				assert.Nil(t, state)
