@@ -122,7 +122,10 @@ func cleanupLockFile(pidFile string) {
 // calculateHeartbeatBackoff computes the exponential backoff duration for heartbeat retries.
 // The formula is: baseInterval * 2^min(failures, maxMultiplier)
 // This function is exported for testing purposes.
-func calculateHeartbeatBackoff(baseInterval time.Duration, consecutiveFailures, maxBackoffMultiplier int) time.Duration {
+func calculateHeartbeatBackoff(
+	baseInterval time.Duration,
+	consecutiveFailures, maxBackoffMultiplier int,
+) time.Duration {
 	// Cap the multiplier to prevent overflow
 	multiplier := consecutiveFailures
 	if multiplier > maxBackoffMultiplier {
