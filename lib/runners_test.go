@@ -212,11 +212,12 @@ func TestHandleStdErrLine(t *testing.T) {
 	}
 }
 
-// TestHandleStdErrLine_ErrorClassification verifies that handleStdErrLine
-// correctly uses hashcat.ClassifyStderr for error classification.
+// TestHandleStdErrLine_ErrorClassification verifies that hashcat.ClassifyStderr
+// returns correct categories and severities for error patterns that handleStdErrLine
+// would encounter, ensuring the classification logic behaves correctly.
 func TestHandleStdErrLine_ErrorClassification(t *testing.T) {
-	// This test verifies the integration between handleStdErrLine and ClassifyStderr
-	// by checking that known error patterns are correctly classified.
+	// This test verifies the classification logic used by handleStdErrLine
+	// by testing hashcat.ClassifyStderr directly with known error patterns.
 	errorPatterns := []struct {
 		name             string
 		line             string

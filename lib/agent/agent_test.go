@@ -265,6 +265,24 @@ func TestCalculateHeartbeatBackoff(t *testing.T) {
 			maxBackoffMultiplier: 0,
 			expectedBackoff:      10 * time.Second, // capped at 10 * 2^0 = 10
 		},
+		{
+			name:                 "negative failures treated as zero",
+			consecutiveFailures:  -5,
+			maxBackoffMultiplier: 6,
+			expectedBackoff:      10 * time.Second, // -5 -> 0, so 10 * 2^0 = 10
+		},
+		{
+			name:                 "negative maxMultiplier treated as zero",
+			consecutiveFailures:  3,
+			maxBackoffMultiplier: -1,
+			expectedBackoff:      10 * time.Second, // -1 -> 0, capped at 2^0
+		},
+		{
+			name:                 "both negative treated as zero",
+			consecutiveFailures:  -1,
+			maxBackoffMultiplier: -1,
+			expectedBackoff:      10 * time.Second, // both -> 0
+		},
 	}
 
 	for _, tt := range tests {
