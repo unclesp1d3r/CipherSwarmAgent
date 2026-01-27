@@ -140,7 +140,6 @@ func TestHandleStdErrLine(t *testing.T) {
 		name                      string
 		stdErrLine                string
 		expectSendClassifiedError bool
-		expectedCategory          hashcat.ErrorCategory
 	}{
 		{
 			name:                      "empty line should not send error",
@@ -161,25 +160,21 @@ func TestHandleStdErrLine(t *testing.T) {
 			name:                      "non-empty line should send error",
 			stdErrLine:                "Some error message",
 			expectSendClassifiedError: true,
-			expectedCategory:          hashcat.ErrorCategoryUnknown,
 		},
 		{
 			name:                      "hash format error should be classified",
 			stdErrLine:                "Hash 'test': Separator unmatched",
 			expectSendClassifiedError: true,
-			expectedCategory:          hashcat.ErrorCategoryHashFormat,
 		},
 		{
 			name:                      "device error should be classified",
 			stdErrLine:                "Device #1: ATTENTION! out of memory",
 			expectSendClassifiedError: true,
-			expectedCategory:          hashcat.ErrorCategoryDevice,
 		},
 		{
 			name:                      "file access error should be classified",
 			stdErrLine:                "ERROR: No such file or directory",
 			expectSendClassifiedError: true,
-			expectedCategory:          hashcat.ErrorCategoryFileAccess,
 		},
 	}
 
@@ -217,9 +212,9 @@ func TestHandleStdErrLine(t *testing.T) {
 	}
 }
 
-// TestHandleStdErrLine_ClassificationIntegration verifies that handleStdErrLine
+// TestHandleStdErrLine_ErrorClassification verifies that handleStdErrLine
 // correctly uses hashcat.ClassifyStderr for error classification.
-func TestHandleStdErrLine_ClassificationIntegration(t *testing.T) {
+func TestHandleStdErrLine_ErrorClassification(t *testing.T) {
 	// This test verifies the integration between handleStdErrLine and ClassifyStderr
 	// by checking that known error patterns are correctly classified.
 	errorPatterns := []struct {
@@ -341,9 +336,9 @@ func TestHandleDoneChan(t *testing.T) {
 	}
 }
 
-// TestHandleDoneChan_ExitCodeClassification verifies that handleDoneChan
+// TestHandleDoneChan_ExitCodeHandling verifies that handleDoneChan
 // correctly uses hashcat.ClassifyExitCode and IsExhausted for exit code handling.
-func TestHandleDoneChan_ExitCodeClassification(t *testing.T) {
+func TestHandleDoneChan_ExitCodeHandling(t *testing.T) {
 	// Verify that the exit code classification functions work correctly
 	// These are used by handleDoneChan internally
 	tests := []struct {
