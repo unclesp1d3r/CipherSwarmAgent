@@ -215,7 +215,7 @@ func TestDownloadWithRetry(t *testing.T) {
 			expectedCalls: 3,
 		},
 		{
-			name:          "single retry allowed",
+			name:          "single attempt fails with no retries remaining",
 			maxRetries:    1,
 			failCount:     1,
 			expectSuccess: false,
