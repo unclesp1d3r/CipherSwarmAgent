@@ -27,6 +27,13 @@ const (
 	defaultUmask = 0o022 // Default umask for file permissions
 )
 
+// Getter is an interface that abstracts the download operation of go-getter's Client.Get() method,
+// allowing for easier testing through mocks without requiring actual network downloads or the
+// hashicorp/go-getter dependency in tests.
+type Getter interface {
+	Get() error
+}
+
 // DownloadFile downloads a file from a given URL and saves it to the specified path with optional checksum verification.
 // If the URL is invalid, it returns an error. If the file already exists and the checksum matches, the download is skipped.
 func DownloadFile(fileURL, filePath, checksum string) error {
@@ -112,10 +119,13 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 		Mode:     getter.ClientModeFile,
 	}
 
-	_ = client.Configure( //nolint:errcheck // Client configuration errors are not critical
+	if err := client.Configure(
 		getter.WithProgress(progress.DefaultProgressBar),
 		getter.WithUmask(os.FileMode(defaultUmask)),
-	)
+	); err != nil {
+		agentstate.Logger.Warn("Download client configuration failed, proceeding with defaults",
+			"error", err)
+	}
 
 	maxRetries := viper.GetInt("download_max_retries")
 	baseDelay := viper.GetDuration("download_retry_delay")
@@ -133,9 +143,11 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 
 // downloadWithRetry attempts to download a file with exponential backoff retry logic.
 // It retries up to maxRetries times, with delays doubling after each failed attempt.
-func downloadWithRetry(client *getter.Client, maxRetries int, baseDelay time.Duration) error {
+func downloadWithRetry(client Getter, maxRetries int, baseDelay time.Duration) error {
 	// Ensure at least one download attempt is made
 	if maxRetries < 1 {
+		agentstate.Logger.Debug("maxRetries value < 1, defaulting to 1 attempt",
+			"configured_value", maxRetries)
 		maxRetries = 1
 	}
 

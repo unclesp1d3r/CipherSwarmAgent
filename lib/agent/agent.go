@@ -119,6 +119,34 @@ func cleanupLockFile(pidFile string) {
 	}
 }
 
+// calculateHeartbeatBackoff computes the exponential backoff duration for heartbeat retries.
+// The formula is: baseInterval * 2^min(failures, maxMultiplier)
+// Negative values for failures or maxMultiplier are treated as 0.
+// This function is exported for testing purposes.
+func calculateHeartbeatBackoff(
+	baseInterval time.Duration,
+	consecutiveFailures, maxBackoffMultiplier int,
+) time.Duration {
+	// Guard against negative values to prevent bit shift panic
+	if maxBackoffMultiplier < 0 {
+		agentstate.Logger.Warn("Negative maxBackoffMultiplier corrected to 0",
+			"original_value", maxBackoffMultiplier)
+		maxBackoffMultiplier = 0
+	}
+	if consecutiveFailures < 0 {
+		agentstate.Logger.Warn("Negative consecutiveFailures corrected to 0",
+			"original_value", consecutiveFailures)
+		consecutiveFailures = 0
+	}
+	// Cap the multiplier to prevent overflow
+	multiplier := consecutiveFailures
+	if multiplier > maxBackoffMultiplier {
+		multiplier = maxBackoffMultiplier
+	}
+	// Exponential backoff: baseInterval * 2^multiplier
+	return baseInterval * time.Duration(1<<multiplier)
+}
+
 // startHeartbeatLoop runs the heartbeat loop with circuit breaker pattern.
 // On consecutive failures, it backs off exponentially up to a maximum multiplier.
 func startHeartbeatLoop(signChan chan os.Signal) {
@@ -131,13 +159,7 @@ func startHeartbeatLoop(signChan chan os.Signal) {
 
 		if err != nil {
 			consecutiveFailures++
-			// Cap the multiplier to prevent overflow
-			multiplier := consecutiveFailures
-			if multiplier > maxBackoffMultiplier {
-				multiplier = maxBackoffMultiplier
-			}
-			// Exponential backoff: baseInterval * 2^multiplier
-			backoff := baseInterval * time.Duration(1<<multiplier)
+			backoff := calculateHeartbeatBackoff(baseInterval, consecutiveFailures, maxBackoffMultiplier)
 			agentstate.Logger.Warn("Heartbeat failed, backing off",
 				"failures", consecutiveFailures, "next_retry", backoff)
 			time.Sleep(backoff)
