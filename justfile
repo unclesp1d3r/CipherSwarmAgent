@@ -140,15 +140,15 @@ lint:
 check:
     @{{ mise_exec }} pre-commit run --all-files
 
-# Apply Go modernization fixes
+# Apply Go modernization fixes (Go 1.26+ built-in)
 [group('quality')]
 modernize:
-    @{{ mise_exec }} go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -fix -test ./...
+    @{{ mise_exec }} go fix ./...
 
 # Check for modernization opportunities (dry-run)
 [group('quality')]
 modernize-check:
-    @{{ mise_exec }} go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -test ./...
+    @{{ mise_exec }} go fix -diff ./...
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Testing
@@ -216,7 +216,7 @@ bench-perf:
 [group('test')]
 bench-save:
     @echo "Saving benchmark baseline..."
-    @{{ mise_exec }} go test -bench=. -run=^$ -benchmem -count=5 ./... 2>/dev/null | tee .benchmark-baseline.txt
+    @{{ mise_exec }} go test -bench=. -run=^$ -benchmem -count=5 ./... 2>{{ _null }} | tee .benchmark-baseline.txt
     @echo "✅ Baseline saved to .benchmark-baseline.txt"
 
 # Compare current benchmarks against baseline
@@ -227,7 +227,7 @@ bench-compare:
         exit 1; \
     fi
     @echo "Running current benchmarks..."
-    @{{ mise_exec }} go test -bench=. -run=^$ -benchmem -count=5 ./... 2>/dev/null | tee .benchmark-current.txt
+    @{{ mise_exec }} go test -bench=. -run=^$ -benchmem -count=5 ./... 2>{{ _null }} | tee .benchmark-current.txt
     @echo ""
     @echo "Comparing benchmarks..."
     @{{ mise_exec }} go install golang.org/x/perf/cmd/benchstat@latest
@@ -282,7 +282,7 @@ rebuild: clean build
 # Check GoReleaser configuration
 [group('release')]
 release-check:
-    @goreleaser check --verbose
+    @{{ mise_exec }} goreleaser check --verbose
 
 # Build snapshot (no tag required)
 [group('release')]
