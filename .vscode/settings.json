@@ -2,5 +2,12 @@
   "go.goroot": "${workspaceFolder}/.vscode/mise-tools/goRoot",
   "go.alternateTools": {
     "go": "${workspaceFolder}/.vscode/mise-tools/go"
-  }
+  },
+  "ruff.path": [
+    "${workspaceFolder}/.vscode/mise-tools/ruff"
+  ],
+  "ruff.interpreter": [
+    "${workspaceFolder}/.vscode/mise-tools/python"
+  ],
+  "python.defaultInterpreterPath": "${workspaceFolder}/.vscode/mise-tools/python"
 }
