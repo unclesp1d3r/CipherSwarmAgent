@@ -67,7 +67,7 @@ func MockAuthenticationSuccess(agentID int64) {
 // Uses a regex pattern to match any HTTP scheme and host.
 // Note: The SDK uses GET for authentication, not POST.
 func MockAuthenticationFailure(statusCode int, errorMessage string) {
-	errorResponse := map[string]interface{}{
+	errorResponse := map[string]any{
 		"authenticated": false,
 		"error":         errorMessage,
 	}
@@ -126,7 +126,7 @@ func MockHeartbeatResponse(agentID int64, state operations.State) {
 // The endpoint parameter should be a regex pattern string (will be compiled to *regexp.Regexp).
 // Registers responders for multiple HTTP methods to handle different SDK implementations.
 func MockAPIError(endpoint string, statusCode int, sdkError sdkerrors.SDKError) {
-	errorResponse := map[string]interface{}{
+	errorResponse := map[string]any{
 		"error":   sdkError.Message,
 		"code":    sdkError.StatusCode,
 		"details": nil,
@@ -161,7 +161,7 @@ func MockHeartbeatNoContent(agentID int64) {
 // that returns a successful UpdateAgentResponse with the provided agent data.
 // According to swagger.json, the endpoint is /api/v1/client/agents/{id}.
 func MockUpdateAgentSuccess(agentID int64, agent components.Agent) {
-	responseBody := map[string]interface{}{
+	responseBody := map[string]any{
 		"agent": agent,
 	}
 	jsonResponse := mustMarshal(responseBody)
@@ -256,7 +256,7 @@ func GetSubmitErrorCallCount(agentID int64, baseURL string) int {
 // MockConfigurationError registers a mock responder for configuration endpoint
 // that returns an error response.
 func MockConfigurationError(statusCode int, errorMsg string) {
-	errorResponse := map[string]interface{}{
+	errorResponse := map[string]any{
 		"error": errorMsg,
 	}
 	jsonResponse := mustMarshal(errorResponse)
