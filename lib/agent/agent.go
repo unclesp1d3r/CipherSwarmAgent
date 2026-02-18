@@ -117,14 +117,16 @@ func cleanupLockFile(pidFile string) {
 	agentstate.Logger.Debug("Cleaning up PID file", "path", pidFile)
 
 	if err := os.Remove(pidFile); err != nil {
-		agentstate.Logger.Error("Failed to remove PID file", "error", err)
+		if !os.IsNotExist(err) {
+			agentstate.Logger.Error("Failed to remove PID file; manually remove it before next startup",
+				"path", pidFile, "error", err)
+		}
 	}
 }
 
 // calculateHeartbeatBackoff computes the exponential backoff duration for heartbeat retries.
 // The formula is: baseInterval * 2^min(failures, maxMultiplier)
-// Negative values for failures or maxMultiplier are treated as 0.
-// Tests in the same package can call this directly.
+// Negative values for failures or maxMultiplier are corrected to 0 with a warning log.
 func calculateHeartbeatBackoff(
 	baseInterval time.Duration,
 	consecutiveFailures, maxBackoffMultiplier int,
@@ -146,7 +148,7 @@ func calculateHeartbeatBackoff(
 	return baseInterval * time.Duration(1<<multiplier)
 }
 
-// startHeartbeatLoop runs the heartbeat loop with circuit breaker pattern.
+// startHeartbeatLoop runs the heartbeat loop with exponential backoff on failures.
 // On consecutive failures, it backs off exponentially up to a maximum multiplier.
 func startHeartbeatLoop(signChan chan os.Signal) {
 	consecutiveFailures := 0
@@ -202,8 +204,11 @@ func handleReload() {
 	agentstate.Logger.Info("Reloading agent")
 
 	if err := fetchAgentConfig(); err != nil {
-		agentstate.Logger.Error("Failed to fetch agent configuration", "error", err)
+		agentstate.Logger.Error("Failed to fetch agent configuration, skipping reload", "error", err)
 		lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
+		agentstate.State.Reload = false
+
+		return
 	}
 
 	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
@@ -252,11 +257,21 @@ func processTask(task *components.Task) error {
 	attack, err := lib.GetAttackParameters(task.GetAttackID())
 	if err != nil || attack == nil {
 		agentstate.Logger.Error("Failed to get attack parameters", "error", err)
-		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
+
+		errMsg := "attack parameters are nil"
+		if err != nil {
+			errMsg = err.Error()
+		}
+
+		lib.SendAgentError(errMsg, task, operations.SeverityFatal)
 		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
 
-		return err
+		if err != nil {
+			return err
+		}
+
+		return errors.New("attack parameters are nil")
 	}
 
 	lib.DisplayNewAttack(attack)
@@ -270,6 +285,7 @@ func processTask(task *components.Task) error {
 
 	lib.DisplayRunTaskAccepted(task)
 
+	// TODO: propagate cancellable context from startAgentLoop for graceful shutdown support
 	if err := lib.DownloadFiles(context.TODO(), attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
@@ -353,8 +369,8 @@ func fetchAgentConfig() error {
 
 func initLogger() {
 	if agentstate.State.Debug {
-		agentstate.Logger.SetLevel(log.DebugLevel) // Set the logger level to debug
-		agentstate.Logger.SetReportCaller(true)    // Report the caller for debugging
+		agentstate.Logger.SetLevel(log.DebugLevel)
+		agentstate.Logger.SetReportCaller(true)
 	} else {
 		agentstate.Logger.SetLevel(log.InfoLevel)
 	}

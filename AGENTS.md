@@ -27,7 +27,7 @@ The agent operates as a long-lived CLI client that interacts with the CipherSwar
    - Submitting structured errors on failure (`POST /agents/{id}/submit_error`).
    - Gracefully notifying the server on shutdown (`POST /agents/{id}/shutdown`).
 
-- **API Specification:** All API interactions must strictly adhere to the v1 Agent API contract defined in `docs/swagger.json`.
+- **API Specification:** All API interactions must strictly adhere to the v1 Agent API contract defined by the CipherSwarm server.
 - **Reliability:** The agent must implement exponential backoff for failed API requests.
 
 ## Go
@@ -131,4 +131,4 @@ The `CHANGELOG.md` is automatically generated from commit messages using `git-ch
 ## Documentation
 
 - **MkDocs:** Project documentation is written in Markdown in the `docs/` directory and built into a static site using `mkdocs`.
-- **API Docs:** The API is documented using an OpenAPI v3 spec in `docs/swagger.json`.
+- **API Docs:** The API is documented using an OpenAPI v3 spec maintained in the CipherSwarm server repository.

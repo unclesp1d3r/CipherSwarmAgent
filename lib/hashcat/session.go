@@ -103,7 +103,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}
 
 	return &Session{
-		proc: exec.CommandContext(
+		proc: exec.CommandContext( //nolint:gosec // G702 - binary path from internal config, not user input
 			ctx,
 			binaryPath,
 			args...),
@@ -320,8 +320,8 @@ func (sess *Session) Cleanup() {
 	agentstate.Logger.Info("Cleaning up session files")
 
 	removeFile := func(filePath string) {
-		if _, err := os.Stat(filePath); err == nil {
-			if err := os.Remove(filePath); err != nil {
+		if _, err := os.Stat(filePath); err == nil { //nolint:gosec // G703 - paths from internal session config
+			if err := os.Remove(filePath); err != nil { //nolint:gosec // G703 - paths from internal session config
 				agentstate.Logger.Error("couldn't remove file", "file", filePath, "error", err)
 			}
 		}
