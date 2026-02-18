@@ -186,10 +186,10 @@ func getDevicesList(ctx context.Context) ([]string, error) {
 // 2. Downloads the hash list associated with the attack.
 // 3. Iterates over resource files (word list, rule list, and mask list) and downloads each one.
 // If any step encounters an error, the function returns that error.
-func DownloadFiles(attack *components.Attack) error {
+func DownloadFiles(ctx context.Context, attack *components.Attack) error {
 	displayDownloadFileStart(attack)
 
-	if err := downloader.DownloadHashList(attack); err != nil {
+	if err := downloader.DownloadHashList(ctx, attack); err != nil {
 		return err
 	}
 
@@ -200,7 +200,7 @@ func DownloadFiles(attack *components.Attack) error {
 	}
 
 	for _, resource := range resourceFiles {
-		if err := downloadResourceFile(resource); err != nil {
+		if err := downloadResourceFile(ctx, resource); err != nil {
 			return err
 		}
 	}
@@ -213,7 +213,7 @@ func DownloadFiles(attack *components.Attack) error {
 // If checksum verification is not always skipped, converts the base64 checksum to hex.
 // Downloads the file using the resource's download URL, target file path, and checksum for verification.
 // Logs and sends an error report if file download fails or if the downloaded file is empty.
-func downloadResourceFile(resource *components.AttackResourceFile) error {
+func downloadResourceFile(ctx context.Context, resource *components.AttackResourceFile) error {
 	if resource == nil {
 		return nil
 	}
@@ -228,11 +228,13 @@ func downloadResourceFile(resource *components.AttackResourceFile) error {
 		agentstate.Logger.Debug("Skipping checksum verification")
 	}
 
-	if err := downloader.DownloadFile(resource.GetDownloadURL(), filePath, checksum); err != nil {
+	if err := downloader.DownloadFile(ctx, resource.GetDownloadURL(), filePath, checksum); err != nil {
+		//nolint:contextcheck // LogAndSendError does not yet accept context
 		return cserrors.LogAndSendError("Error downloading attack resource", err, operations.SeverityCritical, nil)
 	}
 
 	if fileInfo, err := os.Stat(filePath); err != nil || fileInfo.Size() == 0 {
+		//nolint:contextcheck // LogAndSendError does not yet accept context
 		return cserrors.LogAndSendError("Downloaded file is empty", nil, operations.SeverityCritical, nil)
 	}
 

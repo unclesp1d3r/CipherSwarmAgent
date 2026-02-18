@@ -2,7 +2,9 @@
 package agent
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -115,7 +117,7 @@ func cleanupLockFile(pidFile string) {
 	agentstate.Logger.Debug("Cleaning up PID file", "path", pidFile)
 
 	if err := os.Remove(pidFile); err != nil {
-		agentstate.Logger.Fatal("Failed to remove PID file", "error", err)
+		agentstate.Logger.Error("Failed to remove PID file", "error", err)
 	}
 }
 
@@ -139,10 +141,7 @@ func calculateHeartbeatBackoff(
 		consecutiveFailures = 0
 	}
 	// Cap the multiplier to prevent overflow
-	multiplier := consecutiveFailures
-	if multiplier > maxBackoffMultiplier {
-		multiplier = maxBackoffMultiplier
-	}
+	multiplier := min(consecutiveFailures, maxBackoffMultiplier)
 	// Exponential backoff: baseInterval * 2^multiplier
 	return baseInterval * time.Duration(1<<multiplier)
 }
@@ -271,7 +270,7 @@ func processTask(task *components.Task) error {
 
 	lib.DisplayRunTaskAccepted(task)
 
-	if err := lib.DownloadFiles(attack); err != nil {
+	if err := lib.DownloadFiles(context.TODO(), attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
 		lib.AbandonTask(task)
@@ -342,14 +341,14 @@ func heartbeat(signChan chan os.Signal) error {
 func fetchAgentConfig() error {
 	err := lib.GetAgentConfiguration()
 	if err != nil {
-		agentstate.Logger.Fatal("Failed to get agent configuration from the CipherSwarm API", "error", err)
+		return fmt.Errorf("failed to get agent configuration from the CipherSwarm API: %w", err)
 	}
 
 	if viper.GetBool("always_use_native_hashcat") {
 		lib.Configuration.Config.UseNativeHashcat = true
 	}
 
-	return err
+	return nil
 }
 
 func initLogger() {

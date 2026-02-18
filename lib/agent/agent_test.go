@@ -48,11 +48,10 @@ func TestInitLogger_DebugMode(t *testing.T) {
 
 	// Save original logger state
 	originalLevel := agentstate.Logger.GetLevel()
-	originalReportCaller := false // Can't easily check this, but we verify it doesn't panic
 
 	defer func() {
 		agentstate.Logger.SetLevel(originalLevel)
-		agentstate.Logger.SetReportCaller(originalReportCaller)
+		agentstate.Logger.SetReportCaller(false)
 	}()
 
 	agentstate.State.Debug = true

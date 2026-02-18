@@ -56,7 +56,7 @@ func NewTestAttack(id int64, attackMode int) *components.Attack {
 		HashListID:        1,
 		HashListURL:       &hashListURL,
 		HashListChecksum:  &checksum,
-		HashMode:          intPtr(0),
+		HashMode:          new(int64),
 		WordList: &components.AttackResourceFile{
 			ID:          wordListID,
 			DownloadURL: wordListURL,
@@ -161,11 +161,6 @@ func NewTestSDKClientWithClient(baseURL string, client *http.Client) *sdk.Cipher
 		sdk.WithSecurity("test-token"), // Set a default test token for authentication
 		sdk.WithClient(client),
 	)
-}
-
-// Helper functions for creating pointers.
-func intPtr(i int64) *int64 {
-	return &i
 }
 
 // NewTestAgent creates a test Agent object with the specified ID and hostname,

@@ -97,7 +97,7 @@ func AssertTaskStatus(t *testing.T, expected, actual components.TaskStatus) {
 // AssertErrorType verifies that an error is of a specific SDK error type
 // (e.g., sdkerrors.ErrorObject or sdkerrors.SDKError).
 // This is critical for testing error handling paths in lib/errorUtils.go.
-func AssertErrorType(t *testing.T, err error, expectedType interface{}) {
+func AssertErrorType(t *testing.T, err error, expectedType any) {
 	t.Helper()
 	if expectedType == nil {
 		assert.NoError(t, err)

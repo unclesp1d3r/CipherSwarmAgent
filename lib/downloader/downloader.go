@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"github.com/duke-git/lancet/v2/cryptor"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/hashicorp/go-getter"
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -36,7 +36,7 @@ type Getter interface {
 
 // DownloadFile downloads a file from a given URL and saves it to the specified path with optional checksum verification.
 // If the URL is invalid, it returns an error. If the file already exists and the checksum matches, the download is skipped.
-func DownloadFile(fileURL, filePath, checksum string) error {
+func DownloadFile(ctx context.Context, fileURL, filePath, checksum string) error {
 	parsedURL, err := url.Parse(fileURL)
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		agentstate.Logger.Error("Invalid URL", "url", fileURL)
@@ -48,7 +48,7 @@ func DownloadFile(fileURL, filePath, checksum string) error {
 		return nil
 	}
 
-	if err := downloadAndVerifyFile(fileURL, filePath, checksum); err != nil {
+	if err := downloadAndVerifyFile(ctx, fileURL, filePath, checksum); err != nil {
 		return err
 	}
 
@@ -100,7 +100,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 // The file is downloaded using the configured client with retry logic for transient failures.
 // After downloading, the file's checksum is verified, if provided, to ensure integrity.
 // If the checksum does not match, an error is returned, indicating the downloaded file is corrupt.
-func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
+func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum string) error {
 	if strutil.IsNotBlank(checksum) {
 		var err error
 
@@ -111,7 +111,7 @@ func downloadAndVerifyFile(fileURL, filePath, checksum string) error {
 	}
 
 	client := &getter.Client{
-		Ctx:      context.Background(),
+		Ctx:      ctx,
 		Dst:      filePath,
 		Src:      fileURL,
 		Pwd:      agentstate.State.CrackersPath,
@@ -196,7 +196,7 @@ func appendChecksumToURL(rawURL, checksum string) (string, error) {
 // The function makes an API call to fetch the hash list, checks the response status, and handles errors if the call fails.
 // If the response stream is not nil, it writes the hash list to the file and verifies the file's validity.
 // Logs relevant actions and errors encountered during the process and returns any errors that occur.
-func DownloadHashList(attack *components.Attack) error {
+func DownloadHashList(ctx context.Context, attack *components.Attack) error {
 	if attack == nil {
 		return errors.New("attack is nil")
 	}
@@ -208,13 +208,13 @@ func DownloadHashList(attack *components.Attack) error {
 		return err
 	}
 
-	response, err := agentstate.State.APIClient.Attacks().GetHashList(context.Background(), attack.ID)
+	response, err := agentstate.State.APIClient.Attacks().GetHashList(ctx, attack.ID)
 	if err != nil {
-		return errors.Wrap(err, "error downloading hashlist from the CipherSwarm API")
+		return fmt.Errorf("error downloading hashlist from the CipherSwarm API: %w", err)
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return errors.Errorf("error downloading hashlist: %s", response.RawResponse.Status)
+		return fmt.Errorf("error downloading hashlist: %s", response.RawResponse.Status)
 	}
 
 	if response.ResponseStream == nil {
@@ -260,7 +260,7 @@ func removeExistingFile(filePath string) error {
 	if err == nil {
 		// File exists, remove it
 		if err := os.Remove(filePath); err != nil {
-			return errors.Wrap(err, "error removing old file")
+			return fmt.Errorf("error removing old file: %w", err)
 		}
 
 		return nil
@@ -272,7 +272,7 @@ func removeExistingFile(filePath string) error {
 	}
 
 	// Stat failed for other reasons (permission error, IO error, etc.)
-	return errors.Wrap(err, "error checking file existence")
+	return fmt.Errorf("error checking file existence: %w", err)
 }
 
 // writeResponseToFile writes the data from an io.Reader (responseStream) to a file specified by the filePath.
@@ -280,7 +280,7 @@ func removeExistingFile(filePath string) error {
 func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
-		return errors.Wrap(err, "error creating file")
+		return fmt.Errorf("error creating file: %w", err)
 	}
 	defer func(f *os.File) {
 		if err := f.Close(); err != nil {
@@ -289,7 +289,7 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	}(file)
 
 	if _, err := io.Copy(file, responseStream); err != nil {
-		return errors.Wrap(err, "error writing file")
+		return fmt.Errorf("error writing file: %w", err)
 	}
 
 	return nil

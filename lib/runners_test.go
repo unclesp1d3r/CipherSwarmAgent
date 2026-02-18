@@ -212,12 +212,9 @@ func TestHandleStdErrLine(t *testing.T) {
 	}
 }
 
-// TestHandleStdErrLine_ErrorClassification verifies that hashcat.ClassifyStderr
-// returns correct categories and severities for error patterns that handleStdErrLine
-// would encounter, ensuring the classification logic behaves correctly.
-func TestHandleStdErrLine_ErrorClassification(t *testing.T) {
-	// This test verifies the classification logic used by handleStdErrLine
-	// by testing hashcat.ClassifyStderr directly with known error patterns.
+// TestClassifyStderr_KnownPatterns verifies that hashcat.ClassifyStderr
+// returns correct categories and severities for known error patterns.
+func TestClassifyStderr_KnownPatterns(t *testing.T) {
 	errorPatterns := []struct {
 		name             string
 		line             string
@@ -319,7 +316,6 @@ func TestHandleDoneChan(t *testing.T) {
 			sess, err := testhelpers.NewMockSession("test-session")
 			if err != nil {
 				t.Skipf("Skipping test: failed to create mock session: %v", err)
-				return
 			}
 
 			// Note: We cannot easily verify cleanup was called without modifying the Session
