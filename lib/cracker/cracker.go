@@ -41,7 +41,7 @@ func FindHashcatBinary() (string, error) {
 	}
 
 	for _, filePath := range possiblePaths {
-		info, err := os.Stat(filePath)
+		info, err := os.Stat(filePath) //nolint:gosec // G703 - paths from hardcoded list and internal config
 		if err == nil && info.Mode()&0o111 != 0 {
 			foundPath = filePath
 			return foundPath, nil

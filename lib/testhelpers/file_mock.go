@@ -42,7 +42,7 @@ func MockDownloadServer(t *testing.T, baseDir string) *httptest.Server {
 		filename := filepath.Base(r.URL.Path)
 		filePath := filepath.Join(baseDir, filename)
 
-		file, err := os.Open(filePath)
+		file, err := os.Open(filePath) //nolint:gosec // G703 - test helper with controlled file paths
 		if err != nil {
 			http.Error(w, "File not found", http.StatusNotFound)
 			return

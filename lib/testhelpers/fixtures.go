@@ -175,9 +175,9 @@ func NewTestAgent(agentID int64, hostname string) components.Agent {
 	}
 }
 
-// MockHostInfo returns a mock host.InfoStat object with test data (hostname, OS, kernel arch).
-// Note: Go doesn't support easy function mocking without interfaces.
-// Tests using UpdateAgentMetadata should either use build tags or accept that real host info is used.
+// MockHostInfo is a placeholder that always returns an error.
+// Go's host.Info() cannot be easily mocked without interfaces or build tags.
+// Tests requiring host info should use build tags or accept real host.Info() calls.
 func MockHostInfo() (*host.InfoStat, error) {
 	// This is a placeholder - actual tests should use build tags or accept real host.Info()
 	// Returning a sentinel error avoids returning nil, nil which linters disallow.

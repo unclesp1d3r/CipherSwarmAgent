@@ -98,6 +98,7 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	}(tempDir)
 
 	tempArchivePath := path.Join(tempDir, "hashcat.7z")
+	// TODO: propagate cancellable context for graceful shutdown support
 	if err := downloader.DownloadFile(context.TODO(), *update.GetDownloadURL(), tempArchivePath, ""); err != nil {
 		return cserrors.LogAndSendError("Error downloading cracker", err, operations.SeverityCritical, nil)
 	}

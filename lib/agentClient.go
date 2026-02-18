@@ -229,12 +229,12 @@ func downloadResourceFile(ctx context.Context, resource *components.AttackResour
 	}
 
 	if err := downloader.DownloadFile(ctx, resource.GetDownloadURL(), filePath, checksum); err != nil {
-		//nolint:contextcheck // LogAndSendError does not yet accept context
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError("Error downloading attack resource", err, operations.SeverityCritical, nil)
 	}
 
 	if fileInfo, err := os.Stat(filePath); err != nil || fileInfo.Size() == 0 {
-		//nolint:contextcheck // LogAndSendError does not yet accept context
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError("Downloaded file is empty", nil, operations.SeverityCritical, nil)
 	}
 
