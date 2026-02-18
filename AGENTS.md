@@ -32,7 +32,7 @@ The agent operates as a long-lived CLI client that interacts with the CipherSwar
 
 ## Go
 
-The project follows standard, idiomatic Go practices (version >=1.22).
+The project follows standard, idiomatic Go practices (version 1.26+).
 
 ### Project Structure
 
@@ -48,6 +48,8 @@ The project follows standard, idiomatic Go practices (version >=1.22).
 - **Formatting:** All Go code must be formatted using `gofmt`.
 - **Linting:** We use `golangci-lint` for static analysis. Run checks with `just ci-check`.
 - **Note:** Use `mise x -- golangci-lint run ./...` to ensure correct linter version (v2).
+- **Gotcha:** `//go:fix inline` directives conflict with `gocheckcompilerdirectives` linter — avoid adding them.
+- **Gotcha:** `contextcheck` linter flags functions not propagating context — use `//nolint:contextcheck` when callee doesn't accept context yet.
 
 ### Naming Conventions
 
@@ -62,6 +64,7 @@ The project follows standard, idiomatic Go practices (version >=1.22).
 
 - Errors must always be checked and never ignored.
 - Use `fmt.Errorf` with the `%w` verb to wrap errors for context.
+- Use stdlib `errors` and `fmt.Errorf` only — do not use `github.com/pkg/errors` (removed from project).
 - Use `defer` for resource cleanup (e.g., closing files, terminating processes).
 - `panic` should not be used for normal control flow.
 - Never silently correct invalid inputs (e.g., negative values) - always log a warning.
@@ -82,11 +85,16 @@ The project follows standard, idiomatic Go practices (version >=1.22).
 ### Tooling
 
 - **Dev Tool Management:** Use `mise` to install and manage development toolchains (e.g., Go, Bun) via `mise.toml`.
+- **CI Validation:** Run `just ci-check` to validate all checks pass before committing.
+- **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
+- **Vendor Sync:** After `go fix` or dependency changes, run `go mod tidy && go mod vendor` to sync the vendor directory.
 
 ### Testing
 
 - Write table-driven tests for core logic and place them in `_test.go` files within the same package.
 - Use mocks for network and OS-level interactions to ensure testability.
+- Use `lib/testhelpers/` package for shared test fixtures, HTTP mocking (`SetupHTTPMock`), and state setup (`SetupTestState`).
+- Use `any` instead of `interface{}` (enforced by modernize linter).
 - Aim for high test coverage on core logic.
 - Test naming convention: `TestFunctionName_Scenario` with underscore separation.
 - Use `require.Error/NoError` instead of `assert.Error/NoError` for error assertions (testifylint rule).
