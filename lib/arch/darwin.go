@@ -87,7 +87,6 @@ func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) 
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
 func Extract7z(ctx context.Context, srcFile, destDir string) error {
-	//nolint:gosec // Parameters validated upstream
 	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).
 		Output()
 

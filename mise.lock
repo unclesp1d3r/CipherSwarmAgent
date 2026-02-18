@@ -23,7 +23,7 @@ version = "2.23.0"
 backend = "go:github.com/securego/gosec/v2/cmd/gosec"
 
 [[tools.golangci-lint]]
-version = "2.9.0"
+version = "2.10.1"
 backend = "aqua:golangci/golangci-lint"
 
 [[tools.goreleaser]]

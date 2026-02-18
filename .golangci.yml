@@ -125,6 +125,12 @@ linters:
         underef:
           skipRecvDeref: false
 
+    gosec:
+      excludes:
+        - G117 # Struct field matches secret pattern - false positive on config fields
+        - G702 # Command injection via taint - commands built from internal config, not user input
+        - G703 # Path traversal via taint - paths built from internal config, not user input
+
     embeddedstructfieldcheck:
       forbid-mutex: true
 

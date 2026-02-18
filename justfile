@@ -202,16 +202,6 @@ cover: test-coverage
 bench:
     @{{ mise_exec }} go test -bench=. ./...
 
-# Run memory benchmarks for parser
-[group('test')]
-bench-mem:
-    @{{ mise_exec }} go test -bench=BenchmarkParse -benchmem ./internal/parser
-
-# Run comprehensive performance benchmarks
-[group('test')]
-bench-perf:
-    @{{ mise_exec }} go test -bench=. -run=^$ -benchtime=1s -count=3 ./internal/converter
-
 # Save benchmark baseline for comparison
 [group('test')]
 bench-save:
@@ -233,20 +223,6 @@ bench-compare:
     @{{ mise_exec }} go install golang.org/x/perf/cmd/benchstat@latest
     @{{ mise_exec }} benchstat .benchmark-baseline.txt .benchmark-current.txt
 
-# Run startup time benchmarks
-[group('test')]
-bench-startup:
-    @{{ mise_exec }} go test -bench=BenchmarkStartup -run=^$ -benchmem ./cmd/...
-
-# Run pool benchmarks
-[group('test')]
-bench-pool:
-    @{{ mise_exec }} go test -bench=. -run=^$ -benchmem ./internal/pool/...
-
-# Run model completeness check
-[group('test')]
-completeness-check:
-    @{{ mise_exec }} go test -tags=completeness ./internal/model -run TestModelCompleteness
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Build
@@ -396,7 +372,7 @@ ci-check: check format-check lint test test-integration
 ci-smoke:
     @echo "Running smoke tests..."
     @{{ mise_exec }} go build -trimpath -ldflags="-s -w -X main.version=dev" -v ./...
-    @{{ mise_exec }} go test -count=1 -failfast -short -timeout 5m ./cmd/... ./internal/config/...
+    @{{ mise_exec }} go test -count=1 -failfast -short -timeout 5m ./...
     @echo "✅ Smoke tests passed"
 
 # Run full checks including security and release validation
