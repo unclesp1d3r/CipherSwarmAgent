@@ -143,3 +143,5 @@ site/
 **/node_modules/
 cipherswarmagent
 cipherswarm-agent
+
+undefined/

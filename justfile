@@ -1,76 +1,455 @@
-# Justfile for CipherSwarm Agent
+# cipherswarmagent Justfile
+# Run `just` or `just --list` to see available recipes
 
-# Use PowerShell on Windows, bash elsewhere
-set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
-set shell := ["bash", "-lc"]
+set shell := ["bash", "-cu"]
+set windows-powershell := true
+set dotenv-load := true
+set ignore-comments := true
 
-# Use mise to manage all dev tools (pre-commit, etc.)
-# See .mise.toml for tool versions
+# Use mise to manage all dev tools (go, pre-commit, uv, etc.)
+# See mise.toml for tool versions
 mise_exec := "mise exec --"
 
-# Serve documentation locally
-@docs:
-    {{mise_exec}} pipx run --spec mkdocs-material mkdocs serve
+# ─────────────────────────────────────────────────────────────────────────────
+# Variables
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Run the agent (development)
-dev:
-    {{mise_exec}} go run main.go
+project_dir := justfile_directory()
+binary_name := "cipherswarmagent"
 
-# Install all requirements and build the project
+# Platform-specific commands
+_cmd_exists := if os_family() == "windows" { "where" } else { "command -v" }
+_null := if os_family() == "windows" { "nul" } else { "/dev/null" }
+
+# Act configuration
+act_arch := "linux/amd64"
+act_cmd := "act --container-architecture " + act_arch
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Default & Help
+# ─────────────────────────────────────────────────────────────────────────────
+
+[private]
+default:
+    @just --list --unsorted
+
+alias h := help
+alias l := list
+
+# Show available recipes
+[group('help')]
+help:
+    @just --list
+
+# Show recipes in a specific group
+[group('help')]
+list group="":
+    @just --list --unsorted {{ if group != "" { "--list-heading='' --list-prefix='  ' | grep -A999 '" + group + "'" } else { "" } }}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Setup & Installation
+# ─────────────────────────────────────────────────────────────────────────────
+
+alias i := install
+
+# Install all dependencies and setup environment
+[group('setup')]
 install:
-    {{mise_exec}} pre-commit install --hook-type commit-msg
-    {{mise_exec}} go mod tidy
+    @mise install
+    @{{ mise_exec }} pre-commit install --hook-type commit-msg
+    @{{ mise_exec }} go mod tidy
 
-install-docs:
-    {{mise_exec}} pipx install mkdocs --force
-    {{mise_exec}} pipx inject mkdocs mkdocs-material
 
-# Run pre-commit hooks and linting
-check: lint
-    cd {{justfile_dir()}}
-    @{{mise_exec}} pre-commit run -a # Runs all hooks on all files
-    @{{mise_exec}} goreleaser check --verbose
+# Alias for install
+[group('setup')]
+setup: install
 
-# Run lint and code checks
+# Update all dependencies
+[group('setup')]
+update-deps: _update-go _update-python _update-precommit
+    @echo "✅ All dependencies updated"
+
+[private]
+_update-go:
+    @echo "Updating Go dependencies..."
+    @{{ mise_exec }} go get -u ./...
+    @{{ mise_exec }} go mod tidy
+    @{{ mise_exec }} go mod verify
+
+[private]
+[no-exit-message]
+_update-python:
+    @echo "Updating Python dependencies..."
+    @{{ mise_exec }} pre-commit install --hook-type commit-msg 2>{{ _null }} || true
+
+[private]
+_update-precommit: _update-python
+    @echo "Updating pre-commit hooks..."
+    @{{ mise_exec }} pre-commit autoupdate
+
+
+# Install security and SBOM tools (cyclonedx-gomod, gosec)
+[group('setup')]
+install-security-tools:
+    @{{ mise_exec }} go install github.com/securego/gosec/v2/cmd/gosec@latest
+    @{{ mise_exec }} go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+    # cosign is now handled by mise
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Development
+# ─────────────────────────────────────────────────────────────────────────────
+
+alias r := run
+
+# Run the application with optional arguments
+[group('dev')]
+run *args:
+    @{{ mise_exec }} go run main.go {{ args }}
+
+# Run in development mode (alias for run)
+[group('dev')]
+dev *args:
+    @{{ mise_exec }} go run main.go {{ args }}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Code Quality
+# ─────────────────────────────────────────────────────────────────────────────
+
+alias f := format
+alias fmt := format
+
+# Format code and apply fixes
+[group('quality')]
+format:
+    @{{ mise_exec }} golangci-lint run --fix ./...
+    @just modernize
+
+# Check formatting without making changes
+[group('quality')]
+format-check:
+    @{{ mise_exec }} golangci-lint fmt ./...
+
+# Run linter
+[group('quality')]
 lint:
-    @{{mise_exec}} golangci-lint fmt ./...
-    @{{mise_exec}} golangci-lint run ./...
-    @{{mise_exec}} go vet ./...
+    @{{ mise_exec }} golangci-lint run ./...
+    @just modernize-check
 
-# Run tests
+# Run pre-commit checks on all files
+[group('quality')]
+check:
+    @{{ mise_exec }} pre-commit run --all-files
+
+# Apply Go modernization fixes
+[group('quality')]
+modernize:
+    @{{ mise_exec }} go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -fix -test ./...
+
+# Check for modernization opportunities (dry-run)
+[group('quality')]
+modernize-check:
+    @{{ mise_exec }} go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -test ./...
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Testing
+# ─────────────────────────────────────────────────────────────────────────────
+
+alias t := test
+
+# Run all tests
+[group('test')]
 test:
-    {{mise_exec}} go test ./...
-# Test coverage commands
-# Run tests with coverage reporting
+    @{{ mise_exec }} go test ./...
+
+# Run tests with verbose output
+[group('test')]
+test-v:
+    @{{ mise_exec }} go test -v ./...
+
+# Run tests with coverage report
+[group('test')]
 test-coverage:
-    {{mise_exec}} go test -race -coverprofile=coverage.out -covermode=atomic ./...
+    @{{ mise_exec }} go test -coverprofile=coverage.txt ./...
+    @{{ mise_exec }} go tool cover -func=coverage.txt
 
-# Generate and open HTML coverage report (macOS/Linux)
-# Note: For Windows, use `just test-coverage-html-win` instead
-test-coverage-html: test-coverage
-    {{mise_exec}} go tool cover -html=coverage.out -o coverage.html
+# Run integration tests (build tag)
+[group('test')]
+test-integration:
+    @{{ mise_exec }} go test -tags=integration ./...
 
+# Run tests with race detector
+[group('test')]
+test-race:
+    @{{ mise_exec }} go test -race -timeout 10m ./...
 
-# Display function-level coverage in terminal
-test-coverage-func: test-coverage
-    {{mise_exec}} go tool cover -func=coverage.out
+# Run stress tests (heavy load testing)
+[group('test')]
+test-stress:
+    @{{ mise_exec }} go test -tags=stress -timeout 5m ./...
 
-# Display package-level coverage summary
-test-coverage-package: test-coverage
-    {{mise_exec}} go tool cover -func=coverage.out | grep total
-# Run all checks and tests (CI)
-ci-check: check test
+# Run tests and open coverage in browser
+[group('test')]
+coverage:
+    @{{ mise_exec }} go test -coverprofile=coverage.txt ./...
+    @{{ mise_exec }} go tool cover -html=coverage.txt
 
+# Generate coverage artifact
+[group('test')]
+cover: test-coverage
 
-# Run all checks and tests, and build the agent
-build: install check test
-    {{mise_exec}} go mod tidy
-    {{mise_exec}} goreleaser build --clean --auto-snapshot --single-target
+# Run benchmarks
+[group('test')]
+bench:
+    @{{ mise_exec }} go test -bench=. ./...
 
-update-deps:
-    cd {{justfile_dir()}}
-    {{mise_exec}} go get -u ./...
-    {{mise_exec}} go mod tidy
-    {{mise_exec}} go mod verify
-    {{mise_exec}} go mod vendor
-    {{mise_exec}} go mod tidy
+# Run memory benchmarks for parser
+[group('test')]
+bench-mem:
+    @{{ mise_exec }} go test -bench=BenchmarkParse -benchmem ./internal/parser
+
+# Run comprehensive performance benchmarks
+[group('test')]
+bench-perf:
+    @{{ mise_exec }} go test -bench=. -run=^$ -benchtime=1s -count=3 ./internal/converter
+
+# Save benchmark baseline for comparison
+[group('test')]
+bench-save:
+    @echo "Saving benchmark baseline..."
+    @{{ mise_exec }} go test -bench=. -run=^$ -benchmem -count=5 ./... 2>/dev/null | tee .benchmark-baseline.txt
+    @echo "✅ Baseline saved to .benchmark-baseline.txt"
+
+# Compare current benchmarks against baseline
+[group('test')]
+bench-compare:
+    @if [ ! -f .benchmark-baseline.txt ]; then \
+        echo "No baseline found. Run 'just bench-save' first."; \
+        exit 1; \
+    fi
+    @echo "Running current benchmarks..."
+    @{{ mise_exec }} go test -bench=. -run=^$ -benchmem -count=5 ./... 2>/dev/null | tee .benchmark-current.txt
+    @echo ""
+    @echo "Comparing benchmarks..."
+    @{{ mise_exec }} go install golang.org/x/perf/cmd/benchstat@latest
+    @{{ mise_exec }} benchstat .benchmark-baseline.txt .benchmark-current.txt
+
+# Run startup time benchmarks
+[group('test')]
+bench-startup:
+    @{{ mise_exec }} go test -bench=BenchmarkStartup -run=^$ -benchmem ./cmd/...
+
+# Run pool benchmarks
+[group('test')]
+bench-pool:
+    @{{ mise_exec }} go test -bench=. -run=^$ -benchmem ./internal/pool/...
+
+# Run model completeness check
+[group('test')]
+completeness-check:
+    @{{ mise_exec }} go test -tags=completeness ./internal/model -run TestModelCompleteness
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Build
+# ─────────────────────────────────────────────────────────────────────────────
+
+alias b := build
+
+# Build the binary
+[group('build')]
+build:
+    @{{ mise_exec }} go build -o {{ binary_name }}{{ if os_family() == "windows" { ".exe" } else { "" } }} main.go
+
+# Build with optimizations for release
+[group('build')]
+build-release:
+    @CGO_ENABLED=0 {{ mise_exec }} go build -trimpath -ldflags="-s -w" -o {{ binary_name }}{{ if os_family() == "windows" { ".exe" } else { "" } }} main.go
+
+# Clean build artifacts
+[group('build')]
+[confirm("This will remove build artifacts. Continue?")]
+clean:
+    @{{ mise_exec }} go clean
+    @rm -f coverage.txt {{ binary_name }} {{ binary_name }}.exe 2>{{ _null }} || true
+
+# Clean and rebuild
+[group('build')]
+rebuild: clean build
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Release (GoReleaser)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Check GoReleaser configuration
+[group('release')]
+release-check:
+    @goreleaser check --verbose
+
+# Build snapshot (no tag required)
+[group('release')]
+release-snapshot:
+    @{{ mise_exec }} goreleaser build --clean --snapshot
+
+# Build for current platform only
+[group('release')]
+release-local:
+    @{{ mise_exec }} goreleaser build --clean --snapshot --single-target
+
+# Full release (requires git tag and GITHUB_TOKEN)
+[group('release')]
+[confirm("This will create a GitHub release. Continue?")]
+release: check test
+    @{{ mise_exec }} goreleaser release --clean
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Documentation
+# ─────────────────────────────────────────────────────────────────────────────
+
+alias d := docs
+
+# Serve documentation locally
+[group('docs')]
+docs:
+    @{{ mise_exec }} uv run mkdocs serve
+
+# Alias for docs
+[group('docs')]
+site: docs
+
+# Build documentation
+[group('docs')]
+docs-build:
+    @{{ mise_exec }} uv run mkdocs build
+
+# Build documentation with verbose output
+[group('docs')]
+docs-test:
+    @{{ mise_exec }} uv run mkdocs build --verbose
+
+# Generate model reference documentation
+[group('docs')]
+generate-docs:
+    @echo "Generating model reference documentation..."
+    @{{ mise_exec }} go run tools/docgen/main.go
+    @echo "✅ Documentation generated"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Changelog
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Generate changelog
+[group('docs')]
+changelog: _require-git-cliff
+    @{{ mise_exec }} git-cliff --output CHANGELOG.md
+
+# Generate changelog for a specific version
+[group('docs')]
+changelog-version version: _require-git-cliff
+    @{{ mise_exec }} git-cliff --tag {{ version }} --output CHANGELOG.md
+
+# Generate changelog for unreleased changes only
+[group('docs')]
+changelog-unreleased: _require-git-cliff
+    @{{ mise_exec }} git-cliff --unreleased --output CHANGELOG.md
+
+[private]
+_require-git-cliff:
+    #!/usr/bin/env bash
+    if ! command -v git-cliff >/dev/null 2>&1; then
+        echo "Error: git-cliff not found. Run 'just install' to install it."
+        exit 1
+    fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Security
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Run gosec security scanner
+[group('security')]
+scan:
+    @echo "Running security scan..."
+    @{{ mise_exec }} gosec ./...
+
+# Generate SBOM with cyclonedx-gomod
+[group('security')]
+sbom: build-release
+    @echo "Generating SBOM..."
+    @{{ mise_exec }} cyclonedx-gomod bin -output sbom-binary.cyclonedx.json ./{{ binary_name }}{{ if os_family() == "windows" { ".exe" } else { "" } }}
+    @{{ mise_exec }} cyclonedx-gomod app -output sbom-modules.cyclonedx.json -json .
+    @echo "✅ SBOM generated: sbom-binary.cyclonedx.json, sbom-modules.cyclonedx.json"
+
+# Run all security checks (SBOM + security scan)
+[group('security')]
+security-all: sbom scan
+    @echo "✅ All security checks complete"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CI
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Run full CI checks (pre-commit, format, lint, test)
+[group('ci')]
+ci-check: check format-check lint test test-integration
+    @echo "✅ All CI checks passed"
+
+# Run smoke tests (fast, minimal validation)
+[group('ci')]
+ci-smoke:
+    @echo "Running smoke tests..."
+    @{{ mise_exec }} go build -trimpath -ldflags="-s -w -X main.version=dev" -v ./...
+    @{{ mise_exec }} go test -count=1 -failfast -short -timeout 5m ./cmd/... ./internal/config/...
+    @echo "✅ Smoke tests passed"
+
+# Run full checks including security and release validation
+[group('ci')]
+ci-full: ci-check security-all release-check docs-test
+    @echo "✅ All checks passed"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GitHub Actions (act)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[private]
+_require-act:
+    #!/usr/bin/env bash
+    if ! command -v act >/dev/null 2>&1; then
+        echo "Error: act not found. Install: brew install act"
+        exit 1
+    fi
+
+# List available GitHub Actions workflows
+[group('act')]
+act-list: _require-act
+    @{{ act_cmd }} --list
+
+# Run a specific workflow
+[group('act')]
+act-run workflow: _require-act
+    @echo "Running workflow: {{ workflow }}"
+    @{{ act_cmd }} --workflows .github/workflows/{{ workflow }}.yml --verbose
+
+# Dry-run a workflow (list steps only)
+[group('act')]
+act-dry workflow: _require-act
+    @{{ act_cmd }} --workflows .github/workflows/{{ workflow }}.yml --list
+
+# Test PR workflow locally
+[group('act')]
+act-pr: _require-act
+    @{{ act_cmd }} pull_request --verbose
+
+# Test push workflow locally
+[group('act')]
+act-push: _require-act
+    @{{ act_cmd }} push --verbose
+
+# Test all PR workflows (dry-run)
+[group('act')]
+act-test-all: _require-act
+    @echo "Testing CI workflow..."
+    @{{ mise_exec }} just act-dry ci
+    @echo ""
+    @echo "Testing SBOM workflow..."
+    @{{ mise_exec }} just act-dry sbom
+    @echo ""
+    @echo "Testing Scorecard workflow..."
+    @{{ mise_exec }} just act-dry scorecard
