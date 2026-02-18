@@ -95,11 +95,9 @@ func FileExistsAndValid(filePath, checksum string) bool {
 	return false
 }
 
-// downloadAndVerifyFile downloads a file from the given URL and saves it to the specified path, verifying the checksum if provided.
-// If a checksum is given, it is appended to the URL before download. The function then configures a client for secure file transfer.
-// The file is downloaded using the configured client with retry logic for transient failures.
-// After downloading, the file's checksum is verified, if provided, to ensure integrity.
-// If the checksum does not match, an error is returned, indicating the downloaded file is corrupt.
+// downloadAndVerifyFile downloads a file from the given URL and saves it to the specified path.
+// If a checksum is provided, it is appended to the URL for server-side verification,
+// and the downloaded file is verified locally after download. Uses retry logic for transient failures.
 func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum string) error {
 	if strutil.IsNotBlank(checksum) {
 		var err error
@@ -123,8 +121,11 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 		getter.WithProgress(progress.DefaultProgressBar),
 		getter.WithUmask(os.FileMode(defaultUmask)),
 	); err != nil {
-		agentstate.Logger.Warn("Download client configuration failed, proceeding with defaults",
-			"error", err)
+		agentstate.Logger.Warn(
+			"Download client configuration failed; file permissions may be incorrect (umask not set to 0o022)",
+			"error",
+			err,
+		)
 	}
 
 	maxRetries := viper.GetInt("download_max_retries")
@@ -146,7 +147,7 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 func downloadWithRetry(client Getter, maxRetries int, baseDelay time.Duration) error {
 	// Ensure at least one download attempt is made
 	if maxRetries < 1 {
-		agentstate.Logger.Debug("maxRetries value < 1, defaulting to 1 attempt",
+		agentstate.Logger.Warn("maxRetries value < 1, defaulting to 1 attempt",
 			"configured_value", maxRetries)
 		maxRetries = 1
 	}
@@ -194,7 +195,7 @@ func appendChecksumToURL(rawURL, checksum string) (string, error) {
 // DownloadHashList downloads the hash list for a given attack.
 // It constructs the local path for the hash list file and attempts to remove any existing file at that location.
 // The function makes an API call to fetch the hash list, checks the response status, and handles errors if the call fails.
-// If the response stream is not nil, it writes the hash list to the file and verifies the file's validity.
+// If the response stream is not nil, it writes the hash list to the file and verifies the downloaded file is non-empty.
 // Logs relevant actions and errors encountered during the process and returns any errors that occur.
 func DownloadHashList(ctx context.Context, attack *components.Attack) error {
 	if attack == nil {
