@@ -24,19 +24,6 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
-// Helper functions for creating pointers.
-func intPtr(i int64) *int64 {
-	return &i
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func stringPtr(s string) *string {
-	return &s
-}
-
 // stubGetDevicesList replaces getDevicesListFn with a stub that returns mock devices.
 // Returns a cleanup function to restore the original function.
 func stubGetDevicesList() func() {
@@ -984,10 +971,10 @@ func TestMapConfiguration(t *testing.T) {
 			config: &operations.GetConfigurationResponseBody{
 				APIVersion: 1,
 				Config: components.AdvancedAgentConfiguration{
-					UseNativeHashcat:    boolPtr(true),
-					AgentUpdateInterval: intPtr(600),
-					BackendDevice:       stringPtr("OpenCL"),
-					OpenclDevices:       stringPtr("1,2"),
+					UseNativeHashcat:    new(true),
+					AgentUpdateInterval: new(int64(600)),
+					BackendDevice:       new("OpenCL"),
+					OpenclDevices:       new("1,2"),
 				},
 			},
 			expected: agentConfiguration{
@@ -1005,10 +992,10 @@ func TestMapConfiguration(t *testing.T) {
 			config: &operations.GetConfigurationResponseBody{
 				APIVersion: 1,
 				Config: components.AdvancedAgentConfiguration{
-					UseNativeHashcat:    boolPtr(true),
+					UseNativeHashcat:    new(true),
 					AgentUpdateInterval: nil,
 					BackendDevice:       nil,
-					OpenclDevices:       stringPtr("1"),
+					OpenclDevices:       new("1"),
 				},
 			},
 			expected: agentConfiguration{

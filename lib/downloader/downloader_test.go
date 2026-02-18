@@ -111,7 +111,7 @@ func TestAppendChecksumToURL(t *testing.T) {
 			result, err := appendChecksumToURL(tt.fileURL, tt.checksum)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedURL, result)
