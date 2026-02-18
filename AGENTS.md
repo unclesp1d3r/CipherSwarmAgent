@@ -50,6 +50,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Note:** Use `mise x -- golangci-lint run ./...` to ensure correct linter version (v2).
 - **Gotcha:** `//go:fix inline` directives conflict with `gocheckcompilerdirectives` linter — avoid adding them.
 - **Gotcha:** `contextcheck` linter flags functions not propagating context — use `//nolint:contextcheck` when callee doesn't accept context yet.
+- **Gotcha:** When removing global gosec exclusions, run `mise x -- golangci-lint run ./...` to find ALL violation sites before adding per-site `//nolint:gosec` comments.
+- **gosec nolint style:** Use per-site `//nolint:gosec // G7XX - <reason>` with specific rule ID rather than global exclusions in `.golangci.yml`.
 
 ### Naming Conventions
 
@@ -69,6 +71,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - `panic` should not be used for normal control flow.
 - Never silently correct invalid inputs (e.g., negative values) - always log a warning.
 - Guard against negative values in bit shift operations to prevent panic.
+- When checking `err != nil || obj == nil` for API responses, handle `obj == nil && err == nil` as a separate error case to prevent nil pointer dereferences.
+- In deferred cleanup functions (e.g., lock file removal), use `os.IsNotExist` to skip already-removed files and include file paths in error messages.
 
 ### Concurrency
 
