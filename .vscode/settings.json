@@ -1,7 +1,9 @@
 {
   "go.goroot": "${workspaceFolder}/.vscode/mise-tools/goRoot",
   "go.alternateTools": {
-    "go": "${workspaceFolder}/.vscode/mise-tools/go"
+    "go": "${workspaceFolder}/.vscode/mise-tools/go",
+    "dlv": "${workspaceFolder}/.vscode/mise-tools/dlv",
+    "gopls": "${workspaceFolder}/.vscode/mise-tools/gopls"
   },
   "ruff.path": [
     "${workspaceFolder}/.vscode/mise-tools/ruff"
@@ -9,5 +11,8 @@
   "ruff.interpreter": [
     "${workspaceFolder}/.vscode/mise-tools/python"
   ],
-  "python.defaultInterpreterPath": "${workspaceFolder}/.vscode/mise-tools/python"
+  "python.defaultInterpreterPath": "${workspaceFolder}/.vscode/mise-tools/python",
+  "debug.javascript.defaultRuntimeExecutable": {
+    "pwa-node": "${workspaceFolder}/.vscode/mise-tools/node"
+  }
 }

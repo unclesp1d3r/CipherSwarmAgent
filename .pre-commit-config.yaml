@@ -21,7 +21,7 @@ repos:
       - id: check-vcs-permalinks
 
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.7
+    rev: v1.7.11
     hooks:
       - id: actionlint
         files: ".github/workflows/"
@@ -31,8 +31,8 @@ repos:
     hooks:
       - id: shellcheck
 
-  - repo: https://github.com/hukkin/mdformat
-    rev: 0.7.22
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 1.0.0
     hooks:
       - id: mdformat
         additional_dependencies:
@@ -40,12 +40,10 @@ repos:
           - mdformat-admon
           - mdformat-config
           - mdformat-footnote
-          - mdformat-frontmatter
           - mdformat-simple-breaks
-          - mdformat-tables
           - mdformat-web
-          - mdformat-wikilink
           - mdformat-ruff
           - mdformat-gfm-alerts
-          - mdformat-rustfmt
           - mdformat-toc
+          - mdformat-front-matters
+        types: [markdown]
