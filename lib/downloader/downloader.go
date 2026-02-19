@@ -18,8 +18,8 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/hashicorp/go-getter"
 	"github.com/spf13/viper"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
 )
 
@@ -197,32 +197,33 @@ func appendChecksumToURL(rawURL, checksum string) (string, error) {
 // The function makes an API call to fetch the hash list, checks the response status, and handles errors if the call fails.
 // If the response stream is not nil, it writes the hash list to the file and verifies the downloaded file is non-empty.
 // Logs relevant actions and errors encountered during the process and returns any errors that occur.
-func DownloadHashList(ctx context.Context, attack *components.Attack) error {
+func DownloadHashList(ctx context.Context, attack *api.Attack) error {
 	if attack == nil {
 		return errors.New("attack is nil")
 	}
 
-	hashlistPath := path.Join(agentstate.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.GetID()))
-	agentstate.Logger.Debug("Downloading hash list", "url", attack.GetHashListURL(), "path", hashlistPath)
+	hashlistPath := path.Join(agentstate.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.Id))
+	agentstate.Logger.Debug("Downloading hash list", "url", attack.HashListUrl, "path", hashlistPath)
 
 	if err := removeExistingFile(hashlistPath); err != nil {
 		return err
 	}
 
-	response, err := agentstate.State.APIClient.Attacks().GetHashList(ctx, attack.ID)
+	response, err := agentstate.State.APIClient.Attacks().GetHashList(ctx, attack.Id)
 	if err != nil {
 		return fmt.Errorf("error downloading hashlist from the CipherSwarm API: %w", err)
 	}
 
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("error downloading hashlist: %s", response.RawResponse.Status)
+	if response.StatusCode() != http.StatusOK {
+		return fmt.Errorf("error downloading hashlist: %s", response.HTTPResponse.Status)
 	}
 
-	if response.ResponseStream == nil {
+	responseStream := api.HashListResponseStream(response)
+	if responseStream == nil {
 		return errors.New("response stream is nil")
 	}
 
-	if err := writeResponseToFile(response.ResponseStream, hashlistPath); err != nil {
+	if err := writeResponseToFile(responseStream, hashlistPath); err != nil {
 		return err
 	}
 

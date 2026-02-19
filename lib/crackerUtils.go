@@ -7,8 +7,8 @@ import (
 	"path"
 
 	"github.com/spf13/viper"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 )
 
@@ -19,7 +19,7 @@ func setNativeHashcatPath() error {
 	binPath, err := cracker.FindHashcatBinary()
 	if err != nil {
 		agentstate.Logger.Error("Error finding hashcat binary: ", err)
-		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+		SendAgentError(err.Error(), nil, api.SeverityCritical)
 
 		return err
 	}
@@ -69,7 +69,7 @@ func UpdateCracker() {
 			agentstate.Logger.Debug("No new cracker available", "latest_version", update.GetLatestVersion())
 		}
 	} else {
-		agentstate.Logger.Error("Error checking for updated cracker", "CrackerUpdate", response.RawResponse.Status)
+		agentstate.Logger.Error("Error checking for updated cracker", "CrackerUpdate", response.HTTPResponse.Status)
 	}
 }
 

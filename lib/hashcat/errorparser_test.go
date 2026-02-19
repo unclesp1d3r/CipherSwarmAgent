@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
 // stderrTestCase represents a test case for ClassifyStderr.
@@ -12,7 +12,7 @@ type stderrTestCase struct {
 	name             string
 	line             string
 	expectedCategory ErrorCategory
-	expectedSeverity operations.Severity
+	expectedSeverity api.Severity
 	expectedRetry    bool
 }
 
@@ -37,30 +37,30 @@ func TestClassifyStderr_HashFormatErrors(t *testing.T) {
 			"separator unmatched error",
 			"Hash 'abc123def': Separator unmatched",
 			ErrorCategoryHashFormat,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 		{
 			"token length exception",
 			"Hash '$2a$10$abc123': Token length exception",
 			ErrorCategoryHashFormat,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
-		{"no hashes loaded", "No hashes loaded", ErrorCategoryHashFormat, operations.SeverityCritical, false},
-		{"hash-file exception", "Hash-file exception", ErrorCategoryHashFormat, operations.SeverityCritical, false},
+		{"no hashes loaded", "No hashes loaded", ErrorCategoryHashFormat, api.SeverityCritical, false},
+		{"hash-file exception", "Hash-file exception", ErrorCategoryHashFormat, api.SeverityCritical, false},
 		{
 			"line length exception",
 			"Hash 'test': Line-length exception",
 			ErrorCategoryHashFormat,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 		{
 			"salt length exception",
 			"Hash 'test': Salt-length exception",
 			ErrorCategoryHashFormat,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 	})
@@ -72,28 +72,28 @@ func TestClassifyStderr_DeviceErrors(t *testing.T) {
 			"device out of memory",
 			"Device #1: ATTENTION! out of memory",
 			ErrorCategoryDevice,
-			operations.SeverityFatal,
+			api.SeverityFatal,
 			false,
 		},
 		{
 			"device memory error lowercase",
 			"Device #2: memory allocation failed",
 			ErrorCategoryDevice,
-			operations.SeverityFatal,
+			api.SeverityFatal,
 			false,
 		},
 		{
 			"device warning temperature",
 			"Device #1: WARNING! Temperature limit reached",
 			ErrorCategoryDevice,
-			operations.SeverityWarning,
+			api.SeverityWarning,
 			true,
 		},
 		{
 			"hardware monitor warning",
 			"hwmon: GPU temperature above threshold",
 			ErrorCategoryDevice,
-			operations.SeverityWarning,
+			api.SeverityWarning,
 			true,
 		},
 	})
@@ -105,21 +105,21 @@ func TestClassifyStderr_FileAccessErrors(t *testing.T) {
 			"cannot open file",
 			"ERROR: wordlist.txt: can't open",
 			ErrorCategoryFileAccess,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 		{
 			"no such file or directory",
 			"ERROR: No such file or directory",
 			ErrorCategoryFileAccess,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 		{
 			"file not found",
 			"ERROR: /path/to/rules.rule: No such file or directory",
 			ErrorCategoryFileAccess,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 	})
@@ -131,19 +131,19 @@ func TestClassifyStderr_BackendErrors(t *testing.T) {
 			"OpenCL out of resources",
 			"OpenCL API (clEnqueueNDRangeKernel) CL_OUT_OF_RESOURCES",
 			ErrorCategoryBackend,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 		{
 			"OpenCL out of host memory",
 			"OpenCL API (clCreateBuffer) CL_OUT_OF_HOST_MEMORY",
 			ErrorCategoryBackend,
-			operations.SeverityFatal,
+			api.SeverityFatal,
 			false,
 		},
-		{"CUDA error", "cuDeviceGet() CUDA_ERROR_NO_DEVICE", ErrorCategoryBackend, operations.SeverityCritical, false},
-		{"HIP error", "hipDeviceGet() HIP_ERROR_NO_DEVICE", ErrorCategoryBackend, operations.SeverityCritical, false},
-		{"Metal error", "Metal API error", ErrorCategoryBackend, operations.SeverityCritical, false},
+		{"CUDA error", "cuDeviceGet() CUDA_ERROR_NO_DEVICE", ErrorCategoryBackend, api.SeverityCritical, false},
+		{"HIP error", "hipDeviceGet() HIP_ERROR_NO_DEVICE", ErrorCategoryBackend, api.SeverityCritical, false},
+		{"Metal error", "Metal API error", ErrorCategoryBackend, api.SeverityCritical, false},
 	})
 }
 
@@ -153,21 +153,21 @@ func TestClassifyStderr_ConfigurationErrors(t *testing.T) {
 			"invalid argument",
 			"ERROR: Invalid argument specified",
 			ErrorCategoryConfiguration,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 		{
 			"option requires argument",
 			"ERROR: Option --session requires an argument",
 			ErrorCategoryConfiguration,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 		{
 			"mixed options error",
 			"ERROR: Mixed options not allowed",
 			ErrorCategoryConfiguration,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 	})
@@ -179,11 +179,11 @@ func TestClassifyStderr_InfoAndWarnings(t *testing.T) {
 			"skipping invalid hash",
 			"Skipping invalid or unsupported hash on line 5",
 			ErrorCategoryInfo,
-			operations.SeverityInfo,
+			api.SeverityInfo,
 			true,
 		},
-		{"generic warning", "Warning: Hash found in potfile", ErrorCategoryWarning, operations.SeverityMinor, true},
-		{"approaching limit warning", "Approaching final keyspace", ErrorCategoryInfo, operations.SeverityInfo, true},
+		{"generic warning", "Warning: Hash found in potfile", ErrorCategoryWarning, api.SeverityMinor, true},
+		{"approaching limit warning", "Approaching final keyspace", ErrorCategoryInfo, api.SeverityInfo, true},
 	})
 }
 
@@ -193,11 +193,11 @@ func TestClassifyStderr_UnknownErrors(t *testing.T) {
 			"unrecognized error message",
 			"Some random stderr output that doesn't match any pattern",
 			ErrorCategoryUnknown,
-			operations.SeverityMinor,
+			api.SeverityMinor,
 			true,
 		},
-		{"empty line", "", ErrorCategoryUnknown, operations.SeverityMinor, true},
-		{"whitespace only", "   ", ErrorCategoryUnknown, operations.SeverityMinor, true},
+		{"empty line", "", ErrorCategoryUnknown, api.SeverityMinor, true},
+		{"whitespace only", "   ", ErrorCategoryUnknown, api.SeverityMinor, true},
 	})
 }
 
@@ -207,14 +207,14 @@ func TestClassifyStderr_GeneralErrors(t *testing.T) {
 			"generic ERROR prefix without specific pattern",
 			"ERROR: Something unexpected happened",
 			ErrorCategoryUnknown,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			false,
 		},
 		{
 			"restore file issue",
 			"ERROR: Cannot read /path/to/session.restore",
 			ErrorCategoryRetryable,
-			operations.SeverityMinor,
+			api.SeverityMinor,
 			true,
 		},
 	})
@@ -223,13 +223,13 @@ func TestClassifyStderr_GeneralErrors(t *testing.T) {
 func TestErrorInfo_Fields(t *testing.T) {
 	info := ErrorInfo{
 		Category:  ErrorCategoryHashFormat,
-		Severity:  operations.SeverityCritical,
+		Severity:  api.SeverityCritical,
 		Retryable: false,
 		Message:   "Hash 'test': Separator unmatched",
 	}
 
 	assert.Equal(t, ErrorCategoryHashFormat, info.Category)
-	assert.Equal(t, operations.SeverityCritical, info.Severity)
+	assert.Equal(t, api.SeverityCritical, info.Severity)
 	assert.False(t, info.Retryable)
 	assert.Equal(t, "Hash 'test': Separator unmatched", info.Message)
 }

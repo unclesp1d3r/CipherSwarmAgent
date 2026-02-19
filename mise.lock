@@ -18,6 +18,10 @@ backend = "github:anchore/quill"
 version = "1.26.0"
 backend = "core:go"
 
+[[tools."go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen"]]
+version = "2.5.1"
+backend = "go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen"
+
 [[tools."go:github.com/securego/gosec/v2/cmd/gosec"]]
 version = "2.23.0"
 backend = "go:github.com/securego/gosec/v2/cmd/gosec"

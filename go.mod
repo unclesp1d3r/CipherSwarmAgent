@@ -10,16 +10,15 @@ require (
 	github.com/jarcoal/httpmock v1.4.1
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/nxadm/tail v1.4.11
-	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/unclesp1d3r/cipherswarm-agent-sdk-go v0.9.0
 )
 
 require (
 	github.com/charmbracelet/fang v0.4.4
 	github.com/duke-git/lancet/v2 v2.3.8
+	github.com/oapi-codegen/runtime v1.1.2
 	github.com/shirou/gopsutil/v3 v3.24.5
 )
 
@@ -76,6 +75,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.55.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.5 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect

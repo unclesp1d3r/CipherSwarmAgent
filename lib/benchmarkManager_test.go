@@ -85,10 +85,10 @@ func TestCreateBenchmark(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				if tt.checkFields {
-					assert.Equal(t, int64(0), benchmark.HashType)
+					assert.Equal(t, 0, benchmark.HashType)
 					assert.Equal(t, int64(100), benchmark.Runtime)
 					assert.InDelta(t, 12345.67, benchmark.HashSpeed, 0.01)
-					assert.Equal(t, int64(1), benchmark.Device)
+					assert.Equal(t, 1, benchmark.Device)
 				}
 			}
 		})

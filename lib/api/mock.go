@@ -2,14 +2,11 @@ package api
 
 import (
 	"context"
-
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 )
 
 // Compile-time interface compliance checks for mocks.
 var (
-	_ Client         = (*MockClient)(nil)
+	_ APIClient      = (*MockClient)(nil)
 	_ TasksClient    = (*MockTasksClient)(nil)
 	_ AttacksClient  = (*MockAttacksClient)(nil)
 	_ AgentsClient   = (*MockAgentsClient)(nil)
@@ -45,17 +42,17 @@ func (m *MockClient) Crackers() CrackersClient { return m.CrackersImpl }
 // MockTasksClient is a configurable mock for TasksClient.
 // Set the function fields to control mock behavior.
 type MockTasksClient struct {
-	GetNewTaskFunc       func(ctx context.Context) (*operations.GetNewTaskResponse, error)
-	SetTaskAcceptedFunc  func(ctx context.Context, id int64) (*operations.SetTaskAcceptedResponse, error)
-	SetTaskExhaustedFunc func(ctx context.Context, id int64) (*operations.SetTaskExhaustedResponse, error)
-	SetTaskAbandonedFunc func(ctx context.Context, id int64) (*operations.SetTaskAbandonedResponse, error)
-	SendStatusFunc       func(ctx context.Context, id int64, status components.TaskStatus) (*operations.SendStatusResponse, error)
-	SendCrackFunc        func(ctx context.Context, id int64, result *components.HashcatResult) (*operations.SendCrackResponse, error)
-	GetTaskZapsFunc      func(ctx context.Context, id int64) (*operations.GetTaskZapsResponse, error)
+	GetNewTaskFunc       func(ctx context.Context) (*GetNewTaskResponse, error)
+	SetTaskAcceptedFunc  func(ctx context.Context, id int64) (*SetTaskAcceptedResponse, error)
+	SetTaskExhaustedFunc func(ctx context.Context, id int64) (*SetTaskExhaustedResponse, error)
+	SetTaskAbandonedFunc func(ctx context.Context, id int64) (*SetTaskAbandonedResponse, error)
+	SendStatusFunc       func(ctx context.Context, id int64, status TaskStatus) (*SendStatusResponse, error)
+	SendCrackFunc        func(ctx context.Context, id int64, result HashcatResult) (*SendCrackResponse, error)
+	GetTaskZapsFunc      func(ctx context.Context, id int64) (*GetTaskZapsResponse, error)
 }
 
 // GetNewTask calls the configured function or returns nil if not configured.
-func (m *MockTasksClient) GetNewTask(ctx context.Context) (*operations.GetNewTaskResponse, error) {
+func (m *MockTasksClient) GetNewTask(ctx context.Context) (*GetNewTaskResponse, error) {
 	if m.GetNewTaskFunc != nil {
 		return m.GetNewTaskFunc(ctx)
 	}
@@ -64,7 +61,7 @@ func (m *MockTasksClient) GetNewTask(ctx context.Context) (*operations.GetNewTas
 }
 
 // SetTaskAccepted calls the configured function or returns nil if not configured.
-func (m *MockTasksClient) SetTaskAccepted(ctx context.Context, id int64) (*operations.SetTaskAcceptedResponse, error) {
+func (m *MockTasksClient) SetTaskAccepted(ctx context.Context, id int64) (*SetTaskAcceptedResponse, error) {
 	if m.SetTaskAcceptedFunc != nil {
 		return m.SetTaskAcceptedFunc(ctx, id)
 	}
@@ -76,7 +73,7 @@ func (m *MockTasksClient) SetTaskAccepted(ctx context.Context, id int64) (*opera
 func (m *MockTasksClient) SetTaskExhausted(
 	ctx context.Context,
 	id int64,
-) (*operations.SetTaskExhaustedResponse, error) {
+) (*SetTaskExhaustedResponse, error) {
 	if m.SetTaskExhaustedFunc != nil {
 		return m.SetTaskExhaustedFunc(ctx, id)
 	}
@@ -88,7 +85,7 @@ func (m *MockTasksClient) SetTaskExhausted(
 func (m *MockTasksClient) SetTaskAbandoned(
 	ctx context.Context,
 	id int64,
-) (*operations.SetTaskAbandonedResponse, error) {
+) (*SetTaskAbandonedResponse, error) {
 	if m.SetTaskAbandonedFunc != nil {
 		return m.SetTaskAbandonedFunc(ctx, id)
 	}
@@ -100,8 +97,8 @@ func (m *MockTasksClient) SetTaskAbandoned(
 func (m *MockTasksClient) SendStatus(
 	ctx context.Context,
 	id int64,
-	status components.TaskStatus,
-) (*operations.SendStatusResponse, error) {
+	status TaskStatus,
+) (*SendStatusResponse, error) {
 	if m.SendStatusFunc != nil {
 		return m.SendStatusFunc(ctx, id, status)
 	}
@@ -113,8 +110,8 @@ func (m *MockTasksClient) SendStatus(
 func (m *MockTasksClient) SendCrack(
 	ctx context.Context,
 	id int64,
-	result *components.HashcatResult,
-) (*operations.SendCrackResponse, error) {
+	result HashcatResult,
+) (*SendCrackResponse, error) {
 	if m.SendCrackFunc != nil {
 		return m.SendCrackFunc(ctx, id, result)
 	}
@@ -123,7 +120,7 @@ func (m *MockTasksClient) SendCrack(
 }
 
 // GetTaskZaps calls the configured function or returns nil if not configured.
-func (m *MockTasksClient) GetTaskZaps(ctx context.Context, id int64) (*operations.GetTaskZapsResponse, error) {
+func (m *MockTasksClient) GetTaskZaps(ctx context.Context, id int64) (*GetTaskZapsResponse, error) {
 	if m.GetTaskZapsFunc != nil {
 		return m.GetTaskZapsFunc(ctx, id)
 	}
@@ -133,12 +130,12 @@ func (m *MockTasksClient) GetTaskZaps(ctx context.Context, id int64) (*operation
 
 // MockAttacksClient is a configurable mock for AttacksClient.
 type MockAttacksClient struct {
-	GetAttackFunc   func(ctx context.Context, id int64) (*operations.GetAttackResponse, error)
-	GetHashListFunc func(ctx context.Context, id int64) (*operations.GetHashListResponse, error)
+	GetAttackFunc   func(ctx context.Context, id int64) (*GetAttackResponse, error)
+	GetHashListFunc func(ctx context.Context, id int64) (*GetHashListResponse, error)
 }
 
 // GetAttack calls the configured function or returns nil if not configured.
-func (m *MockAttacksClient) GetAttack(ctx context.Context, id int64) (*operations.GetAttackResponse, error) {
+func (m *MockAttacksClient) GetAttack(ctx context.Context, id int64) (*GetAttackResponse, error) {
 	if m.GetAttackFunc != nil {
 		return m.GetAttackFunc(ctx, id)
 	}
@@ -147,7 +144,7 @@ func (m *MockAttacksClient) GetAttack(ctx context.Context, id int64) (*operation
 }
 
 // GetHashList calls the configured function or returns nil if not configured.
-func (m *MockAttacksClient) GetHashList(ctx context.Context, id int64) (*operations.GetHashListResponse, error) {
+func (m *MockAttacksClient) GetHashList(ctx context.Context, id int64) (*GetHashListResponse, error) {
 	if m.GetHashListFunc != nil {
 		return m.GetHashListFunc(ctx, id)
 	}
@@ -157,15 +154,15 @@ func (m *MockAttacksClient) GetHashList(ctx context.Context, id int64) (*operati
 
 // MockAgentsClient is a configurable mock for AgentsClient.
 type MockAgentsClient struct {
-	SendHeartbeatFunc    func(ctx context.Context, id int64) (*operations.SendHeartbeatResponse, error)
-	UpdateAgentFunc      func(ctx context.Context, id int64, body *operations.UpdateAgentRequestBody) (*operations.UpdateAgentResponse, error)
-	SubmitBenchmarkFunc  func(ctx context.Context, id int64, body operations.SubmitBenchmarkRequestBody) (*operations.SubmitBenchmarkResponse, error)
-	SubmitErrorAgentFunc func(ctx context.Context, id int64, body *operations.SubmitErrorAgentRequestBody) (*operations.SubmitErrorAgentResponse, error)
-	SetAgentShutdownFunc func(ctx context.Context, id int64) (*operations.SetAgentShutdownResponse, error)
+	SendHeartbeatFunc    func(ctx context.Context, id int64) (*SendHeartbeatResponse, error)
+	UpdateAgentFunc      func(ctx context.Context, id int64, body UpdateAgentJSONRequestBody) (*UpdateAgentResponse, error)
+	SubmitBenchmarkFunc  func(ctx context.Context, id int64, body SubmitBenchmarkJSONRequestBody) (*SubmitBenchmarkResponse, error)
+	SubmitErrorAgentFunc func(ctx context.Context, id int64, body SubmitErrorAgentJSONRequestBody) (*SubmitErrorAgentResponse, error)
+	SetAgentShutdownFunc func(ctx context.Context, id int64) (*SetAgentShutdownResponse, error)
 }
 
 // SendHeartbeat calls the configured function or returns nil if not configured.
-func (m *MockAgentsClient) SendHeartbeat(ctx context.Context, id int64) (*operations.SendHeartbeatResponse, error) {
+func (m *MockAgentsClient) SendHeartbeat(ctx context.Context, id int64) (*SendHeartbeatResponse, error) {
 	if m.SendHeartbeatFunc != nil {
 		return m.SendHeartbeatFunc(ctx, id)
 	}
@@ -177,8 +174,8 @@ func (m *MockAgentsClient) SendHeartbeat(ctx context.Context, id int64) (*operat
 func (m *MockAgentsClient) UpdateAgent(
 	ctx context.Context,
 	id int64,
-	body *operations.UpdateAgentRequestBody,
-) (*operations.UpdateAgentResponse, error) {
+	body UpdateAgentJSONRequestBody,
+) (*UpdateAgentResponse, error) {
 	if m.UpdateAgentFunc != nil {
 		return m.UpdateAgentFunc(ctx, id, body)
 	}
@@ -190,8 +187,8 @@ func (m *MockAgentsClient) UpdateAgent(
 func (m *MockAgentsClient) SubmitBenchmark(
 	ctx context.Context,
 	id int64,
-	body operations.SubmitBenchmarkRequestBody,
-) (*operations.SubmitBenchmarkResponse, error) {
+	body SubmitBenchmarkJSONRequestBody,
+) (*SubmitBenchmarkResponse, error) {
 	if m.SubmitBenchmarkFunc != nil {
 		return m.SubmitBenchmarkFunc(ctx, id, body)
 	}
@@ -203,8 +200,8 @@ func (m *MockAgentsClient) SubmitBenchmark(
 func (m *MockAgentsClient) SubmitErrorAgent(
 	ctx context.Context,
 	id int64,
-	body *operations.SubmitErrorAgentRequestBody,
-) (*operations.SubmitErrorAgentResponse, error) {
+	body SubmitErrorAgentJSONRequestBody,
+) (*SubmitErrorAgentResponse, error) {
 	if m.SubmitErrorAgentFunc != nil {
 		return m.SubmitErrorAgentFunc(ctx, id, body)
 	}
@@ -216,7 +213,7 @@ func (m *MockAgentsClient) SubmitErrorAgent(
 func (m *MockAgentsClient) SetAgentShutdown(
 	ctx context.Context,
 	id int64,
-) (*operations.SetAgentShutdownResponse, error) {
+) (*SetAgentShutdownResponse, error) {
 	if m.SetAgentShutdownFunc != nil {
 		return m.SetAgentShutdownFunc(ctx, id)
 	}
@@ -226,12 +223,12 @@ func (m *MockAgentsClient) SetAgentShutdown(
 
 // MockAuthClient is a configurable mock for AuthClient.
 type MockAuthClient struct {
-	AuthenticateFunc     func(ctx context.Context) (*operations.AuthenticateResponse, error)
-	GetConfigurationFunc func(ctx context.Context) (*operations.GetConfigurationResponse, error)
+	AuthenticateFunc     func(ctx context.Context) (*AuthenticateResponse, error)
+	GetConfigurationFunc func(ctx context.Context) (*GetConfigurationResponse, error)
 }
 
 // Authenticate calls the configured function or returns nil if not configured.
-func (m *MockAuthClient) Authenticate(ctx context.Context) (*operations.AuthenticateResponse, error) {
+func (m *MockAuthClient) Authenticate(ctx context.Context) (*AuthenticateResponse, error) {
 	if m.AuthenticateFunc != nil {
 		return m.AuthenticateFunc(ctx)
 	}
@@ -240,7 +237,7 @@ func (m *MockAuthClient) Authenticate(ctx context.Context) (*operations.Authenti
 }
 
 // GetConfiguration calls the configured function or returns nil if not configured.
-func (m *MockAuthClient) GetConfiguration(ctx context.Context) (*operations.GetConfigurationResponse, error) {
+func (m *MockAuthClient) GetConfiguration(ctx context.Context) (*GetConfigurationResponse, error) {
 	if m.GetConfigurationFunc != nil {
 		return m.GetConfigurationFunc(ctx)
 	}
@@ -250,14 +247,14 @@ func (m *MockAuthClient) GetConfiguration(ctx context.Context) (*operations.GetC
 
 // MockCrackersClient is a configurable mock for CrackersClient.
 type MockCrackersClient struct {
-	CheckForCrackerUpdateFunc func(ctx context.Context, os, version *string) (*operations.CheckForCrackerUpdateResponse, error)
+	CheckForCrackerUpdateFunc func(ctx context.Context, os, version *string) (*CheckForCrackerUpdateResponse, error)
 }
 
 // CheckForCrackerUpdate calls the configured function or returns nil if not configured.
 func (m *MockCrackersClient) CheckForCrackerUpdate(
 	ctx context.Context,
 	os, version *string,
-) (*operations.CheckForCrackerUpdateResponse, error) {
+) (*CheckForCrackerUpdateResponse, error) {
 	if m.CheckForCrackerUpdateFunc != nil {
 		return m.CheckForCrackerUpdateFunc(ctx, os, version)
 	}

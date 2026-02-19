@@ -6,9 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
@@ -16,9 +14,9 @@ const epsilon = 1e-4
 
 // AssertDeviceStatus compares two DeviceStatus objects field-by-field with clear error messages.
 // This is useful when testing the convertDeviceStatuses function in lib/agentClient.go.
-func AssertDeviceStatus(t *testing.T, expected, actual components.DeviceStatus) {
+func AssertDeviceStatus(t *testing.T, expected, actual api.DeviceStatus) {
 	t.Helper()
-	assert.Equal(t, expected.DeviceID, actual.DeviceID, "DeviceID mismatch")
+	assert.Equal(t, expected.DeviceId, actual.DeviceId, "DeviceId mismatch")
 	assert.Equal(t, expected.DeviceName, actual.DeviceName, "DeviceName mismatch")
 	assert.Equal(t, expected.DeviceType, actual.DeviceType, "DeviceType mismatch")
 	assert.Equal(t, expected.Speed, actual.Speed, "Speed mismatch")
@@ -28,7 +26,7 @@ func AssertDeviceStatus(t *testing.T, expected, actual components.DeviceStatus) 
 
 // AssertTaskStatus compares two TaskStatus objects, including nested HashcatGuess fields.
 // This will be essential for testing convertToTaskStatus function.
-func AssertTaskStatus(t *testing.T, expected, actual components.TaskStatus) {
+func AssertTaskStatus(t *testing.T, expected, actual api.TaskStatus) {
 	t.Helper()
 	assert.Equal(t, expected.OriginalLine, actual.OriginalLine, "OriginalLine mismatch")
 	assert.Equal(t, expected.Time, actual.Time, "Time mismatch")
@@ -94,8 +92,8 @@ func AssertTaskStatus(t *testing.T, expected, actual components.TaskStatus) {
 	}
 }
 
-// AssertErrorType verifies that an error is of a specific SDK error type
-// (e.g., sdkerrors.ErrorObject or sdkerrors.SDKError).
+// AssertErrorType verifies that an error is of a specific API error type
+// (e.g., *api.APIError or *api.SetTaskAbandonedError).
 // This is critical for testing error handling paths in lib/errorUtils.go.
 func AssertErrorType(t *testing.T, err error, expectedType any) {
 	t.Helper()
@@ -105,19 +103,19 @@ func AssertErrorType(t *testing.T, err error, expectedType any) {
 	}
 
 	switch expectedType.(type) {
-	case *sdkerrors.ErrorObject:
-		var eo *sdkerrors.ErrorObject
-		require.ErrorAs(t, err, &eo, "Error should be of type *sdkerrors.ErrorObject")
-	case *sdkerrors.SDKError:
-		var se *sdkerrors.SDKError
-		require.ErrorAs(t, err, &se, "Error should be of type *sdkerrors.SDKError")
+	case *api.APIError:
+		var ae *api.APIError
+		require.ErrorAs(t, err, &ae, "Error should be of type *api.APIError")
+	case *api.SetTaskAbandonedError:
+		var sae *api.SetTaskAbandonedError
+		require.ErrorAs(t, err, &sae, "Error should be of type *api.SetTaskAbandonedError")
 	default:
 		t.Fatalf("Unsupported error type: %T", expectedType)
 	}
 }
 
-// AssertAgentConfiguration compares GetConfigurationResponseBody objects with detailed field-by-field comparison.
-func AssertAgentConfiguration(t *testing.T, expected, actual operations.GetConfigurationResponseBody) {
+// AssertAgentConfiguration compares TestAgentConfiguration objects with detailed field-by-field comparison.
+func AssertAgentConfiguration(t *testing.T, expected, actual TestAgentConfiguration) {
 	t.Helper()
 	assert.Equal(t, expected.APIVersion, actual.APIVersion, "APIVersion mismatch")
 

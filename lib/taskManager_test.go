@@ -10,7 +10,7 @@ import (
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
@@ -19,7 +19,7 @@ func TestGetNewTask(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupMock     func()
-		expectedTask  *components.Task
+		expectedTask  *api.Task
 		expectedError error
 	}{
 		{
@@ -40,7 +40,7 @@ func TestGetNewTask(t *testing.T) {
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
 			},
-			expectedTask:  &components.Task{ID: 123, AttackID: 456},
+			expectedTask:  &api.Task{Id: 123, AttackId: 456},
 			expectedError: nil,
 		},
 		{
@@ -89,8 +89,8 @@ func TestGetNewTask(t *testing.T) {
 				require.NoError(t, err)
 				if tt.expectedTask != nil {
 					require.NotNil(t, task)
-					assert.Equal(t, tt.expectedTask.ID, task.ID)
-					assert.Equal(t, tt.expectedTask.AttackID, task.AttackID)
+					assert.Equal(t, tt.expectedTask.Id, task.Id)
+					assert.Equal(t, tt.expectedTask.AttackId, task.AttackId)
 				}
 			}
 		})
@@ -103,7 +103,7 @@ func TestGetAttackParameters(t *testing.T) {
 		name           string
 		attackID       int64
 		setupMock      func(attackID int64)
-		expectedAttack *components.Attack
+		expectedAttack *api.Attack
 		expectedError  error
 	}{
 		{
@@ -125,7 +125,7 @@ func TestGetAttackParameters(t *testing.T) {
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/attacks/\d+$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
 			},
-			expectedAttack: &components.Attack{ID: 456},
+			expectedAttack: &api.Attack{Id: 456},
 			expectedError:  nil,
 		},
 		{
@@ -163,7 +163,7 @@ func TestGetAttackParameters(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, attack)
-				assert.Equal(t, tt.expectedAttack.ID, attack.ID)
+				assert.Equal(t, tt.expectedAttack.Id, attack.Id)
 			}
 		})
 	}
@@ -173,7 +173,7 @@ func TestGetAttackParameters(t *testing.T) {
 func TestAcceptTask(t *testing.T) {
 	tests := []struct {
 		name          string
-		task          *components.Task
+		task          *api.Task
 		setupMock     func(taskID int64)
 		expectedError bool
 	}{
@@ -221,7 +221,7 @@ func TestAcceptTask(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(789)
 
 			if tt.task != nil {
-				tt.setupMock(tt.task.ID)
+				tt.setupMock(tt.task.Id)
 			} else {
 				tt.setupMock(0)
 			}
@@ -241,7 +241,7 @@ func TestAcceptTask(t *testing.T) {
 func TestAbandonTask(t *testing.T) {
 	tests := []struct {
 		name      string
-		task      *components.Task
+		task      *api.Task
 		setupMock func(taskID int64)
 	}{
 		{
@@ -284,7 +284,7 @@ func TestAbandonTask(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(789)
 
 			if tt.task != nil {
-				tt.setupMock(tt.task.ID)
+				tt.setupMock(tt.task.Id)
 			} else {
 				tt.setupMock(0)
 			}

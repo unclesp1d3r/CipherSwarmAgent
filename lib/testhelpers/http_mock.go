@@ -8,10 +8,21 @@ import (
 	"regexp"
 
 	"github.com/jarcoal/httpmock"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
+
+// authenticateResponseBody represents the JSON response for authentication.
+// Replaces the old operations.AuthenticateResponseBody type.
+type authenticateResponseBody struct {
+	Authenticated bool  `json:"authenticated"`
+	AgentID       int64 `json:"agent_id"`
+}
+
+// heartbeatResponseBody represents the JSON response for heartbeat.
+// Replaces the old operations.SendHeartbeatResponseBody type.
+type heartbeatResponseBody struct {
+	State api.SendHeartbeat200State `json:"state"`
+}
 
 // mustMarshal marshals v to JSON or panics in tests if it fails.
 func mustMarshal(v any) []byte {
@@ -46,7 +57,7 @@ func SetupHTTPMockForClient(client *http.Client) func() {
 // Uses a regex pattern to match any HTTP scheme and host.
 // Note: The SDK uses GET for authentication, not POST.
 func MockAuthenticationSuccess(agentID int64) {
-	authResponse := operations.AuthenticateResponseBody{
+	authResponse := authenticateResponseBody{
 		Authenticated: true,
 		AgentID:       agentID,
 	}
@@ -86,7 +97,7 @@ func MockAuthenticationFailure(statusCode int, errorMessage string) {
 // MockConfigurationResponse registers a mock responder for the configuration endpoint
 // that returns the provided configuration.
 // Uses a regex pattern to match any HTTP scheme and host.
-func MockConfigurationResponse(config operations.GetConfigurationResponseBody) {
+func MockConfigurationResponse(config TestAgentConfiguration) {
 	jsonResponse := mustMarshal(config)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
@@ -102,8 +113,8 @@ func MockConfigurationResponse(config operations.GetConfigurationResponseBody) {
 // that returns the specified agent state.
 // Accepts agentID and uses a regex pattern to match the path with the numeric agent ID.
 // According to swagger.json, the endpoint is /api/v1/client/agents/{id}/heartbeat.
-func MockHeartbeatResponse(agentID int64, state operations.State) {
-	stateResponse := operations.SendHeartbeatResponseBody{
+func MockHeartbeatResponse(agentID int64, state api.SendHeartbeat200State) {
+	stateResponse := heartbeatResponseBody{
 		State: state,
 	}
 	jsonResponse := mustMarshal(stateResponse)
@@ -125,10 +136,10 @@ func MockHeartbeatResponse(agentID int64, state operations.State) {
 // useful for testing error handling across different API calls.
 // The endpoint parameter should be a regex pattern string (will be compiled to *regexp.Regexp).
 // Registers responders for multiple HTTP methods to handle different SDK implementations.
-func MockAPIError(endpoint string, statusCode int, sdkError sdkerrors.SDKError) {
+func MockAPIError(endpoint string, statusCode int, apiError api.APIError) {
 	errorResponse := map[string]any{
-		"error":   sdkError.Message,
-		"code":    sdkError.StatusCode,
+		"error":   apiError.Message,
+		"code":    apiError.StatusCode,
 		"details": nil,
 	}
 	jsonResponse := mustMarshal(errorResponse)
@@ -160,7 +171,7 @@ func MockHeartbeatNoContent(agentID int64) {
 // MockUpdateAgentSuccess registers a mock responder for POST /api/v1/client/agents/{id}
 // that returns a successful UpdateAgentResponse with the provided agent data.
 // According to swagger.json, the endpoint is /api/v1/client/agents/{id}.
-func MockUpdateAgentSuccess(agentID int64, agent components.Agent) {
+func MockUpdateAgentSuccess(agentID int64, agent api.Agent) {
 	responseBody := map[string]any{
 		"agent": agent,
 	}

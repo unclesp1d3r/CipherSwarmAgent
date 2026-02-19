@@ -7,9 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
 const testErrorMessage = "test error"
@@ -45,75 +44,76 @@ func TestHandler_Handle_NilError(t *testing.T) {
 	assert.NoError(t, result)
 }
 
-func TestHandler_Handle_ErrorObject(t *testing.T) {
+func TestHandler_Handle_APIError_ClientError(t *testing.T) {
 	cleanup := setupTestState()
 	defer cleanup()
 
 	var sentMessage string
-	var sentSeverity operations.Severity
+	var sentSeverity api.Severity
 
 	h := &Handler{
-		SendError: func(message string, severity operations.Severity) {
+		SendError: func(message string, severity api.Severity) {
 			sentMessage = message
 			sentSeverity = severity
 		},
 	}
 
-	errObj := &sdkerrors.ErrorObject{
-		Error_: testErrorMessage,
+	apiErr := &api.APIError{
+		StatusCode: http.StatusUnprocessableEntity,
+		Message:    testErrorMessage,
 	}
 
 	opts := Options{
 		Message:      "API error occurred",
-		Severity:     operations.SeverityCritical,
+		Severity:     api.SeverityCritical,
 		SendToServer: true,
 	}
 
-	result := h.Handle(errObj, opts)
+	result := h.Handle(apiErr, opts)
 
 	require.Error(t, result)
 	assert.NotEmpty(t, sentMessage)
-	assert.Equal(t, operations.SeverityCritical, sentSeverity)
+	assert.Equal(t, api.SeverityCritical, sentSeverity)
 }
 
-func TestHandler_Handle_SDKError(t *testing.T) {
+func TestHandler_Handle_APIError_ServerError(t *testing.T) {
 	cleanup := setupTestState()
 	defer cleanup()
 
 	var sentMessage string
-	var sentSeverity operations.Severity
+	var sentSeverity api.Severity
 
 	h := &Handler{
-		SendError: func(message string, severity operations.Severity) {
+		SendError: func(message string, severity api.Severity) {
 			sentMessage = message
 			sentSeverity = severity
 		},
 	}
 
-	sdkErr := &sdkerrors.SDKError{
+	apiErr := &api.APIError{
 		StatusCode: http.StatusInternalServerError,
 		Message:    "internal server error",
 	}
 
 	opts := Options{
-		Message:      "SDK error occurred",
-		Severity:     operations.SeverityMajor,
+		Message:      "API error occurred",
+		Severity:     api.SeverityMajor,
 		SendToServer: true,
 	}
 
-	result := h.Handle(sdkErr, opts)
+	result := h.Handle(apiErr, opts)
 
 	require.Error(t, result)
 	assert.NotEmpty(t, sentMessage)
-	assert.Equal(t, operations.SeverityMajor, sentSeverity)
+	assert.Equal(t, api.SeverityMajor, sentSeverity)
 }
 
-func TestHandler_Handle_SDKError_AuthRelated(t *testing.T) {
+func TestHandler_Handle_APIError_AuthRelated(t *testing.T) {
 	cleanup := setupTestState()
 	defer cleanup()
 
 	h := &Handler{
-		SendError: func(_ string, _ operations.Severity) {},
+		SendError: func(_ string, _ api.Severity) {},
 	}
 
 	testCases := []struct {
@@ -126,18 +126,18 @@ func TestHandler_Handle_SDKError_AuthRelated(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sdkErr := &sdkerrors.SDKError{
+			apiErr := &api.APIError{
 				StatusCode: tc.statusCode,
 				Message:    "auth error",
 			}
 
 			opts := Options{
 				Message:      "Auth error",
-				Severity:     operations.SeverityCritical,
+				Severity:     api.SeverityCritical,
 				SendToServer: true,
 			}
 
-			result := h.Handle(sdkErr, opts)
+			result := h.Handle(apiErr, opts)
 			require.Error(t, result)
 		})
 	}
@@ -149,7 +149,7 @@ func TestHandler_Handle_GenericError(t *testing.T) {
 
 	sendCalled := false
 	h := &Handler{
-		SendError: func(_ string, _ operations.Severity) {
+		SendError: func(_ string, _ api.Severity) {
 			sendCalled = true
 		},
 	}
@@ -158,7 +158,7 @@ func TestHandler_Handle_GenericError(t *testing.T) {
 
 	opts := Options{
 		Message:      "Generic error occurred",
-		Severity:     operations.SeverityCritical,
+		Severity:     api.SeverityCritical,
 		SendToServer: true,
 	}
 
@@ -175,23 +175,24 @@ func TestHandler_Handle_NoSendToServer(t *testing.T) {
 
 	sendCalled := false
 	h := &Handler{
-		SendError: func(_ string, _ operations.Severity) {
+		SendError: func(_ string, _ api.Severity) {
 			sendCalled = true
 		},
 	}
 
-	errObj := &sdkerrors.ErrorObject{
-		Error_: testErrorMessage,
+	apiErr := &api.APIError{
+		StatusCode: http.StatusUnprocessableEntity,
+		Message:    testErrorMessage,
 	}
 
 	opts := Options{
 		Message:      "Error",
-		Severity:     operations.SeverityCritical,
+		Severity:     api.SeverityCritical,
 		SendToServer: false,
 	}
 
 	//nolint:errcheck,gosec // Intentionally ignoring return in test
-	h.Handle(errObj, opts)
+	h.Handle(apiErr, opts)
 
 	assert.False(t, sendCalled, "SendError should not be called when SendToServer is false")
 }
@@ -204,18 +205,19 @@ func TestHandler_Handle_NilSendError(t *testing.T) {
 		SendError: nil,
 	}
 
-	errObj := &sdkerrors.ErrorObject{
-		Error_: testErrorMessage,
+	apiErr := &api.APIError{
+		StatusCode: http.StatusUnprocessableEntity,
+		Message:    testErrorMessage,
 	}
 
 	opts := Options{
 		Message:      "Error",
-		Severity:     operations.SeverityCritical,
+		Severity:     api.SeverityCritical,
 		SendToServer: true,
 	}
 
 	// Should not panic even with nil SendError
-	result := h.Handle(errObj, opts)
+	result := h.Handle(apiErr, opts)
 	require.Error(t, result)
 }
 
@@ -225,7 +227,7 @@ func TestHandler_LogOnly(t *testing.T) {
 
 	sendCalled := false
 	h := &Handler{
-		SendError: func(_ string, _ operations.Severity) {
+		SendError: func(_ string, _ api.Severity) {
 			sendCalled = true
 		},
 	}
@@ -241,29 +243,30 @@ func TestHandler_HandleWithSeverity(t *testing.T) {
 	cleanup := setupTestState()
 	defer cleanup()
 
-	var sentSeverity operations.Severity
+	var sentSeverity api.Severity
 
 	h := &Handler{
-		SendError: func(_ string, severity operations.Severity) {
+		SendError: func(_ string, severity api.Severity) {
 			sentSeverity = severity
 		},
 	}
 
-	errObj := &sdkerrors.ErrorObject{
-		Error_: testErrorMessage,
+	apiErr := &api.APIError{
+		StatusCode: http.StatusUnprocessableEntity,
+		Message:    testErrorMessage,
 	}
 
 	//nolint:errcheck,gosec // Intentionally ignoring return in test
-	h.HandleWithSeverity(errObj, "Test message", operations.SeverityWarning)
+	h.HandleWithSeverity(apiErr, "Test message", api.SeverityWarning)
 
-	assert.Equal(t, operations.SeverityWarning, sentSeverity)
+	assert.Equal(t, api.SeverityWarning, sentSeverity)
 }
 
 func TestDefaultOptions(t *testing.T) {
 	opts := DefaultOptions("test message")
 
 	assert.Equal(t, "test message", opts.Message)
-	assert.Equal(t, operations.SeverityCritical, opts.Severity)
+	assert.Equal(t, api.SeverityCritical, opts.Severity)
 	assert.True(t, opts.SendToServer)
 	assert.False(t, opts.LogAuthContext)
 }
@@ -275,13 +278,13 @@ func TestIsNotFoundError(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "NotFound SDKError",
-			err:      &sdkerrors.SDKError{StatusCode: http.StatusNotFound},
+			name:     "NotFound APIError",
+			err:      &api.APIError{StatusCode: http.StatusNotFound},
 			expected: true,
 		},
 		{
-			name:     "Other SDKError",
-			err:      &sdkerrors.SDKError{StatusCode: http.StatusInternalServerError},
+			name:     "Other APIError",
+			err:      &api.APIError{StatusCode: http.StatusInternalServerError},
 			expected: false,
 		},
 		{
@@ -311,13 +314,13 @@ func TestIsGoneError(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "Gone SDKError",
-			err:      &sdkerrors.SDKError{StatusCode: http.StatusGone},
+			name:     "Gone APIError",
+			err:      &api.APIError{StatusCode: http.StatusGone},
 			expected: true,
 		},
 		{
-			name:     "Other SDKError",
-			err:      &sdkerrors.SDKError{StatusCode: http.StatusNotFound},
+			name:     "Other APIError",
+			err:      &api.APIError{StatusCode: http.StatusNotFound},
 			expected: false,
 		},
 		{
@@ -342,8 +345,8 @@ func TestGetStatusCode(t *testing.T) {
 		expected int
 	}{
 		{
-			name:     "SDKError with status",
-			err:      &sdkerrors.SDKError{StatusCode: http.StatusBadRequest},
+			name:     "APIError with status",
+			err:      &api.APIError{StatusCode: http.StatusBadRequest},
 			expected: http.StatusBadRequest,
 		},
 		{
@@ -371,21 +374,22 @@ func TestHandler_Handle_WithAuthContext(t *testing.T) {
 	defer cleanup()
 
 	h := &Handler{
-		SendError: func(_ string, _ operations.Severity) {},
+		SendError: func(_ string, _ api.Severity) {},
 	}
 
-	errObj := &sdkerrors.ErrorObject{
-		Error_: testErrorMessage,
+	apiErr := &api.APIError{
+		StatusCode: http.StatusUnprocessableEntity,
+		Message:    testErrorMessage,
 	}
 
 	opts := Options{
 		Message:        "Auth error",
-		Severity:       operations.SeverityCritical,
+		Severity:       api.SeverityCritical,
 		SendToServer:   true,
 		LogAuthContext: true,
 	}
 
 	// Should not panic and should log with auth context
-	result := h.Handle(errObj, opts)
+	result := h.Handle(apiErr, opts)
 	require.Error(t, result)
 }

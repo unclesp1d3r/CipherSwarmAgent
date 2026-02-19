@@ -3,6 +3,7 @@ package lib
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,9 +13,8 @@ import (
 
 	"github.com/duke-git/lancet/v2/pointer"
 	"github.com/shirou/gopsutil/v3/host"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	cserrors "github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/downloader"
@@ -55,13 +55,13 @@ func AuthenticateAgent() error {
 		return handleAuthenticationError(err)
 	}
 
-	if response.Object == nil || !response.GetObject().Authenticated {
+	if response.JSON200 == nil || !response.JSON200.Authenticated {
 		agentstate.Logger.Error("Failed to authenticate with the CipherSwarm API")
 
 		return ErrAuthenticationFailed
 	}
 
-	agentstate.State.AgentID = response.GetObject().AgentID
+	agentstate.State.AgentID = response.JSON200.AgentId
 
 	return nil
 }
@@ -75,14 +75,13 @@ func GetAgentConfiguration() error {
 		return handleConfigurationError(err)
 	}
 
-	if response.Object == nil {
+	if response.JSON200 == nil {
 		agentstate.Logger.Error("Error getting agent configuration")
 
 		return ErrConfigurationFailed
 	}
 
-	config := response.GetObject()
-	agentConfig := mapConfiguration(config)
+	agentConfig := mapConfiguration(response.JSON200.ApiVersion, response.JSON200.Config)
 
 	if agentConfig.Config.UseNativeHashcat {
 		if err := setNativeHashcatPathFn(); err != nil {
@@ -98,15 +97,15 @@ func GetAgentConfiguration() error {
 	return nil
 }
 
-// mapConfiguration converts the GetConfigurationResponseBody into an agentConfiguration for use within the agent.
-func mapConfiguration(config *operations.GetConfigurationResponseBody) agentConfiguration {
+// mapConfiguration converts the API configuration response into an agentConfiguration for use within the agent.
+func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration) agentConfiguration {
 	agentConfig := agentConfiguration{
-		APIVersion: config.APIVersion,
+		APIVersion: int64(apiVersion),
 		Config: agentConfig{
-			UseNativeHashcat:    pointer.UnwrapOr(config.Config.UseNativeHashcat, false),
-			AgentUpdateInterval: pointer.UnwrapOr(config.Config.AgentUpdateInterval, defaultAgentUpdateInterval),
-			BackendDevices:      pointer.UnwrapOr(config.Config.BackendDevice, ""),
-			OpenCLDevices:       pointer.UnwrapOr(config.Config.OpenclDevices, ""),
+			UseNativeHashcat:    pointer.UnwrapOr(config.UseNativeHashcat, false),
+			AgentUpdateInterval: int64(pointer.UnwrapOr(config.AgentUpdateInterval, defaultAgentUpdateInterval)),
+			BackendDevices:      pointer.UnwrapOr(config.BackendDevice, ""),
+			OpenCLDevices:       pointer.UnwrapOr(config.OpenclDevices, ""),
 		},
 	}
 
@@ -119,19 +118,19 @@ func mapConfiguration(config *operations.GetConfigurationResponseBody) agentConf
 func UpdateAgentMetadata() error {
 	info, err := host.Info()
 	if err != nil {
-		return cserrors.LogAndSendError("Error getting host info", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error getting host info", err, api.SeverityCritical, nil)
 	}
 
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
 	devices, err := getDevicesListFn(context.Background())
 	if err != nil {
-		return cserrors.LogAndSendError("Error getting devices", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error getting devices", err, api.SeverityCritical, nil)
 	}
 
 	agentPlatform = info.OS
-	agentUpdate := &operations.UpdateAgentRequestBody{
-		ID:              agentstate.State.AgentID,
+	agentUpdate := api.UpdateAgentJSONRequestBody{
+		Id:              agentstate.State.AgentID,
 		HostName:        info.Hostname,
 		ClientSignature: clientSignature,
 		OperatingSystem: info.OS,
@@ -159,12 +158,12 @@ func UpdateAgentMetadata() error {
 		return err
 	}
 
-	if response.Agent != nil {
+	if response.JSON200 != nil {
 		displayAgentMetadataUpdated(response)
 	} else {
-		agentstate.ErrorLogger.Error("bad response", "status", response.RawResponse.Status)
+		agentstate.ErrorLogger.Error("bad response", "status", response.HTTPResponse.Status)
 
-		return fmt.Errorf("%w: %s", ErrBadResponse, response.RawResponse.Status)
+		return fmt.Errorf("%w: %s", ErrBadResponse, response.HTTPResponse.Status)
 	}
 
 	return nil
@@ -186,14 +185,14 @@ func getDevicesList(ctx context.Context) ([]string, error) {
 // 2. Downloads the hash list associated with the attack.
 // 3. Iterates over resource files (word list, rule list, and mask list) and downloads each one.
 // If any step encounters an error, the function returns that error.
-func DownloadFiles(ctx context.Context, attack *components.Attack) error {
+func DownloadFiles(ctx context.Context, attack *api.Attack) error {
 	displayDownloadFileStart(attack)
 
 	if err := downloader.DownloadHashList(ctx, attack); err != nil {
 		return err
 	}
 
-	resourceFiles := []*components.AttackResourceFile{
+	resourceFiles := []*api.AttackResourceFile{
 		attack.WordList,
 		attack.RuleList,
 		attack.MaskList,
@@ -210,32 +209,32 @@ func DownloadFiles(ctx context.Context, attack *components.Attack) error {
 
 // downloadResourceFile downloads a resource file if the provided resource is not nil.
 // Constructs the file path based on the resource file name and logs the download action.
-// If checksum verification is not always skipped, converts the base64 checksum to hex.
+// If checksum verification is not always skipped, converts the checksum bytes to hex.
 // Downloads the file using the resource's download URL, target file path, and checksum for verification.
 // Logs and sends an error report if file download fails or if the downloaded file is empty.
-func downloadResourceFile(ctx context.Context, resource *components.AttackResourceFile) error {
+func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile) error {
 	if resource == nil {
 		return nil
 	}
 
 	filePath := path.Join(agentstate.State.FilePath, resource.FileName)
-	agentstate.Logger.Debug("Downloading resource file", "url", resource.GetDownloadURL(), "path", filePath)
+	agentstate.Logger.Debug("Downloading resource file", "url", resource.DownloadUrl, "path", filePath)
 
 	checksum := ""
 	if !agentstate.State.AlwaysTrustFiles {
-		checksum = downloader.Base64ToHex(resource.GetChecksum())
+		checksum = hex.EncodeToString(resource.Checksum)
 	} else {
 		agentstate.Logger.Debug("Skipping checksum verification")
 	}
 
-	if err := downloader.DownloadFile(ctx, resource.GetDownloadURL(), filePath, checksum); err != nil {
+	if err := downloader.DownloadFile(ctx, resource.DownloadUrl, filePath, checksum); err != nil {
 		//nolint:contextcheck // LogAndSendError uses context.Background() internally
-		return cserrors.LogAndSendError("Error downloading attack resource", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error downloading attack resource", err, api.SeverityCritical, nil)
 	}
 
 	if fileInfo, err := os.Stat(filePath); err != nil || fileInfo.Size() == 0 {
 		//nolint:contextcheck // LogAndSendError uses context.Background() internally
-		return cserrors.LogAndSendError("Downloaded file is empty", nil, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Downloaded file is empty", nil, api.SeverityCritical, nil)
 	}
 
 	agentstate.Logger.Debug("Downloaded resource file", "path", filePath)
@@ -246,7 +245,7 @@ func downloadResourceFile(ctx context.Context, resource *components.AttackResour
 // SendHeartBeat sends a heartbeat signal to the server and processes the server's response.
 // It handles different response status codes and logs relevant messages.
 // It returns the agent's state object (or nil for no state change) and an error if the heartbeat failed.
-func SendHeartBeat() (*operations.State, error) {
+func SendHeartBeat() (*api.SendHeartbeat200State, error) {
 	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(context.Background(), agentstate.State.AgentID)
 	if err != nil {
 		handleHeartbeatError(err)
@@ -254,16 +253,16 @@ func SendHeartBeat() (*operations.State, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode == http.StatusNoContent {
+	if resp.StatusCode() == http.StatusNoContent {
 		logHeartbeatSent()
 
 		return nil, nil //nolint:nilnil // nil state with nil error means successful heartbeat with no state change
 	}
 
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode() == http.StatusOK {
 		logHeartbeatSent()
 
-		return handleStateResponse(resp.GetObject()), nil
+		return handleStateResponse(resp.JSON200), nil
 	}
 
 	return nil, nil //nolint:nilnil // nil state with nil error means successful heartbeat with no state change
@@ -281,20 +280,23 @@ func logHeartbeatSent() {
 
 // handleStateResponse processes the given state response and performs logging based on the agent state.
 // It returns the agent's state object or nil if the response is nil.
-func handleStateResponse(stateResponse *operations.SendHeartbeatResponseBody) *operations.State {
+func handleStateResponse(stateResponse *struct {
+	State api.SendHeartbeat200State `json:"state"`
+},
+) *api.SendHeartbeat200State {
 	if stateResponse == nil {
 		return nil
 	}
 
-	state := stateResponse.GetState()
+	state := stateResponse.State
 	switch state {
-	case operations.StatePending:
+	case api.StatePending:
 		if agentstate.State.ExtraDebugging {
 			agentstate.Logger.Debug("Agent is pending")
 		}
-	case operations.StateStopped:
+	case api.StateStopped:
 		agentstate.Logger.Debug("Agent is stopped")
-	case operations.StateError:
+	case api.StateError:
 		agentstate.Logger.Debug("Agent is in error state")
 	default:
 		if agentstate.State.ExtraDebugging {
@@ -308,7 +310,7 @@ func handleStateResponse(stateResponse *operations.SendHeartbeatResponseBody) *o
 // sendStatusUpdate sends a status update to the server for a given task and session.
 // It ensures the update time is set, converts device statuses, and converts hashcat.Status to cipherswarm.TaskStatus.
 // Finally, it sends the status update to the server and handles the response.
-func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashcat.Session) {
+func sendStatusUpdate(update hashcat.Status, task *api.Task, sess *hashcat.Session) {
 	// Ensure the update time is set
 	if update.Time.IsZero() {
 		update.Time = time.Now()
@@ -322,7 +324,7 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	taskStatus := convertToTaskStatus(update, deviceStatuses)
 
 	// Send status update to the server
-	resp, err := agentstate.State.APIClient.Tasks().SendStatus(context.Background(), task.GetID(), taskStatus)
+	resp, err := agentstate.State.APIClient.Tasks().SendStatus(context.Background(), task.Id, taskStatus)
 	if err != nil {
 		handleStatusUpdateError(err, task, sess)
 		return
@@ -331,28 +333,28 @@ func sendStatusUpdate(update hashcat.Status, task *components.Task, sess *hashca
 	handleSendStatusResponse(resp, task)
 }
 
-func convertDeviceStatuses(devices []hashcat.StatusDevice) []components.DeviceStatus {
-	deviceStatuses := make([]components.DeviceStatus, len(devices))
+func convertDeviceStatuses(devices []hashcat.StatusDevice) []api.DeviceStatus {
+	deviceStatuses := make([]api.DeviceStatus, len(devices))
 	for i, device := range devices {
-		deviceStatuses[i] = components.DeviceStatus{
-			DeviceID:    device.DeviceID,
+		deviceStatuses[i] = api.DeviceStatus{
+			DeviceId:    int(device.DeviceID),
 			DeviceName:  device.DeviceName,
 			DeviceType:  parseStringToDeviceType(device.DeviceType),
 			Speed:       device.Speed,
-			Utilization: device.Util,
-			Temperature: device.Temp,
+			Utilization: int(device.Util),
+			Temperature: int(device.Temp),
 		}
 	}
 
 	return deviceStatuses
 }
 
-func convertToTaskStatus(update hashcat.Status, deviceStatuses []components.DeviceStatus) components.TaskStatus {
-	return components.TaskStatus{
+func convertToTaskStatus(update hashcat.Status, deviceStatuses []api.DeviceStatus) api.TaskStatus {
+	return api.TaskStatus{
 		OriginalLine: update.OriginalLine,
 		Time:         update.Time,
 		Session:      update.Session,
-		HashcatGuess: components.HashcatGuess{
+		HashcatGuess: api.HashcatGuess{
 			GuessBase:           update.Guess.GuessBase,
 			GuessBaseCount:      update.Guess.GuessBaseCount,
 			GuessBaseOffset:     update.Guess.GuessBaseOffset,
@@ -361,14 +363,14 @@ func convertToTaskStatus(update hashcat.Status, deviceStatuses []components.Devi
 			GuessModCount:       update.Guess.GuessModCount,
 			GuessModOffset:      update.Guess.GuessModOffset,
 			GuessModPercentage:  update.Guess.GuessModPercent,
-			GuessMode:           update.Guess.GuessMode,
+			GuessMode:           int(update.Guess.GuessMode),
 		},
-		Status:          update.Status,
+		Status:          int(update.Status),
 		Target:          update.Target,
 		Progress:        update.Progress,
 		RestorePoint:    update.RestorePoint,
-		RecoveredHashes: update.RecoveredHashes,
-		RecoveredSalts:  update.RecoveredSalts,
+		RecoveredHashes: api.ConvertInt64SliceToInt(update.RecoveredHashes),
+		RecoveredSalts:  api.ConvertInt64SliceToInt(update.RecoveredSalts),
 		Rejected:        update.Rejected,
 		DeviceStatuses:  deviceStatuses,
 		TimeStart:       time.Unix(update.TimeStart, 0),
@@ -376,8 +378,8 @@ func convertToTaskStatus(update hashcat.Status, deviceStatuses []components.Devi
 	}
 }
 
-func handleSendStatusResponse(resp *operations.SendStatusResponse, task *components.Task) {
-	switch resp.StatusCode {
+func handleSendStatusResponse(resp *api.SendStatusResponse, task *api.Task) {
+	switch resp.StatusCode() {
 	case http.StatusNoContent:
 		if agentstate.State.ExtraDebugging {
 			agentstate.Logger.Debug("Status update sent")
@@ -402,14 +404,14 @@ func SendAgentShutdown() {
 // Logs and handles any errors encountered during the sending process.
 // If configured, writes the cracked hash to a file.
 // Logs additional information based on the HTTP response status.
-func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *components.Task) {
+func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *api.Task) {
 	if task == nil {
 		agentstate.Logger.Error("Task is nil")
 
 		return
 	}
 
-	hashcatResult := &components.HashcatResult{
+	hashcatResult := api.HashcatResult{
 		Timestamp: timestamp,
 		Hash:      hash,
 		PlainText: plaintext,
@@ -417,7 +419,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 
 	agentstate.Logger.Info("Cracked hash", "hash", hash)
 
-	response, err := agentstate.State.APIClient.Tasks().SendCrack(context.Background(), task.GetID(), hashcatResult)
+	response, err := agentstate.State.APIClient.Tasks().SendCrack(context.Background(), task.Id, hashcatResult)
 	if err != nil {
 		handleSendCrackError(err)
 
@@ -425,7 +427,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 	}
 
 	if agentstate.State.WriteZapsToFile {
-		hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.GetID()))
+		hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
 
 		file, err := os.OpenFile(
 			hashFile,
@@ -437,7 +439,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 			_ = cserrors.LogAndSendError(
 				"Error opening cracked hash file",
 				err,
-				operations.SeverityCritical,
+				api.SeverityCritical,
 				task,
 			)
 			return
@@ -451,7 +453,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 			_ = cserrors.LogAndSendError(
 				"Error writing cracked hash to file",
 				err,
-				operations.SeverityCritical,
+				api.SeverityCritical,
 				task,
 			)
 			return
@@ -460,7 +462,7 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *componen
 
 	agentstate.Logger.Debug("Cracked hash sent")
 
-	if response.StatusCode == http.StatusNoContent {
+	if response.StatusCode() == http.StatusNoContent {
 		agentstate.Logger.Info("Hashlist completed", "hash", hash)
 	}
 }

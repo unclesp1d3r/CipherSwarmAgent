@@ -44,9 +44,12 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	agentstate.State.RestoreFilePath = filepath.Join(testDataDir, "restore")
 	agentstate.State.Debug = false
 	agentstate.State.ExtraDebugging = false
-	agentstate.State.SdkClient = NewTestSDKClient(apiURL)
-	// Wrap SDK client with interface for dependency injection support
-	agentstate.State.APIClient = api.NewSDKWrapper(agentstate.State.SdkClient)
+	// Initialize API client using generated client wrapper
+	apiClient, err := api.NewAgentClient(apiURL, apiToken)
+	if err != nil {
+		panic(err)
+	}
+	agentstate.State.APIClient = apiClient
 
 	// Create directories
 	mustMkdirAll(agentstate.State.DataPath)
@@ -89,7 +92,6 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.JobCheckingStopped = false
 		agentstate.State.UseLegacyDeviceIdentificationMethod = false
 		agentstate.State.BenchmarksSubmitted = false
-		agentstate.State.SdkClient = nil
 		agentstate.State.APIClient = nil
 		// Deactivate httpmock
 		httpmock.DeactivateAndReset()
@@ -125,7 +127,6 @@ func ResetTestState() {
 	agentstate.State.JobCheckingStopped = false
 	agentstate.State.UseLegacyDeviceIdentificationMethod = false
 	agentstate.State.BenchmarksSubmitted = false
-	agentstate.State.SdkClient = nil
 	agentstate.State.APIClient = nil
 }
 

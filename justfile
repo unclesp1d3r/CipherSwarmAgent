@@ -111,6 +111,12 @@ run *args:
 dev *args:
     @{{ mise_exec }} go run main.go {{ args }}
 
+# Regenerate lib/api/client.gen.go from docs/swagger.json
+[group('dev')]
+generate:
+    @{{ mise_exec }} go generate ./lib/api/...
+    @echo "✅ API client regenerated at lib/api/client.gen.go"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Code Quality
 # ─────────────────────────────────────────────────────────────────────────────

@@ -16,10 +16,8 @@ import (
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
@@ -100,10 +98,9 @@ func TestAuthenticateAgent(t *testing.T) {
 		{
 			name: "authentication failure - not authenticated",
 			setupMock: func(_ int64) {
-				authResponse := operations.AuthenticateResponseBody{
-					Authenticated: false,
+				authResponse := map[string]any{
+					"authenticated": false,
 				}
-				// Override with authentication response
 				jsonResponse, err := json.Marshal(authResponse)
 				if err != nil {
 					panic(err)
@@ -126,7 +123,7 @@ func TestAuthenticateAgent(t *testing.T) {
 			setupMock: func(_ int64) {
 				testhelpers.MockAuthenticationFailure(http.StatusUnauthorized, "authentication failed")
 			},
-			expectedError: &sdkerrors.ErrorObject{},
+			expectedError: &api.APIError{},
 			expectedID:    0,
 		},
 		{
@@ -138,7 +135,7 @@ func TestAuthenticateAgent(t *testing.T) {
 				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
 				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/authenticate$`, http.StatusBadRequest, *sdkErr)
 			},
-			expectedError: &sdkerrors.SDKError{},
+			expectedError: &api.APIError{},
 			expectedID:    0,
 		},
 		{
@@ -178,8 +175,8 @@ func TestAuthenticateAgent(t *testing.T) {
 			} else {
 				require.Error(t, err)
 				// Only check error type if it's an SDK error type, not for standard errors
-				errorObject := &sdkerrors.ErrorObject{}
-				sDKError := &sdkerrors.SDKError{}
+				errorObject := &api.APIError{}
+				sDKError := &api.APIError{}
 				switch {
 				case errors.As(tt.expectedError, &errorObject):
 					testhelpers.AssertErrorType(t, err, tt.expectedError)
@@ -235,7 +232,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 				testhelpers.MockConfigurationError(http.StatusBadRequest, "bad request")
 				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
 			},
-			expectedError: &sdkerrors.SDKError{}, // SDK wraps ErrorObject in SDKError
+			expectedError: &api.APIError{}, // SDK wraps ErrorObject in SDKError
 		},
 		{
 			name: "configuration error with SDKError",
@@ -245,7 +242,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/configuration$`, http.StatusBadRequest, *sdkErr)
 				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
 			},
-			expectedError: &sdkerrors.SDKError{},
+			expectedError: &api.APIError{},
 		},
 		{
 			name: "empty response handling",
@@ -253,9 +250,9 @@ func TestGetAgentConfiguration(t *testing.T) {
 				// Mock a response that returns empty config object
 				// When SDK parses {} successfully, it creates an empty struct (not nil)
 				// So this test verifies that empty config is handled gracefully
-				emptyConfig := operations.GetConfigurationResponseBody{
+				emptyConfig := testhelpers.TestAgentConfiguration{
 					APIVersion: 0,
-					Config:     components.AdvancedAgentConfiguration{},
+					Config:     api.AdvancedAgentConfiguration{},
 				}
 				testhelpers.MockConfigurationResponse(emptyConfig)
 			},
@@ -317,15 +314,15 @@ func TestUpdateAgentMetadata(t *testing.T) {
 		{
 			name: "bad response - nil agent",
 			setupMock: func(agentID int64) {
-				// The SDK unmarshals the response body directly into components.Agent,
+				// The SDK unmarshals the response body directly into api.Agent,
 				// not from a wrapper object. When it receives {}, it creates an empty Agent struct,
-				// so response.Agent will be non-nil (just empty). To actually get nil Agent,
+				// so response.JSON200 will be non-nil (just empty). To actually get nil Agent,
 				// we'd need a parsing error, but then UpdateAgentMetadata would return that error.
 				// This test case cannot actually occur in practice when parsing succeeds.
 				// Testing that an empty Agent (which is valid) is handled correctly:
 				// Return a valid response with an empty agent object.
-				agent := components.Agent{
-					ID:              agentID,
+				agent := api.Agent{
+					Id:              agentID,
 					HostName:        "",
 					ClientSignature: "",
 					OperatingSystem: "",
@@ -371,7 +368,7 @@ func TestSendHeartBeat(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupMock     func(agentID int64)
-		expectedState *operations.State
+		expectedState *api.SendHeartbeat200State
 		expectedError bool
 	}{
 		{
@@ -385,10 +382,10 @@ func TestSendHeartBeat(t *testing.T) {
 		{
 			name: "heartbeat with state response",
 			setupMock: func(agentID int64) {
-				testhelpers.MockHeartbeatResponse(agentID, operations.StatePending)
+				testhelpers.MockHeartbeatResponse(agentID, api.StatePending)
 			},
-			expectedState: func() *operations.State {
-				s := operations.StatePending
+			expectedState: func() *api.SendHeartbeat200State {
+				s := api.StatePending
 				return &s
 			}(),
 			expectedError: false,
@@ -396,10 +393,10 @@ func TestSendHeartBeat(t *testing.T) {
 		{
 			name: "heartbeat with StateStopped",
 			setupMock: func(agentID int64) {
-				testhelpers.MockHeartbeatResponse(agentID, operations.StateStopped)
+				testhelpers.MockHeartbeatResponse(agentID, api.StateStopped)
 			},
-			expectedState: func() *operations.State {
-				s := operations.StateStopped
+			expectedState: func() *api.SendHeartbeat200State {
+				s := api.StateStopped
 				return &s
 			}(),
 			expectedError: false,
@@ -407,10 +404,10 @@ func TestSendHeartBeat(t *testing.T) {
 		{
 			name: "heartbeat with StateError",
 			setupMock: func(agentID int64) {
-				testhelpers.MockHeartbeatResponse(agentID, operations.StateError)
+				testhelpers.MockHeartbeatResponse(agentID, api.StateError)
 			},
-			expectedState: func() *operations.State {
-				s := operations.StateError
+			expectedState: func() *api.SendHeartbeat200State {
+				s := api.StateError
 				return &s
 			}(),
 			expectedError: false,
@@ -531,7 +528,7 @@ func TestSendCrackedHash(t *testing.T) {
 	tests := []struct {
 		name              string
 		setupMock         func(taskID int64)
-		task              *components.Task
+		task              *api.Task
 		writeZapsToFile   bool
 		expectedError     bool
 		expectSubmitError bool
@@ -687,39 +684,21 @@ func TestSendCrackedHash(t *testing.T) {
 					require.NoError(t, os.Chmod(tempDir, 0o755)) //nolint:gosec // adjusting temp dir perms for cleanup
 				})
 
-				hashFile := path.Join(tempDir, fmt.Sprintf("%d_clientout.zap", tt.task.ID))
+				hashFile := path.Join(tempDir, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
 
 				// Create the file normally first with secure permissions
 				file, err := os.OpenFile(hashFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 				require.NoError(t, err)
 				require.NoError(t, file.Close())
 
-				// Make the parent directory read-only. On Unix systems, you need write
-				// permission on the directory to append to files (O_APPEND requires directory
-				// write permission). OpenFile with O_APPEND will check directory permissions.
-				// However, if the file already exists and we try to open it, some systems
-				// might allow opening but fail on WriteString due to directory permissions.
-				//
-				// More reliable: Make the directory read-only which will cause WriteString
-				// to fail when trying to append, even if OpenFile succeeds on some systems.
-				// Note: On strict Unix systems, OpenFile with O_APPEND will fail if directory
-				// is read-only, so this might test OpenFile error instead. But on some systems
-				// or with different flags, it could test WriteString error.
-				//
-				// Best approach for cross-platform WriteString testing: Create a directory
-				// at the file path. This will cause OpenFile to fail (can't open directory as file),
-				// testing the OpenFile error path. For WriteString specifically, the read-only
-				// file approach on Windows might work, but on Unix OpenFile will fail first.
-				//
-				// Given the complexity, we test that file errors (whether at OpenFile or WriteString)
-				// are properly handled and reported via submit_error endpoint.
+				// Make the parent directory read-only.
 				require.NoError(t, os.Chmod(tempDir, 0o500)) //nolint:gosec // Read-only directory for error path
 
 				agentstate.State.ZapsPath = tempDir
 			}
 
 			if tt.task != nil {
-				tt.setupMock(tt.task.ID)
+				tt.setupMock(tt.task.Id)
 			}
 
 			// Call sendCrackedHash - it doesn't return errors, just logs
@@ -741,7 +720,7 @@ func TestSendCrackedHash(t *testing.T) {
 
 			// Verify file was created if WriteZapsToFile is enabled and no errors expected
 			if tt.writeZapsToFile && tt.task != nil && !tt.expectSubmitError {
-				hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", tt.task.ID))
+				hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
 				_, err := os.Stat(hashFile)
 				require.NoError(t, err, "zap file should be created")
 			}
@@ -763,7 +742,7 @@ func TestConvertDeviceStatuses(t *testing.T) {
 	tests := []struct {
 		name     string
 		devices  []hashcat.StatusDevice
-		expected []components.DeviceStatus
+		expected []api.DeviceStatus
 	}{
 		{
 			name: "single CPU device",
@@ -777,11 +756,11 @@ func TestConvertDeviceStatuses(t *testing.T) {
 					Temp:       60,
 				},
 			},
-			expected: []components.DeviceStatus{
+			expected: []api.DeviceStatus{
 				{
-					DeviceID:    0,
+					DeviceId:    0,
 					DeviceName:  "CPU",
-					DeviceType:  components.DeviceTypeCPU,
+					DeviceType:  api.CPU,
 					Speed:       1000,
 					Utilization: 50,
 					Temperature: 60,
@@ -808,19 +787,19 @@ func TestConvertDeviceStatuses(t *testing.T) {
 					Temp:       70,
 				},
 			},
-			expected: []components.DeviceStatus{
+			expected: []api.DeviceStatus{
 				{
-					DeviceID:    0,
+					DeviceId:    0,
 					DeviceName:  "CPU",
-					DeviceType:  components.DeviceTypeCPU,
+					DeviceType:  api.CPU,
 					Speed:       1000,
 					Utilization: 50,
 					Temperature: 60,
 				},
 				{
-					DeviceID:    1,
+					DeviceId:    1,
 					DeviceName:  "GPU0",
-					DeviceType:  components.DeviceTypeGpu,
+					DeviceType:  api.GPU,
 					Speed:       5000,
 					Utilization: 80,
 					Temperature: 70,
@@ -845,27 +824,27 @@ func TestParseStringToDeviceType(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected components.DeviceType
+		expected api.DeviceStatusDeviceType
 	}{
 		{
 			name:     "CPU device type",
 			input:    "CPU",
-			expected: components.DeviceTypeCPU,
+			expected: api.CPU,
 		},
 		{
 			name:     "GPU device type",
 			input:    "GPU",
-			expected: components.DeviceTypeGpu,
+			expected: api.GPU,
 		},
 		{
 			name:     "unknown device type defaults to CPU",
 			input:    "UNKNOWN",
-			expected: components.DeviceTypeCPU,
+			expected: api.CPU,
 		},
 		{
 			name:     "empty string defaults to CPU",
 			input:    "",
-			expected: components.DeviceTypeCPU,
+			expected: api.CPU,
 		},
 	}
 
@@ -880,9 +859,11 @@ func TestParseStringToDeviceType(t *testing.T) {
 // TestHandleStateResponse tests the handleStateResponse function.
 func TestHandleStateResponse(t *testing.T) {
 	tests := []struct {
-		name          string
-		response      *operations.SendHeartbeatResponseBody
-		expectedState *operations.State
+		name     string
+		response *struct {
+			State api.SendHeartbeat200State `json:"state"`
+		}
+		expectedState *api.SendHeartbeat200State
 	}{
 		{
 			name:          "nil response",
@@ -891,31 +872,37 @@ func TestHandleStateResponse(t *testing.T) {
 		},
 		{
 			name: "StatePending",
-			response: &operations.SendHeartbeatResponseBody{
-				State: operations.StatePending,
+			response: &struct {
+				State api.SendHeartbeat200State `json:"state"`
+			}{
+				State: api.StatePending,
 			},
-			expectedState: func() *operations.State {
-				s := operations.StatePending
+			expectedState: func() *api.SendHeartbeat200State {
+				s := api.StatePending
 				return &s
 			}(),
 		},
 		{
 			name: "StateStopped",
-			response: &operations.SendHeartbeatResponseBody{
-				State: operations.StateStopped,
+			response: &struct {
+				State api.SendHeartbeat200State `json:"state"`
+			}{
+				State: api.StateStopped,
 			},
-			expectedState: func() *operations.State {
-				s := operations.StateStopped
+			expectedState: func() *api.SendHeartbeat200State {
+				s := api.StateStopped
 				return &s
 			}(),
 		},
 		{
 			name: "StateError",
-			response: &operations.SendHeartbeatResponseBody{
-				State: operations.StateError,
+			response: &struct {
+				State api.SendHeartbeat200State `json:"state"`
+			}{
+				State: api.StateError,
 			},
-			expectedState: func() *operations.State {
-				s := operations.StateError
+			expectedState: func() *api.SendHeartbeat200State {
+				s := api.StateError
 				return &s
 			}(),
 		},
@@ -941,20 +928,19 @@ func TestHandleStateResponse(t *testing.T) {
 // TestMapConfiguration tests the mapConfiguration function with various pointer combinations.
 func TestMapConfiguration(t *testing.T) {
 	tests := []struct {
-		name     string
-		config   *operations.GetConfigurationResponseBody
-		expected agentConfiguration
+		name       string
+		apiVersion int
+		config     api.AdvancedAgentConfiguration
+		expected   agentConfiguration
 	}{
 		{
-			name: "all nil pointers",
-			config: &operations.GetConfigurationResponseBody{
-				APIVersion: 1,
-				Config: components.AdvancedAgentConfiguration{
-					UseNativeHashcat:    nil,
-					AgentUpdateInterval: nil,
-					BackendDevice:       nil,
-					OpenclDevices:       nil,
-				},
+			name:       "all nil pointers",
+			apiVersion: 1,
+			config: api.AdvancedAgentConfiguration{
+				UseNativeHashcat:    nil,
+				AgentUpdateInterval: nil,
+				BackendDevice:       nil,
+				OpenclDevices:       nil,
 			},
 			expected: agentConfiguration{
 				APIVersion: 1,
@@ -967,15 +953,13 @@ func TestMapConfiguration(t *testing.T) {
 			},
 		},
 		{
-			name: "all non-nil pointers",
-			config: &operations.GetConfigurationResponseBody{
-				APIVersion: 1,
-				Config: components.AdvancedAgentConfiguration{
-					UseNativeHashcat:    new(true),
-					AgentUpdateInterval: new(int64(600)),
-					BackendDevice:       new("OpenCL"),
-					OpenclDevices:       new("1,2"),
-				},
+			name:       "all non-nil pointers",
+			apiVersion: 1,
+			config: api.AdvancedAgentConfiguration{
+				UseNativeHashcat:    ptrBool(true),
+				AgentUpdateInterval: ptrInt(600),
+				BackendDevice:       ptrString("OpenCL"),
+				OpenclDevices:       ptrString("1,2"),
 			},
 			expected: agentConfiguration{
 				APIVersion: 1,
@@ -988,15 +972,13 @@ func TestMapConfiguration(t *testing.T) {
 			},
 		},
 		{
-			name: "mixed nil and non-nil pointers",
-			config: &operations.GetConfigurationResponseBody{
-				APIVersion: 1,
-				Config: components.AdvancedAgentConfiguration{
-					UseNativeHashcat:    new(true),
-					AgentUpdateInterval: nil,
-					BackendDevice:       nil,
-					OpenclDevices:       new("1"),
-				},
+			name:       "mixed nil and non-nil pointers",
+			apiVersion: 1,
+			config: api.AdvancedAgentConfiguration{
+				UseNativeHashcat:    ptrBool(true),
+				AgentUpdateInterval: nil,
+				BackendDevice:       nil,
+				OpenclDevices:       ptrString("1"),
 			},
 			expected: agentConfiguration{
 				APIVersion: 1,
@@ -1012,7 +994,7 @@ func TestMapConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mapConfiguration(tt.config)
+			result := mapConfiguration(tt.apiVersion, tt.config)
 			assert.Equal(t, tt.expected.APIVersion, result.APIVersion)
 			assert.Equal(t, tt.expected.Config.UseNativeHashcat, result.Config.UseNativeHashcat)
 			assert.Equal(t, tt.expected.Config.AgentUpdateInterval, result.Config.AgentUpdateInterval)
@@ -1021,6 +1003,11 @@ func TestMapConfiguration(t *testing.T) {
 		})
 	}
 }
+
+// Helper functions for creating pointers in tests.
+func ptrBool(b bool) *bool       { return &b }
+func ptrInt(i int) *int          { return &i }
+func ptrString(s string) *string { return &s }
 
 // TestConvertToTaskStatusAllFields tests convertToTaskStatus with all fields populated.
 const epsilon = 1e-4
@@ -1070,12 +1057,18 @@ func TestConvertToTaskStatusAllFields(t *testing.T) {
 	assert.Equal(t, update.OriginalLine, status.OriginalLine)
 	assert.Equal(t, update.Time, status.Time)
 	assert.Equal(t, update.Session, status.Session)
-	assert.Equal(t, update.Status, status.Status)
+	assert.Equal(t, int(update.Status), status.Status)
 	assert.Equal(t, update.Target, status.Target)
 	assert.Equal(t, update.Progress, status.Progress)
 	assert.Equal(t, update.RestorePoint, status.RestorePoint)
-	assert.Equal(t, update.RecoveredHashes, status.RecoveredHashes)
-	assert.Equal(t, update.RecoveredSalts, status.RecoveredSalts)
+	assert.Len(t, status.RecoveredHashes, len(update.RecoveredHashes))
+	for i := range update.RecoveredHashes {
+		assert.Equal(t, int(update.RecoveredHashes[i]), status.RecoveredHashes[i])
+	}
+	assert.Len(t, status.RecoveredSalts, len(update.RecoveredSalts))
+	for i := range update.RecoveredSalts {
+		assert.Equal(t, int(update.RecoveredSalts[i]), status.RecoveredSalts[i])
+	}
 	assert.Equal(t, update.Rejected, status.Rejected)
 	assert.Equal(t, update.Guess.GuessBase, status.HashcatGuess.GuessBase)
 	assert.Equal(t, update.Guess.GuessBaseCount, status.HashcatGuess.GuessBaseCount)
@@ -1085,7 +1078,7 @@ func TestConvertToTaskStatusAllFields(t *testing.T) {
 	assert.Equal(t, update.Guess.GuessModCount, status.HashcatGuess.GuessModCount)
 	assert.Equal(t, update.Guess.GuessModOffset, status.HashcatGuess.GuessModOffset)
 	assert.InEpsilon(t, update.Guess.GuessModPercent, status.HashcatGuess.GuessModPercentage, epsilon)
-	assert.Equal(t, update.Guess.GuessMode, status.HashcatGuess.GuessMode)
+	assert.Equal(t, int(update.Guess.GuessMode), status.HashcatGuess.GuessMode)
 }
 
 // TestHandleSendStatusResponse tests the handleSendStatusResponse function.
@@ -1093,7 +1086,7 @@ func TestHandleSendStatusResponse(t *testing.T) {
 	tests := []struct {
 		name       string
 		statusCode int
-		task       *components.Task
+		task       *api.Task
 	}{
 		{
 			name:       "HTTP 204 No Content",
@@ -1113,9 +1106,9 @@ func TestHandleSendStatusResponse(t *testing.T) {
 			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
 			defer cleanupState()
 
-			// Create a mock response
-			resp := &operations.SendStatusResponse{
-				StatusCode: tt.statusCode,
+			// Create a mock response with HTTPResponse for StatusCode() method
+			resp := &api.SendStatusResponse{
+				HTTPResponse: &http.Response{StatusCode: tt.statusCode},
 			}
 
 			// Call handleSendStatusResponse - should not panic
