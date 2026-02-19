@@ -215,7 +215,7 @@ func DownloadHashList(ctx context.Context, attack *api.Attack) error {
 	}
 
 	if response.StatusCode() != http.StatusOK {
-		return fmt.Errorf("error downloading hashlist: %s", response.HTTPResponse.Status)
+		return fmt.Errorf("error downloading hashlist: %s", response.Status())
 	}
 
 	responseStream := api.HashListResponseStream(response)

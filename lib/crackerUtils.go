@@ -69,7 +69,7 @@ func UpdateCracker() {
 			agentstate.Logger.Debug("No new cracker available", "latest_version", update.GetLatestVersion())
 		}
 	} else {
-		agentstate.Logger.Error("Error checking for updated cracker", "CrackerUpdate", response.HTTPResponse.Status)
+		agentstate.Logger.Error("Error checking for updated cracker", "CrackerUpdate", response.Status())
 	}
 }
 

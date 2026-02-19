@@ -52,7 +52,7 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 		return nil
 	}
 
-	return fmt.Errorf("%w: %s", ErrBadResponse, res.HTTPResponse.Status)
+	return fmt.Errorf("%w: %s", ErrBadResponse, res.Status())
 }
 
 // createBenchmark converts a benchmarkResult to an api.HashcatBenchmark struct.

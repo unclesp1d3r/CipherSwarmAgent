@@ -114,6 +114,7 @@ dev *args:
 # Regenerate lib/api/client.gen.go from docs/swagger.json
 [group('dev')]
 generate:
+    @curl -o docs/swagger.json https://raw.githubusercontent.com/unclesp1d3r/CipherSwarm/refs/heads/main/swagger/v1/swagger.json
     @{{ mise_exec }} go generate ./lib/api/...
     @echo "✅ API client regenerated at lib/api/client.gen.go"
 

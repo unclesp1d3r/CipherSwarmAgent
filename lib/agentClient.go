@@ -161,9 +161,10 @@ func UpdateAgentMetadata() error {
 	if response.JSON200 != nil {
 		displayAgentMetadataUpdated(response)
 	} else {
-		agentstate.ErrorLogger.Error("bad response", "status", response.HTTPResponse.Status)
+		status := response.Status()
+		agentstate.ErrorLogger.Error("bad response", "status", status)
 
-		return fmt.Errorf("%w: %s", ErrBadResponse, response.HTTPResponse.Status)
+		return fmt.Errorf("%w: %s", ErrBadResponse, status)
 	}
 
 	return nil

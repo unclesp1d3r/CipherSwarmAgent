@@ -44,7 +44,7 @@ func GetNewTask() (*api.Task, error) {
 		// New task available
 		return response.JSON200, nil
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrTaskBadResponse, response.HTTPResponse.Status)
+		return nil, fmt.Errorf("%w: %s", ErrTaskBadResponse, response.Status())
 	}
 }
 
@@ -62,7 +62,7 @@ func GetAttackParameters(attackID int64) (*api.Attack, error) {
 		return response.JSON200, nil
 	}
 
-	return nil, fmt.Errorf("%w: %s", ErrTaskBadResponse, response.HTTPResponse.Status)
+	return nil, fmt.Errorf("%w: %s", ErrTaskBadResponse, response.Status())
 }
 
 // createJobParams creates hashcat parameters from the given Task and Attack objects.
