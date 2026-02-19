@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -29,6 +30,8 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 	for _, result := range benchmarkResults {
 		benchmark, err := createBenchmark(result)
 		if err != nil {
+			agentstate.Logger.Warn("Skipping unparseable benchmark result", "error", err, "hash_type", result.HashType)
+
 			continue
 		}
 
@@ -115,7 +118,12 @@ func UpdateBenchmarks() error {
 
 	benchmarkResult, done := runBenchmarkTask(sess)
 	if done {
-		return nil
+		return cserrors.LogAndSendError(
+			"Benchmark session failed to produce results",
+			stderrors.New("benchmark task failed"),
+			api.SeverityMajor,
+			nil,
+		)
 	}
 
 	displayBenchmarksComplete(benchmarkResult)

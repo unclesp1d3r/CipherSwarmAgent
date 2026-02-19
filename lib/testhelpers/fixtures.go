@@ -27,7 +27,7 @@ const (
 )
 
 // TestAgentConfiguration represents the configuration response body for tests.
-// This replaces the old operations.GetConfigurationResponseBody type.
+// It mirrors the structure returned by the GetConfiguration API endpoint.
 type TestAgentConfiguration struct {
 	APIVersion int                            `json:"api_version"`
 	Config     api.AdvancedAgentConfiguration `json:"config"`

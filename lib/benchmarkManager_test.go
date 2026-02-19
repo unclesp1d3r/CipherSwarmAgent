@@ -147,7 +147,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 				},
 			},
 			setupMock: func(_ int64) {
-				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
+				// Use 400 Bad Request to test client error handling
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)

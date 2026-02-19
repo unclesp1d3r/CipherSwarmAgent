@@ -3,7 +3,6 @@ package lib
 import (
 	"context"
 	stderrors "errors"
-	"net/http"
 	"os"
 	"path"
 	"sync"
@@ -85,6 +84,15 @@ func handleConfigurationError(err error) error {
 // 7. Updates the configuration with the new executable path.
 // Returns an error if any step in the process fails.
 func handleCrackerUpdate(update *api.CrackerUpdate) error {
+	if update.GetDownloadURL() == nil || update.GetExecName() == nil {
+		return cserrors.LogAndSendError(
+			"Cracker update missing download URL or exec name",
+			stderrors.New("incomplete cracker update response"),
+			api.SeverityCritical,
+			nil,
+		)
+	}
+
 	DisplayNewCrackerAvailable(update)
 
 	tempDir, err := os.MkdirTemp("", "cipherswarm-*")
@@ -131,7 +139,10 @@ func handleCrackerUpdate(update *api.CrackerUpdate) error {
 	}
 
 	viper.Set("hashcat_path", path.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName()))
-	_ = viper.WriteConfig() //nolint:errcheck // Config write failure not critical
+	if err := viper.WriteConfig(); err != nil {
+		agentstate.Logger.Warn("Failed to persist hashcat path to config; update will be lost on restart",
+			"error", err, "hashcat_path", viper.GetString("hashcat_path"))
+	}
 
 	return nil
 }
@@ -176,24 +187,6 @@ func handleStatusUpdateError(err error, task *api.Task, sess *hashcat.Session) {
 	// For all other errors, log and send
 	//nolint:errcheck,gosec // Error handler returns error for chaining; not needed here
 	cserrors.LogAndSendError("Error sending status update", err, api.SeverityCritical, task)
-}
-
-// handleAPIStatusError handles API errors by taking appropriate action based on the error's status code.
-func handleAPIStatusError(ae *api.APIError, task *api.Task, sess *hashcat.Session) {
-	switch ae.StatusCode {
-	case http.StatusNotFound:
-		handleTaskNotFound(task, sess)
-	case http.StatusGone:
-		handleTaskGone(task, sess)
-	default:
-		//nolint:errcheck // Error already being handled
-		_ = cserrors.LogAndSendError(
-			"Error connecting to the CipherSwarm API, unexpected error",
-			ae,
-			api.SeverityCritical,
-			task,
-		)
-	}
 }
 
 // handleTaskNotFound handles the scenario where a task is not found in the system.

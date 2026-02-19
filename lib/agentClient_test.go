@@ -127,13 +127,11 @@ func TestAuthenticateAgent(t *testing.T) {
 			expectedID:    0,
 		},
 		{
-			name: "SDKError handling",
+			name: "APIError handling",
 			setupMock: func(_ int64) {
-				// Note: This test may timeout due to SDK retry logic with exponential backoff.
-				// The SDK retries on 500 errors, which can cause long delays in tests.
-				// Using 400 Bad Request instead to avoid retries.
-				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
-				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/authenticate$`, http.StatusBadRequest, *sdkErr)
+				// Using 400 Bad Request to test client error handling.
+				apiErr := testhelpers.NewAPIError(http.StatusBadRequest, "bad request")
+				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/authenticate$`, http.StatusBadRequest, *apiErr)
 			},
 			expectedError: &api.APIError{},
 			expectedID:    0,
@@ -174,13 +172,13 @@ func TestAuthenticateAgent(t *testing.T) {
 				assert.Equal(t, int64(123), agentstate.State.AgentID)
 			} else {
 				require.Error(t, err)
-				// Only check error type if it's an SDK error type, not for standard errors
+				// Only check error type if it's an API error type, not for standard errors
 				errorObject := &api.APIError{}
-				sDKError := &api.APIError{}
+				apiError := &api.APIError{}
 				switch {
 				case errors.As(tt.expectedError, &errorObject):
 					testhelpers.AssertErrorType(t, err, tt.expectedError)
-				case errors.As(tt.expectedError, &sDKError):
+				case errors.As(tt.expectedError, &apiError):
 					testhelpers.AssertErrorType(t, err, tt.expectedError)
 				default:
 					// For standard errors like ErrAuthenticationFailed, just check that an error was returned
@@ -232,14 +230,14 @@ func TestGetAgentConfiguration(t *testing.T) {
 				testhelpers.MockConfigurationError(http.StatusBadRequest, "bad request")
 				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
 			},
-			expectedError: &api.APIError{}, // SDK wraps ErrorObject in SDKError
+			expectedError: &api.APIError{}, // API returns APIError for error responses
 		},
 		{
-			name: "configuration error with SDKError",
+			name: "configuration error with APIError",
 			setupMock: func() {
-				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
-				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
-				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/configuration$`, http.StatusBadRequest, *sdkErr)
+				// Use 400 Bad Request to test client error handling.
+				apiErr := testhelpers.NewAPIError(http.StatusBadRequest, "bad request")
+				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/configuration$`, http.StatusBadRequest, *apiErr)
 				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
 			},
 			expectedError: &api.APIError{},
@@ -248,7 +246,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 			name: "empty response handling",
 			setupMock: func() {
 				// Mock a response that returns empty config object
-				// When SDK parses {} successfully, it creates an empty struct (not nil)
+				// When the client parses {} successfully, it creates an empty struct (not nil)
 				// So this test verifies that empty config is handled gracefully
 				emptyConfig := testhelpers.TestAgentConfiguration{
 					APIVersion: 0,
@@ -304,9 +302,9 @@ func TestUpdateAgentMetadata(t *testing.T) {
 		{
 			name: "API error with ErrorObject",
 			setupMock: func(_ int64) {
-				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
+				apiErr := testhelpers.NewAPIError(http.StatusBadRequest, "bad request")
 				// According to swagger.json, the endpoint is /api/v1/client/agents/{id}
-				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/agents/\d+$`, http.StatusBadRequest, *sdkErr)
+				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/client/agents/\d+$`, http.StatusBadRequest, *apiErr)
 			},
 			expectedError: true,
 			expectBadResp: false,
@@ -314,7 +312,7 @@ func TestUpdateAgentMetadata(t *testing.T) {
 		{
 			name: "bad response - nil agent",
 			setupMock: func(agentID int64) {
-				// The SDK unmarshals the response body directly into api.Agent,
+				// The API client unmarshals the response body directly into api.Agent,
 				// not from a wrapper object. When it receives {}, it creates an empty Agent struct,
 				// so response.JSON200 will be non-nil (just empty). To actually get nil Agent,
 				// we'd need a parsing error, but then UpdateAgentMetadata would return that error.
@@ -415,8 +413,8 @@ func TestSendHeartBeat(t *testing.T) {
 		{
 			name: "heartbeat error with ErrorObject",
 			setupMock: func(_ int64) {
-				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
-				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/agents/\d+/heartbeat$`, http.StatusBadRequest, *sdkErr)
+				apiErr := testhelpers.NewAPIError(http.StatusBadRequest, "bad request")
+				testhelpers.MockAPIError(`^https?://[^/]+/api/v1/agents/\d+/heartbeat$`, http.StatusBadRequest, *apiErr)
 			},
 			expectedState: nil,
 			expectedError: true,
@@ -567,12 +565,12 @@ func TestSendCrackedHash(t *testing.T) {
 			name: "ErrorObject error handling",
 			setupMock: func(_ int64) {
 				errObj := testhelpers.NewErrorObject("task not found")
-				sdkErr := testhelpers.NewSDKError(http.StatusNotFound, errObj.Error())
+				apiErr := testhelpers.NewAPIError(http.StatusNotFound, errObj.Error())
 				// According to swagger.json, the endpoint is /api/v1/client/tasks/{id}/submit_crack
 				testhelpers.MockAPIError(
 					`^https?://[^/]+/api/v1/client/tasks/\d+/submit_crack$`,
 					http.StatusNotFound,
-					*sdkErr,
+					*apiErr,
 				)
 				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
 			},
@@ -582,15 +580,15 @@ func TestSendCrackedHash(t *testing.T) {
 			expectSubmitError: true,
 		},
 		{
-			name: "SDKError error handling",
+			name: "APIError error handling",
 			setupMock: func(_ int64) {
-				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
-				sdkErr := testhelpers.NewSDKError(http.StatusBadRequest, "bad request")
+				// Use 400 Bad Request to test client error handling.
+				apiErr := testhelpers.NewAPIError(http.StatusBadRequest, "bad request")
 				// According to swagger.json, the endpoint is /api/v1/client/tasks/{id}/submit_crack
 				testhelpers.MockAPIError(
 					`^https?://[^/]+/api/v1/client/tasks/\d+/submit_crack$`,
 					http.StatusBadRequest,
-					*sdkErr,
+					*apiErr,
 				)
 				testhelpers.MockSubmitErrorSuccess(123) // Mock submit_error endpoint
 			},

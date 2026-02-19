@@ -165,8 +165,8 @@ func TestHandler_Handle_GenericError(t *testing.T) {
 	result := h.Handle(genericErr, opts)
 
 	require.Error(t, result)
-	// Generic errors should not trigger SendError (only log)
-	assert.False(t, sendCalled)
+	// Generic errors should also trigger SendError for server visibility
+	assert.True(t, sendCalled)
 }
 
 func TestHandler_Handle_NoSendToServer(t *testing.T) {

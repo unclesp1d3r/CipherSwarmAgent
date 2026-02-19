@@ -6,12 +6,12 @@ import (
 )
 
 // ErrorObject represents an API error object with an "error" JSON field.
-// It replaces sdkerrors.ErrorObject and implements the error interface.
+// It implements the error interface and maps to the OpenAPI ErrorObject schema.
 // The generated ErrorObject schema is excluded from client.gen.go (via
 // exclude-schemas in config.yaml) because a struct field named "Error"
 // conflicts with the Error() method required by the error interface.
 // The Err field is serialized as "error" in JSON to match the API contract.
-type ErrorObject struct { //nolint:errname // Name matches the OpenAPI schema and replaces sdkerrors.ErrorObject
+type ErrorObject struct { //nolint:errname // Name matches the OpenAPI schema
 	Err                  string         `json:"error"`
 	AdditionalProperties map[string]any `json:"-"`
 }
@@ -90,9 +90,8 @@ func (e *ErrorObject) MarshalJSON() ([]byte, error) {
 }
 
 // APIError represents an HTTP error returned by the CipherSwarm API.
-// It replaces sdkerrors.SDKError as the unified internal error type for
-// non-2xx API responses. For the API error object model (JSON "error" field),
-// see ErrorObject.
+// It serves as the unified internal error type for non-2xx API responses.
+// For the API error object model (JSON "error" field), see ErrorObject.
 type APIError struct { //nolint:revive // Name is intentional for clarity across packages
 	StatusCode int
 	Message    string
@@ -112,7 +111,7 @@ func (e *APIError) Error() string {
 }
 
 // SetTaskAbandonedError represents a 422 error when abandoning a task.
-// It replaces sdkerrors.SetTaskAbandonedResponseBody.
+// It maps to the 422 response schema for the SetTaskAbandoned endpoint.
 type SetTaskAbandonedError struct {
 	Details []string `json:"details"`
 	Error_  *string  `json:"error"` //nolint:revive // Underscore avoids collision with Error() method
@@ -121,13 +120,23 @@ type SetTaskAbandonedError struct {
 var _ error = (*SetTaskAbandonedError)(nil) //nolint:errcheck // compile-time interface check
 
 // Error returns a JSON representation of the error.
+// Falls back to a descriptive string if JSON marshaling fails.
 func (e *SetTaskAbandonedError) Error() string {
-	data, _ := json.Marshal(e) //nolint:errcheck,errchkjson // Best-effort JSON serialization for error message
+	data, err := json.Marshal(e)
+	if err != nil {
+		errStr := "<nil>"
+		if e.Error_ != nil {
+			errStr = *e.Error_
+		}
+
+		return fmt.Sprintf("SetTaskAbandonedError{error: %s, details: %v}", errStr, e.Details)
+	}
+
 	return string(data)
 }
 
 // Severity is a type alias for the generated SubmitErrorAgentJSONBodySeverity.
-// This provides named constants matching the SDK's operations.Severity.
+// This provides named constants for error severity levels.
 type Severity = SubmitErrorAgentJSONBodySeverity
 
 // Severity levels for error reporting.

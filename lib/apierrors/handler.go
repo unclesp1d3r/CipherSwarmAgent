@@ -56,7 +56,10 @@ func (h *Handler) Handle(err error, opts Options) error {
 	case stderrors.As(err, &ae):
 		h.handleAPIError(ae, opts)
 	default:
-		agentstate.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		agentstate.ErrorLogger.Error(opts.Message, "error", err)
+		if opts.SendToServer && h.SendError != nil {
+			h.SendError(err.Error(), opts.Severity)
+		}
 	}
 
 	return err

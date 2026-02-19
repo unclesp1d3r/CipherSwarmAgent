@@ -24,11 +24,6 @@ func NewErrorObject(message string) *api.APIError {
 	return NewAPIError(http.StatusUnprocessableEntity, message)
 }
 
-// NewSDKError creates a new APIError with the specified status code and message.
-func NewSDKError(statusCode int, message string) *api.APIError {
-	return NewAPIError(statusCode, message)
-}
-
 // NewSetTaskAbandonedError creates a SetTaskAbandonedError
 // for testing task abandonment scenarios.
 func NewSetTaskAbandonedError(state string) *api.SetTaskAbandonedError {
@@ -63,10 +58,10 @@ func WrapAsErrorObject(err error) error {
 	return NewErrorObject(err.Error())
 }
 
-// WrapAsSDKError wraps a standard error as an APIError for testing error type assertions.
-func WrapAsSDKError(err error, statusCode int) error {
+// WrapAsAPIError wraps a standard error as an APIError for testing error type assertions.
+func WrapAsAPIError(err error, statusCode int) error {
 	if err == nil {
 		return nil
 	}
-	return NewSDKError(statusCode, err.Error())
+	return NewAPIError(statusCode, err.Error())
 }

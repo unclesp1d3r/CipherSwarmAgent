@@ -31,6 +31,8 @@ func GetZaps(task *api.Task, sendCrackedHashFunc func(time.Time, string, string,
 
 	res, err := agentstate.State.APIClient.Tasks().GetTaskZaps(context.Background(), task.Id)
 	if err != nil {
+		agentstate.Logger.Error("Error fetching zaps for task", "task_id", task.Id, "error", err)
+
 		return
 	}
 
@@ -95,33 +97,15 @@ func handleResponseStream(
 
 	zapFilePath := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d.zap", task.Id))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
-		//nolint:errcheck // Error already being handled
-		_ = cserrors.LogAndSendError(
-			"Error removing existing zap file",
-			err,
-			api.SeverityCritical,
-			task,
-		)
+		return cserrors.LogAndSendError("Error removing existing zap file", err, api.SeverityCritical, task)
 	}
 
 	if err := createAndWriteZapFile(zapFilePath, responseStream, task); err != nil {
-		//nolint:errcheck // Error already being handled
-		_ = cserrors.LogAndSendError(
-			"Error creating and writing zap file",
-			err,
-			api.SeverityCritical,
-			task,
-		)
+		return cserrors.LogAndSendError("Error creating and writing zap file", err, api.SeverityCritical, task)
 	}
 
 	if err := processZapFile(zapFilePath, task, sendCrackedHashFunc); err != nil {
-		//nolint:errcheck // Error already being handled
-		_ = cserrors.LogAndSendError(
-			"Error processing zap file",
-			err,
-			api.SeverityCritical,
-			task,
-		)
+		return cserrors.LogAndSendError("Error processing zap file", err, api.SeverityCritical, task)
 	}
 
 	return nil

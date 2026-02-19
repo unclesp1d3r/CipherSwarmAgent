@@ -233,9 +233,20 @@ func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile)
 		return cserrors.LogAndSendError("Error downloading attack resource", err, api.SeverityCritical, nil)
 	}
 
-	if fileInfo, err := os.Stat(filePath); err != nil || fileInfo.Size() == 0 {
+	fileInfo, statErr := os.Stat(filePath)
+	if statErr != nil {
 		//nolint:contextcheck // LogAndSendError uses context.Background() internally
-		return cserrors.LogAndSendError("Downloaded file is empty", nil, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error checking downloaded file", statErr, api.SeverityCritical, nil)
+	}
+
+	if fileInfo.Size() == 0 {
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
+		return cserrors.LogAndSendError(
+			"Downloaded file is empty: "+filePath,
+			fmt.Errorf("file %s has zero bytes", filePath),
+			api.SeverityCritical,
+			nil,
+		)
 	}
 
 	agentstate.Logger.Debug("Downloaded resource file", "path", filePath)
@@ -309,7 +320,7 @@ func handleStateResponse(stateResponse *struct {
 }
 
 // sendStatusUpdate sends a status update to the server for a given task and session.
-// It ensures the update time is set, converts device statuses, and converts hashcat.Status to cipherswarm.TaskStatus.
+// It ensures the update time is set, converts device statuses, and converts hashcat.Status to api.TaskStatus.
 // Finally, it sends the status update to the server and handles the response.
 func sendStatusUpdate(update hashcat.Status, task *api.Task, sess *hashcat.Session) {
 	// Ensure the update time is set
@@ -388,6 +399,9 @@ func handleSendStatusResponse(resp *api.SendStatusResponse, task *api.Task) {
 	case http.StatusAccepted:
 		agentstate.Logger.Debug("Status update sent, but stale")
 		zap.GetZaps(task, sendCrackedHash)
+	default:
+		agentstate.Logger.Warn("Unexpected status update response code",
+			"status_code", resp.StatusCode(), "task_id", task.Id)
 	}
 }
 

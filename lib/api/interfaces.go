@@ -8,7 +8,7 @@ import (
 )
 
 // TasksClient defines the interface for task-related API operations.
-// This enables mocking in tests and decouples code from the concrete SDK implementation.
+// This enables mocking in tests and decouples code from the concrete API client implementation.
 type TasksClient interface {
 	// GetNewTask retrieves a new task from the server.
 	GetNewTask(ctx context.Context) (*GetNewTaskResponse, error)
@@ -87,7 +87,7 @@ type CrackersClient interface {
 }
 
 // APIClient is the aggregate interface combining all API subsystems.
-// This can be implemented by a wrapper around the SDK client or by mocks in tests.
+// This can be implemented by the AgentClient wrapper or by mocks in tests.
 //
 //nolint:revive // Client name is taken by oapi-codegen generated struct in client.gen.go
 type APIClient interface {

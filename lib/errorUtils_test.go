@@ -47,7 +47,7 @@ func TestHandleAuthenticationError(t *testing.T) {
 		},
 		{
 			name:        "APIError_ServerError",
-			err:         testhelpers.NewSDKError(http.StatusBadRequest, "bad request"),
+			err:         testhelpers.NewAPIError(http.StatusBadRequest, "bad request"),
 			expectError: true,
 		},
 		{
@@ -89,7 +89,7 @@ func TestHandleConfigurationError(t *testing.T) {
 		},
 		{
 			name:              "APIError_ServerError",
-			err:               testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			err:               testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 			expectError:       true,
 			expectSubmitError: true,
 		},
@@ -97,7 +97,7 @@ func TestHandleConfigurationError(t *testing.T) {
 			name:              "generic error",
 			err:               errors.New("generic error"),
 			expectError:       true,
-			expectSubmitError: false, // Generic errors don't call SubmitErrorAgent
+			expectSubmitError: true, // Generic errors are now sent to the server for visibility
 		},
 	}
 
@@ -160,19 +160,19 @@ func TestHandleAPIError(t *testing.T) {
 		{
 			name:        "APIError for 401 Unauthorized",
 			message:     "API error",
-			err:         testhelpers.NewSDKError(http.StatusUnauthorized, "unauthorized"),
+			err:         testhelpers.NewAPIError(http.StatusUnauthorized, "unauthorized"),
 			expectError: false,
 		},
 		{
 			name:        "APIError for 403 Forbidden",
 			message:     "API error",
-			err:         testhelpers.NewSDKError(http.StatusForbidden, "forbidden"),
+			err:         testhelpers.NewAPIError(http.StatusForbidden, "forbidden"),
 			expectError: false,
 		},
 		{
 			name:        "APIError for other status codes",
 			message:     "API error",
-			err:         testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			err:         testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 			expectError: false,
 		},
 		{
@@ -221,7 +221,7 @@ func TestHandleHeartbeatError(t *testing.T) {
 		},
 		{
 			name: "APIError_ServerError",
-			err:  testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			err:  testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 		},
 		{
 			name: "generic error",
@@ -254,7 +254,7 @@ func TestHandleStatusUpdateError(t *testing.T) {
 		},
 		{
 			name: "APIError_NotFound",
-			err:  testhelpers.NewSDKError(http.StatusNotFound, "not found"),
+			err:  testhelpers.NewAPIError(http.StatusNotFound, "not found"),
 			task: testhelpers.NewTestTask(456, 789),
 		},
 		{
@@ -285,65 +285,6 @@ func TestHandleStatusUpdateError(t *testing.T) {
 
 			// This function doesn't return an error
 			handleStatusUpdateError(tt.err, tt.task, sess)
-		})
-	}
-}
-
-// TestHandleAPIStatusError tests the handleAPIStatusError function.
-func TestHandleAPIStatusError(t *testing.T) {
-	tests := []struct {
-		name       string
-		apiError   *api.APIError
-		task       *api.Task
-		expectKill bool
-	}{
-		{
-			name:       "HTTP 404 Not Found",
-			apiError:   testhelpers.NewSDKError(http.StatusNotFound, "not found"),
-			task:       testhelpers.NewTestTask(456, 789),
-			expectKill: true,
-		},
-		{
-			name:       "HTTP 410 Gone",
-			apiError:   testhelpers.NewSDKError(http.StatusGone, "gone"),
-			task:       testhelpers.NewTestTask(456, 789),
-			expectKill: true,
-		},
-		{
-			name:       "other status codes",
-			apiError:   testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
-			task:       testhelpers.NewTestTask(456, 789),
-			expectKill: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
-
-			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
-
-			// Create a mock session
-			sess, err := testhelpers.NewMockSession("test-session")
-			if err != nil {
-				t.Skipf("Skipping test: failed to create mock session: %v", err)
-				return
-			}
-			defer sess.Cleanup()
-
-			// This function doesn't return an error
-			handleAPIStatusError(tt.apiError, tt.task, sess)
-
-			// For 404 and 410, session should be killed - ensure function completes
-			if tt.expectKill {
-				// No direct assertion without deeper mocking; ensure branch is executed without panics
-				t.Log("kill path exercised")
-			}
 		})
 	}
 }
@@ -485,7 +426,7 @@ func TestHandleSendError(t *testing.T) {
 		},
 		{
 			name: "APIError_ServerError",
-			err:  testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			err:  testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 		},
 		{
 			name: "generic error",
@@ -527,7 +468,7 @@ func TestHandleAcceptTaskError(t *testing.T) {
 		},
 		{
 			name: "APIError_ServerError",
-			err:  testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			err:  testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 		},
 		{
 			name: "generic error",
@@ -575,7 +516,7 @@ func TestHandleTaskError(t *testing.T) {
 		},
 		{
 			name:    "APIError_ServerError",
-			err:     testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			err:     testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 			message: "Task error occurred",
 		},
 		{
@@ -622,7 +563,7 @@ func TestHandleSendCrackError(t *testing.T) {
 		},
 		{
 			name: "APIError_ServerError",
-			err:  testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			err:  testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 		},
 		{
 			name: "generic error",

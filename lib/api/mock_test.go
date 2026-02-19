@@ -76,11 +76,12 @@ func TestMockClient_InterfaceCompliance(t *testing.T) {
 func TestMockTasksClient_DefaultBehavior(t *testing.T) {
 	t.Parallel()
 
-	// When no function is configured, mocks return nil, nil
+	// When no function is configured, mocks return a descriptive error
 	mock := &MockTasksClient{}
 
 	resp, err := mock.GetNewTask(context.Background())
 
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "mock method not configured")
 }

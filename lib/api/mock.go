@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 )
 
 // Compile-time interface compliance checks for mocks.
@@ -51,25 +52,25 @@ type MockTasksClient struct {
 	GetTaskZapsFunc      func(ctx context.Context, id int64) (*GetTaskZapsResponse, error)
 }
 
-// GetNewTask calls the configured function or returns nil if not configured.
+// GetNewTask calls the configured function or returns an error if not configured.
 func (m *MockTasksClient) GetNewTask(ctx context.Context) (*GetNewTaskResponse, error) {
 	if m.GetNewTaskFunc != nil {
 		return m.GetNewTaskFunc(ctx)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// SetTaskAccepted calls the configured function or returns nil if not configured.
+// SetTaskAccepted calls the configured function or returns an error if not configured.
 func (m *MockTasksClient) SetTaskAccepted(ctx context.Context, id int64) (*SetTaskAcceptedResponse, error) {
 	if m.SetTaskAcceptedFunc != nil {
 		return m.SetTaskAcceptedFunc(ctx, id)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// SetTaskExhausted calls the configured function or returns nil if not configured.
+// SetTaskExhausted calls the configured function or returns an error if not configured.
 func (m *MockTasksClient) SetTaskExhausted(
 	ctx context.Context,
 	id int64,
@@ -78,10 +79,10 @@ func (m *MockTasksClient) SetTaskExhausted(
 		return m.SetTaskExhaustedFunc(ctx, id)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// SetTaskAbandoned calls the configured function or returns nil if not configured.
+// SetTaskAbandoned calls the configured function or returns an error if not configured.
 func (m *MockTasksClient) SetTaskAbandoned(
 	ctx context.Context,
 	id int64,
@@ -90,10 +91,10 @@ func (m *MockTasksClient) SetTaskAbandoned(
 		return m.SetTaskAbandonedFunc(ctx, id)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// SendStatus calls the configured function or returns nil if not configured.
+// SendStatus calls the configured function or returns an error if not configured.
 func (m *MockTasksClient) SendStatus(
 	ctx context.Context,
 	id int64,
@@ -103,10 +104,10 @@ func (m *MockTasksClient) SendStatus(
 		return m.SendStatusFunc(ctx, id, status)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// SendCrack calls the configured function or returns nil if not configured.
+// SendCrack calls the configured function or returns an error if not configured.
 func (m *MockTasksClient) SendCrack(
 	ctx context.Context,
 	id int64,
@@ -116,16 +117,16 @@ func (m *MockTasksClient) SendCrack(
 		return m.SendCrackFunc(ctx, id, result)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// GetTaskZaps calls the configured function or returns nil if not configured.
+// GetTaskZaps calls the configured function or returns an error if not configured.
 func (m *MockTasksClient) GetTaskZaps(ctx context.Context, id int64) (*GetTaskZapsResponse, error) {
 	if m.GetTaskZapsFunc != nil {
 		return m.GetTaskZapsFunc(ctx, id)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
 // MockAttacksClient is a configurable mock for AttacksClient.
@@ -134,22 +135,22 @@ type MockAttacksClient struct {
 	GetHashListFunc func(ctx context.Context, id int64) (*GetHashListResponse, error)
 }
 
-// GetAttack calls the configured function or returns nil if not configured.
+// GetAttack calls the configured function or returns an error if not configured.
 func (m *MockAttacksClient) GetAttack(ctx context.Context, id int64) (*GetAttackResponse, error) {
 	if m.GetAttackFunc != nil {
 		return m.GetAttackFunc(ctx, id)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// GetHashList calls the configured function or returns nil if not configured.
+// GetHashList calls the configured function or returns an error if not configured.
 func (m *MockAttacksClient) GetHashList(ctx context.Context, id int64) (*GetHashListResponse, error) {
 	if m.GetHashListFunc != nil {
 		return m.GetHashListFunc(ctx, id)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
 // MockAgentsClient is a configurable mock for AgentsClient.
@@ -161,16 +162,16 @@ type MockAgentsClient struct {
 	SetAgentShutdownFunc func(ctx context.Context, id int64) (*SetAgentShutdownResponse, error)
 }
 
-// SendHeartbeat calls the configured function or returns nil if not configured.
+// SendHeartbeat calls the configured function or returns an error if not configured.
 func (m *MockAgentsClient) SendHeartbeat(ctx context.Context, id int64) (*SendHeartbeatResponse, error) {
 	if m.SendHeartbeatFunc != nil {
 		return m.SendHeartbeatFunc(ctx, id)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// UpdateAgent calls the configured function or returns nil if not configured.
+// UpdateAgent calls the configured function or returns an error if not configured.
 func (m *MockAgentsClient) UpdateAgent(
 	ctx context.Context,
 	id int64,
@@ -180,10 +181,10 @@ func (m *MockAgentsClient) UpdateAgent(
 		return m.UpdateAgentFunc(ctx, id, body)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// SubmitBenchmark calls the configured function or returns nil if not configured.
+// SubmitBenchmark calls the configured function or returns an error if not configured.
 func (m *MockAgentsClient) SubmitBenchmark(
 	ctx context.Context,
 	id int64,
@@ -193,10 +194,10 @@ func (m *MockAgentsClient) SubmitBenchmark(
 		return m.SubmitBenchmarkFunc(ctx, id, body)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// SubmitErrorAgent calls the configured function or returns nil if not configured.
+// SubmitErrorAgent calls the configured function or returns an error if not configured.
 func (m *MockAgentsClient) SubmitErrorAgent(
 	ctx context.Context,
 	id int64,
@@ -206,10 +207,10 @@ func (m *MockAgentsClient) SubmitErrorAgent(
 		return m.SubmitErrorAgentFunc(ctx, id, body)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// SetAgentShutdown calls the configured function or returns nil if not configured.
+// SetAgentShutdown calls the configured function or returns an error if not configured.
 func (m *MockAgentsClient) SetAgentShutdown(
 	ctx context.Context,
 	id int64,
@@ -218,7 +219,7 @@ func (m *MockAgentsClient) SetAgentShutdown(
 		return m.SetAgentShutdownFunc(ctx, id)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
 // MockAuthClient is a configurable mock for AuthClient.
@@ -227,22 +228,22 @@ type MockAuthClient struct {
 	GetConfigurationFunc func(ctx context.Context) (*GetConfigurationResponse, error)
 }
 
-// Authenticate calls the configured function or returns nil if not configured.
+// Authenticate calls the configured function or returns an error if not configured.
 func (m *MockAuthClient) Authenticate(ctx context.Context) (*AuthenticateResponse, error) {
 	if m.AuthenticateFunc != nil {
 		return m.AuthenticateFunc(ctx)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// GetConfiguration calls the configured function or returns nil if not configured.
+// GetConfiguration calls the configured function or returns an error if not configured.
 func (m *MockAuthClient) GetConfiguration(ctx context.Context) (*GetConfigurationResponse, error) {
 	if m.GetConfigurationFunc != nil {
 		return m.GetConfigurationFunc(ctx)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
 // MockCrackersClient is a configurable mock for CrackersClient.
@@ -250,7 +251,7 @@ type MockCrackersClient struct {
 	CheckForCrackerUpdateFunc func(ctx context.Context, os, version *string) (*CheckForCrackerUpdateResponse, error)
 }
 
-// CheckForCrackerUpdate calls the configured function or returns nil if not configured.
+// CheckForCrackerUpdate calls the configured function or returns an error if not configured.
 func (m *MockCrackersClient) CheckForCrackerUpdate(
 	ctx context.Context,
 	os, version *string,
@@ -259,5 +260,5 @@ func (m *MockCrackersClient) CheckForCrackerUpdate(
 		return m.CheckForCrackerUpdateFunc(ctx, os, version)
 	}
 
-	return nil, nil //nolint:nilnil // Intentional for unconfigured mock methods
+	return nil, fmt.Errorf("mock method not configured: %T", m)
 }

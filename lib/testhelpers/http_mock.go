@@ -12,14 +12,12 @@ import (
 )
 
 // authenticateResponseBody represents the JSON response for authentication.
-// Replaces the old operations.AuthenticateResponseBody type.
 type authenticateResponseBody struct {
 	Authenticated bool  `json:"authenticated"`
 	AgentID       int64 `json:"agent_id"`
 }
 
 // heartbeatResponseBody represents the JSON response for heartbeat.
-// Replaces the old operations.SendHeartbeatResponseBody type.
 type heartbeatResponseBody struct {
 	State api.SendHeartbeat200State `json:"state"`
 }
@@ -43,8 +41,8 @@ func SetupHTTPMock() func() {
 }
 
 // SetupHTTPMockForClient initializes httpmock for a custom http.Client and returns a cleanup function.
-// This should be used when the SDK uses a custom http.Client. The client should be passed
-// to the SDK via WithClient option after activating httpmock.
+// This should be used when the API client uses a custom http.Client, or when
+// ActivateNonDefault is needed instead of wrapping http.DefaultTransport.
 func SetupHTTPMockForClient(client *http.Client) func() {
 	httpmock.ActivateNonDefault(client)
 	return func() {
@@ -55,7 +53,7 @@ func SetupHTTPMockForClient(client *http.Client) func() {
 // MockAuthenticationSuccess registers a mock responder for the authentication endpoint
 // that returns a successful authentication response with the provided agent ID.
 // Uses a regex pattern to match any HTTP scheme and host.
-// Note: The SDK uses GET for authentication, not POST.
+// Note: The API uses GET for authentication, not POST.
 func MockAuthenticationSuccess(agentID int64) {
 	authResponse := authenticateResponseBody{
 		Authenticated: true,
@@ -76,7 +74,7 @@ func MockAuthenticationSuccess(agentID int64) {
 // MockAuthenticationFailure registers a mock responder for authentication
 // that returns an error response with the specified status code and error message.
 // Uses a regex pattern to match any HTTP scheme and host.
-// Note: The SDK uses GET for authentication, not POST.
+// Note: The API uses GET for authentication, not POST.
 func MockAuthenticationFailure(statusCode int, errorMessage string) {
 	errorResponse := map[string]any{
 		"authenticated": false,
@@ -135,7 +133,7 @@ func MockHeartbeatResponse(agentID int64, state api.SendHeartbeat200State) {
 // MockAPIError is a generic helper to mock API errors for any endpoint,
 // useful for testing error handling across different API calls.
 // The endpoint parameter should be a regex pattern string (will be compiled to *regexp.Regexp).
-// Registers responders for multiple HTTP methods to handle different SDK implementations.
+// Registers responders for multiple HTTP methods to handle different API call patterns.
 func MockAPIError(endpoint string, statusCode int, apiError api.APIError) {
 	errorResponse := map[string]any{
 		"error":   apiError.Message,
@@ -238,10 +236,10 @@ func MockSendCrackComplete(taskID int64) {
 
 // MockSubmitErrorSuccess registers a mock responder for POST /api/v1/client/agents/{id}/submit_error
 // that returns HTTP 200 OK with a proper JSON response body.
-// Note: The SDK uses /api/v1/client/agents/{id}/submit_error path.
+// Note: The API endpoint path is /api/v1/client/agents/{id}/submit_error.
 // Returns 204 No Content to avoid infinite recursion when handleSendError processes errors.
 func MockSubmitErrorSuccess(agentID int64) {
-	// Use 204 No Content to signal success without a body, which prevents the SDK from
+	// Use 204 No Content to signal success without a body, which prevents the API client from
 	// treating it as an error and triggering infinite recursion in handleSendError.
 	responder := httpmock.NewStringResponder(http.StatusNoContent, "")
 	// Register both paths for compatibility

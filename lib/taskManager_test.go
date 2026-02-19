@@ -56,7 +56,7 @@ func TestGetNewTask(t *testing.T) {
 		{
 			name: "bad response - unexpected status",
 			setupMock: func() {
-				// Use 400 Bad Request instead of 500 to avoid SDK retry backoff loops
+				// Use 400 Bad Request to test client error handling without server error complications
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
@@ -81,7 +81,7 @@ func TestGetNewTask(t *testing.T) {
 
 			if tt.expectedError != nil {
 				require.Error(t, err)
-				// The SDK may wrap errors for non-2xx responses; only assert type for specific sentinel we control.
+				// The API client wraps non-2xx responses as APIError; only assert type for specific sentinels we control.
 				if errors.Is(tt.expectedError, ErrNoTaskAvailable) {
 					require.ErrorIs(t, err, tt.expectedError)
 				}
@@ -156,7 +156,7 @@ func TestGetAttackParameters(t *testing.T) {
 
 			if tt.expectedError != nil {
 				require.Error(t, err)
-				// For 4xx from SDK, errors are wrapped; avoid strict ErrorIs here.
+				// For 4xx responses, errors are wrapped as APIError; avoid strict ErrorIs here.
 				if !errors.Is(tt.expectedError, ErrTaskBadResponse) {
 					require.ErrorIs(t, err, tt.expectedError)
 				}
@@ -199,7 +199,7 @@ func TestAcceptTask(t *testing.T) {
 			name: "API error during acceptance",
 			task: testhelpers.NewTestTask(123, 456),
 			setupMock: func(_ int64) {
-				// Use 400 Bad Request instead of 500 to avoid SDK retry backoff loops
+				// Use 400 Bad Request to test client error handling without server error complications
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)

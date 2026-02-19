@@ -19,7 +19,7 @@ func mustMkdirAll(path string) {
 }
 
 // SetupTestState initializes agentstate.State with test values.
-// It creates temporary directories for all path fields, sets up the SDK client,
+// It creates temporary directories for all path fields, sets up the API client,
 // stubs device discovery to avoid requiring hashcat binary,
 // and returns a cleanup function that removes temporary directories and resets state.
 func SetupTestState(agentID int64, apiURL, apiToken string) func() {
