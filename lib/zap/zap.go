@@ -37,14 +37,19 @@ func GetZaps(task *api.Task, sendCrackedHashFunc func(time.Time, string, string,
 	}
 
 	responseStream := api.ResponseStream(res)
-	if responseStream != nil {
-		//nolint:errcheck // Error already being handled
-		_ = handleResponseStream(
-			task,
-			responseStream,
-			sendCrackedHashFunc,
-		)
+	if responseStream == nil {
+		agentstate.Logger.Warn("Zaps response was successful but contained no data",
+			"task_id", task.Id, "status_code", res.StatusCode())
+
+		return
 	}
+
+	//nolint:errcheck // Error already being handled
+	_ = handleResponseStream(
+		task,
+		responseStream,
+		sendCrackedHashFunc,
+	)
 }
 
 // removeExistingZapFile removes the zap file at the given path if it exists, logging debug information.

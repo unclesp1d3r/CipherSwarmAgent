@@ -90,7 +90,7 @@ func (e *ErrorObject) MarshalJSON() ([]byte, error) {
 }
 
 // APIError represents an HTTP error returned by the CipherSwarm API.
-// It serves as the unified internal error type for non-2xx API responses.
+// It serves as the unified internal error type for 4xx and 5xx API responses.
 // For the API error object model (JSON "error" field), see ErrorObject.
 type APIError struct { //nolint:revive // Name is intentional for clarity across packages
 	StatusCode int

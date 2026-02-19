@@ -63,8 +63,15 @@ func UpdateCracker() {
 
 	if response.StatusCode == http.StatusOK {
 		update := response.GetCrackerUpdate()
+		if update == nil {
+			agentstate.Logger.Warn("Cracker update response was 200 OK but contained no update data")
+
+			return
+		}
 		if update.GetAvailable() {
-			_ = handleCrackerUpdate(update) //nolint:errcheck // Error already logged in function
+			if err := handleCrackerUpdate(update); err != nil {
+				agentstate.Logger.Error("Failed to apply cracker update", "error", err)
+			}
 		} else {
 			agentstate.Logger.Debug("No new cracker available", "latest_version", update.GetLatestVersion())
 		}

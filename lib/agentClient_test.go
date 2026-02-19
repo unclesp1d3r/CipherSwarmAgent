@@ -172,17 +172,10 @@ func TestAuthenticateAgent(t *testing.T) {
 				assert.Equal(t, int64(123), agentstate.State.AgentID)
 			} else {
 				require.Error(t, err)
-				// Only check error type if it's an API error type, not for standard errors
-				errorObject := &api.APIError{}
-				apiError := &api.APIError{}
-				switch {
-				case errors.As(tt.expectedError, &errorObject):
+				// Check error type if it's an API error type, otherwise just verify error was returned
+				var ae *api.APIError
+				if errors.As(tt.expectedError, &ae) {
 					testhelpers.AssertErrorType(t, err, tt.expectedError)
-				case errors.As(tt.expectedError, &apiError):
-					testhelpers.AssertErrorType(t, err, tt.expectedError)
-				default:
-					// For standard errors like ErrAuthenticationFailed, just check that an error was returned
-					require.Error(t, err)
 				}
 			}
 		})

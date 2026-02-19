@@ -10,7 +10,7 @@ import (
 )
 
 // LogAndSendError logs an error message with severity and optionally sends it to the CipherSwarm API.
-// It constructs an AgentError object and sends it to the API if a task is provided and APIClient is initialized.
+// It constructs a SubmitErrorAgentJSONRequestBody and sends it to the API if a task is provided and APIClient is initialized.
 // Returns the original error for further handling.
 func LogAndSendError(message string, err error, severity api.Severity, task *api.Task) error {
 	agentstate.ErrorLogger.Error(message, "error", err)

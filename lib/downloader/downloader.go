@@ -241,16 +241,14 @@ func DownloadHashList(ctx context.Context, attack *api.Attack) error {
 }
 
 // Base64ToHex converts a base64 encoded string to a hexadecimal string.
-// It returns an empty string if the input is invalid.
-func Base64ToHex(b64 string) string {
+// Returns an error if the base64 input is invalid.
+func Base64ToHex(b64 string) (string, error) {
 	data, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		agentstate.Logger.Error("Error decoding base64 string", "error", err)
-
-		return ""
+		return "", fmt.Errorf("decoding base64 checksum: %w", err)
 	}
 
-	return hex.EncodeToString(data)
+	return hex.EncodeToString(data), nil
 }
 
 // removeExistingFile removes the file specified by filePath if it exists, logging and reporting an error if removal fails.

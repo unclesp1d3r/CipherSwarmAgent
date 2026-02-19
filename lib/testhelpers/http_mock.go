@@ -166,7 +166,7 @@ func MockHeartbeatNoContent(agentID int64) {
 	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
 }
 
-// MockUpdateAgentSuccess registers a mock responder for POST /api/v1/client/agents/{id}
+// MockUpdateAgentSuccess registers a mock responder for PUT /api/v1/client/agents/{id}
 // that returns a successful UpdateAgentResponse with the provided agent data.
 // According to swagger.json, the endpoint is /api/v1/client/agents/{id}.
 func MockUpdateAgentSuccess(agentID int64, agent api.Agent) {
@@ -235,9 +235,8 @@ func MockSendCrackComplete(taskID int64) {
 }
 
 // MockSubmitErrorSuccess registers a mock responder for POST /api/v1/client/agents/{id}/submit_error
-// that returns HTTP 200 OK with a proper JSON response body.
-// Note: The API endpoint path is /api/v1/client/agents/{id}/submit_error.
-// Returns 204 No Content to avoid infinite recursion when handleSendError processes errors.
+// that returns HTTP 204 No Content.
+// Returns 204 instead of 200 to avoid infinite recursion when handleSendError processes errors.
 func MockSubmitErrorSuccess(agentID int64) {
 	// Use 204 No Content to signal success without a body, which prevents the API client from
 	// treating it as an error and triggering infinite recursion in handleSendError.

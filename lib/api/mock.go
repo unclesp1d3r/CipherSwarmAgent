@@ -15,7 +15,7 @@ var (
 	_ CrackersClient = (*MockCrackersClient)(nil)
 )
 
-// MockClient is a test double for the Client interface.
+// MockClient is a test double for the APIClient interface.
 // Each subsystem client can be configured independently.
 type MockClient struct {
 	TasksImpl    TasksClient

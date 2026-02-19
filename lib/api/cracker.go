@@ -48,10 +48,7 @@ func (r *CheckForCrackerUpdateResponse) Status() string {
 	return http.StatusText(0)
 }
 
-// GetCrackerUpdate returns the CrackerUpdate from the response, or a zero value if nil.
+// GetCrackerUpdate returns the CrackerUpdate from the response, or nil if no update data is present.
 func (r *CheckForCrackerUpdateResponse) GetCrackerUpdate() *CrackerUpdate {
-	if r.CrackerUpdate == nil {
-		return &CrackerUpdate{}
-	}
 	return r.CrackerUpdate
 }

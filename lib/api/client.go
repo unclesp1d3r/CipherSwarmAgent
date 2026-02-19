@@ -428,10 +428,11 @@ func newAPIError(statusCode int, status string, body []byte) *APIError {
 }
 
 // ResponseStream extracts the response body as an io.ReadCloser from a GetTaskZapsResponse.
-// Returns the HTTPResponse.Body if available, or wraps the Body bytes.
+// It uses the parsed Body bytes because the generated oapi-codegen parser reads and closes
+// HTTPResponse.Body during parsing, making the original body stream unavailable.
 func ResponseStream(resp *GetTaskZapsResponse) io.ReadCloser {
-	if resp.HTTPResponse != nil && resp.HTTPResponse.Body != nil {
-		return resp.HTTPResponse.Body
+	if resp == nil {
+		return nil
 	}
 	if len(resp.Body) > 0 {
 		return io.NopCloser(bytes.NewReader(resp.Body))
@@ -440,10 +441,11 @@ func ResponseStream(resp *GetTaskZapsResponse) io.ReadCloser {
 }
 
 // HashListResponseStream extracts the response body as an io.Reader from a GetHashListResponse.
-// Returns the HTTPResponse.Body if available, or wraps the Body bytes.
+// It uses the parsed Body bytes because the generated oapi-codegen parser reads and closes
+// HTTPResponse.Body during parsing, making the original body stream unavailable.
 func HashListResponseStream(resp *GetHashListResponse) io.Reader {
-	if resp.HTTPResponse != nil && resp.HTTPResponse.Body != nil {
-		return resp.HTTPResponse.Body
+	if resp == nil {
+		return nil
 	}
 	if len(resp.Body) > 0 {
 		return bytes.NewReader(resp.Body)

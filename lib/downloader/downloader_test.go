@@ -123,9 +123,10 @@ func TestAppendChecksumToURL(t *testing.T) {
 // TestBase64ToHex tests the Base64ToHex function.
 func TestBase64ToHex(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name        string
+		input       string
+		expected    string
+		expectError bool
 	}{
 		{
 			name:     "valid base64 string",
@@ -142,12 +143,22 @@ func TestBase64ToHex(t *testing.T) {
 			input:    "VGVzdA==", // "Test" in base64
 			expected: "54657374",
 		},
+		{
+			name:        "invalid base64",
+			input:       "not-valid-base64!@#",
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := Base64ToHex(tt.input)
-			assert.Equal(t, tt.expected, result)
+			result, err := Base64ToHex(tt.input)
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
 		})
 	}
 }

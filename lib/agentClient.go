@@ -277,6 +277,8 @@ func SendHeartBeat() (*api.SendHeartbeat200State, error) {
 		return handleStateResponse(resp.JSON200), nil
 	}
 
+	agentstate.Logger.Warn("Unexpected heartbeat response code", "status_code", resp.StatusCode())
+
 	return nil, nil //nolint:nilnil // nil state with nil error means successful heartbeat with no state change
 }
 
