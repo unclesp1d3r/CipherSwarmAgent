@@ -25,20 +25,50 @@ type MockClient struct {
 	CrackersImpl CrackersClient
 }
 
-// Tasks returns the configured TasksClient implementation.
-func (m *MockClient) Tasks() TasksClient { return m.TasksImpl }
+// Tasks returns the configured TasksClient, or an unconfigured mock that returns descriptive errors.
+func (m *MockClient) Tasks() TasksClient {
+	if m.TasksImpl != nil {
+		return m.TasksImpl
+	}
 
-// Attacks returns the configured AttacksClient implementation.
-func (m *MockClient) Attacks() AttacksClient { return m.AttacksImpl }
+	return &MockTasksClient{}
+}
 
-// Agents returns the configured AgentsClient implementation.
-func (m *MockClient) Agents() AgentsClient { return m.AgentsImpl }
+// Attacks returns the configured AttacksClient, or an unconfigured mock that returns descriptive errors.
+func (m *MockClient) Attacks() AttacksClient {
+	if m.AttacksImpl != nil {
+		return m.AttacksImpl
+	}
 
-// Auth returns the configured AuthClient implementation.
-func (m *MockClient) Auth() AuthClient { return m.AuthImpl }
+	return &MockAttacksClient{}
+}
 
-// Crackers returns the configured CrackersClient implementation.
-func (m *MockClient) Crackers() CrackersClient { return m.CrackersImpl }
+// Agents returns the configured AgentsClient, or an unconfigured mock that returns descriptive errors.
+func (m *MockClient) Agents() AgentsClient {
+	if m.AgentsImpl != nil {
+		return m.AgentsImpl
+	}
+
+	return &MockAgentsClient{}
+}
+
+// Auth returns the configured AuthClient, or an unconfigured mock that returns descriptive errors.
+func (m *MockClient) Auth() AuthClient {
+	if m.AuthImpl != nil {
+		return m.AuthImpl
+	}
+
+	return &MockAuthClient{}
+}
+
+// Crackers returns the configured CrackersClient, or an unconfigured mock that returns descriptive errors.
+func (m *MockClient) Crackers() CrackersClient {
+	if m.CrackersImpl != nil {
+		return m.CrackersImpl
+	}
+
+	return &MockCrackersClient{}
+}
 
 // MockTasksClient is a configurable mock for TasksClient.
 // Set the function fields to control mock behavior.

@@ -27,7 +27,12 @@ func setNativeHashcatPath() error {
 	agentstate.Logger.Info("Found Hashcat binary", "path", binPath)
 	viper.Set("hashcat_path", binPath)
 
-	return viper.WriteConfig()
+	if err := viper.WriteConfig(); err != nil {
+		agentstate.Logger.Warn("Failed to persist hashcat path to config; path will be lost on restart",
+			"error", err, "hashcat_path", binPath)
+	}
+
+	return nil
 }
 
 // UpdateCracker checks for updates to the cracker and applies them if available.

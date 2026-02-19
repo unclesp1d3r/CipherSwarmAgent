@@ -404,6 +404,10 @@ func handleSendStatusResponse(resp *api.SendStatusResponse, task *api.Task) {
 	default:
 		agentstate.Logger.Warn("Unexpected status update response code",
 			"status_code", resp.StatusCode(), "task_id", task.Id)
+		// Defensively fetch zaps for any other 2xx success code to avoid losing cracked hashes
+		if resp.StatusCode() >= http.StatusOK && resp.StatusCode() < http.StatusMultipleChoices {
+			zap.GetZaps(task, sendCrackedHash)
+		}
 	}
 }
 

@@ -151,6 +151,9 @@ const (
 
 // SendHeartbeat200State constants for heartbeat response state values.
 // The generated code defines the type but not constants.
+// Note: The swagger enum only includes "pending", "stopped", and "error".
+// "active" is described in the API prose but is not part of the response enum;
+// it may not be returned by current server versions.
 const (
 	StatePending SendHeartbeat200State = "pending"
 	StateActive  SendHeartbeat200State = "active"

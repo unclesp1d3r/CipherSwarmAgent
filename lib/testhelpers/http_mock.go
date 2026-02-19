@@ -235,11 +235,9 @@ func MockSendCrackComplete(taskID int64) {
 }
 
 // MockSubmitErrorSuccess registers a mock responder for POST /api/v1/client/agents/{id}/submit_error
-// that returns HTTP 204 No Content.
-// Returns 204 instead of 200 to avoid infinite recursion when handleSendError processes errors.
+// that returns HTTP 204 No Content, matching the swagger.json contract for submit_error.
+// Using 204 (no body) also avoids triggering error-handling logic that could cause infinite recursion.
 func MockSubmitErrorSuccess(agentID int64) {
-	// Use 204 No Content to signal success without a body, which prevents the API client from
-	// treating it as an error and triggering infinite recursion in handleSendError.
 	responder := httpmock.NewStringResponder(http.StatusNoContent, "")
 	// Register both paths for compatibility
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d/submit_error$`, agentID))

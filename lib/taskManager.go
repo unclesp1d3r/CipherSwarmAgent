@@ -41,7 +41,12 @@ func GetNewTask() (*api.Task, error) {
 		// No new task available
 		return nil, ErrNoTaskAvailable
 	case http.StatusOK:
-		// New task available
+		if response.JSON200 == nil {
+			agentstate.Logger.Warn("Server returned HTTP 200 but task body was empty or unparseable")
+
+			return nil, fmt.Errorf("%w: HTTP 200 with nil task body", ErrTaskBadResponse)
+		}
+
 		return response.JSON200, nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrTaskBadResponse, response.Status())
@@ -59,6 +64,13 @@ func GetAttackParameters(attackID int64) (*api.Attack, error) {
 	}
 
 	if response.StatusCode() == http.StatusOK {
+		if response.JSON200 == nil {
+			agentstate.Logger.Warn("Server returned HTTP 200 but attack body was empty or unparseable",
+				"attack_id", attackID)
+
+			return nil, fmt.Errorf("%w: HTTP 200 with nil attack body for attack_id %d", ErrTaskBadResponse, attackID)
+		}
+
 		return response.JSON200, nil
 	}
 
