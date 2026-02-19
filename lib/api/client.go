@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 )
@@ -453,10 +454,16 @@ func HashListResponseStream(resp *GetHashListResponse) io.Reader {
 	return nil
 }
 
-// ConvertInt64SliceToInt converts []int64 to []int.
+// ConvertInt64SliceToInt converts []int64 to []int with bounds checking
+// to prevent silent overflow on 32-bit platforms.
 func ConvertInt64SliceToInt(s []int64) []int {
 	result := make([]int, len(s))
 	for i, v := range s {
+		if v > math.MaxInt || v < math.MinInt {
+			result[i] = 0 // Clamp to zero rather than silently overflow
+
+			continue
+		}
 		result[i] = int(v)
 	}
 	return result
