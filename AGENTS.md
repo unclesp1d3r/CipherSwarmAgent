@@ -38,6 +38,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - `cmd/`: Main application entry points using the Cobra framework.
 - `lib/`: Core agent logic, including the agent client, task/benchmark managers, and utilities.
+  - `api/`: API client layer — generated OpenAPI client (`client.gen.go`), hand-written wrapper (`client.go`), error types (`errors.go`), interfaces (`interfaces.go`), and mocks (`mock.go`). Regenerate with `just generate`.
   - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
   - `arch/`: OS-specific abstractions for handling different platforms (Linux, macOS, Windows).
 - `shared/`: Global state, logging, and shared data types.
@@ -52,6 +53,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** `contextcheck` linter flags functions not propagating context — use `//nolint:contextcheck` when callee doesn't accept context yet.
 - **Gotcha:** When removing global gosec exclusions, run `mise x -- golangci-lint run ./...` to find ALL violation sites before adding per-site `//nolint:gosec` comments.
 - **gosec nolint style:** Use per-site `//nolint:gosec // G7XX - <reason>` with specific rule ID rather than global exclusions in `.golangci.yml`.
+- **Gotcha:** `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint comments short (e.g., `// G704 - trusted URL`) so total line stays under 120 chars.
+- **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
 
 ### Naming Conventions
 
@@ -73,6 +76,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Guard against negative values in bit shift operations to prevent panic.
 - When checking `err != nil || obj == nil` for API responses, handle `obj == nil && err == nil` as a separate error case to prevent nil pointer dereferences.
 - In deferred cleanup functions (e.g., lock file removal), use `os.IsNotExist` to skip already-removed files and include file paths in error messages.
+- **Gotcha:** Generated types with an `Error` field (e.g., `ErrorObject`) can't implement Go's `error` interface (`Error()` method) — use a wrapper type like `api.APIError` instead.
 
 ### Concurrency
 
@@ -88,6 +92,12 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 ### Tooling
 
+- **Code Generation:** `oapi-codegen` is declared as a Go tool in `go.mod` — invoke via `go tool oapi-codegen`, not bare binary. `just generate` runs it from `lib/api/config.yaml` against `docs/swagger.json`. After regenerating, run `go mod tidy && go mod vendor`.
+- **Gotcha:** oapi-codegen v2 config does NOT support `input-spec` — the spec path must be a positional CLI argument.
+- **Gotcha:** oapi-codegen generates a `Client` struct in `lib/api/client.gen.go` — the hand-written aggregate interface is named `APIClient` (with `//nolint:revive` for stutter) to avoid the conflict.
+- **Gotcha:** Use `exclude-schemas` in `lib/api/config.yaml` when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface in `errors.go`).
+- **API Client Architecture:** `AgentClient` in `client.go` wraps the generated `ClientWithResponses`, implements `APIClient` interface. Error types (`APIError`, `SetTaskAbandonedError`, `Severity`) live in `errors.go`. Use `errors.As` to extract `*api.APIError` from returned errors.
+- **Gotcha:** Do not name directories `gen/` — the user's global gitignore excludes them.
 - **Dev Tool Management:** Use `mise` to install and manage development toolchains (e.g., Go, Bun) via `mise.toml`.
 - **CI Validation:** Run `just ci-check` to validate all checks pass before committing.
 - **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
@@ -103,6 +113,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Test naming convention: `TestFunctionName_Scenario` with underscore separation.
 - Use `require.Error/NoError` instead of `assert.Error/NoError` for error assertions (testifylint rule).
 - Use `atomic.Int32` for thread-safe counters in mock implementations.
+- Use `lib/testhelpers/error_helpers.go` for constructing test errors (`NewAPIError`, `NewErrorObject`, `NewSetTaskAbandonedError`).
+- When removing a field from global state (`agentstate.State`), grep all test helpers, cleanup functions, and reset functions for references.
 - Run `go test -race ./...` to detect data races.
 
 ## Git
