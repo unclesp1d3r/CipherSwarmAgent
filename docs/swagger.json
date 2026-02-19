@@ -826,6 +826,22 @@
           },
           "required": true,
           "description": "id"
+        },
+        {
+          "name": "heartbeat_body",
+          "in": "body",
+          "required": false,
+          "schema": {
+            "type": "object",
+            "properties": {
+              "activity": {
+                "type": "string",
+                "description": "Current agent activity state. Known values: starting, benchmarking, updating, downloading, waiting, cracking, stopping. Future versions may support additional values.",
+                "example": "cracking",
+                "nullable": true
+              }
+            }
+          }
         }
       ],
       "post": {
@@ -840,24 +856,6 @@
           }
         ],
         "operationId": "sendHeartbeat",
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "activity": {
-                    "type": "string",
-                    "description": "Current agent activity state. Known values: starting, benchmarking, updating, downloading, waiting, cracking, stopping. Future versions may support additional values.",
-                    "example": "cracking",
-                    "nullable": true
-                  }
-                }
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "successful, but with server feedback",
@@ -872,7 +870,6 @@
                       "description": "The state of the agent:\n                       * `pending` - The agent needs to perform the setup process again.\n                       * `active` - The agent is ready to accept tasks, all is good.\n                       * `error` - The agent has encountered an error and needs to be checked.\n                       * `stopped` - The agent has been stopped by the user.",
                       "enum": [
                         "pending",
-                        "active",
                         "stopped",
                         "error"
                       ]
