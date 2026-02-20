@@ -279,7 +279,7 @@ func SendHeartBeat() (*api.SendHeartbeat200State, error) {
 
 	agentstate.Logger.Warn("Unexpected heartbeat response code", "status_code", resp.StatusCode())
 
-	return nil, nil //nolint:nilnil // nil state with nil error means successful heartbeat with no state change
+	return nil, fmt.Errorf("%w: heartbeat returned status %d", ErrBadResponse, resp.StatusCode())
 }
 
 // logHeartbeatSent logs a debug message indicating a heartbeat was sent if extra debugging is enabled.

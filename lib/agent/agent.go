@@ -78,8 +78,6 @@ func StartAgent() {
 	err = lib.UpdateAgentMetadata()
 	if err != nil {
 		agentstate.Logger.Fatal("Failed to update agent metadata", "error", err)
-
-		return
 	}
 
 	agentstate.Logger.Info("Sent agent metadata to the CipherSwarm API")

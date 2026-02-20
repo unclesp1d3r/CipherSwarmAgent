@@ -103,7 +103,7 @@ func createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
 		HashType:   int64(attack.HashMode),
 		HashFile: path.Join(
 			agentstate.State.HashlistPath,
-			strconv.FormatInt(attack.HashListId, 10)+".txt",
+			strconv.FormatInt(attack.Id, 10)+".hsh",
 		),
 		Mask:             unwrapOrString(attack.Mask),
 		MaskIncrement:    attack.IncrementMode,

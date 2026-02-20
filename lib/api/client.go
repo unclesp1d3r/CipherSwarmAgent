@@ -358,10 +358,11 @@ type agentCrackersClient struct {
 	token      string
 }
 
+//nolint:nonamedreturns // Named returns required for deferred resp.Body.Close() error capture
 func (c *agentCrackersClient) CheckForCrackerUpdate(
 	ctx context.Context,
 	operatingSystem, version *string,
-) (*CheckForCrackerUpdateResponse, error) {
+) (result *CheckForCrackerUpdateResponse, err error) {
 	reqURL, err := url.Parse(c.baseURL + "/api/v1/client/crackers/check_for_cracker_update")
 	if err != nil {
 		return nil, fmt.Errorf("parsing cracker update URL: %w", err)
@@ -388,14 +389,18 @@ func (c *agentCrackersClient) CheckForCrackerUpdate(
 		return nil, fmt.Errorf("executing cracker update request: %w", err)
 	}
 
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("closing cracker update response body: %w", cerr)
+		}
+	}()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading cracker update response: %w", err)
 	}
 
-	result := &CheckForCrackerUpdateResponse{
+	result = &CheckForCrackerUpdateResponse{
 		StatusCode:   resp.StatusCode,
 		HTTPResponse: resp,
 	}

@@ -191,8 +191,8 @@ func TestHandler_Handle_NoSendToServer(t *testing.T) {
 		SendToServer: false,
 	}
 
-	//nolint:errcheck,gosec // Intentionally ignoring return in test
-	h.Handle(apiErr, opts)
+	err := h.Handle(apiErr, opts)
+	require.Error(t, err)
 
 	assert.False(t, sendCalled, "SendError should not be called when SendToServer is false")
 }
@@ -256,8 +256,8 @@ func TestHandler_HandleWithSeverity(t *testing.T) {
 		Message:    testErrorMessage,
 	}
 
-	//nolint:errcheck,gosec // Intentionally ignoring return in test
-	h.HandleWithSeverity(apiErr, "Test message", api.SeverityWarning)
+	err := h.HandleWithSeverity(apiErr, "Test message", api.SeverityWarning)
+	require.Error(t, err)
 
 	assert.Equal(t, api.SeverityWarning, sentSeverity)
 }
