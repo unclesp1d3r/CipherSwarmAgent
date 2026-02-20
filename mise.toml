@@ -2,7 +2,6 @@
 
 [tools]
 act                                         = "latest"
-claude-code = "latest"
 cosign                                      = "3.0.4"
 git-cliff                                   = "2.12.0"
 "github:anchore/quill"                      = "latest"
