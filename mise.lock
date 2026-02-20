@@ -2,6 +2,11 @@
 version = "0.2.84"
 backend = "aqua:nektos/act"
 
+[[tools.claude-code]]
+version = "2.1.49"
+backend = "aqua:anthropics/claude-code"
+"platforms.macos-arm64" = { checksum = "blake3:f6c99c06ce8e4698045ab24b20348df9fd3a2fc1b0db19b081d2db151b3512bf", url = "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.49/darwin-arm64/claude"}
+
 [[tools.cosign]]
 version = "3.0.4"
 backend = "aqua:sigstore/cosign"
@@ -17,6 +22,10 @@ backend = "github:anchore/quill"
 [[tools.go]]
 version = "1.26.0"
 backend = "core:go"
+
+[[tools."go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen"]]
+version = "2.5.1"
+backend = "go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen"
 
 [[tools."go:github.com/securego/gosec/v2/cmd/gosec"]]
 version = "2.23.0"

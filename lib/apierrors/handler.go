@@ -2,17 +2,17 @@
 package apierrors
 
 import (
+	"context"
 	stderrors "errors"
 	"net/http"
 
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
 // ErrorSender is a function type for sending errors to the server.
 // This allows dependency injection for testing and prevents circular imports.
-type ErrorSender func(message string, severity operations.Severity)
+type ErrorSender func(message string, severity api.Severity)
 
 // Handler provides unified error handling for API operations.
 type Handler struct {
@@ -26,7 +26,7 @@ type Options struct {
 	// Message is the context message to log with the error.
 	Message string
 	// Severity is the severity level for the error report.
-	Severity operations.Severity
+	Severity api.Severity
 	// SendToServer indicates whether to send the error to the server.
 	SendToServer bool
 	// LogAuthContext adds agent_id, api_url, has_token to auth-related errors.
@@ -37,71 +37,58 @@ type Options struct {
 func DefaultOptions(message string) Options {
 	return Options{
 		Message:        message,
-		Severity:       operations.SeverityCritical,
+		Severity:       api.SeverityCritical,
 		SendToServer:   true,
 		LogAuthContext: false,
 	}
 }
 
 // Handle processes an API error according to the provided options.
-// It extracts error details from SDK error types and logs/reports appropriately.
+// It extracts error details from API error types and logs/reports appropriately.
 // Returns the original error for chaining.
 func (h *Handler) Handle(err error, opts Options) error {
 	if err == nil {
 		return nil
 	}
 
-	var eo *sdkerrors.ErrorObject
-	var se *sdkerrors.SDKError
+	var ae *api.APIError
 
 	switch {
-	case stderrors.As(err, &eo):
-		h.handleErrorObject(eo, opts)
-	case stderrors.As(err, &se):
-		h.handleSDKError(se, opts)
+	case stderrors.As(err, &ae):
+		h.handleAPIError(ae, opts)
 	default:
-		agentstate.ErrorLogger.Error("Critical error communicating with the CipherSwarm API", "error", err)
+		agentstate.ErrorLogger.Error(opts.Message, "error", err)
+		// Skip server reporting for context cancellation (expected during shutdown)
+		if stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded) {
+			break
+		}
+		if opts.SendToServer && h.SendError != nil {
+			h.SendError(err.Error(), opts.Severity)
+		}
 	}
 
 	return err
 }
 
-// handleErrorObject handles sdkerrors.ErrorObject type errors.
-func (h *Handler) handleErrorObject(eo *sdkerrors.ErrorObject, opts Options) {
-	if opts.LogAuthContext {
-		agentstate.Logger.Error(opts.Message,
-			"error", eo.Error(),
-			"agent_id", agentstate.State.AgentID,
-			"api_url", agentstate.State.URL,
-			"has_token", agentstate.State.APIToken != "")
-	} else {
-		agentstate.Logger.Error(opts.Message, "error", eo.Error())
-	}
-
-	if opts.SendToServer && h.SendError != nil {
-		h.SendError(eo.Error(), opts.Severity)
-	}
-}
-
-// handleSDKError handles sdkerrors.SDKError type errors.
-func (h *Handler) handleSDKError(se *sdkerrors.SDKError, opts Options) {
-	isAuthError := se.StatusCode == http.StatusUnauthorized || se.StatusCode == http.StatusForbidden
+// handleAPIError handles *api.APIError type errors.
+func (h *Handler) handleAPIError(ae *api.APIError, opts Options) {
+	isAuthError := ae.StatusCode == http.StatusUnauthorized || ae.StatusCode == http.StatusForbidden
 
 	if opts.LogAuthContext || isAuthError {
 		agentstate.Logger.Error(opts.Message,
-			"status_code", se.StatusCode,
-			"message", se.Message,
+			"status_code", ae.StatusCode,
+			"message", ae.Message,
 			"agent_id", agentstate.State.AgentID,
 			"api_url", agentstate.State.URL,
 			"has_token", agentstate.State.APIToken != "")
 	} else {
-		agentstate.Logger.Error(opts.Message+", unexpected error",
-			"status_code", se.StatusCode,
-			"message", se.Message)
+		agentstate.Logger.Error(opts.Message,
+			"status_code", ae.StatusCode,
+			"message", ae.Message)
 	}
 
 	if opts.SendToServer && h.SendError != nil {
-		h.SendError(se.Error(), opts.Severity)
+		h.SendError(ae.Error(), opts.Severity)
 	}
 }
 
@@ -116,7 +103,7 @@ func (h *Handler) LogOnly(err error, message string) error {
 }
 
 // HandleWithSeverity handles an error with a specific severity level.
-func (h *Handler) HandleWithSeverity(err error, message string, severity operations.Severity) error {
+func (h *Handler) HandleWithSeverity(err error, message string, severity api.Severity) error {
 	opts := Options{
 		Message:      message,
 		Severity:     severity,
@@ -127,28 +114,28 @@ func (h *Handler) HandleWithSeverity(err error, message string, severity operati
 
 // IsNotFoundError checks if the error is a 404 Not Found error.
 func IsNotFoundError(err error) bool {
-	var se *sdkerrors.SDKError
-	if stderrors.As(err, &se) {
-		return se.StatusCode == http.StatusNotFound
+	var ae *api.APIError
+	if stderrors.As(err, &ae) {
+		return ae.StatusCode == http.StatusNotFound
 	}
 	return false
 }
 
 // IsGoneError checks if the error is a 410 Gone error.
 func IsGoneError(err error) bool {
-	var se *sdkerrors.SDKError
-	if stderrors.As(err, &se) {
-		return se.StatusCode == http.StatusGone
+	var ae *api.APIError
+	if stderrors.As(err, &ae) {
+		return ae.StatusCode == http.StatusGone
 	}
 	return false
 }
 
-// GetStatusCode extracts the HTTP status code from an SDK error.
-// Returns 0 if the error is not an SDKError.
+// GetStatusCode extracts the HTTP status code from an API error.
+// Returns 0 if the error is not an APIError.
 func GetStatusCode(err error) int {
-	var se *sdkerrors.SDKError
-	if stderrors.As(err, &se) {
-		return se.StatusCode
+	var ae *api.APIError
+	if stderrors.As(err, &ae) {
+		return ae.StatusCode
 	}
 	return 0
 }

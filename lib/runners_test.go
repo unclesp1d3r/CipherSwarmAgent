@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
@@ -219,25 +219,25 @@ func TestClassifyStderr_KnownPatterns(t *testing.T) {
 		name             string
 		line             string
 		expectedCategory hashcat.ErrorCategory
-		expectedSeverity operations.Severity
+		expectedSeverity api.Severity
 	}{
 		{
 			name:             "no hashes loaded",
 			line:             "No hashes loaded",
 			expectedCategory: hashcat.ErrorCategoryHashFormat,
-			expectedSeverity: operations.SeverityCritical,
+			expectedSeverity: api.SeverityCritical,
 		},
 		{
 			name:             "OpenCL error",
 			line:             "OpenCL API (clEnqueueNDRangeKernel) CL_OUT_OF_RESOURCES",
 			expectedCategory: hashcat.ErrorCategoryBackend,
-			expectedSeverity: operations.SeverityCritical,
+			expectedSeverity: api.SeverityCritical,
 		},
 		{
 			name:             "restore file error",
 			line:             "ERROR: Cannot read /path/to/session.restore",
 			expectedCategory: hashcat.ErrorCategoryRetryable,
-			expectedSeverity: operations.SeverityMinor,
+			expectedSeverity: api.SeverityMinor,
 		},
 	}
 

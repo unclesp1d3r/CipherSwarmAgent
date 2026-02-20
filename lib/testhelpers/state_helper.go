@@ -19,8 +19,7 @@ func mustMkdirAll(path string) {
 }
 
 // SetupTestState initializes agentstate.State with test values.
-// It creates temporary directories for all path fields, sets up the SDK client,
-// stubs device discovery to avoid requiring hashcat binary,
+// It creates temporary directories for all path fields, sets up the API client,
 // and returns a cleanup function that removes temporary directories and resets state.
 func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	// Create temporary directories for all path fields
@@ -44,9 +43,12 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	agentstate.State.RestoreFilePath = filepath.Join(testDataDir, "restore")
 	agentstate.State.Debug = false
 	agentstate.State.ExtraDebugging = false
-	agentstate.State.SdkClient = NewTestSDKClient(apiURL)
-	// Wrap SDK client with interface for dependency injection support
-	agentstate.State.APIClient = api.NewSDKWrapper(agentstate.State.SdkClient)
+	// Initialize API client using generated client wrapper
+	apiClient, err := api.NewAgentClient(apiURL, apiToken)
+	if err != nil {
+		panic(err)
+	}
+	agentstate.State.APIClient = apiClient
 
 	// Create directories
 	mustMkdirAll(agentstate.State.DataPath)
@@ -89,7 +91,6 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.JobCheckingStopped = false
 		agentstate.State.UseLegacyDeviceIdentificationMethod = false
 		agentstate.State.BenchmarksSubmitted = false
-		agentstate.State.SdkClient = nil
 		agentstate.State.APIClient = nil
 		// Deactivate httpmock
 		httpmock.DeactivateAndReset()
@@ -125,7 +126,6 @@ func ResetTestState() {
 	agentstate.State.JobCheckingStopped = false
 	agentstate.State.UseLegacyDeviceIdentificationMethod = false
 	agentstate.State.BenchmarksSubmitted = false
-	agentstate.State.SdkClient = nil
 	agentstate.State.APIClient = nil
 }
 

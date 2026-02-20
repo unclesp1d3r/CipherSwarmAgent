@@ -7,20 +7,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 )
 
 func TestMockTasksClient_GetNewTask(t *testing.T) {
 	t.Parallel()
 
-	expectedTask := &components.Task{ID: 123, AttackID: 456}
+	expectedTask := &Task{Id: 123, AttackId: 456}
 
 	mock := &MockTasksClient{
-		GetNewTaskFunc: func(_ context.Context) (*operations.GetNewTaskResponse, error) {
-			return &operations.GetNewTaskResponse{
-				StatusCode: http.StatusOK,
-				Task:       expectedTask,
+		GetNewTaskFunc: func(_ context.Context) (*GetNewTaskResponse, error) {
+			return &GetNewTaskResponse{
+				HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+				JSON200:      expectedTask,
 			}, nil
 		},
 	}
@@ -29,19 +27,19 @@ func TestMockTasksClient_GetNewTask(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	require.NotNil(t, resp.Task, "Task should not be nil for successful response")
-	assert.Equal(t, expectedTask.ID, resp.Task.ID)
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
+	require.NotNil(t, resp.JSON200, "Task should not be nil for successful response")
+	assert.Equal(t, expectedTask.Id, resp.JSON200.Id)
 }
 
 func TestMockTasksClient_NoContent(t *testing.T) {
 	t.Parallel()
 
 	mock := &MockTasksClient{
-		GetNewTaskFunc: func(_ context.Context) (*operations.GetNewTaskResponse, error) {
-			return &operations.GetNewTaskResponse{
-				StatusCode: http.StatusNoContent,
-				Task:       nil,
+		GetNewTaskFunc: func(_ context.Context) (*GetNewTaskResponse, error) {
+			return &GetNewTaskResponse{
+				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
+				JSON200:      nil,
 			}, nil
 		},
 	}
@@ -50,16 +48,16 @@ func TestMockTasksClient_NoContent(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
-	assert.Nil(t, resp.Task)
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode())
+	assert.Nil(t, resp.JSON200)
 }
 
 func TestMockClient_InterfaceCompliance(t *testing.T) {
 	t.Parallel()
 
-	// This test verifies that MockClient satisfies the Client interface
+	// This test verifies that MockClient satisfies the APIClient interface
 	// and that all subsystem mocks satisfy their respective interfaces.
-	var client Client = &MockClient{
+	var client APIClient = &MockClient{
 		TasksImpl:    &MockTasksClient{},
 		AttacksImpl:  &MockAttacksClient{},
 		AgentsImpl:   &MockAgentsClient{},
@@ -78,11 +76,12 @@ func TestMockClient_InterfaceCompliance(t *testing.T) {
 func TestMockTasksClient_DefaultBehavior(t *testing.T) {
 	t.Parallel()
 
-	// When no function is configured, mocks return nil, nil
+	// When no function is configured, mocks return a descriptive error
 	mock := &MockTasksClient{}
 
 	resp, err := mock.GetNewTask(context.Background())
 
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "mock method not configured")
 }

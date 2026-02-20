@@ -2,7 +2,7 @@
 package hashcat
 
 import (
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
 // Hashcat exit codes.
@@ -27,7 +27,7 @@ const (
 // ExitCodeInfo contains information about a hashcat exit code.
 type ExitCodeInfo struct {
 	Category  ErrorCategory
-	Severity  operations.Severity
+	Severity  api.Severity
 	Retryable bool
 	Status    string
 	ExitCode  int
@@ -39,7 +39,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeSuccess:
 		return ExitCodeInfo{
 			Category:  ErrorCategorySuccess,
-			Severity:  operations.SeverityInfo,
+			Severity:  api.SeverityInfo,
 			Retryable: false,
 			Status:    "cracked",
 			ExitCode:  exitCode,
@@ -47,7 +47,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeExhausted:
 		return ExitCodeInfo{
 			Category:  ErrorCategorySuccess,
-			Severity:  operations.SeverityInfo,
+			Severity:  api.SeverityInfo,
 			Retryable: false,
 			Status:    "exhausted",
 			ExitCode:  exitCode,
@@ -55,7 +55,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeAborted:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryRetryable,
-			Severity:  operations.SeverityMinor,
+			Severity:  api.SeverityMinor,
 			Retryable: true,
 			Status:    "aborted",
 			ExitCode:  exitCode,
@@ -63,7 +63,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeCheckpoint:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryRetryable,
-			Severity:  operations.SeverityMinor,
+			Severity:  api.SeverityMinor,
 			Retryable: true,
 			Status:    "checkpoint",
 			ExitCode:  exitCode,
@@ -71,7 +71,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeRuntimeLimit:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryRetryable,
-			Severity:  operations.SeverityMinor,
+			Severity:  api.SeverityMinor,
 			Retryable: true,
 			Status:    "runtime_limit",
 			ExitCode:  exitCode,
@@ -79,7 +79,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeGeneralError:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryUnknown,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Status:    "error",
 			ExitCode:  exitCode,
@@ -87,7 +87,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeGPUWatchdog:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryDevice,
-			Severity:  operations.SeverityFatal,
+			Severity:  api.SeverityFatal,
 			Retryable: false,
 			Status:    "gpu_watchdog",
 			ExitCode:  exitCode,
@@ -95,7 +95,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeBackendAbort:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Status:    "backend_abort",
 			ExitCode:  exitCode,
@@ -103,7 +103,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeBackendChkpt:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Status:    "backend_checkpoint",
 			ExitCode:  exitCode,
@@ -111,7 +111,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeBackendRuntime:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Status:    "backend_runtime",
 			ExitCode:  exitCode,
@@ -119,7 +119,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeSelftestFail:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Status:    "selftest_fail",
 			ExitCode:  exitCode,
@@ -127,7 +127,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case ExitCodeAutotuneFail:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Status:    "autotune_fail",
 			ExitCode:  exitCode,
@@ -135,7 +135,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	case -8, -9, -10, -11:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Status:    "backend_error",
 			ExitCode:  exitCode,
@@ -143,7 +143,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 	default:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryUnknown,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Status:    "unknown",
 			ExitCode:  exitCode,
