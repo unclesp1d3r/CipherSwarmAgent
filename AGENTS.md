@@ -116,7 +116,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Test naming convention: `TestFunctionName_Scenario` with underscore separation.
 - Use `require.Error/NoError` instead of `assert.Error/NoError` for error assertions (testifylint rule).
 - Use `atomic.Int32` for thread-safe counters in mock implementations.
-- Use `lib/testhelpers/error_helpers.go` for constructing test errors (`NewAPIError`, `NewErrorObject`, `NewSetTaskAbandonedError`).
+- Use `lib/testhelpers/error_helpers.go` for constructing test errors (`NewAPIError`, `NewValidationAPIError`, `NewSetTaskAbandonedError`).
 - MockClient sub-client accessors (`Tasks()`, `Agents()`, etc.) return default unconfigured mocks (not nil) to prevent nil pointer panics when code paths call sub-clients the test didn't explicitly mock.
 - When removing a field from global state (`agentstate.State`), grep all test helpers, cleanup functions, and reset functions for references.
 - Run `go test -race ./...` to detect data races.

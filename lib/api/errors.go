@@ -16,7 +16,7 @@ type ErrorObject struct { //nolint:errname // Name matches the OpenAPI schema
 	AdditionalProperties map[string]any `json:"-"`
 }
 
-var _ error = (*ErrorObject)(nil) //nolint:errcheck // compile-time interface assertion, not a function call
+var _ error = (*ErrorObject)(nil) //nolint:errcheck // compile-time interface assertion
 
 // Error implements the error interface, returning the error message.
 func (e *ErrorObject) Error() string {
@@ -98,7 +98,7 @@ type APIError struct { //nolint:revive // Name is intentional for clarity across
 	Body       string
 }
 
-var _ error = (*APIError)(nil) //nolint:errcheck // compile-time interface assertion, not a function call
+var _ error = (*APIError)(nil) //nolint:errcheck // compile-time interface assertion
 
 // Error returns a formatted error string including the status code and body.
 func (e *APIError) Error() string {
@@ -117,7 +117,7 @@ type SetTaskAbandonedError struct {
 	Error_  *string  `json:"error"` //nolint:revive // Underscore avoids collision with Error() method
 }
 
-var _ error = (*SetTaskAbandonedError)(nil) //nolint:errcheck // compile-time interface assertion, not a function call
+var _ error = (*SetTaskAbandonedError)(nil) //nolint:errcheck // compile-time interface assertion
 
 // Error returns a JSON representation of the error.
 // Falls back to a descriptive string if JSON marshaling fails.
@@ -156,7 +156,7 @@ const (
 // it may not be returned by current server versions.
 const (
 	StatePending SendHeartbeat200State = "pending"
-	StateActive  SendHeartbeat200State = "active"
+	StateActive  SendHeartbeat200State = "active" // Not in swagger enum; see block comment above
 	StateError   SendHeartbeat200State = "error"
 	StateStopped SendHeartbeat200State = "stopped"
 )

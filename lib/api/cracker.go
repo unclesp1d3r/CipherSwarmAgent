@@ -40,7 +40,7 @@ type CheckForCrackerUpdateResponse struct {
 	CrackerUpdate *CrackerUpdate
 }
 
-// Status returns the HTTP status line, or a fallback if HTTPResponse is nil.
+// Status returns the HTTP status line, or an empty string if HTTPResponse is nil.
 func (r *CheckForCrackerUpdateResponse) Status() string {
 	if r != nil && r.HTTPResponse != nil {
 		return r.HTTPResponse.Status

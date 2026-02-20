@@ -56,7 +56,7 @@ func SetupHTTPMockForClient(client *http.Client) func() {
 // MockAuthenticationSuccess registers a mock responder for the authentication endpoint
 // that returns a successful authentication response with the provided agent ID.
 // Uses a regex pattern to match any HTTP scheme and host.
-// Note: The API uses GET for authentication, not POST.
+// Note: The API spec uses GET for authentication. POST is also registered for compatibility with test variations.
 func MockAuthenticationSuccess(agentID int64) {
 	authResponse := authenticateResponseBody{
 		Authenticated: true,
@@ -77,7 +77,7 @@ func MockAuthenticationSuccess(agentID int64) {
 // MockAuthenticationFailure registers a mock responder for authentication
 // that returns an error response with the specified status code and error message.
 // Uses a regex pattern to match any HTTP scheme and host.
-// Note: The API uses GET for authentication, not POST.
+// Note: The API spec uses GET for authentication. POST is also registered for compatibility with test variations.
 func MockAuthenticationFailure(statusCode int, errorMessage string) {
 	errorResponse := map[string]any{
 		"authenticated": false,

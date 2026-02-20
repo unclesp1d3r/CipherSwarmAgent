@@ -479,7 +479,12 @@ func sendCrackedHash(timestamp time.Time, hash, plaintext string, task *api.Task
 			return
 		}
 
-		defer func() { _ = file.Close() }()
+		defer func() {
+			if cerr := file.Close(); cerr != nil {
+				agentstate.Logger.Error("Error closing cracked hash file; data may not be persisted",
+					"error", cerr, "path", hashFile)
+			}
+		}()
 
 		_, err = file.WriteString(fmt.Sprintf("%s:%s", hash, plaintext) + "\n")
 		if err != nil {

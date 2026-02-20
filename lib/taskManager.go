@@ -201,7 +201,7 @@ func RunTask(task *api.Task, attack *api.Attack) error {
 	displayRunTaskStarting(task)
 
 	if attack == nil {
-		return cserrors.LogAndSendError("Attack is nil", nil, api.SeverityCritical, task)
+		return cserrors.LogAndSendError("Attack is nil", errors.New("attack is nil"), api.SeverityCritical, task)
 	}
 
 	jobParams := createJobParams(task, attack)
