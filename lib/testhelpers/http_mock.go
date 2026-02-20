@@ -1,4 +1,7 @@
 // Package testhelpers provides reusable test utilities and helpers for testing the CipherSwarm agent.
+//
+// Mock responders register multiple URL patterns and HTTP methods per endpoint
+// for compatibility across API path variations (e.g. /client/agents vs /agents).
 package testhelpers
 
 import (
@@ -68,7 +71,7 @@ func MockAuthenticationSuccess(agentID int64) {
 	})
 	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/authenticate$`)
 	httpmock.RegisterRegexpResponder("GET", pattern, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern, responder)
 }
 
 // MockAuthenticationFailure registers a mock responder for authentication
@@ -89,7 +92,7 @@ func MockAuthenticationFailure(statusCode int, errorMessage string) {
 	})
 	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/authenticate$`)
 	httpmock.RegisterRegexpResponder("GET", pattern, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern, responder)
 }
 
 // MockConfigurationResponse registers a mock responder for the configuration endpoint
@@ -127,7 +130,7 @@ func MockHeartbeatResponse(agentID int64, state api.SendHeartbeat200State) {
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d/heartbeat$`, agentID))
 	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/agents/%d/heartbeat$`, agentID))
 	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern2, responder)
 }
 
 // MockAPIError is a generic helper to mock API errors for any endpoint,
@@ -163,11 +166,11 @@ func MockHeartbeatNoContent(agentID int64) {
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d/heartbeat$`, agentID))
 	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/agents/%d/heartbeat$`, agentID))
 	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern2, responder)
 }
 
-// MockUpdateAgentSuccess registers a mock responder for PUT /api/v1/client/agents/{id}
-// that returns a successful UpdateAgentResponse with the provided agent data.
+// MockUpdateAgentSuccess registers mock responders for PUT /api/v1/client/agents/{id}
+// (and POST/PATCH for compatibility) that returns a successful UpdateAgentResponse.
 // According to swagger.json, the endpoint is /api/v1/client/agents/{id}.
 func MockUpdateAgentSuccess(agentID int64, agent api.Agent) {
 	responseBody := map[string]any{
@@ -183,7 +186,7 @@ func MockUpdateAgentSuccess(agentID int64, agent api.Agent) {
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d$`, agentID))
 	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/agents/%d$`, agentID))
 	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern2, responder)
 	httpmock.RegisterRegexpResponder("PUT", pattern1, responder)
 	httpmock.RegisterRegexpResponder("PUT", pattern2, responder)
 	httpmock.RegisterRegexpResponder("PATCH", pattern1, responder)
@@ -198,7 +201,7 @@ func MockSendStatusSuccess(taskID int64) {
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/tasks/%d/submit_status$`, taskID))
 	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/tasks/%d/send_status$`, taskID))
 	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern2, responder)
 }
 
 // MockSendStatusStale registers a mock responder for send status
@@ -209,7 +212,7 @@ func MockSendStatusStale(taskID int64) {
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/tasks/%d/submit_status$`, taskID))
 	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/tasks/%d/send_status$`, taskID))
 	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern2, responder)
 }
 
 // MockSendCrackSuccess registers a mock responder for POST /api/v1/client/tasks/{id}/submit_crack
@@ -220,7 +223,7 @@ func MockSendCrackSuccess(taskID int64) {
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/tasks/%d/submit_crack$`, taskID))
 	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/tasks/%d/send_crack$`, taskID))
 	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern2, responder)
 }
 
 // MockSendCrackComplete registers a mock responder for send crack
@@ -231,7 +234,7 @@ func MockSendCrackComplete(taskID int64) {
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/tasks/%d/submit_crack$`, taskID))
 	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/tasks/%d/send_crack$`, taskID))
 	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
-	httpmock.RegisterRegexpResponder("POST", pattern2, responder) // Register both for compatibility
+	httpmock.RegisterRegexpResponder("POST", pattern2, responder)
 }
 
 // MockSubmitErrorSuccess registers a mock responder for POST /api/v1/client/agents/{id}/submit_error

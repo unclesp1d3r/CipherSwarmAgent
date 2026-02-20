@@ -44,12 +44,10 @@ func GetZaps(task *api.Task, sendCrackedHashFunc func(time.Time, string, string,
 		return
 	}
 
-	//nolint:errcheck // Error already being handled
-	_ = handleResponseStream(
-		task,
-		responseStream,
-		sendCrackedHashFunc,
-	)
+	if err := handleResponseStream(task, responseStream, sendCrackedHashFunc); err != nil {
+		agentstate.Logger.Warn("Failed to process zap response stream; cracked hashes may be lost",
+			"task_id", task.Id, "error", err)
+	}
 }
 
 // removeExistingZapFile removes the zap file at the given path if it exists, logging debug information.

@@ -38,6 +38,10 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 		benchmarks = append(benchmarks, benchmark)
 	}
 
+	if len(benchmarks) == 0 {
+		return fmt.Errorf("all %d benchmark results failed to parse; nothing to submit", len(benchmarkResults))
+	}
+
 	results := api.SubmitBenchmarkJSONRequestBody{
 		HashcatBenchmarks: benchmarks,
 	}

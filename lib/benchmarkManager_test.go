@@ -130,11 +130,9 @@ func TestSendBenchmarkResults(t *testing.T) {
 			name:    "empty benchmark results",
 			results: []benchmarkResult{},
 			setupMock: func(_ int64) {
-				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				// No mock needed — function returns early before API call
 			},
-			expectedError: false,
+			expectedError: true,
 		},
 		{
 			name: "API error during submission",

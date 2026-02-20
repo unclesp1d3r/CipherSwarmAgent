@@ -17,10 +17,9 @@ func NewAPIError(statusCode int, message string) *api.APIError {
 	}
 }
 
-// NewErrorObject creates a new APIError representing a client validation error.
-// Uses 422 Unprocessable Entity as the default status code since the former
-// ErrorObject type was typically used for validation errors.
-func NewErrorObject(message string) *api.APIError {
+// NewValidationAPIError creates a new APIError with 422 Unprocessable Entity status,
+// used as a test convenience for simulating validation errors.
+func NewValidationAPIError(message string) *api.APIError {
 	return NewAPIError(http.StatusUnprocessableEntity, message)
 }
 

@@ -2,6 +2,7 @@
 package apierrors
 
 import (
+	"context"
 	stderrors "errors"
 	"net/http"
 
@@ -57,6 +58,10 @@ func (h *Handler) Handle(err error, opts Options) error {
 		h.handleAPIError(ae, opts)
 	default:
 		agentstate.ErrorLogger.Error(opts.Message, "error", err)
+		// Skip server reporting for context cancellation (expected during shutdown)
+		if stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded) {
+			break
+		}
 		if opts.SendToServer && h.SendError != nil {
 			h.SendError(err.Error(), opts.Severity)
 		}

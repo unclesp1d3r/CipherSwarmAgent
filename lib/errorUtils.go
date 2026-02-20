@@ -75,6 +75,7 @@ func handleConfigurationError(err error) error {
 
 // handleCrackerUpdate manages the process of updating the cracker tool.
 // It follows these steps:
+// 0. Validates that download URL and exec name are present.
 // 1. Logs the new cracker update information.
 // 2. Creates a temporary directory for download and extraction.
 // 3. Downloads the cracker archive from the provided URL.

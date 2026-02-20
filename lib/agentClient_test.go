@@ -557,7 +557,7 @@ func TestSendCrackedHash(t *testing.T) {
 		{
 			name: "ErrorObject error handling",
 			setupMock: func(_ int64) {
-				errObj := testhelpers.NewErrorObject("task not found")
+				errObj := testhelpers.NewValidationAPIError("task not found")
 				apiErr := testhelpers.NewAPIError(http.StatusNotFound, errObj.Error())
 				// According to swagger.json, the endpoint is /api/v1/client/tasks/{id}/submit_crack
 				testhelpers.MockAPIError(

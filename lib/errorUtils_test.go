@@ -42,7 +42,7 @@ func TestHandleAuthenticationError(t *testing.T) {
 	}{
 		{
 			name:        "APIError_ClientError",
-			err:         testhelpers.NewErrorObject("authentication failed"),
+			err:         testhelpers.NewValidationAPIError("authentication failed"),
 			expectError: true,
 		},
 		{
@@ -83,7 +83,7 @@ func TestHandleConfigurationError(t *testing.T) {
 	}{
 		{
 			name:              "APIError_ClientError",
-			err:               testhelpers.NewErrorObject("configuration error"),
+			err:               testhelpers.NewValidationAPIError("configuration error"),
 			expectError:       true,
 			expectSubmitError: true,
 		},
@@ -148,7 +148,7 @@ func TestHandleAPIError(t *testing.T) {
 		{
 			name:        "APIError_ClientError",
 			message:     "API error",
-			err:         testhelpers.NewErrorObject("api error"),
+			err:         testhelpers.NewValidationAPIError("api error"),
 			expectError: false, // function doesn't return error
 		},
 		{
@@ -217,7 +217,7 @@ func TestHandleHeartbeatError(t *testing.T) {
 	}{
 		{
 			name: "APIError_ClientError",
-			err:  testhelpers.NewErrorObject("heartbeat error"),
+			err:  testhelpers.NewValidationAPIError("heartbeat error"),
 		},
 		{
 			name: "APIError_ServerError",
@@ -249,7 +249,7 @@ func TestHandleStatusUpdateError(t *testing.T) {
 	}{
 		{
 			name: "APIError_ClientError",
-			err:  testhelpers.NewErrorObject("status update error"),
+			err:  testhelpers.NewValidationAPIError("status update error"),
 			task: testhelpers.NewTestTask(456, 789),
 		},
 		{
@@ -422,7 +422,7 @@ func TestHandleSendError(t *testing.T) {
 	}{
 		{
 			name: "APIError_ClientError",
-			err:  testhelpers.NewErrorObject("send error"),
+			err:  testhelpers.NewValidationAPIError("send error"),
 		},
 		{
 			name: "APIError_ServerError",
@@ -464,7 +464,7 @@ func TestHandleAcceptTaskError(t *testing.T) {
 	}{
 		{
 			name: "APIError_ClientError",
-			err:  testhelpers.NewErrorObject("accept task error"),
+			err:  testhelpers.NewValidationAPIError("accept task error"),
 		},
 		{
 			name: "APIError_ServerError",
@@ -496,7 +496,7 @@ func TestHandleTaskError(t *testing.T) {
 	}{
 		{
 			name:    "APIError_ClientError",
-			err:     testhelpers.NewErrorObject("task error"),
+			err:     testhelpers.NewValidationAPIError("task error"),
 			message: "Task error occurred",
 		},
 		{
@@ -559,7 +559,7 @@ func TestHandleSendCrackError(t *testing.T) {
 	}{
 		{
 			name: "APIError_ClientError",
-			err:  testhelpers.NewErrorObject("send crack error"),
+			err:  testhelpers.NewValidationAPIError("send crack error"),
 		},
 		{
 			name: "APIError_ServerError",

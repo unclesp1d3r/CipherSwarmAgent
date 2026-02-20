@@ -431,6 +431,7 @@ func newAPIError(statusCode int, status string, body []byte) *APIError {
 // ResponseStream extracts the response body as an io.ReadCloser from a GetTaskZapsResponse.
 // It uses the parsed Body bytes because the generated oapi-codegen parser reads and closes
 // HTTPResponse.Body during parsing, making the original body stream unavailable.
+// Returns io.ReadCloser (vs io.Reader) because callers in zap.go defer-close the stream.
 func ResponseStream(resp *GetTaskZapsResponse) io.ReadCloser {
 	if resp == nil {
 		return nil
@@ -444,6 +445,7 @@ func ResponseStream(resp *GetTaskZapsResponse) io.ReadCloser {
 // HashListResponseStream extracts the response body as an io.Reader from a GetHashListResponse.
 // It uses the parsed Body bytes because the generated oapi-codegen parser reads and closes
 // HTTPResponse.Body during parsing, making the original body stream unavailable.
+// Returns io.Reader (vs io.ReadCloser) because callers in downloader.go don't need Close semantics.
 func HashListResponseStream(resp *GetHashListResponse) io.Reader {
 	if resp == nil {
 		return nil
