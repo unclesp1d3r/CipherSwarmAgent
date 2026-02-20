@@ -2,14 +2,12 @@
 package testhelpers
 
 import (
+	"encoding/hex"
 	"errors"
-	"net/http"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/host"
-	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
@@ -28,13 +26,20 @@ const (
 	maskListID = 3
 )
 
+// TestAgentConfiguration represents the configuration response body for tests.
+// It mirrors the structure returned by the GetConfiguration API endpoint.
+type TestAgentConfiguration struct {
+	APIVersion int                            `json:"api_version"`
+	Config     api.AdvancedAgentConfiguration `json:"config"`
+}
+
 // NewTestTask creates a minimal valid Task object with the specified IDs and reasonable defaults for other fields.
 // This will be used extensively across task-related tests.
-func NewTestTask(id, attackID int64) *components.Task {
+func NewTestTask(id, attackID int64) *api.Task {
 	now := time.Now()
-	return &components.Task{
-		ID:        id,
-		AttackID:  attackID,
+	return &api.Task{
+		Id:        id,
+		AttackId:  attackID,
 		StartDate: now,
 		Status:    "pending",
 	}
@@ -42,37 +47,40 @@ func NewTestTask(id, attackID int64) *components.Task {
 
 // NewTestAttack creates a test Attack object with the specified ID and attack mode,
 // including mock resource files (word list, rule list, mask list) with download URLs.
-func NewTestAttack(id int64, attackMode int) *components.Attack {
-	mode := int64(attackMode)
+func NewTestAttack(id int64, attackMode int) *api.Attack {
 	hashListURL := "https://example.com/hashlist"
-	checksum := "d41d8cd98f00b204e9800998ecf8427e"
+	checksumHex := "d41d8cd98f00b204e9800998ecf8427e"
+	checksumBytes, err := hex.DecodeString(checksumHex)
+	if err != nil {
+		panic("invalid test checksum hex: " + err.Error())
+	}
 	wordListURL := "https://example.com/wordlist.txt"
 	ruleListURL := "https://example.com/rules.txt"
 	maskListURL := "https://example.com/masks.txt"
 
-	attack := &components.Attack{
-		ID:                id,
-		AttackModeHashcat: &mode,
-		HashListID:        1,
-		HashListURL:       &hashListURL,
-		HashListChecksum:  &checksum,
-		HashMode:          new(int64),
-		WordList: &components.AttackResourceFile{
-			ID:          wordListID,
-			DownloadURL: wordListURL,
-			Checksum:    checksum,
+	attack := &api.Attack{
+		Id:                id,
+		AttackModeHashcat: attackMode,
+		HashListId:        1,
+		HashListUrl:       &hashListURL,
+		HashListChecksum:  &checksumBytes,
+		HashMode:          0,
+		WordList: &api.AttackResourceFile{
+			Id:          wordListID,
+			DownloadUrl: wordListURL,
+			Checksum:    checksumBytes,
 			FileName:    "wordlist.txt",
 		},
-		RuleList: &components.AttackResourceFile{
-			ID:          ruleListID,
-			DownloadURL: ruleListURL,
-			Checksum:    checksum,
+		RuleList: &api.AttackResourceFile{
+			Id:          ruleListID,
+			DownloadUrl: ruleListURL,
+			Checksum:    checksumBytes,
 			FileName:    "rules.txt",
 		},
-		MaskList: &components.AttackResourceFile{
-			ID:          maskListID,
-			DownloadURL: maskListURL,
-			Checksum:    checksum,
+		MaskList: &api.AttackResourceFile{
+			Id:          maskListID,
+			DownloadUrl: maskListURL,
+			Checksum:    checksumBytes,
 			FileName:    "masks.txt",
 		},
 	}
@@ -128,46 +136,22 @@ func NewTestDeviceStatus(deviceID int64, deviceType string) hashcat.StatusDevice
 }
 
 // NewTestAgentConfiguration creates a test agent configuration with specified settings.
-func NewTestAgentConfiguration(useNativeHashcat bool) operations.GetConfigurationResponseBody {
-	interval := defaultAgentInterval
-	return operations.GetConfigurationResponseBody{
+func NewTestAgentConfiguration(useNativeHashcat bool) TestAgentConfiguration {
+	interval := int(defaultAgentInterval)
+	return TestAgentConfiguration{
 		APIVersion: 1,
-		Config: components.AdvancedAgentConfiguration{
+		Config: api.AdvancedAgentConfiguration{
 			UseNativeHashcat:    &useNativeHashcat,
 			AgentUpdateInterval: &interval,
 		},
 	}
 }
 
-// NewTestSDKClient creates a configured SDK client instance pointing to the provided base URL
-// (typically a test server). This should be used after calling SetupHTTPMock().
-// When httpmock.Activate() is called, it wraps http.DefaultTransport, so the SDK will
-// automatically use the mocked transport when using the default client.
-// For custom clients, use SetupHTTPMockForClient() and pass that client to this function.
-func NewTestSDKClient(baseURL string) *sdk.CipherSwarmAgentSDK {
-	return sdk.New(
-		sdk.WithServerURL(baseURL),
-		sdk.WithSecurity("test-token"), // Set a default test token for authentication
-		// Don't override the client - let SDK use default client which httpmock.Activate() wraps
-	)
-}
-
-// NewTestSDKClientWithClient creates a configured SDK client instance with a custom http.Client.
-// This should be used after calling SetupHTTPMockForClient(client). The same client instance
-// passed to SetupHTTPMockForClient must be passed here.
-func NewTestSDKClientWithClient(baseURL string, client *http.Client) *sdk.CipherSwarmAgentSDK {
-	return sdk.New(
-		sdk.WithServerURL(baseURL),
-		sdk.WithSecurity("test-token"), // Set a default test token for authentication
-		sdk.WithClient(client),
-	)
-}
-
 // NewTestAgent creates a test Agent object with the specified ID and hostname,
 // including reasonable defaults for other fields (client_signature, operating_system, devices).
-func NewTestAgent(agentID int64, hostname string) components.Agent {
-	return components.Agent{
-		ID:              agentID,
+func NewTestAgent(agentID int64, hostname string) api.Agent {
+	return api.Agent{
+		Id:              agentID,
 		HostName:        hostname,
 		ClientSignature: "CipherSwarm Agent/test",
 		OperatingSystem: "linux",

@@ -7,9 +7,8 @@ import (
 	"unicode"
 
 	"github.com/dustin/go-humanize"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
 )
@@ -28,16 +27,16 @@ func DisplayAuthenticated() {
 
 // DisplayNewTask logs a new task as available using the agentstate.Logger instance.
 // It outputs debug and info level logs with the complete task details and its ID, respectively.
-func DisplayNewTask(task *components.Task) {
+func DisplayNewTask(task *api.Task) {
 	agentstate.Logger.Debug("New task available", "task", task)
-	agentstate.Logger.Info("New task available", "task_id", task.GetID())
+	agentstate.Logger.Info("New task available", "task_id", task.Id)
 }
 
 // DisplayNewAttack logs debug and info level messages for a new attack.
 // It logs attack parameters and information about the new attack initiation using agentstate.Logger.
-func DisplayNewAttack(attack *components.Attack) {
+func DisplayNewAttack(attack *api.Attack) {
 	agentstate.Logger.Debug("Attack parameters", "attack", attack)
-	agentstate.Logger.Info("New attack started", "attack_id", attack.GetID(), "attack_type", *attack.GetAttackMode())
+	agentstate.Logger.Info("New attack started", "attack_id", attack.Id, "attack_type", attack.AttackMode)
 }
 
 // DisplayInactive logs a debug message with the provided sleepTime duration before the agent pauses its activity.
@@ -133,13 +132,13 @@ func displayJobStatus(update hashcat.Status) {
 
 // displayAgentMetadataUpdated logs that the agent metadata has been updated using the CipherSwarm API.
 // Logs relevant metadata and agent ID for debugging.
-func displayAgentMetadataUpdated(result *operations.UpdateAgentResponse) {
+func displayAgentMetadataUpdated(result *api.UpdateAgentResponse) {
 	agentstate.Logger.Info("Agent metadata updated with the CipherSwarm API", "agent_id", agentstate.State.AgentID)
 	agentstate.Logger.Debug("Agent metadata", "metadata", result)
 }
 
 // DisplayNewCrackerAvailable logs details about the newly available cracker, including the latest version and download URL.
-func DisplayNewCrackerAvailable(result *components.CrackerUpdate) {
+func DisplayNewCrackerAvailable(result *api.CrackerUpdate) {
 	agentstate.Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
 	agentstate.Logger.Info("Download URL", "url", result.GetDownloadURL())
 }
@@ -155,8 +154,8 @@ func displayBenchmarksComplete(benchmarkResult []benchmarkResult) {
 }
 
 // displayDownloadFileStart logs the start of the file download process for the provided attack.
-func displayDownloadFileStart(attack *components.Attack) {
-	agentstate.Logger.Info("Downloading files for attack", "attack_id", attack.GetID())
+func displayDownloadFileStart(attack *api.Attack) {
+	agentstate.Logger.Info("Downloading files for attack", "attack_id", attack.Id)
 }
 
 // displayRunTaskCompleted logs a message indicating that a task has been completed successfully.
@@ -165,11 +164,11 @@ func displayRunTaskCompleted() {
 }
 
 // DisplayRunTaskAccepted logs an informational message indicating that a task has been accepted, specifying the task ID.
-func DisplayRunTaskAccepted(task *components.Task) {
-	agentstate.Logger.Info("Task accepted", "task_id", task.GetID())
+func DisplayRunTaskAccepted(task *api.Task) {
+	agentstate.Logger.Info("Task accepted", "task_id", task.Id)
 }
 
 // displayRunTaskStarting logs a message indicating that a task is starting with the specified task ID.
-func displayRunTaskStarting(task *components.Task) {
-	agentstate.Logger.Info("Running task", "task_id", task.GetID())
+func displayRunTaskStarting(task *api.Task) {
+	agentstate.Logger.Info("Running task", "task_id", task.Id)
 }

@@ -1,7 +1,7 @@
 package lib
 
 import (
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
 // agentConfig holds the various configuration settings for an agent.
@@ -18,20 +18,20 @@ type agentConfiguration struct {
 	APIVersion int64       `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
 }
 
-// parseStringToDeviceType converts a string representing a device type to the corresponding components.DeviceType enum.
-// If the input string does not match any known device type, it defaults to components.DeviceTypeCPU.
-func parseStringToDeviceType(deviceType string) components.DeviceType {
+// parseStringToDeviceType converts a string representing a device type to the corresponding api.DeviceStatusDeviceType enum.
+// If the input string does not match any known device type, it defaults to api.CPU.
+func parseStringToDeviceType(deviceType string) api.DeviceStatusDeviceType {
 	switch deviceType {
 	case "CPU":
-		return components.DeviceTypeCPU
+		return api.CPU
 	case "GPU":
-		return components.DeviceTypeGpu
+		return api.GPU
 	// case "fpga":
-	// 	return components.DeviceTypeFPGA
+	// 	return api.FPGA
 	// case "asic":
-	// 	return components.DeviceTypeASIC
+	// 	return api.ASIC
 	default:
-		return components.DeviceTypeCPU
+		return api.CPU
 	}
 }
 

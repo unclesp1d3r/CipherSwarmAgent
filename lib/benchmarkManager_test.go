@@ -85,10 +85,10 @@ func TestCreateBenchmark(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				if tt.checkFields {
-					assert.Equal(t, int64(0), benchmark.HashType)
+					assert.Equal(t, 0, benchmark.HashType)
 					assert.Equal(t, int64(100), benchmark.Runtime)
 					assert.InDelta(t, 12345.67, benchmark.HashSpeed, 0.01)
-					assert.Equal(t, int64(1), benchmark.Device)
+					assert.Equal(t, 1, benchmark.Device)
 				}
 			}
 		})
@@ -130,11 +130,9 @@ func TestSendBenchmarkResults(t *testing.T) {
 			name:    "empty benchmark results",
 			results: []benchmarkResult{},
 			setupMock: func(_ int64) {
-				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				// No mock needed — function returns early before API call
 			},
-			expectedError: false,
+			expectedError: true,
 		},
 		{
 			name: "API error during submission",
@@ -147,7 +145,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 				},
 			},
 			setupMock: func(_ int64) {
-				// Use 400 Bad Request instead of 500 to avoid SDK retry logic causing timeouts
+				// Use 400 Bad Request to test client error handling
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)

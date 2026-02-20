@@ -8,20 +8,19 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
 // runAttackTask starts the attack session and handles real-time outputs and status updates.
 // It processes stdout, stderr, status updates, cracked hashes, and handles session completion.
 // A configurable timeout (task_timeout) prevents indefinite blocking if hashcat hangs.
-func runAttackTask(sess *hashcat.Session, task *components.Task) {
+func runAttackTask(sess *hashcat.Session, task *api.Task) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start attack session", "error", err)
-		SendAgentError(err.Error(), task, operations.SeverityFatal)
+		SendAgentError(err.Error(), task, api.SeverityFatal)
 
 		return
 	}
@@ -46,13 +45,13 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 					SendAgentError(
 						"Task timed out; failed to kill session: "+err.Error(),
 						task,
-						operations.SeverityFatal,
+						api.SeverityFatal,
 					)
 
 					return
 				}
 
-				SendAgentError("Task timed out", task, operations.SeverityWarning)
+				SendAgentError("Task timed out", task, api.SeverityWarning)
 
 				return
 			case stdoutLine := <-sess.StdoutLines:
@@ -75,7 +74,7 @@ func runAttackTask(sess *hashcat.Session, task *components.Task) {
 }
 
 // handleStdOutLine handles a line of standard output, parses it if it's JSON, and updates the task and session status.
-func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Session) {
+func handleStdOutLine(stdoutLine string, task *api.Task, sess *hashcat.Session) {
 	if json.Valid([]byte(stdoutLine)) {
 		update := hashcat.Status{}
 
@@ -86,7 +85,7 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 			SendClassifiedError(
 				"Failed to parse hashcat status update: "+err.Error(),
 				task,
-				operations.SeverityWarning,
+				api.SeverityWarning,
 				"parse_error",
 				true, // Retryable - this is likely a transient or version mismatch issue
 			)
@@ -99,7 +98,7 @@ func handleStdOutLine(stdoutLine string, task *components.Task, sess *hashcat.Se
 
 // handleStdErrLine handles a single line of standard error output by classifying it
 // and sending it to the server with the appropriate severity level.
-func handleStdErrLine(stdErrLine string, task *components.Task) {
+func handleStdErrLine(stdErrLine string, task *api.Task) {
 	displayJobError(stdErrLine)
 
 	if strings.TrimSpace(stdErrLine) != "" {
@@ -111,13 +110,13 @@ func handleStdErrLine(stdErrLine string, task *components.Task) {
 
 // handleStatusUpdate processes a status update for a hashcat task and session.
 // It does this by displaying the job status and sending the status update.
-func handleStatusUpdate(statusUpdate hashcat.Status, task *components.Task, sess *hashcat.Session) {
+func handleStatusUpdate(statusUpdate hashcat.Status, task *api.Task, sess *hashcat.Session) {
 	displayJobStatus(statusUpdate)
 	sendStatusUpdate(statusUpdate, task, sess)
 }
 
 // handleCrackedHash processes a cracked hash by displaying it and then sending it to a task server.
-func handleCrackedHash(crackedHash hashcat.Result, task *components.Task) {
+func handleCrackedHash(crackedHash hashcat.Result, task *api.Task) {
 	displayJobCrackedHash(crackedHash)
 	sendCrackedHash(crackedHash.Timestamp, crackedHash.Hash, crackedHash.Plaintext, task)
 }
@@ -127,7 +126,7 @@ func handleCrackedHash(crackedHash hashcat.Result, task *components.Task) {
 // Note: When hashcat completes successfully with exit code 0, proc.Wait() returns nil,
 // so the err != nil block only handles non-zero exit codes. Successful completion
 // (nil error) proceeds directly to cleanup.
-func handleDoneChan(err error, task *components.Task, sess *hashcat.Session) {
+func handleDoneChan(err error, task *api.Task, sess *hashcat.Session) {
 	if err != nil {
 		exitCode := parseExitCode(err.Error())
 		exitInfo := hashcat.ClassifyExitCode(exitCode)
@@ -168,7 +167,7 @@ func parseExitCode(errMsg string) int {
 
 // handleNonExhaustedError handles errors which are not related to exhaustion
 // by performing specific actions based on the error category and message.
-func handleNonExhaustedError(err error, task *components.Task, sess *hashcat.Session, exitInfo hashcat.ExitCodeInfo) {
+func handleNonExhaustedError(err error, task *api.Task, sess *hashcat.Session, exitInfo hashcat.ExitCodeInfo) {
 	// Handle restore file issues specially.
 	// Check path is non-empty first to avoid matching unrelated "Cannot read " errors.
 	if strings.TrimSpace(sess.RestoreFilePath) != "" &&

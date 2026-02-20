@@ -3,11 +3,11 @@ package lib
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 
-	pkg_errors "github.com/pkg/errors"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
@@ -29,12 +29,12 @@ func getDevices(ctx context.Context) ([]string, error) {
 
 	sess, err := hashcat.NewHashcatSession("test", jobParams)
 	if err != nil {
-		return nil, cserrors.LogAndSendError("Failed to create test session", err, operations.SeverityMajor, nil)
+		return nil, cserrors.LogAndSendError("Failed to create test session", err, api.SeverityMajor, nil)
 	}
 
 	testStatus, err := runTestTask(sess)
 	if err != nil {
-		return nil, cserrors.LogAndSendError("Error running test task", err, operations.SeverityFatal, nil)
+		return nil, cserrors.LogAndSendError("Error running test task", err, api.SeverityFatal, nil)
 	}
 
 	return extractDeviceNames(testStatus.Devices), nil
@@ -55,7 +55,7 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start hashcat startup test session", "error", err)
-		SendAgentError(err.Error(), nil, operations.SeverityFatal)
+		SendAgentError(err.Error(), nil, api.SeverityFatal)
 
 		return nil, err
 	}
@@ -111,8 +111,8 @@ func handleTestStdOutLine(stdoutLine string) {
 // handleTestStdErrLine sends the specified stderr line to the central server and returns an error if the line is not empty.
 func handleTestStdErrLine(stdErrLine string) error {
 	if strings.TrimSpace(stdErrLine) != "" {
-		SendAgentError(stdErrLine, nil, operations.SeverityMinor)
-		return pkg_errors.New(stdErrLine)
+		SendAgentError(stdErrLine, nil, api.SeverityMinor)
+		return errors.New(stdErrLine)
 	}
 
 	return nil
@@ -121,7 +121,7 @@ func handleTestStdErrLine(stdErrLine string) error {
 // handleTestCrackedHash processes a cracked hash result from hashcat and returns an error if the plaintext is blank.
 func handleTestCrackedHash(crackedHash hashcat.Result) error {
 	if strings.TrimSpace(crackedHash.Plaintext) == "" {
-		return pkg_errors.New("received empty cracked hash")
+		return errors.New("received empty cracked hash")
 	}
 
 	return nil
@@ -130,7 +130,7 @@ func handleTestCrackedHash(crackedHash hashcat.Result) error {
 // handleTestDoneChan handles errors from the test session's done channel, sends them to central server if not exit status 1.
 func handleTestDoneChan(err error) error {
 	if err != nil && err.Error() != "exit status 1" {
-		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+		SendAgentError(err.Error(), nil, api.SeverityCritical)
 		return err
 	}
 

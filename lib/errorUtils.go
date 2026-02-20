@@ -3,17 +3,14 @@ package lib
 import (
 	"context"
 	stderrors "errors"
-	"net/http"
 	"os"
 	"path"
 	"sync"
 	"time"
 
 	"github.com/spf13/viper"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
@@ -39,7 +36,7 @@ var (
 func getErrorHandler() *apierrors.Handler {
 	apiErrorHandlerOnce.Do(func() {
 		apiErrorHandler = &apierrors.Handler{
-			SendError: func(message string, severity operations.Severity) {
+			SendError: func(message string, severity api.Severity) {
 				SendAgentError(message, nil, severity)
 			},
 		}
@@ -70,7 +67,7 @@ func handleAuthenticationError(err error) error {
 func handleConfigurationError(err error) error {
 	opts := apierrors.Options{
 		Message:      "Error getting agent configuration",
-		Severity:     operations.SeverityCritical,
+		Severity:     api.SeverityCritical,
 		SendToServer: true,
 	}
 	return getErrorHandler().Handle(err, opts)
@@ -78,6 +75,7 @@ func handleConfigurationError(err error) error {
 
 // handleCrackerUpdate manages the process of updating the cracker tool.
 // It follows these steps:
+// 0. Validates that download URL and exec name are present.
 // 1. Logs the new cracker update information.
 // 2. Creates a temporary directory for download and extraction.
 // 3. Downloads the cracker archive from the provided URL.
@@ -86,12 +84,21 @@ func handleConfigurationError(err error) error {
 // 6. Validates the new cracker directory and executable.
 // 7. Updates the configuration with the new executable path.
 // Returns an error if any step in the process fails.
-func handleCrackerUpdate(update *components.CrackerUpdate) error {
+func handleCrackerUpdate(update *api.CrackerUpdate) error {
+	if update.GetDownloadURL() == nil || update.GetExecName() == nil {
+		return cserrors.LogAndSendError(
+			"Cracker update missing download URL or exec name",
+			stderrors.New("incomplete cracker update response"),
+			api.SeverityCritical,
+			nil,
+		)
+	}
+
 	DisplayNewCrackerAvailable(update)
 
 	tempDir, err := os.MkdirTemp("", "cipherswarm-*")
 	if err != nil {
-		return cserrors.LogAndSendError("Error creating temporary directory", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error creating temporary directory", err, api.SeverityCritical, nil)
 	}
 	defer func(tempDir string) {
 		_ = downloader.CleanupTempDir(tempDir) //nolint:errcheck // Cleanup in defer, error not critical
@@ -100,24 +107,24 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 	tempArchivePath := path.Join(tempDir, "hashcat.7z")
 	// TODO: propagate cancellable context for graceful shutdown support
 	if err := downloader.DownloadFile(context.TODO(), *update.GetDownloadURL(), tempArchivePath, ""); err != nil {
-		return cserrors.LogAndSendError("Error downloading cracker", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error downloading cracker", err, api.SeverityCritical, nil)
 	}
 
 	newArchivePath, err := cracker.MoveArchiveFile(tempArchivePath)
 	if err != nil {
-		return cserrors.LogAndSendError("Error moving file", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error moving file", err, api.SeverityCritical, nil)
 	}
 
 	hashcatDirectory, err := cracker.ExtractHashcatArchive(context.Background(), newArchivePath)
 	if err != nil {
-		return cserrors.LogAndSendError("Error extracting file", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error extracting file", err, api.SeverityCritical, nil)
 	}
 
 	if !validateHashcatDirectory(hashcatDirectory, *update.GetExecName()) {
 		return cserrors.LogAndSendError(
 			"Hashcat directory validation failed after extraction",
 			stderrors.New("hashcat binary validation failed"),
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			nil,
 		)
 	}
@@ -127,13 +134,16 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 		_ = cserrors.LogAndSendError(
 			"Error removing 7z file",
 			err,
-			operations.SeverityWarning,
+			api.SeverityWarning,
 			nil,
 		)
 	}
 
 	viper.Set("hashcat_path", path.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName()))
-	_ = viper.WriteConfig() //nolint:errcheck // Config write failure not critical
+	if err := viper.WriteConfig(); err != nil {
+		agentstate.Logger.Warn("Failed to persist hashcat path to config; update will be lost on restart",
+			"error", err, "hashcat_path", viper.GetString("hashcat_path"))
+	}
 
 	return nil
 }
@@ -143,7 +153,7 @@ func handleCrackerUpdate(update *components.CrackerUpdate) error {
 func handleAPIError(message string, err error) {
 	opts := apierrors.Options{
 		Message:        message,
-		Severity:       operations.SeverityCritical,
+		Severity:       api.SeverityCritical,
 		SendToServer:   true,
 		LogAuthContext: stderrors.Is(err, ErrCouldNotValidateCredentials),
 	}
@@ -155,7 +165,7 @@ func handleAPIError(message string, err error) {
 func handleHeartbeatError(err error) {
 	opts := apierrors.Options{
 		Message:      "Error sending heartbeat",
-		Severity:     operations.SeverityCritical,
+		Severity:     api.SeverityCritical,
 		SendToServer: true,
 	}
 	//nolint:errcheck,gosec // Error handler returns error for chaining; not needed here
@@ -163,7 +173,7 @@ func handleHeartbeatError(err error) {
 }
 
 // handleStatusUpdateError handles specific error types during a status update and logs or processes them accordingly.
-func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Session) {
+func handleStatusUpdateError(err error, task *api.Task, sess *hashcat.Session) {
 	// Check for special status codes that require specific handling
 	if apierrors.IsNotFoundError(err) {
 		handleTaskNotFound(task, sess)
@@ -177,32 +187,14 @@ func handleStatusUpdateError(err error, task *components.Task, sess *hashcat.Ses
 
 	// For all other errors, log and send
 	//nolint:errcheck,gosec // Error handler returns error for chaining; not needed here
-	cserrors.LogAndSendError("Error sending status update", err, operations.SeverityCritical, task)
-}
-
-// handleSDKError handles errors from the SDK by taking appropriate action based on the error's status code.
-func handleSDKError(se *sdkerrors.SDKError, task *components.Task, sess *hashcat.Session) {
-	switch se.StatusCode {
-	case http.StatusNotFound:
-		handleTaskNotFound(task, sess)
-	case http.StatusGone:
-		handleTaskGone(task, sess)
-	default:
-		//nolint:errcheck // Error already being handled
-		_ = cserrors.LogAndSendError(
-			"Error connecting to the CipherSwarm API, unexpected error",
-			se,
-			operations.SeverityCritical,
-			task,
-		)
-	}
+	cserrors.LogAndSendError("Error sending status update", err, api.SeverityCritical, task)
 }
 
 // handleTaskNotFound handles the scenario where a task is not found in the system.
 // It logs an error message with the task ID, attempts to kill the session, and cleans up the session.
-func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
-	agentstate.Logger.Error("Task not found", "task_id", task.GetID())
-	agentstate.Logger.Info("Killing task", "task_id", task.GetID())
+func handleTaskNotFound(task *api.Task, sess *hashcat.Session) {
+	agentstate.Logger.Error("Task not found", "task_id", task.Id)
+	agentstate.Logger.Info("Killing task", "task_id", task.Id)
 	agentstate.Logger.Info(
 		"It is possible that multiple errors appear as the task takes some time to kill. This is expected.",
 	)
@@ -212,7 +204,7 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 		_ = cserrors.LogAndSendError(
 			"Error killing task",
 			err,
-			operations.SeverityCritical,
+			api.SeverityCritical,
 			task,
 		)
 	}
@@ -221,41 +213,44 @@ func handleTaskNotFound(task *components.Task, sess *hashcat.Session) {
 }
 
 // handleTaskGone handles the termination of a task when it is no longer needed, ensuring the session is appropriately killed.
-func handleTaskGone(task *components.Task, sess *hashcat.Session) {
-	agentstate.Logger.Info("Pausing task", "task_id", task.GetID())
+func handleTaskGone(task *api.Task, sess *hashcat.Session) {
+	agentstate.Logger.Info("Pausing task", "task_id", task.Id)
 
 	if err := sess.Kill(); err != nil {
 		//nolint:errcheck // Error already being handled
 		_ = cserrors.LogAndSendError(
 			"Error pausing task",
 			err,
-			operations.SeverityFatal,
+			api.SeverityFatal,
 			task,
 		)
 	}
 }
 
 // SendAgentError sends an error message to the centralized server, including metadata and severity level.
-func SendAgentError(stdErrLine string, task *components.Task, severity operations.Severity) {
+func SendAgentError(stdErrLine string, task *api.Task, severity api.Severity) {
 	var taskID *int64
 	if task != nil {
-		taskID = &task.ID
+		taskID = &task.Id
 	}
 
-	metadata := &operations.Metadata{
-		ErrorDate: time.Now(),
-		Other: map[string]any{
-			"platform": agentPlatform,
-			"version":  AgentVersion,
-		},
+	otherMap := map[string]any{
+		"platform": agentPlatform,
+		"version":  AgentVersion,
 	}
 
-	agentError := &operations.SubmitErrorAgentRequestBody{
+	agentError := api.SubmitErrorAgentJSONRequestBody{
 		Message:  stdErrLine,
-		Metadata: metadata,
 		Severity: severity,
-		AgentID:  agentstate.State.AgentID,
-		TaskID:   taskID,
+		AgentId:  agentstate.State.AgentID,
+		TaskId:   taskID,
+		Metadata: &struct {
+			ErrorDate time.Time       `json:"error_date"`
+			Other     *map[string]any `json:"other"`
+		}{
+			ErrorDate: time.Now(),
+			Other:     &otherMap,
+		},
 	}
 
 	if _, err := agentstate.State.APIClient.Agents().SubmitErrorAgent(
@@ -271,32 +266,35 @@ func SendAgentError(stdErrLine string, task *components.Task, severity operation
 // It includes the error category and retryable flag for better error handling on the server side.
 func SendClassifiedError(
 	message string,
-	task *components.Task,
-	severity operations.Severity,
+	task *api.Task,
+	severity api.Severity,
 	category string,
 	retryable bool,
 ) {
 	var taskID *int64
 	if task != nil {
-		taskID = &task.ID
+		taskID = &task.Id
 	}
 
-	metadata := &operations.Metadata{
-		ErrorDate: time.Now(),
-		Other: map[string]any{
-			"platform":  agentPlatform,
-			"version":   AgentVersion,
-			"category":  category,
-			"retryable": retryable,
-		},
+	otherMap := map[string]any{
+		"platform":  agentPlatform,
+		"version":   AgentVersion,
+		"category":  category,
+		"retryable": retryable,
 	}
 
-	agentError := &operations.SubmitErrorAgentRequestBody{
+	agentError := api.SubmitErrorAgentJSONRequestBody{
 		Message:  message,
-		Metadata: metadata,
 		Severity: severity,
-		AgentID:  agentstate.State.AgentID,
-		TaskID:   taskID,
+		AgentId:  agentstate.State.AgentID,
+		TaskId:   taskID,
+		Metadata: &struct {
+			ErrorDate time.Time       `json:"error_date"`
+			Other     *map[string]any `json:"other"`
+		}{
+			ErrorDate: time.Now(),
+			Other:     &otherMap,
+		},
 	}
 
 	if _, err := agentstate.State.APIClient.Agents().SubmitErrorAgent(
@@ -318,11 +316,11 @@ func handleSendError(err error) {
 
 // handleAcceptTaskError handles errors that occur when attempting to accept a task.
 func handleAcceptTaskError(err error) {
-	// ErrorObject gets Info severity, SDKError gets Critical
-	var eo *sdkerrors.ErrorObject
-	severity := operations.SeverityCritical
-	if stderrors.As(err, &eo) {
-		severity = operations.SeverityInfo
+	// Client errors (4xx) get Info severity, other errors get Critical
+	var ae *api.APIError
+	severity := api.SeverityCritical
+	if stderrors.As(err, &ae) && ae.StatusCode >= 400 && ae.StatusCode < 500 {
+		severity = api.SeverityInfo
 	}
 
 	opts := apierrors.Options{
@@ -336,8 +334,8 @@ func handleAcceptTaskError(err error) {
 
 // handleTaskError handles different types of errors encountered during task operations.
 func handleTaskError(err error, message string) {
-	// Handle SetTaskAbandonedResponseBody specially
-	var e1 *sdkerrors.SetTaskAbandonedResponseBody
+	// Handle SetTaskAbandonedError specially
+	var e1 *api.SetTaskAbandonedError
 	if stderrors.As(err, &e1) {
 		details := e1.Details
 		// If Details is empty, fall back to Error_ field
@@ -349,13 +347,13 @@ func handleTaskError(err error, message string) {
 			"details",
 			details,
 		)
-		SendAgentError(e1.Error(), nil, operations.SeverityWarning)
+		SendAgentError(e1.Error(), nil, api.SeverityWarning)
 		return
 	}
 
 	opts := apierrors.Options{
 		Message:      message,
-		Severity:     operations.SeverityCritical,
+		Severity:     api.SeverityCritical,
 		SendToServer: true,
 	}
 	//nolint:errcheck,gosec // Error handler returns error for chaining; not needed here
@@ -364,12 +362,12 @@ func handleTaskError(err error, message string) {
 
 // handleSendCrackError processes different types of errors encountered when communicating with the CipherSwarm API.
 func handleSendCrackError(err error) {
-	// ErrorObject gets Major severity, SDKError gets Critical
-	var eo *sdkerrors.ErrorObject
-	severity := operations.SeverityCritical
+	// Client errors (4xx) get Major severity, other errors get Critical
+	var ae *api.APIError
+	severity := api.SeverityCritical
 	message := "Error sending cracked hash to server"
-	if stderrors.As(err, &eo) {
-		severity = operations.SeverityMajor
+	if stderrors.As(err, &ae) && ae.StatusCode >= 400 && ae.StatusCode < 500 {
+		severity = api.SeverityMajor
 		message = "Error notifying server of cracked hash, task not found"
 	}
 

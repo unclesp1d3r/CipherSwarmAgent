@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
@@ -63,7 +63,7 @@ func TestCreateAndWriteZapFile(t *testing.T) {
 	tests := []struct {
 		name          string
 		content       string
-		task          *components.Task
+		task          *api.Task
 		expectedError bool
 	}{
 		{
@@ -140,7 +140,7 @@ invalidline
 			require.NoError(t, err)
 
 			callCount := 0
-			mockSendFunc := func(_ time.Time, hash, plaintext string, _ *components.Task) {
+			mockSendFunc := func(_ time.Time, hash, plaintext string, _ *api.Task) {
 				callCount++
 				assert.NotEmpty(t, hash)
 				assert.NotEmpty(t, plaintext)

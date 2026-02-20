@@ -34,7 +34,6 @@ func TestState_DefaultValues(t *testing.T) {
 	assert.False(t, State.JobCheckingStopped)
 	assert.False(t, State.UseLegacyDeviceIdentificationMethod)
 	assert.False(t, State.BenchmarksSubmitted)
-	assert.Nil(t, State.SdkClient)
 }
 
 func TestState_Modification(t *testing.T) {

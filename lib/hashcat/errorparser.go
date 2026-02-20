@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
 // ErrorCategory represents the classification of a hashcat error.
@@ -65,7 +65,7 @@ func (c ErrorCategory) String() string {
 // ErrorInfo contains information about a classified stderr line.
 type ErrorInfo struct {
 	Category  ErrorCategory
-	Severity  operations.Severity
+	Severity  api.Severity
 	Retryable bool
 	Message   string
 }
@@ -74,7 +74,7 @@ type ErrorInfo struct {
 type errorPattern struct {
 	pattern   *regexp.Regexp
 	category  ErrorCategory
-	severity  operations.Severity
+	severity  api.Severity
 	retryable bool
 }
 
@@ -86,72 +86,72 @@ type errorPattern struct {
 //nolint:gochecknoglobals // Patterns are intentionally global for performance
 var errorPatterns = []errorPattern{
 	// Hash format errors (non-retryable, critical)
-	{regexp.MustCompile(`Hash '.+': Separator unmatched`), ErrorCategoryHashFormat, operations.SeverityCritical, false},
+	{regexp.MustCompile(`Hash '.+': Separator unmatched`), ErrorCategoryHashFormat, api.SeverityCritical, false},
 	{
 		regexp.MustCompile(`Hash '.+': Token length exception`),
 		ErrorCategoryHashFormat,
-		operations.SeverityCritical,
+		api.SeverityCritical,
 		false,
 	},
 	{
 		regexp.MustCompile(`Hash '.+': Line-length exception`),
 		ErrorCategoryHashFormat,
-		operations.SeverityCritical,
+		api.SeverityCritical,
 		false,
 	},
 	{
 		regexp.MustCompile(`Hash '.+': Salt-length exception`),
 		ErrorCategoryHashFormat,
-		operations.SeverityCritical,
+		api.SeverityCritical,
 		false,
 	},
-	{regexp.MustCompile(`(?i)No hashes loaded`), ErrorCategoryHashFormat, operations.SeverityCritical, false},
-	{regexp.MustCompile(`(?i)Hash-file exception`), ErrorCategoryHashFormat, operations.SeverityCritical, false},
+	{regexp.MustCompile(`(?i)No hashes loaded`), ErrorCategoryHashFormat, api.SeverityCritical, false},
+	{regexp.MustCompile(`(?i)Hash-file exception`), ErrorCategoryHashFormat, api.SeverityCritical, false},
 
 	// Device memory errors (non-retryable, fatal)
 	// Using non-greedy .*? to prevent catastrophic backtracking on long lines
 	{
 		regexp.MustCompile(`Device #\d+:.*?(?i)(out of memory|memory allocation|MEMORY)`),
 		ErrorCategoryDevice,
-		operations.SeverityFatal,
+		api.SeverityFatal,
 		false,
 	},
 
 	// Device warnings (retryable)
 	// Using non-greedy .*? to prevent performance issues on long lines
-	{regexp.MustCompile(`Device #\d+:.*?WARNING`), ErrorCategoryDevice, operations.SeverityWarning, true},
-	{regexp.MustCompile(`(?i)hwmon.*temperature`), ErrorCategoryDevice, operations.SeverityWarning, true},
+	{regexp.MustCompile(`Device #\d+:.*?WARNING`), ErrorCategoryDevice, api.SeverityWarning, true},
+	{regexp.MustCompile(`(?i)hwmon.*temperature`), ErrorCategoryDevice, api.SeverityWarning, true},
 
 	// File access errors (non-retryable, critical)
-	{regexp.MustCompile(`ERROR:.*can't open`), ErrorCategoryFileAccess, operations.SeverityCritical, false},
+	{regexp.MustCompile(`ERROR:.*can't open`), ErrorCategoryFileAccess, api.SeverityCritical, false},
 	{
 		regexp.MustCompile(`ERROR:.*No such file or directory`),
 		ErrorCategoryFileAccess,
-		operations.SeverityCritical,
+		api.SeverityCritical,
 		false,
 	},
 
 	// Backend errors - memory (fatal)
-	{regexp.MustCompile(`OpenCL API.*CL_OUT_OF_HOST_MEMORY`), ErrorCategoryBackend, operations.SeverityFatal, false},
+	{regexp.MustCompile(`OpenCL API.*CL_OUT_OF_HOST_MEMORY`), ErrorCategoryBackend, api.SeverityFatal, false},
 
 	// Backend errors - general (critical)
-	{regexp.MustCompile(`OpenCL API.*CL_`), ErrorCategoryBackend, operations.SeverityCritical, false},
-	{regexp.MustCompile(`cuDeviceGet\(\).*CUDA_ERROR`), ErrorCategoryBackend, operations.SeverityCritical, false},
-	{regexp.MustCompile(`hipDeviceGet\(\).*HIP_ERROR`), ErrorCategoryBackend, operations.SeverityCritical, false},
-	{regexp.MustCompile(`(?i)Metal API`), ErrorCategoryBackend, operations.SeverityCritical, false},
+	{regexp.MustCompile(`OpenCL API.*CL_`), ErrorCategoryBackend, api.SeverityCritical, false},
+	{regexp.MustCompile(`cuDeviceGet\(\).*CUDA_ERROR`), ErrorCategoryBackend, api.SeverityCritical, false},
+	{regexp.MustCompile(`hipDeviceGet\(\).*HIP_ERROR`), ErrorCategoryBackend, api.SeverityCritical, false},
+	{regexp.MustCompile(`(?i)Metal API`), ErrorCategoryBackend, api.SeverityCritical, false},
 
 	// Configuration errors (non-retryable, critical)
-	{regexp.MustCompile(`ERROR:.*Invalid argument`), ErrorCategoryConfiguration, operations.SeverityCritical, false},
-	{regexp.MustCompile(`ERROR:.*Option.*requires`), ErrorCategoryConfiguration, operations.SeverityCritical, false},
-	{regexp.MustCompile(`ERROR:.*Mixed.*not allowed`), ErrorCategoryConfiguration, operations.SeverityCritical, false},
+	{regexp.MustCompile(`ERROR:.*Invalid argument`), ErrorCategoryConfiguration, api.SeverityCritical, false},
+	{regexp.MustCompile(`ERROR:.*Option.*requires`), ErrorCategoryConfiguration, api.SeverityCritical, false},
+	{regexp.MustCompile(`ERROR:.*Mixed.*not allowed`), ErrorCategoryConfiguration, api.SeverityCritical, false},
 
 	// Restore file issues (retryable)
-	{regexp.MustCompile(`ERROR:.*Cannot read.*\.restore`), ErrorCategoryRetryable, operations.SeverityMinor, true},
+	{regexp.MustCompile(`ERROR:.*Cannot read.*\.restore`), ErrorCategoryRetryable, api.SeverityMinor, true},
 
 	// Info/warnings (retryable)
-	{regexp.MustCompile(`(?i)Skipping invalid or unsupported`), ErrorCategoryInfo, operations.SeverityInfo, true},
-	{regexp.MustCompile(`(?i)Approaching final keyspace`), ErrorCategoryInfo, operations.SeverityInfo, true},
-	{regexp.MustCompile(`^Warning:`), ErrorCategoryWarning, operations.SeverityMinor, true},
+	{regexp.MustCompile(`(?i)Skipping invalid or unsupported`), ErrorCategoryInfo, api.SeverityInfo, true},
+	{regexp.MustCompile(`(?i)Approaching final keyspace`), ErrorCategoryInfo, api.SeverityInfo, true},
+	{regexp.MustCompile(`^Warning:`), ErrorCategoryWarning, api.SeverityMinor, true},
 }
 
 // ClassifyStderr classifies a stderr line from hashcat and returns error information.
@@ -172,7 +172,7 @@ func ClassifyStderr(line string) ErrorInfo {
 	if strings.HasPrefix(line, "ERROR:") {
 		return ErrorInfo{
 			Category:  ErrorCategoryUnknown,
-			Severity:  operations.SeverityCritical,
+			Severity:  api.SeverityCritical,
 			Retryable: false,
 			Message:   line,
 		}
@@ -186,7 +186,7 @@ func ClassifyStderr(line string) ErrorInfo {
 	// non-zero exit code which is classified separately with appropriate severity.
 	return ErrorInfo{
 		Category:  ErrorCategoryUnknown,
-		Severity:  operations.SeverityMinor,
+		Severity:  api.SeverityMinor,
 		Retryable: true,
 		Message:   line,
 	}
