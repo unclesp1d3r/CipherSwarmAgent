@@ -383,13 +383,23 @@ func convertToTaskStatus(update hashcat.Status, deviceStatuses []api.DeviceStatu
 		Target:          update.Target,
 		Progress:        update.Progress,
 		RestorePoint:    update.RestorePoint,
-		RecoveredHashes: api.ConvertInt64SliceToInt(update.RecoveredHashes),
-		RecoveredSalts:  api.ConvertInt64SliceToInt(update.RecoveredSalts),
+		RecoveredHashes: convertAndWarn(update.RecoveredHashes, "RecoveredHashes"),
+		RecoveredSalts:  convertAndWarn(update.RecoveredSalts, "RecoveredSalts"),
 		Rejected:        update.Rejected,
 		DeviceStatuses:  deviceStatuses,
 		TimeStart:       time.Unix(update.TimeStart, 0),
 		EstimatedStop:   time.Unix(update.EstimatedStop, 0),
 	}
+}
+
+// convertAndWarn converts an int64 slice to int, logging a warning if any values were clamped.
+func convertAndWarn(s []int64, field string) []int {
+	result, clamped := api.ConvertInt64SliceToInt(s)
+	if clamped > 0 {
+		agentstate.Logger.Warn("int64 values exceeded platform int range and were clamped to zero",
+			"field", field, "clamped_count", clamped)
+	}
+	return result
 }
 
 func handleSendStatusResponse(resp *api.SendStatusResponse, task *api.Task) {

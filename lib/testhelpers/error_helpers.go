@@ -49,19 +49,3 @@ func NewSetTaskAbandonedErrorWithNilError() *api.SetTaskAbandonedError {
 		Details: []string{},
 	}
 }
-
-// WrapAsErrorObject wraps a standard error as an APIError for testing error type assertions.
-func WrapAsErrorObject(err error) error {
-	if err == nil {
-		return nil
-	}
-	return NewErrorObject(err.Error())
-}
-
-// WrapAsAPIError wraps a standard error as an APIError for testing error type assertions.
-func WrapAsAPIError(err error, statusCode int) error {
-	if err == nil {
-		return nil
-	}
-	return NewAPIError(statusCode, err.Error())
-}

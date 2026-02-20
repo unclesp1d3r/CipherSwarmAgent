@@ -456,15 +456,21 @@ func HashListResponseStream(resp *GetHashListResponse) io.Reader {
 
 // ConvertInt64SliceToInt converts []int64 to []int with bounds checking
 // to prevent silent overflow on 32-bit platforms.
-func ConvertInt64SliceToInt(s []int64) []int {
+// Returns the converted slice and the number of values that were clamped to zero.
+// Callers should log a warning when clamped > 0.
+//
+//nolint:gocritic // unnamedResult - two returns are clear from doc comment
+func ConvertInt64SliceToInt(s []int64) ([]int, int) {
 	result := make([]int, len(s))
+	clamped := 0
 	for i, v := range s {
 		if v > math.MaxInt || v < math.MinInt {
-			result[i] = 0 // Clamp to zero rather than silently overflow
+			result[i] = 0
+			clamped++
 
 			continue
 		}
 		result[i] = int(v)
 	}
-	return result
+	return result, clamped
 }
