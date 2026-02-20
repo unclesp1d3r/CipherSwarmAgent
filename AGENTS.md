@@ -89,6 +89,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - **Logging:** Use a structured logger (e.g., `charmbracelet/log`). Never log secrets or sensitive data.
 - **Configuration:** Use `spf13/viper` to manage configuration from files, environment variables, and CLI flags.
+- Treat `viper.WriteConfig()` failures as non-fatal warnings (log + continue) — the in-memory config is correct and a read-only filesystem should not block agent operation.
 
 ### Tooling
 
@@ -97,6 +98,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** oapi-codegen generates a `Client` struct in `lib/api/client.gen.go` — the hand-written aggregate interface is named `APIClient` (with `//nolint:revive` for stutter) to avoid the conflict.
 - **Gotcha:** Use `exclude-schemas` in `lib/api/config.yaml` when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface in `errors.go`).
 - **API Client Architecture:** `AgentClient` in `client.go` wraps the generated `ClientWithResponses`, implements `APIClient` interface. Error types (`APIError`, `SetTaskAbandonedError`, `Severity`) live in `errors.go`. Use `errors.As` to extract `*api.APIError` from returned errors.
+- **Gotcha:** oapi-codegen's generated `Parse*Response` methods read and close `HTTPResponse.Body` during parsing. Helper functions must use the parsed `Body` byte slice (`resp.Body`), not `resp.HTTPResponse.Body` (already drained and closed).
+- **Gotcha:** When an API method returns HTTP 200, always guard `resp.JSON200 == nil` before using it — oapi-codegen silently sets JSON200 to nil if JSON unmarshaling fails.
 - **Gotcha:** Do not name directories `gen/` — the user's global gitignore excludes them.
 - **Dev Tool Management:** Use `mise` to install and manage development toolchains (e.g., Go, Bun) via `mise.toml`.
 - **CI Validation:** Run `just ci-check` to validate all checks pass before committing.
@@ -114,6 +117,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `require.Error/NoError` instead of `assert.Error/NoError` for error assertions (testifylint rule).
 - Use `atomic.Int32` for thread-safe counters in mock implementations.
 - Use `lib/testhelpers/error_helpers.go` for constructing test errors (`NewAPIError`, `NewErrorObject`, `NewSetTaskAbandonedError`).
+- MockClient sub-client accessors (`Tasks()`, `Agents()`, etc.) return default unconfigured mocks (not nil) to prevent nil pointer panics when code paths call sub-clients the test didn't explicitly mock.
 - When removing a field from global state (`agentstate.State`), grep all test helpers, cleanup functions, and reset functions for references.
 - Run `go test -race ./...` to detect data races.
 
