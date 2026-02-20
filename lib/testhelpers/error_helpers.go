@@ -3,66 +3,48 @@ package testhelpers
 
 import (
 	"fmt"
+	"net/http"
 
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
-// NewErrorObject creates a new ErrorObject with the specified message.
-// Wraps the error construction to make tests more readable.
-func NewErrorObject(message string) *sdkerrors.ErrorObject {
-	return &sdkerrors.ErrorObject{
-		Error_: message,
-	}
-}
-
-// NewSDKError creates a new SDKError with the specified status code and message.
-// Sets other fields (Body, RawResponse) to reasonable test values.
-func NewSDKError(statusCode int, message string) *sdkerrors.SDKError {
-	return &sdkerrors.SDKError{
+// NewAPIError creates a new APIError with the specified status code and message.
+func NewAPIError(statusCode int, message string) *api.APIError {
+	return &api.APIError{
 		StatusCode: statusCode,
 		Message:    message,
 		Body:       fmt.Sprintf(`{"error":%q}`, message),
 	}
 }
 
-// NewSetTaskAbandonedError creates a SetTaskAbandonedResponseBody error
+// NewValidationAPIError creates a new APIError with 422 Unprocessable Entity status,
+// used as a test convenience for simulating validation errors.
+func NewValidationAPIError(message string) *api.APIError {
+	return NewAPIError(http.StatusUnprocessableEntity, message)
+}
+
+// NewSetTaskAbandonedError creates a SetTaskAbandonedError
 // for testing task abandonment scenarios.
-func NewSetTaskAbandonedError(state string) *sdkerrors.SetTaskAbandonedResponseBody {
-	return &sdkerrors.SetTaskAbandonedResponseBody{
+func NewSetTaskAbandonedError(state string) *api.SetTaskAbandonedError {
+	return &api.SetTaskAbandonedError{
 		Details: []string{state},
 	}
 }
 
-// NewSetTaskAbandonedErrorWithErrorField creates a SetTaskAbandonedResponseBody error
+// NewSetTaskAbandonedErrorWithErrorField creates a SetTaskAbandonedError
 // with empty Details but a populated Error_ field for testing fallback extraction.
-func NewSetTaskAbandonedErrorWithErrorField(errorMsg string) *sdkerrors.SetTaskAbandonedResponseBody {
-	return &sdkerrors.SetTaskAbandonedResponseBody{
+func NewSetTaskAbandonedErrorWithErrorField(errorMsg string) *api.SetTaskAbandonedError {
+	return &api.SetTaskAbandonedError{
 		Error_:  &errorMsg,
 		Details: []string{},
 	}
 }
 
-// NewSetTaskAbandonedErrorWithNilError creates a SetTaskAbandonedResponseBody error
+// NewSetTaskAbandonedErrorWithNilError creates a SetTaskAbandonedError
 // with empty Details and nil Error_ for testing edge case handling.
-func NewSetTaskAbandonedErrorWithNilError() *sdkerrors.SetTaskAbandonedResponseBody {
-	return &sdkerrors.SetTaskAbandonedResponseBody{
+func NewSetTaskAbandonedErrorWithNilError() *api.SetTaskAbandonedError {
+	return &api.SetTaskAbandonedError{
 		Error_:  nil,
 		Details: []string{},
 	}
-}
-
-// WrapAsErrorObject wraps a standard error as an ErrorObject for testing error type assertions.
-func WrapAsErrorObject(err error) error {
-	if err == nil {
-		return nil
-	}
-	return NewErrorObject(err.Error())
-}
-
-// WrapAsSDKError wraps a standard error as an SDKError for testing error type assertions.
-func WrapAsSDKError(err error, statusCode int) error {
-	if err == nil {
-		return nil
-	}
-	return NewSDKError(statusCode, err.Error())
 }

@@ -7,8 +7,8 @@ import (
 	"path"
 
 	"github.com/spf13/viper"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 )
 
@@ -19,7 +19,7 @@ func setNativeHashcatPath() error {
 	binPath, err := cracker.FindHashcatBinary()
 	if err != nil {
 		agentstate.Logger.Error("Error finding hashcat binary: ", err)
-		SendAgentError(err.Error(), nil, operations.SeverityCritical)
+		SendAgentError(err.Error(), nil, api.SeverityCritical)
 
 		return err
 	}
@@ -27,7 +27,12 @@ func setNativeHashcatPath() error {
 	agentstate.Logger.Info("Found Hashcat binary", "path", binPath)
 	viper.Set("hashcat_path", binPath)
 
-	return viper.WriteConfig()
+	if err := viper.WriteConfig(); err != nil {
+		agentstate.Logger.Warn("Failed to persist hashcat path to config; path will be lost on restart",
+			"error", err, "hashcat_path", binPath)
+	}
+
+	return nil
 }
 
 // UpdateCracker checks for updates to the cracker and applies them if available.
@@ -63,13 +68,20 @@ func UpdateCracker() {
 
 	if response.StatusCode == http.StatusOK {
 		update := response.GetCrackerUpdate()
+		if update == nil {
+			agentstate.Logger.Warn("Cracker update response was 200 OK but contained no update data")
+
+			return
+		}
 		if update.GetAvailable() {
-			_ = handleCrackerUpdate(update) //nolint:errcheck // Error already logged in function
+			if err := handleCrackerUpdate(update); err != nil {
+				agentstate.Logger.Error("Failed to apply cracker update", "error", err)
+			}
 		} else {
 			agentstate.Logger.Debug("No new cracker available", "latest_version", update.GetLatestVersion())
 		}
 	} else {
-		agentstate.Logger.Error("Error checking for updated cracker", "CrackerUpdate", response.RawResponse.Status)
+		agentstate.Logger.Error("Error checking for updated cracker", "CrackerUpdate", response.Status())
 	}
 }
 

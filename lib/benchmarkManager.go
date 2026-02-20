@@ -2,14 +2,14 @@ package lib
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
@@ -22,21 +22,27 @@ const (
 // sendBenchmarkResults sends the collected benchmark results to a server endpoint.
 // It converts each benchmarkResult into a HashcatBenchmark and appends them to a slice.
 // If the conversion fails for a result, it continues to the next result.
-// Creates a SubmitBenchmarkRequestBody with the HashcatBenchmarks slice and submits it via the API client interface.
+// Creates a SubmitBenchmarkJSONRequestBody with the HashcatBenchmarks slice and submits it via the API client interface.
 // Returns an error if submission or the response received is not successful.
 func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
-	var benchmarks []components.HashcatBenchmark //nolint:prealloc // Size unknown until after parsing
+	var benchmarks []api.HashcatBenchmark //nolint:prealloc // Size unknown until after parsing
 
 	for _, result := range benchmarkResults {
 		benchmark, err := createBenchmark(result)
 		if err != nil {
+			agentstate.Logger.Warn("Skipping unparseable benchmark result", "error", err, "hash_type", result.HashType)
+
 			continue
 		}
 
 		benchmarks = append(benchmarks, benchmark)
 	}
 
-	results := operations.SubmitBenchmarkRequestBody{
+	if len(benchmarks) == 0 {
+		return fmt.Errorf("all %d benchmark results failed to parse; nothing to submit", len(benchmarkResults))
+	}
+
+	results := api.SubmitBenchmarkJSONRequestBody{
 		HashcatBenchmarks: benchmarks,
 	}
 
@@ -49,42 +55,42 @@ func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
 		return err
 	}
 
-	if res.StatusCode == http.StatusNoContent {
+	if res.StatusCode() == http.StatusNoContent {
 		return nil
 	}
 
-	return fmt.Errorf("%w: %s", ErrBadResponse, res.RawResponse.Status)
+	return fmt.Errorf("%w: %s", ErrBadResponse, res.Status())
 }
 
-// createBenchmark converts a benchmarkResult to a components.HashcatBenchmark struct.
+// createBenchmark converts a benchmarkResult to an api.HashcatBenchmark struct.
 // It handles the conversion of string fields in benchmarkResult to appropriate types.
 // Returns a HashcatBenchmark instance and an error if any conversion fails.
-func createBenchmark(result benchmarkResult) (components.HashcatBenchmark, error) {
+func createBenchmark(result benchmarkResult) (api.HashcatBenchmark, error) {
 	hashType, err := strconv.Atoi(result.HashType)
 	if err != nil {
-		return components.HashcatBenchmark{}, fmt.Errorf("failed to convert HashType: %w", err)
+		return api.HashcatBenchmark{}, fmt.Errorf("failed to convert HashType: %w", err)
 	}
 
 	runtimeMs, err := strconv.Atoi(result.RuntimeMs)
 	if err != nil {
-		return components.HashcatBenchmark{}, fmt.Errorf("failed to convert RuntimeMs: %w", err)
+		return api.HashcatBenchmark{}, fmt.Errorf("failed to convert RuntimeMs: %w", err)
 	}
 
 	speedHs, err := strconv.ParseFloat(result.SpeedHs, 64)
 	if err != nil {
-		return components.HashcatBenchmark{}, fmt.Errorf("failed to convert SpeedHs: %w", err)
+		return api.HashcatBenchmark{}, fmt.Errorf("failed to convert SpeedHs: %w", err)
 	}
 
 	device, err := strconv.Atoi(result.Device)
 	if err != nil {
-		return components.HashcatBenchmark{}, fmt.Errorf("failed to convert Device: %w", err)
+		return api.HashcatBenchmark{}, fmt.Errorf("failed to convert Device: %w", err)
 	}
 
-	return components.HashcatBenchmark{
-		HashType:  int64(hashType),
+	return api.HashcatBenchmark{
+		HashType:  hashType,
 		Runtime:   int64(runtimeMs),
 		HashSpeed: speedHs,
-		Device:    int64(device),
+		Device:    device,
 	}, nil
 }
 
@@ -107,7 +113,7 @@ func UpdateBenchmarks() error {
 
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
 	if err != nil {
-		return cserrors.LogAndSendError("Failed to create benchmark session", err, operations.SeverityMajor, nil)
+		return cserrors.LogAndSendError("Failed to create benchmark session", err, api.SeverityMajor, nil)
 	}
 
 	agentstate.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
@@ -116,13 +122,18 @@ func UpdateBenchmarks() error {
 
 	benchmarkResult, done := runBenchmarkTask(sess)
 	if done {
-		return nil
+		return cserrors.LogAndSendError(
+			"Benchmark session failed to produce results",
+			stderrors.New("benchmark task failed"),
+			api.SeverityMajor,
+			nil,
+		)
 	}
 
 	displayBenchmarksComplete(benchmarkResult)
 
 	if err := sendBenchmarkResults(benchmarkResult); err != nil {
-		return cserrors.LogAndSendError("Error updating benchmarks", err, operations.SeverityCritical, nil)
+		return cserrors.LogAndSendError("Error updating benchmarks", err, api.SeverityCritical, nil)
 	}
 
 	agentstate.State.BenchmarksSubmitted = true
@@ -161,7 +172,7 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 			case err := <-sess.DoneChan:
 				if err != nil {
 					agentstate.Logger.Error("Benchmark session failed", "error", err)
-					SendAgentError(err.Error(), nil, operations.SeverityFatal)
+					SendAgentError(err.Error(), nil, api.SeverityFatal)
 				}
 
 				return
@@ -199,6 +210,6 @@ func handleBenchmarkStdErrLine(line string) {
 	displayBenchmarkError(line)
 
 	if strings.TrimSpace(line) != "" {
-		SendAgentError(line, nil, operations.SeverityWarning)
+		SendAgentError(line, nil, api.SeverityWarning)
 	}
 }

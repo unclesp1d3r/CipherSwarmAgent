@@ -1,0 +1,489 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+tone_instructions: >-
+  Senior Go engineer: distributed hash-cracking agent. Priority: reliability
+  (retry/backoff, heartbeat), API v1 contract compliance, cross-platform
+  (Linux/macOS/Windows), security (no leaked secrets, safe process management).
+  Direct, flag issues with fixes. Actionable over explanations.
+early_access: true
+enable_free_tier: true
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  high_level_summary_in_walkthrough: true
+  auto_title_placeholder: "@coderabbitai"
+  auto_title_instructions: >-
+    Generate title using Conventional Commits format:
+    <type>(scope): <description>. Types: feat (new features), fix (bug fixes),
+    refactor (code improvements), perf (performance), docs (documentation),
+    test (tests), chore (maintenance). Scopes: agent, api, hashcat, cli, docs,
+    deps. Description: imperative mood, capitalize first word, no period, under
+    72 chars. Prioritize: 1) security fixes, 2) breaking changes (use !),
+    3) API changes, 4) core functionality. Emphasize user impact over
+    implementation details.
+  review_status: true
+  commit_status: true
+  fail_commit_status: false
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  enable_prompt_for_ai_agents: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  auto_apply_labels: true
+  suggested_reviewers: true
+  auto_assign_reviewers: true
+  in_progress_fortune: true
+  poem: true
+  labeling_instructions:
+    - label: "bug"
+      instructions: "Defects, errors, or broken functionality"
+    - label: "enhancement"
+      instructions: "New features or improvements"
+    - label: "security"
+      instructions: "Vulnerabilities, secret leaks, or process safety issues"
+    - label: "performance"
+      instructions: "Optimization, memory, or concurrency improvements"
+    - label: "documentation"
+      instructions: "Docs, comments, or README updates"
+    - label: "critical"
+      instructions: "Production-breaking issues or severe security flaws"
+    - label: "priority:high"
+      instructions: "Important but non-critical issues"
+    - label: "agent-api"
+      instructions: "CipherSwarm server API contract changes"
+    - label: "hashcat"
+      instructions: "Hashcat process management, parsing, or integration"
+    - label: "go"
+      instructions: "Go code changes"
+    - label: "dependencies"
+      instructions: "go.mod or vendor updates"
+    - label: "testing"
+      instructions: "Test-related changes"
+    - label: "ci"
+      instructions: "CI/CD and GitHub Actions changes"
+    - label: "breaking_change"
+      instructions: "Incompatible changes requiring migration"
+    - label: "cross-platform"
+      instructions: "Platform-specific or OS compatibility changes"
+  path_filters:
+    - "!vendor/**"
+    - "!dist/**"
+    - "!site/**"
+    - "!lib/api/client.gen.go"
+    - "!coverage.out"
+    - "!*.log"
+    - "!.DS_Store"
+    - "!*.swp"
+    - "!*.swo"
+  path_instructions:
+    - path: "cmd/**/*.go"
+      instructions: |
+        CLI entry points using Cobra/Viper. Focus on:
+        - Verify command structure and flag definitions
+        - Ensure error messages are actionable and user-friendly
+        - Check Viper configuration binding is consistent
+        - Validate graceful shutdown signal handling
+        - Confirm help text follows CLI conventions
+    - path: "lib/api/**/*.go"
+      instructions: |
+        API client layer (oapi-codegen generated + hand-written wrappers). Focus on:
+        - Do NOT modify client.gen.go (auto-generated from swagger.json)
+        - Verify hand-written code in client.go, interfaces.go, cracker.go, errors.go
+        - Check error handling wraps errors with context (fmt.Errorf + %w)
+        - Ensure API contract matches docs/swagger.json
+        - Validate response parsing handles all status codes
+        - Keep this package free from logging/agentstate dependencies
+    - path: "lib/hashcat/**/*.go"
+      instructions: |
+        Hashcat process management and output parsing. Critical path. Focus on:
+        - Verify process lifecycle (start, monitor, stop) is correct
+        - Check output parsing handles all hashcat status line formats
+        - Ensure proper cleanup of child processes on cancellation
+        - Validate cross-platform process management (Linux/macOS/Windows)
+        - Guard against negative values in bit shift operations
+    - path: "lib/agent/**/*.go"
+      instructions: |
+        Agent lifecycle management. Focus on:
+        - Verify heartbeat loop and signal handling
+        - Check graceful shutdown sequence
+        - Ensure proper goroutine lifecycle (no leaks)
+        - Validate configuration fetching and state initialization
+    - path: "lib/downloader/**/*.go"
+      instructions: |
+        File download with retry logic. Focus on:
+        - Verify retry/backoff behavior
+        - Check file path construction matches consumers
+        - Ensure proper cleanup on failure (partial downloads)
+        - Validate response stream handling
+    - path: "lib/apierrors/**/*.go"
+      instructions: |
+        Error handling and server reporting. Focus on:
+        - Verify errors are logged AND reported (not swallowed)
+        - Check for infinite recursion (error reporting that itself fails)
+        - Ensure context cancellation is handled gracefully
+        - Validate severity levels match error conditions
+    - path: "lib/*.go"
+      instructions: |
+        Core agent logic (task manager, benchmark, runners, etc.). Focus on:
+        - Verify API contract compliance with docs/swagger.json
+        - Check error handling follows wrap-with-context pattern
+        - Ensure shared state access is thread-safe
+        - Validate heartbeat, status, and crack submission flows
+        - Never silently correct invalid inputs - log warnings
+    - path: "agentstate/**/*.go"
+      instructions: |
+        Global agent state and configuration. Focus on:
+        - Verify state mutations are intentional and documented
+        - Check for race conditions on shared state
+        - Ensure logger configuration is correct
+        - Validate configuration defaults
+    - path: "lib/arch/**/*.go"
+      instructions: |
+        OS-specific abstractions. Focus on:
+        - Verify build tags are correct for each platform
+        - Check platform-specific behavior matches expectations
+        - Ensure fallback behavior on unsupported platforms
+    - path: "lib/testhelpers/**/*.go"
+      instructions: |
+        Test utilities and HTTP mocks. Focus on:
+        - Verify mock responders match actual API responses
+        - Check URL patterns match swagger.json endpoints
+        - Ensure cleanup functions prevent test pollution
+    - path: "**/*_test.go"
+      instructions: |
+        Test files. Follow Go testing conventions:
+        - Use table-driven tests with descriptive case names
+        - Use require.Error/NoError for error assertions (testifylint)
+        - Test naming: TestFunctionName_Scenario with underscores
+        - Run with -race flag consideration
+        - Use httpmock for API interactions
+        - Keep tests shorter and simpler than implementation
+    - path: "docs/**"
+      instructions: |
+        Documentation and API specification. Focus on:
+        - swagger.json is downloaded from the server - do not suggest modifications
+        - Verify documentation matches current behavior
+        - Check links and references are current
+    - path: "*.go"
+      instructions: |
+        General Go code. Apply Go idioms:
+        - Prefer simple implementations over abstractions
+        - Use standard library patterns
+        - Keep functions focused and single-purpose
+        - Ensure exported APIs have clear documentation
+        - Check error handling wraps with context
+        - Follow Go conventions and idioms
+    - path: ".github/**/*.yml"
+      instructions: |
+        GitHub Actions workflows. Focus on:
+        - Verify proper secret handling
+        - Check cross-platform matrix builds (Linux/macOS/Windows)
+        - Ensure caching strategies are effective
+        - Validate mise tool management integration
+  abort_on_close: true
+  disable_cache: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    ignore_title_keywords: ["WIP"]
+    labels: []
+    drafts: false
+    base_branches: ["main"]
+    ignore_usernames: ["dependabot[bot]", "github-actions[bot]"]
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+  pre_merge_checks:
+    docstrings:
+      mode: warning
+      threshold: 80
+    title:
+      mode: warning
+      requirements: >-
+        Follow Conventional Commits: <type>[optional scope]: <description>.
+        Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore.
+        Scopes: (agent), (api), (hashcat), (cli), (docs), (deps).
+        Use imperative mood, capitalize, no period, under 72 chars.
+        Use ! for breaking changes.
+    description:
+      mode: warning
+    issue_assessment:
+      mode: warning
+    custom_checks:
+      - name: "API Contract Compliance"
+        instructions: >-
+          For changes in lib/api/** or lib/agentClient.go, verify:
+          1) Response handling matches docs/swagger.json status codes,
+          2) Error responses are properly parsed and wrapped,
+          3) New endpoints follow the sub-client pattern (Tasks/Attacks/Agents/Auth/Crackers),
+          4) Generated code in client.gen.go is not manually modified.
+          Flag any endpoint behavior that diverges from the swagger spec.
+      - name: "Cross-Platform Safety"
+        instructions: >-
+          For changes in lib/hashcat/** or lib/arch/**, verify:
+          1) Build tags correctly gate platform-specific code,
+          2) File paths use path/filepath for OS compatibility,
+          3) Process management handles signals correctly per OS,
+          4) No hardcoded Unix assumptions (paths, signals, etc.).
+      - name: "Concurrency Safety"
+        instructions: >-
+          For changes touching shared state or goroutines, verify:
+          1) agentstate access is thread-safe,
+          2) Goroutines have proper lifecycle management (no leaks),
+          3) Context cancellation is propagated correctly,
+          4) Channel operations won't deadlock.
+          Tests should run with -race flag.
+      - name: "Error Handling"
+        instructions: >-
+          Verify error handling follows project conventions:
+          1) Errors are wrapped with context using fmt.Errorf + %w,
+          2) No silently swallowed errors (no _ = fn()),
+          3) Invalid inputs are logged as warnings, not silently corrected,
+          4) API errors use the APIError type consistently.
+  tools:
+    ast-grep:
+      rule_dirs: []
+      util_dirs: []
+      essential_rules: true
+      packages: []
+    shellcheck:
+      enabled: true
+    ruff:
+      enabled: false
+    markdownlint:
+      enabled: true
+    github-checks:
+      enabled: true
+      timeout_ms: 300000
+    languagetool:
+      enabled: true
+      enabled_rules: []
+      disabled_rules: []
+      enabled_categories: []
+      disabled_categories: []
+      enabled_only: false
+      level: default
+    biome:
+      enabled: false
+    hadolint:
+      enabled: true
+    swiftlint:
+      enabled: false
+    phpstan:
+      enabled: false
+      level: default
+    phpmd:
+      enabled: false
+    phpcs:
+      enabled: false
+    golangci-lint:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    checkov:
+      enabled: true
+    detekt:
+      enabled: false
+    eslint:
+      enabled: false
+    flake8:
+      enabled: false
+    rubocop:
+      enabled: false
+    buf:
+      enabled: false
+    regal:
+      enabled: false
+    actionlint:
+      enabled: true
+    pmd:
+      enabled: false
+    cppcheck:
+      enabled: false
+    semgrep:
+      enabled: true
+    circleci:
+      enabled: false
+    clippy:
+      enabled: false
+    sqlfluff:
+      enabled: false
+    prismaLint:
+      enabled: false
+    pylint:
+      enabled: false
+    oxc:
+      enabled: false
+    shopifyThemeCheck:
+      enabled: false
+    luacheck:
+      enabled: false
+    brakeman:
+      enabled: false
+    dotenvLint:
+      enabled: true
+    htmlhint:
+      enabled: false
+    checkmake:
+      enabled: false
+    osvScanner:
+      enabled: true
+chat:
+  auto_reply: true
+  integrations:
+    jira:
+      usage: disabled
+    linear:
+      usage: disabled
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - "AGENTS.md"
+      - "**/*.go"
+      - "justfile"
+      - "**/*.yaml"
+      - "**/*.yml"
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  jira:
+    usage: disabled
+    project_keys: []
+  linear:
+    usage: disabled
+    team_keys: []
+  pull_requests:
+    scope: auto
+  mcp:
+    usage: auto
+    disabled_servers: []
+code_generation:
+  docstrings:
+    language: en-US
+    path_instructions:
+      - path: "cmd/**/*.go"
+        instructions: |
+          CLI commands require clear, user-focused documentation.
+          - Document what the command does from user perspective
+          - Include usage examples with common flags
+          - Explain error conditions users might encounter
+          - Follow Go doc comment conventions
+      - path: "lib/api/**/*.go"
+        instructions: |
+          API client documentation should explain purpose and contract.
+          - Document exported functions/types with purpose and usage
+          - Explain response handling and error conditions
+          - Note which endpoints correspond to swagger.json paths
+          - Do not generate docs for client.gen.go (auto-generated)
+      - path: "lib/**/*.go"
+        instructions: |
+          Core agent logic documentation.
+          - Focus on package-level docs explaining domain
+          - Document exported functions with purpose and usage
+          - Explain non-obvious behavior or edge cases
+          - Avoid documenting trivial getters/setters
+          - Note thread-safety requirements where applicable
+      - path: "**/*_test.go"
+        instructions: |
+          Test documentation should explain what is being validated.
+          - Use descriptive test function names instead of excessive comments
+          - Document table-driven test structure when complex
+          - Explain test fixtures or mock setup when non-obvious
+          - Focus on documenting test rationale, not mechanics
+  unit_tests:
+    path_instructions:
+      - path: "lib/api/**/*.go"
+        instructions: |
+          API client tests. Focus on contract compliance:
+          - Test all response status codes per swagger.json
+          - Use httpmock for HTTP interactions
+          - Verify error wrapping and APIError creation
+          - Test edge cases (nil responses, empty bodies)
+          - Do not test client.gen.go (auto-generated)
+      - path: "lib/hashcat/**/*.go"
+        instructions: |
+          Hashcat integration tests. Critical for correctness:
+          - Test output parsing with real hashcat output samples
+          - Test parameter construction for different attack modes
+          - Verify process lifecycle management
+          - Use testdata fixtures for hashcat output
+          - Test cross-platform behavior where applicable
+      - path: "lib/*.go"
+        instructions: |
+          Core agent logic tests:
+          - Use table-driven tests with descriptive case names
+          - Test API interactions with httpmock
+          - Verify error handling and edge cases
+          - Use testhelpers for consistent mock setup
+          - Test naming: TestFunctionName_Scenario
+      - path: "lib/apierrors/**/*.go"
+        instructions: |
+          Error handler tests:
+          - Test error logging and server reporting
+          - Verify no infinite recursion on report failures
+          - Test context cancellation handling
+          - Check severity assignment logic
+      - path: "cmd/**/*.go"
+        instructions: |
+          CLI command tests:
+          - Test flag parsing and validation
+          - Verify error messages for invalid inputs
+          - Test integration with Viper configuration
+          - Use table-driven tests for multiple input scenarios
+issue_enrichment:
+  auto_enrich:
+    enabled: true
+  planning:
+    enabled: false
+    auto_planning:
+      enabled: false
+      labels: []
+  labeling:
+    labeling_instructions:
+      - label: "bug"
+        instructions: "Defects, errors, crashes, or unexpected behavior"
+      - label: "enhancement"
+        instructions: "New features or improvements to existing functionality"
+      - label: "documentation"
+        instructions: "Documentation, README, or code comment improvements"
+      - label: "question"
+        instructions: "Clarification or information requests"
+      - label: "good first issue"
+        instructions: "Simple, self-contained issues suitable for newcomers"
+      - label: "help wanted"
+        instructions: "Issues needing extra attention or community contribution"
+      - label: "security"
+        instructions: "Security vulnerabilities, secret leaks, or process safety"
+      - label: "performance"
+        instructions: "Optimization, memory, or concurrency improvements"
+      - label: "go"
+        instructions: "Go code changes or Go-specific issues"
+      - label: "dependencies"
+        instructions: "go.mod, vendor, or third-party library changes"
+      - label: "ci"
+        instructions: "CI/CD pipeline or GitHub Actions changes"
+      - label: "hashcat"
+        instructions: "Hashcat process management, parsing, or integration"
+      - label: "agent-api"
+        instructions: "CipherSwarm server API contract changes"
+      - label: "cross-platform"
+        instructions: "Platform-specific or OS compatibility issues"
+      - label: "breaking_change"
+        instructions: "Incompatible changes requiring migration"
+    auto_apply_labels: true

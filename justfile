@@ -111,6 +111,13 @@ run *args:
 dev *args:
     @{{ mise_exec }} go run main.go {{ args }}
 
+# Regenerate lib/api/client.gen.go from docs/swagger.json
+[group('dev')]
+generate:
+    @curl -fSL -o docs/swagger.json https://raw.githubusercontent.com/unclesp1d3r/CipherSwarm/refs/heads/main/swagger/v1/swagger.json
+    @{{ mise_exec }} go generate ./lib/api/...
+    @echo "✅ API client regenerated at lib/api/client.gen.go"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Code Quality
 # ─────────────────────────────────────────────────────────────────────────────

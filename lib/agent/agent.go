@@ -12,9 +12,6 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/viper"
-	sdk "github.com/unclesp1d3r/cipherswarm-agent-sdk-go"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
@@ -38,12 +35,11 @@ func StartAgent() {
 	initLogger()
 
 	// Initialize API client
-	agentstate.State.SdkClient = sdk.New(
-		sdk.WithSecurity(agentstate.State.APIToken),
-		sdk.WithServerURL(agentstate.State.URL),
-	)
-	// Wrap SDK client with interface for dependency injection support
-	agentstate.State.APIClient = api.NewSDKWrapper(agentstate.State.SdkClient)
+	apiClient, err := api.NewAgentClient(agentstate.State.URL, agentstate.State.APIToken)
+	if err != nil {
+		agentstate.Logger.Fatal("Failed to initialize API client", "error", err)
+	}
+	agentstate.State.APIClient = apiClient
 
 	lib.DisplayStartup()
 
@@ -79,9 +75,9 @@ func StartAgent() {
 		agentstate.Logger.Fatal("Failed to fetch agent configuration", "error", err)
 	}
 
-	err := lib.UpdateAgentMetadata()
+	err = lib.UpdateAgentMetadata()
 	if err != nil {
-		return // Error already logged
+		agentstate.Logger.Fatal("Failed to update agent metadata", "error", err)
 	}
 
 	agentstate.Logger.Info("Sent agent metadata to the CipherSwarm API")
@@ -108,7 +104,7 @@ func StartAgent() {
 	// Wait for termination signal
 	sig := <-signChan
 	agentstate.Logger.Debug("Received signal", "signal", sig)
-	lib.SendAgentError("Received signal to terminate. Shutting down", nil, operations.SeverityInfo)
+	lib.SendAgentError("Received signal to terminate. Shutting down", nil, api.SeverityInfo)
 	lib.SendAgentShutdown()
 	lib.DisplayShuttingDown()
 }
@@ -198,14 +194,14 @@ func startAgentLoop() {
 }
 
 func handleReload() {
-	lib.SendAgentError("Reloading config and performing new benchmark", nil, operations.SeverityInfo)
+	lib.SendAgentError("Reloading config and performing new benchmark", nil, api.SeverityInfo)
 
 	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
 	agentstate.Logger.Info("Reloading agent")
 
 	if err := fetchAgentConfig(); err != nil {
 		agentstate.Logger.Error("Failed to fetch agent configuration, skipping reload", "error", err)
-		lib.SendAgentError("Failed to fetch agent configuration", nil, operations.SeverityFatal)
+		lib.SendAgentError("Failed to fetch agent configuration", nil, api.SeverityFatal)
 		agentstate.State.Reload = false
 
 		return
@@ -249,12 +245,12 @@ func handleNewTask() {
 	}
 }
 
-func processTask(task *components.Task) error {
+func processTask(task *api.Task) error {
 	agentstate.State.CurrentActivity = agentstate.CurrentActivityCracking
 
 	lib.DisplayNewTask(task)
 
-	attack, err := lib.GetAttackParameters(task.GetAttackID())
+	attack, err := lib.GetAttackParameters(task.AttackId)
 	if err != nil || attack == nil {
 		agentstate.Logger.Error("Failed to get attack parameters", "error", err)
 
@@ -263,7 +259,7 @@ func processTask(task *components.Task) error {
 			errMsg = err.Error()
 		}
 
-		lib.SendAgentError(errMsg, task, operations.SeverityFatal)
+		lib.SendAgentError(errMsg, task, api.SeverityFatal)
 		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
 
@@ -278,7 +274,7 @@ func processTask(task *components.Task) error {
 
 	err = lib.AcceptTask(task)
 	if err != nil {
-		agentstate.Logger.Error("Failed to accept task", "task_id", task.GetID())
+		agentstate.Logger.Error("Failed to accept task", "task_id", task.Id)
 
 		return err
 	}
@@ -288,7 +284,7 @@ func processTask(task *components.Task) error {
 	// TODO: propagate cancellable context from startAgentLoop for graceful shutdown support
 	if err := lib.DownloadFiles(context.TODO(), attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
-		lib.SendAgentError(err.Error(), task, operations.SeverityFatal)
+		lib.SendAgentError(err.Error(), task, api.SeverityFatal)
 		lib.AbandonTask(task)
 		time.Sleep(viper.GetDuration("sleep_on_failure"))
 
@@ -327,12 +323,12 @@ func heartbeat(signChan chan os.Signal) error {
 	}
 
 	switch *state {
-	case operations.StatePending:
+	case api.StatePending:
 		if agentstate.State.CurrentActivity != agentstate.CurrentActivityBenchmarking {
 			agentstate.Logger.Info("Agent is pending, performing reload")
 			agentstate.State.Reload = true
 		}
-	case operations.StateStopped:
+	case api.StateStopped:
 		if agentstate.State.CurrentActivity != agentstate.CurrentActivityCracking {
 			agentstate.State.CurrentActivity = agentstate.CurrentActivityStopping
 			agentstate.Logger.Debug("Agent is stopped, stopping processing")
@@ -345,7 +341,7 @@ func heartbeat(signChan chan os.Signal) error {
 
 			agentstate.State.JobCheckingStopped = true
 		}
-	case operations.StateError:
+	case api.StateError:
 		agentstate.Logger.Info("Agent is in error state, stopping processing")
 
 		signChan <- syscall.SIGTERM

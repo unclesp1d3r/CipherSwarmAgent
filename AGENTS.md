@@ -38,6 +38,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - `cmd/`: Main application entry points using the Cobra framework.
 - `lib/`: Core agent logic, including the agent client, task/benchmark managers, and utilities.
+  - `api/`: API client layer — generated OpenAPI client (`client.gen.go`), hand-written wrapper (`client.go`), error types (`errors.go`), interfaces (`interfaces.go`), and mocks (`mock.go`). Regenerate with `just generate`.
   - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
   - `arch/`: OS-specific abstractions for handling different platforms (Linux, macOS, Windows).
 - `shared/`: Global state, logging, and shared data types.
@@ -50,6 +51,10 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Note:** Use `mise x -- golangci-lint run ./...` to ensure correct linter version (v2).
 - **Gotcha:** `//go:fix inline` directives conflict with `gocheckcompilerdirectives` linter — avoid adding them.
 - **Gotcha:** `contextcheck` linter flags functions not propagating context — use `//nolint:contextcheck` when callee doesn't accept context yet.
+- **Gotcha:** When removing global gosec exclusions, run `mise x -- golangci-lint run ./...` to find ALL violation sites before adding per-site `//nolint:gosec` comments.
+- **gosec nolint style:** Use per-site `//nolint:gosec // G7XX - <reason>` with specific rule ID rather than global exclusions in `.golangci.yml`.
+- **Gotcha:** `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint comments short (e.g., `// G704 - trusted URL`) so total line stays under 120 chars.
+- **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
 
 ### Naming Conventions
 
@@ -69,6 +74,9 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - `panic` should not be used for normal control flow.
 - Never silently correct invalid inputs (e.g., negative values) - always log a warning.
 - Guard against negative values in bit shift operations to prevent panic.
+- When checking `err != nil || obj == nil` for API responses, handle `obj == nil && err == nil` as a separate error case to prevent nil pointer dereferences.
+- In deferred cleanup functions (e.g., lock file removal), use `os.IsNotExist` to skip already-removed files and include file paths in error messages.
+- **Gotcha:** Generated types with an `Error` field (e.g., `ErrorObject`) can't implement Go's `error` interface (`Error()` method) — use a wrapper type like `api.APIError` instead.
 
 ### Concurrency
 
@@ -81,9 +89,18 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - **Logging:** Use a structured logger (e.g., `charmbracelet/log`). Never log secrets or sensitive data.
 - **Configuration:** Use `spf13/viper` to manage configuration from files, environment variables, and CLI flags.
+- Treat `viper.WriteConfig()` failures as non-fatal warnings (log + continue) — the in-memory config is correct and a read-only filesystem should not block agent operation.
 
 ### Tooling
 
+- **Code Generation:** `oapi-codegen` is declared as a Go tool in `go.mod` — invoke via `go tool oapi-codegen`, not bare binary. `just generate` runs it from `lib/api/config.yaml` against `docs/swagger.json`. After regenerating, run `go mod tidy && go mod vendor`.
+- **Gotcha:** oapi-codegen v2 config does NOT support `input-spec` — the spec path must be a positional CLI argument.
+- **Gotcha:** oapi-codegen generates a `Client` struct in `lib/api/client.gen.go` — the hand-written aggregate interface is named `APIClient` (with `//nolint:revive` for stutter) to avoid the conflict.
+- **Gotcha:** Use `exclude-schemas` in `lib/api/config.yaml` when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface in `errors.go`).
+- **API Client Architecture:** `AgentClient` in `client.go` wraps the generated `ClientWithResponses`, implements `APIClient` interface. Error types (`APIError`, `SetTaskAbandonedError`, `Severity`) live in `errors.go`. Use `errors.As` to extract `*api.APIError` from returned errors.
+- **Gotcha:** oapi-codegen's generated `Parse*Response` methods read and close `HTTPResponse.Body` during parsing. Helper functions must use the parsed `Body` byte slice (`resp.Body`), not `resp.HTTPResponse.Body` (already drained and closed).
+- **Gotcha:** When an API method returns HTTP 200, always guard `resp.JSON200 == nil` before using it — oapi-codegen silently sets JSON200 to nil if JSON unmarshaling fails.
+- **Gotcha:** Do not name directories `gen/` — the user's global gitignore excludes them.
 - **Dev Tool Management:** Use `mise` to install and manage development toolchains (e.g., Go, Bun) via `mise.toml`.
 - **CI Validation:** Run `just ci-check` to validate all checks pass before committing.
 - **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
@@ -99,6 +116,9 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Test naming convention: `TestFunctionName_Scenario` with underscore separation.
 - Use `require.Error/NoError` instead of `assert.Error/NoError` for error assertions (testifylint rule).
 - Use `atomic.Int32` for thread-safe counters in mock implementations.
+- Use `lib/testhelpers/error_helpers.go` for constructing test errors (`NewAPIError`, `NewValidationAPIError`, `NewSetTaskAbandonedError`).
+- MockClient sub-client accessors (`Tasks()`, `Agents()`, etc.) return default unconfigured mocks (not nil) to prevent nil pointer panics when code paths call sub-clients the test didn't explicitly mock.
+- When removing a field from global state (`agentstate.State`), grep all test helpers, cleanup functions, and reset functions for references.
 - Run `go test -race ./...` to detect data races.
 
 ## Git

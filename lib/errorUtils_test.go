@@ -7,9 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/components"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/operations"
-	"github.com/unclesp1d3r/cipherswarm-agent-sdk-go/models/sdkerrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
@@ -25,12 +23,11 @@ func withHTTPAndState(t *testing.T, fn func()) {
 	fn()
 }
 
-// assertSubmitErrorCalledIfSDK asserts submit_error was called when err is an SDK error type.
-func assertSubmitErrorCalledIfSDK(t *testing.T, err error) {
+// assertSubmitErrorCalledIfAPIError asserts submit_error was called when err is an API error type.
+func assertSubmitErrorCalledIfAPIError(t *testing.T, err error) {
 	t.Helper()
-	var se *sdkerrors.SDKError
-	var eo *sdkerrors.ErrorObject
-	if errors.As(err, &se) || errors.As(err, &eo) {
+	var ae *api.APIError
+	if errors.As(err, &ae) {
 		callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 		assert.Positive(t, callCount)
 	}
@@ -44,13 +41,13 @@ func TestHandleAuthenticationError(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "ErrorObject",
-			err:         testhelpers.NewErrorObject("authentication failed"),
+			name:        "APIError_ClientError",
+			err:         testhelpers.NewValidationAPIError("authentication failed"),
 			expectError: true,
 		},
 		{
-			name:        "SDKError",
-			err:         testhelpers.NewSDKError(http.StatusBadRequest, "bad request"),
+			name:        "APIError_ServerError",
+			err:         testhelpers.NewAPIError(http.StatusBadRequest, "bad request"),
 			expectError: true,
 		},
 		{
@@ -85,14 +82,14 @@ func TestHandleConfigurationError(t *testing.T) {
 		expectSubmitError bool
 	}{
 		{
-			name:              "ErrorObject",
-			err:               testhelpers.NewErrorObject("configuration error"),
+			name:              "APIError_ClientError",
+			err:               testhelpers.NewValidationAPIError("configuration error"),
 			expectError:       true,
 			expectSubmitError: true,
 		},
 		{
-			name:              "SDKError",
-			err:               testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			name:              "APIError_ServerError",
+			err:               testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 			expectError:       true,
 			expectSubmitError: true,
 		},
@@ -100,7 +97,7 @@ func TestHandleConfigurationError(t *testing.T) {
 			name:              "generic error",
 			err:               errors.New("generic error"),
 			expectError:       true,
-			expectSubmitError: false, // Generic errors don't call SubmitErrorAgent
+			expectSubmitError: true, // Generic errors are now sent to the server for visibility
 		},
 	}
 
@@ -124,11 +121,10 @@ func TestHandleConfigurationError(t *testing.T) {
 				require.NoError(t, result)
 			}
 
-			// Verify SubmitErrorAgent was called only for SDK error types
-			// Use GetSubmitErrorCallCount helper to handle httpmock key format differences
+			// Verify SubmitErrorAgent was called only for API error types
 			finalCallCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 			if tt.expectSubmitError {
-				assert.Greater(t, finalCallCount, initialCallCount, "submit_error should be called for SDK error types")
+				assert.Greater(t, finalCallCount, initialCallCount, "submit_error should be called for API error types")
 			} else {
 				assert.Equal(
 					t,
@@ -150,33 +146,33 @@ func TestHandleAPIError(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "ErrorObject",
+			name:        "APIError_ClientError",
 			message:     "API error",
-			err:         testhelpers.NewErrorObject("api error"),
+			err:         testhelpers.NewValidationAPIError("api error"),
 			expectError: false, // function doesn't return error
 		},
 		{
-			name:        "ErrorObject for credential validation",
+			name:        "credential validation error",
 			message:     "API error",
 			err:         ErrCouldNotValidateCredentials,
 			expectError: false,
 		},
 		{
-			name:        "SDKError for 401 Unauthorized",
+			name:        "APIError for 401 Unauthorized",
 			message:     "API error",
-			err:         testhelpers.NewSDKError(http.StatusUnauthorized, "unauthorized"),
+			err:         testhelpers.NewAPIError(http.StatusUnauthorized, "unauthorized"),
 			expectError: false,
 		},
 		{
-			name:        "SDKError for 403 Forbidden",
+			name:        "APIError for 403 Forbidden",
 			message:     "API error",
-			err:         testhelpers.NewSDKError(http.StatusForbidden, "forbidden"),
+			err:         testhelpers.NewAPIError(http.StatusForbidden, "forbidden"),
 			expectError: false,
 		},
 		{
-			name:        "SDKError for other status codes",
+			name:        "APIError for other status codes",
 			message:     "API error",
-			err:         testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			err:         testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 			expectError: false,
 		},
 		{
@@ -201,11 +197,10 @@ func TestHandleAPIError(t *testing.T) {
 			// This function doesn't return an error
 			handleAPIError(tt.message, tt.err)
 
-			// Verify SubmitErrorAgent was called for SDK errors
+			// Verify SubmitErrorAgent was called for API errors
 			if tt.err != nil {
-				var se *sdkerrors.SDKError
-				var eo *sdkerrors.ErrorObject
-				if errors.As(tt.err, &se) || errors.As(tt.err, &eo) {
+				var ae *api.APIError
+				if errors.As(tt.err, &ae) {
 					callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 					assert.Positive(t, callCount)
 				}
@@ -221,12 +216,12 @@ func TestHandleHeartbeatError(t *testing.T) {
 		err  error
 	}{
 		{
-			name: "ErrorObject",
-			err:  testhelpers.NewErrorObject("heartbeat error"),
+			name: "APIError_ClientError",
+			err:  testhelpers.NewValidationAPIError("heartbeat error"),
 		},
 		{
-			name: "SDKError",
-			err:  testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			name: "APIError_ServerError",
+			err:  testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 		},
 		{
 			name: "generic error",
@@ -239,7 +234,7 @@ func TestHandleHeartbeatError(t *testing.T) {
 			withHTTPAndState(t, func() {
 				// This function doesn't return an error
 				handleHeartbeatError(tt.err)
-				assertSubmitErrorCalledIfSDK(t, tt.err)
+				assertSubmitErrorCalledIfAPIError(t, tt.err)
 			})
 		})
 	}
@@ -250,16 +245,16 @@ func TestHandleStatusUpdateError(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
-		task *components.Task
+		task *api.Task
 	}{
 		{
-			name: "ErrorObject",
-			err:  testhelpers.NewErrorObject("status update error"),
+			name: "APIError_ClientError",
+			err:  testhelpers.NewValidationAPIError("status update error"),
 			task: testhelpers.NewTestTask(456, 789),
 		},
 		{
-			name: "SDKError",
-			err:  testhelpers.NewSDKError(http.StatusNotFound, "not found"),
+			name: "APIError_NotFound",
+			err:  testhelpers.NewAPIError(http.StatusNotFound, "not found"),
 			task: testhelpers.NewTestTask(456, 789),
 		},
 		{
@@ -294,70 +289,11 @@ func TestHandleStatusUpdateError(t *testing.T) {
 	}
 }
 
-// TestHandleSDKError tests the handleSDKError function.
-func TestHandleSDKError(t *testing.T) {
-	tests := []struct {
-		name       string
-		sdkError   *sdkerrors.SDKError
-		task       *components.Task
-		expectKill bool
-	}{
-		{
-			name:       "HTTP 404 Not Found",
-			sdkError:   testhelpers.NewSDKError(http.StatusNotFound, "not found"),
-			task:       testhelpers.NewTestTask(456, 789),
-			expectKill: true,
-		},
-		{
-			name:       "HTTP 410 Gone",
-			sdkError:   testhelpers.NewSDKError(http.StatusGone, "gone"),
-			task:       testhelpers.NewTestTask(456, 789),
-			expectKill: true,
-		},
-		{
-			name:       "other status codes",
-			sdkError:   testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
-			task:       testhelpers.NewTestTask(456, 789),
-			expectKill: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
-
-			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
-
-			// Create a mock session
-			sess, err := testhelpers.NewMockSession("test-session")
-			if err != nil {
-				t.Skipf("Skipping test: failed to create mock session: %v", err)
-				return
-			}
-			defer sess.Cleanup()
-
-			// This function doesn't return an error
-			handleSDKError(tt.sdkError, tt.task, sess)
-
-			// For 404 and 410, session should be killed - ensure function completes
-			if tt.expectKill {
-				// No direct assertion without deeper mocking; ensure branch is executed without panics
-				t.Log("kill path exercised")
-			}
-		})
-	}
-}
-
 // TestHandleTaskNotFound tests the handleTaskNotFound function.
 func TestHandleTaskNotFound(t *testing.T) {
 	tests := []struct {
 		name string
-		task *components.Task
+		task *api.Task
 	}{
 		{
 			name: "task not found",
@@ -394,7 +330,7 @@ func TestHandleTaskNotFound(t *testing.T) {
 func TestHandleTaskGone(t *testing.T) {
 	tests := []struct {
 		name string
-		task *components.Task
+		task *api.Task
 	}{
 		{
 			name: "task gone",
@@ -432,26 +368,26 @@ func TestSendAgentError(t *testing.T) {
 	tests := []struct {
 		name     string
 		message  string
-		task     *components.Task
-		severity operations.Severity
+		task     *api.Task
+		severity api.Severity
 	}{
 		{
 			name:     "with nil task",
 			message:  "test error",
 			task:     nil,
-			severity: operations.SeverityCritical,
+			severity: api.SeverityCritical,
 		},
 		{
 			name:     "with non-nil task",
 			message:  "test error",
 			task:     testhelpers.NewTestTask(456, 789),
-			severity: operations.SeverityCritical,
+			severity: api.SeverityCritical,
 		},
 		{
 			name:     "different severity levels",
 			message:  "test error",
 			task:     nil,
-			severity: operations.SeverityWarning,
+			severity: api.SeverityWarning,
 		},
 	}
 
@@ -470,7 +406,6 @@ func TestSendAgentError(t *testing.T) {
 			SendAgentError(tt.message, tt.task, tt.severity)
 
 			// Verify SubmitErrorAgent was called
-			// According to swagger.json, the endpoint is /api/v1/client/agents/{id}/submit_error
 			callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 			assert.Positive(t, callCount)
 		})
@@ -486,12 +421,12 @@ func TestHandleSendError(t *testing.T) {
 		err  error
 	}{
 		{
-			name: "ErrorObject",
-			err:  testhelpers.NewErrorObject("send error"),
+			name: "APIError_ClientError",
+			err:  testhelpers.NewValidationAPIError("send error"),
 		},
 		{
-			name: "SDKError",
-			err:  testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			name: "APIError_ServerError",
+			err:  testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 		},
 		{
 			name: "generic error",
@@ -528,12 +463,12 @@ func TestHandleAcceptTaskError(t *testing.T) {
 		err  error
 	}{
 		{
-			name: "ErrorObject",
-			err:  testhelpers.NewErrorObject("accept task error"),
+			name: "APIError_ClientError",
+			err:  testhelpers.NewValidationAPIError("accept task error"),
 		},
 		{
-			name: "SDKError",
-			err:  testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			name: "APIError_ServerError",
+			err:  testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 		},
 		{
 			name: "generic error",
@@ -546,7 +481,7 @@ func TestHandleAcceptTaskError(t *testing.T) {
 			withHTTPAndState(t, func() {
 				// This function doesn't return an error
 				handleAcceptTaskError(tt.err)
-				assertSubmitErrorCalledIfSDK(t, tt.err)
+				assertSubmitErrorCalledIfAPIError(t, tt.err)
 			})
 		})
 	}
@@ -560,28 +495,28 @@ func TestHandleTaskError(t *testing.T) {
 		message string
 	}{
 		{
-			name:    "ErrorObject",
-			err:     testhelpers.NewErrorObject("task error"),
+			name:    "APIError_ClientError",
+			err:     testhelpers.NewValidationAPIError("task error"),
 			message: "Task error occurred",
 		},
 		{
-			name:    "SetTaskAbandonedResponseBody",
+			name:    "SetTaskAbandonedError",
 			err:     testhelpers.NewSetTaskAbandonedError("abandoned"),
 			message: "Task error occurred",
 		},
 		{
-			name:    "SetTaskAbandonedResponseBody_with_Error_fallback",
+			name:    "SetTaskAbandonedError_with_Error_fallback",
 			err:     testhelpers.NewSetTaskAbandonedErrorWithErrorField("fallback error message"),
 			message: "Task error occurred",
 		},
 		{
-			name:    "SetTaskAbandonedResponseBody_with_nil_Error",
+			name:    "SetTaskAbandonedError_with_nil_Error",
 			err:     testhelpers.NewSetTaskAbandonedErrorWithNilError(),
 			message: "Task error occurred",
 		},
 		{
-			name:    "SDKError",
-			err:     testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			name:    "APIError_ServerError",
+			err:     testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 			message: "Task error occurred",
 		},
 		{
@@ -605,11 +540,10 @@ func TestHandleTaskError(t *testing.T) {
 			// This function doesn't return an error
 			handleTaskError(tt.err, tt.message)
 
-			// Verify SubmitErrorAgent was called
-			var se *sdkerrors.SDKError
-			var eo *sdkerrors.ErrorObject
-			var sab *sdkerrors.SetTaskAbandonedResponseBody
-			if errors.As(tt.err, &se) || errors.As(tt.err, &eo) || errors.As(tt.err, &sab) {
+			// Verify SubmitErrorAgent was called for API error types
+			var ae *api.APIError
+			var sab *api.SetTaskAbandonedError
+			if errors.As(tt.err, &ae) || errors.As(tt.err, &sab) {
 				callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 				assert.Positive(t, callCount)
 			}
@@ -624,12 +558,12 @@ func TestHandleSendCrackError(t *testing.T) {
 		err  error
 	}{
 		{
-			name: "ErrorObject",
-			err:  testhelpers.NewErrorObject("send crack error"),
+			name: "APIError_ClientError",
+			err:  testhelpers.NewValidationAPIError("send crack error"),
 		},
 		{
-			name: "SDKError",
-			err:  testhelpers.NewSDKError(http.StatusBadRequest, "server error"),
+			name: "APIError_ServerError",
+			err:  testhelpers.NewAPIError(http.StatusBadRequest, "server error"),
 		},
 		{
 			name: "generic error",
@@ -642,7 +576,7 @@ func TestHandleSendCrackError(t *testing.T) {
 			withHTTPAndState(t, func() {
 				// This function doesn't return an error
 				handleSendCrackError(tt.err)
-				assertSubmitErrorCalledIfSDK(t, tt.err)
+				assertSubmitErrorCalledIfAPIError(t, tt.err)
 			})
 		})
 	}
