@@ -25,7 +25,7 @@ func AssertDeviceStatus(t *testing.T, expected, actual api.DeviceStatus) {
 }
 
 // AssertTaskStatus compares two TaskStatus objects, including nested HashcatGuess fields.
-// This will be essential for testing convertToTaskStatus function.
+// This is useful when testing the convertToTaskStatus function in lib/agentClient.go.
 func AssertTaskStatus(t *testing.T, expected, actual api.TaskStatus) {
 	t.Helper()
 	assert.Equal(t, expected.OriginalLine, actual.OriginalLine, "OriginalLine mismatch")

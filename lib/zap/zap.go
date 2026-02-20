@@ -102,7 +102,8 @@ func handleResponseStream(
 
 	zapFilePath := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d.zap", task.Id))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
-		return cserrors.LogAndSendError("Error removing existing zap file", err, api.SeverityCritical, task)
+		// Log but continue — os.Create in createAndWriteZapFile will truncate the file anyway.
+		_ = cserrors.LogAndSendError("Error removing existing zap file", err, api.SeverityWarning, task)
 	}
 
 	if err := createAndWriteZapFile(zapFilePath, responseStream, task); err != nil {

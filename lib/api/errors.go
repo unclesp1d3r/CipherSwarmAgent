@@ -16,7 +16,7 @@ type ErrorObject struct { //nolint:errname // Name matches the OpenAPI schema
 	AdditionalProperties map[string]any `json:"-"`
 }
 
-var _ error = (*ErrorObject)(nil) //nolint:errcheck // compile-time interface check
+var _ error = (*ErrorObject)(nil) // compile-time interface check
 
 // Error implements the error interface, returning the error message.
 func (e *ErrorObject) Error() string {
@@ -98,7 +98,7 @@ type APIError struct { //nolint:revive // Name is intentional for clarity across
 	Body       string
 }
 
-var _ error = (*APIError)(nil) //nolint:errcheck // compile-time interface check
+var _ error = (*APIError)(nil) // compile-time interface check
 
 // Error returns a formatted error string including the status code and body.
 func (e *APIError) Error() string {
@@ -117,7 +117,7 @@ type SetTaskAbandonedError struct {
 	Error_  *string  `json:"error"` //nolint:revive // Underscore avoids collision with Error() method
 }
 
-var _ error = (*SetTaskAbandonedError)(nil) //nolint:errcheck // compile-time interface check
+var _ error = (*SetTaskAbandonedError)(nil) // compile-time interface check
 
 // Error returns a JSON representation of the error.
 // Falls back to a descriptive string if JSON marshaling fails.

@@ -383,7 +383,7 @@ func (c *agentCrackersClient) CheckForCrackerUpdate(
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 
-	resp, err := c.httpClient.Do(req) //nolint:gosec // G704 - trusted URL
+	resp, err := c.httpClient.Do(req) //nolint:gosec // G107 - trusted URL
 	if err != nil {
 		return nil, fmt.Errorf("executing cracker update request: %w", err)
 	}
