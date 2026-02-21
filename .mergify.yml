@@ -1,6 +1,16 @@
+---
 queue_rules:
   - name: default
     merge_method: squash
+    batch_size: 1
+    # queue_conditions: validated before entering the queue (gate-keep)
+    queue_conditions:
+      - check-success = lint
+      - check-success = Build and test (stable, ubuntu-latest)
+      - check-success = Build and test (stable, macos-latest)
+      - check-success = Build and test (stable, windows-latest)
+      - check-success = DCO
+    # merge_conditions: validated again after the queue rebases onto main
     merge_conditions:
       - check-success = lint
       - check-success = Build and test (stable, ubuntu-latest)
@@ -12,7 +22,7 @@ pull_request_rules:
   - name: Queue maintainer PRs with lgtm label
     conditions:
       - base = main
-      - author=@maintainers
+      - author = @maintainers
       - label = lgtm
       - label != do-not-merge
     actions:
@@ -33,9 +43,9 @@ pull_request_rules:
   - name: Queue external PRs when approved by maintainer
     conditions:
       - base = main
-      - -author=@maintainers
+      - -author = @maintainers
       - author != dependabot[bot]
-      - approved-reviews-by=@maintainers
+      - approved-reviews-by = @maintainers
       - label != do-not-merge
     actions:
       queue:
@@ -51,7 +61,9 @@ pull_request_rules:
       update: {}
 merge_protections:
   - name: Enforce conventional commit
-    description: Make sure that we follow https://www.conventionalcommits.org/en/v1.0.0/
+    description: >-
+      Make sure that we follow
+      https://www.conventionalcommits.org/en/v1.0.0/
     if:
       - base = main
       - author != dependabot[bot]
@@ -59,6 +71,8 @@ merge_protections:
       - "title ~=
         ^(fix|feat|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\(.+\
         \\))?:"
+  # Belt-and-suspenders: merge_protections prevent manual merges that bypass
+  # the queue. These duplicate queue_rules.merge_conditions intentionally.
   - name: CI must pass
     description: All CI checks must pass. This protection prevents manual merges
       that bypass the merge queue.
@@ -71,7 +85,9 @@ merge_protections:
       - check-success = Build and test (stable, windows-latest)
       - check-success = DCO
   - name: Do not merge outdated PRs
-    description: Make sure PRs are within 10 commits of the base branch before merging
+    description: >-
+      Make sure PRs are within 10 commits of the
+      base branch before merging
     if:
       - base = main
     success_conditions:

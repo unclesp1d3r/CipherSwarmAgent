@@ -2,8 +2,6 @@
 package cmd
 
 import (
-	"time"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
@@ -11,21 +9,10 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 )
 
-const (
-	// Default configuration values.
-	defaultGPUTempThreshold    = 80               // Default GPU temperature threshold in Celsius
-	defaultSleepOnFailure      = 60 * time.Second // Default sleep duration after task failure
-	defaultStatusTimer         = 10               // Default status update interval in seconds (10 seconds)
-	defaultHeartbeatInterval   = 10 * time.Second // Default heartbeat interval (10 seconds)
-	defaultTaskTimeout         = 24 * time.Hour   // Default task timeout (long-running tasks are expected)
-	defaultDownloadMaxRetries  = 3                // Default max download retry attempts
-	defaultDownloadRetryDelay  = 2 * time.Second  // Default base delay between download retries
-	defaultMaxHeartbeatBackoff = 6                // Default max heartbeat backoff multiplier (caps at 64x)
-)
-
 var (
-	cfgFile     string //nolint:gochecknoglobals // CLI flag variable
-	enableDebug bool   //nolint:gochecknoglobals // CLI flag variable
+	cfgFile           string //nolint:gochecknoglobals // CLI flag variable
+	enableDebug       bool   //nolint:gochecknoglobals // CLI flag variable
+	forceBenchmarkRun bool   //nolint:gochecknoglobals // CLI flag variable
 )
 
 // RootCmd represents the base command for the CipherSwarm Agent CLI application.
@@ -69,7 +56,7 @@ func init() {
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		IntP("gpu_temp_threshold", "g", defaultGPUTempThreshold, "Temperature threshold for the GPU in degrees Celsius")
+		IntP("gpu_temp_threshold", "g", config.DefaultGPUTempThreshold, "Temperature threshold for the GPU in degrees Celsius")
 	err = viper.BindPFlag("gpu_temp_threshold", RootCmd.PersistentFlags().Lookup("gpu_temp_threshold"))
 	cobra.CheckErr(err)
 
@@ -78,7 +65,7 @@ func init() {
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		DurationP("sleep_on_failure", "s", defaultSleepOnFailure, "Duration of sleep after a task failure")
+		DurationP("sleep_on_failure", "s", config.DefaultSleepOnFailure, "Duration of sleep after a task failure")
 	err = viper.BindPFlag("sleep_on_failure", RootCmd.PersistentFlags().Lookup("sleep_on_failure"))
 	cobra.CheckErr(err)
 
@@ -92,12 +79,12 @@ func init() {
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		IntP("status_timer", "t", defaultStatusTimer, "Interval in seconds for sending status updates to the server")
+		IntP("status_timer", "t", config.DefaultStatusTimer, "Interval in seconds for sending status updates to the server")
 	err = viper.BindPFlag("status_timer", RootCmd.PersistentFlags().Lookup("status_timer"))
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		DurationP("heartbeat_interval", "", defaultHeartbeatInterval, "Interval between heartbeat messages to the server")
+		DurationP("heartbeat_interval", "", config.DefaultHeartbeatInterval, "Interval between heartbeat messages to the server")
 	err = viper.BindPFlag("heartbeat_interval", RootCmd.PersistentFlags().Lookup("heartbeat_interval"))
 	cobra.CheckErr(err)
 
@@ -116,17 +103,17 @@ func init() {
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		Duration("task_timeout", defaultTaskTimeout, "Maximum time for a single task before timeout")
+		Duration("task_timeout", config.DefaultTaskTimeout, "Maximum time for a single task before timeout")
 	err = viper.BindPFlag("task_timeout", RootCmd.PersistentFlags().Lookup("task_timeout"))
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		Int("download_max_retries", defaultDownloadMaxRetries, "Maximum number of download retry attempts")
+		Int("download_max_retries", config.DefaultDownloadMaxRetries, "Maximum number of download retry attempts")
 	err = viper.BindPFlag("download_max_retries", RootCmd.PersistentFlags().Lookup("download_max_retries"))
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		Duration("download_retry_delay", defaultDownloadRetryDelay, "Base delay between download retries (exponential backoff)")
+		Duration("download_retry_delay", config.DefaultDownloadRetryDelay, "Base delay between download retries (exponential backoff)")
 	err = viper.BindPFlag("download_retry_delay", RootCmd.PersistentFlags().Lookup("download_retry_delay"))
 	cobra.CheckErr(err)
 
@@ -136,8 +123,13 @@ func init() {
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		Int("max_heartbeat_backoff", defaultMaxHeartbeatBackoff, "Maximum heartbeat backoff multiplier (caps exponential backoff)")
+		Int("max_heartbeat_backoff", config.DefaultMaxHeartbeatBackoff, "Maximum heartbeat backoff multiplier (caps exponential backoff)")
 	err = viper.BindPFlag("max_heartbeat_backoff", RootCmd.PersistentFlags().Lookup("max_heartbeat_backoff"))
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		BoolVar(&forceBenchmarkRun, "force-benchmark", false, "Force re-run of benchmarks, bypassing cache")
+	err = viper.BindPFlag("force_benchmark_run", RootCmd.PersistentFlags().Lookup("force-benchmark"))
 	cobra.CheckErr(err)
 
 	config.SetDefaultConfigValues()

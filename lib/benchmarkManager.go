@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
@@ -25,7 +26,7 @@ const (
 // Creates a SubmitBenchmarkJSONRequestBody with the HashcatBenchmarks slice and submits it via the API client interface.
 // Returns an error if submission or the response received is not successful.
 func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
-	var benchmarks []api.HashcatBenchmark //nolint:prealloc // Size unknown until after parsing
+	benchmarks := make([]api.HashcatBenchmark, 0, len(benchmarkResults))
 
 	for _, result := range benchmarkResults {
 		benchmark, err := createBenchmark(result)
@@ -95,12 +96,98 @@ func createBenchmark(result benchmarkResult) (api.HashcatBenchmark, error) {
 }
 
 // UpdateBenchmarks updates the benchmark metrics using Hashcat.
-// Creates a Hashcat session with benchmark parameters and initiates the benchmarking process.
-// Logs the session start, runs the benchmark task, and updates the results.
-// If any errors occur during session creation or result sending, logs the errors and returns them.
+// It first checks for cached results from a previous run. If a valid cache
+// exists (and the force-benchmark flag is not set), it attempts submission.
+// Submission failure of cached results is non-fatal — it returns nil and
+// the cache is preserved for retry via TrySubmitCachedBenchmarks.
+//
+// When no cache exists (or force re-run is requested), it runs a new benchmark
+// session and delegates to cacheAndSubmitBenchmarks, which may return an error
+// if both the cache save and submission fail simultaneously.
 func UpdateBenchmarks() error {
 	agentstate.State.BenchmarksSubmitted = false
 
+	// Try submitting from cache first (unless force re-run is requested)
+	if !viper.GetBool("force_benchmark_run") {
+		cached, loadErr := loadBenchmarkCache()
+		if loadErr != nil {
+			agentstate.Logger.Warn("Failed to load benchmark cache, will re-run benchmarks",
+				"error", loadErr)
+		}
+
+		if cached != nil {
+			agentstate.Logger.Info("Found cached benchmark results, submitting to server")
+
+			if err := sendBenchmarkResults(cached); err != nil {
+				agentstate.Logger.Warn(
+					"Failed to submit cached benchmarks; task processing paused until submission succeeds",
+					"error", err,
+				)
+				return nil
+			}
+
+			clearBenchmarkCache()
+			agentstate.State.BenchmarksSubmitted = true
+			agentstate.Logger.Info("Cached benchmarks successfully submitted to server")
+
+			return nil
+		}
+	}
+
+	// No cache (or force re-run): run benchmarks from scratch
+	benchmarkResults, err := runBenchmarks()
+	if err != nil {
+		return err
+	}
+
+	return cacheAndSubmitBenchmarks(benchmarkResults)
+}
+
+// cacheAndSubmitBenchmarks saves benchmark results to the disk cache and then
+// submits them to the server. On successful submission, clears the cache file
+// and sets BenchmarksSubmitted to true. If both the cache save and submission
+// fail, it returns the submission error so the caller can fail fast. When the
+// cache was saved but submission fails, it returns nil to allow retry via
+// TrySubmitCachedBenchmarks.
+func cacheAndSubmitBenchmarks(benchmarkResults []benchmarkResult) error {
+	cacheSaved := true
+
+	if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
+		agentstate.Logger.Warn("Failed to cache benchmark results", "error", saveErr)
+		cacheSaved = false
+	}
+
+	if err := sendBenchmarkResults(benchmarkResults); err != nil {
+		if cacheSaved {
+			agentstate.Logger.Warn(
+				"Failed to submit benchmarks, cached results preserved for retry",
+				"error", err,
+			)
+
+			return nil
+		}
+
+		// No cache was saved, so retry via TrySubmitCachedBenchmarks is impossible.
+		// Return the error so the caller can fail fast or re-run benchmarks.
+		agentstate.Logger.Error(
+			"Failed to submit benchmarks and no cache was saved, cannot retry",
+			"error", err,
+		)
+
+		return fmt.Errorf("benchmark submission failed with no cache for retry: %w", err)
+	}
+
+	clearBenchmarkCache()
+	agentstate.State.BenchmarksSubmitted = true
+	agentstate.Logger.Info("Benchmarks successfully submitted to server")
+
+	return nil
+}
+
+// runBenchmarks creates and runs a hashcat benchmark session, returning the
+// parsed results. Returns an error (reported as SeverityMajor to the server)
+// if the session cannot be created or fails to produce results.
+func runBenchmarks() ([]benchmarkResult, error) {
 	additionalArgs := arch.GetAdditionalHashcatArgs()
 
 	jobParams := hashcat.Params{
@@ -113,16 +200,17 @@ func UpdateBenchmarks() error {
 
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
 	if err != nil {
-		return cserrors.LogAndSendError("Failed to create benchmark session", err, api.SeverityMajor, nil)
+		return nil, cserrors.LogAndSendError(
+			"Failed to create benchmark session", err, api.SeverityMajor, nil,
+		)
 	}
 
 	agentstate.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
-
 	displayBenchmarkStarting()
 
-	benchmarkResult, done := runBenchmarkTask(sess)
+	results, done := runBenchmarkTask(sess)
 	if done {
-		return cserrors.LogAndSendError(
+		return nil, cserrors.LogAndSendError(
 			"Benchmark session failed to produce results",
 			stderrors.New("benchmark task failed"),
 			api.SeverityMajor,
@@ -130,16 +218,9 @@ func UpdateBenchmarks() error {
 		)
 	}
 
-	displayBenchmarksComplete(benchmarkResult)
+	displayBenchmarksComplete(results)
 
-	if err := sendBenchmarkResults(benchmarkResult); err != nil {
-		return cserrors.LogAndSendError("Error updating benchmarks", err, api.SeverityCritical, nil)
-	}
-
-	agentstate.State.BenchmarksSubmitted = true
-	agentstate.Logger.Info("Benchmarks successfully submitted to server")
-
-	return nil
+	return results, nil
 }
 
 // runBenchmarkTask starts a hashcat benchmark session and processes its output.
@@ -154,7 +235,7 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 
 	var benchmarkResults []benchmarkResult
 
-	waitChan := make(chan int)
+	waitChan := make(chan struct{})
 
 	go func() {
 		defer close(waitChan)
