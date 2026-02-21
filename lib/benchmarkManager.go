@@ -97,12 +97,13 @@ func createBenchmark(result benchmarkResult) (api.HashcatBenchmark, error) {
 
 // UpdateBenchmarks updates the benchmark metrics using Hashcat.
 // It first checks for cached results from a previous run. If a valid cache
-// exists (and the force-benchmark flag is not set), it submits those directly.
-// Otherwise, it runs a new benchmark session and caches the results before
-// submitting. Submission failure after caching is non-fatal — the cache is
-// preserved for retry via TrySubmitCachedBenchmarks in the agent loop.
-// If both the cache save and submission fail, the error is returned so the
-// caller can fail fast or re-run benchmarks, since no cache exists to retry.
+// exists (and the force-benchmark flag is not set), it attempts submission.
+// Submission failure of cached results is non-fatal — it returns nil and
+// the cache is preserved for retry via TrySubmitCachedBenchmarks.
+//
+// When no cache exists (or force re-run is requested), it runs a new benchmark
+// session and delegates to cacheAndSubmitBenchmarks, which may return an error
+// if both the cache save and submission fail simultaneously.
 func UpdateBenchmarks() error {
 	agentstate.State.BenchmarksSubmitted = false
 
@@ -119,7 +120,7 @@ func UpdateBenchmarks() error {
 
 			if err := sendBenchmarkResults(cached); err != nil {
 				agentstate.Logger.Warn(
-					"Failed to submit cached benchmarks, will retry next interval",
+					"Failed to submit cached benchmarks; task processing paused until submission succeeds",
 					"error", err,
 				)
 				return nil
@@ -143,9 +144,10 @@ func UpdateBenchmarks() error {
 }
 
 // cacheAndSubmitBenchmarks saves benchmark results to the disk cache and then
-// submits them to the server. If both the cache save and submission fail, it
-// returns the submission error so the caller can fail fast. When the cache was
-// saved successfully but submission fails, it returns nil to allow retry via
+// submits them to the server. On successful submission, clears the cache file
+// and sets BenchmarksSubmitted to true. If both the cache save and submission
+// fail, it returns the submission error so the caller can fail fast. When the
+// cache was saved but submission fails, it returns nil to allow retry via
 // TrySubmitCachedBenchmarks.
 func cacheAndSubmitBenchmarks(benchmarkResults []benchmarkResult) error {
 	cacheSaved := true
@@ -183,8 +185,8 @@ func cacheAndSubmitBenchmarks(benchmarkResults []benchmarkResult) error {
 }
 
 // runBenchmarks creates and runs a hashcat benchmark session, returning the
-// parsed results. Returns a fatal error if the session cannot be created or
-// fails to produce results.
+// parsed results. Returns an error (reported as SeverityMajor to the server)
+// if the session cannot be created or fails to produce results.
 func runBenchmarks() ([]benchmarkResult, error) {
 	additionalArgs := arch.GetAdditionalHashcatArgs()
 

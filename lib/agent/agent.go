@@ -19,6 +19,10 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 )
 
+const (
+	maxBenchmarkRetries = 10 // Stop retrying cached benchmark submission after this many failures
+)
+
 // StartAgent initializes and starts the CipherSwarm agent.
 func StartAgent() {
 	// Ensure API URL and token are set
@@ -174,14 +178,28 @@ func startHeartbeatLoop(signChan chan os.Signal) {
 }
 
 func startAgentLoop() {
+	benchmarkRetryFailures := 0
+
 	for {
-		// Retry cached benchmark submission if benchmarks haven't been submitted yet
+		// Retry cached benchmark submission if benchmarks haven't been submitted yet.
+		// TrySubmitCachedBenchmarks is a no-op when force-benchmark flag is set.
 		if !agentstate.State.BenchmarksSubmitted {
-			lib.TrySubmitCachedBenchmarks()
+			if lib.TrySubmitCachedBenchmarks() {
+				benchmarkRetryFailures = 0
+			} else if benchmarkRetryFailures < maxBenchmarkRetries {
+				benchmarkRetryFailures++
+				if benchmarkRetryFailures >= maxBenchmarkRetries {
+					agentstate.Logger.Error(
+						"Benchmark cache retry limit reached, will not retry until reload",
+						"attempts", benchmarkRetryFailures,
+					)
+				}
+			}
 		}
 
 		if agentstate.State.Reload {
 			handleReload()
+			benchmarkRetryFailures = 0 // Reset retry counter after reload
 		}
 
 		if !lib.Configuration.Config.UseNativeHashcat {
@@ -213,7 +231,14 @@ func handleReload() {
 	}
 
 	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
-	_ = lib.UpdateBenchmarks() //nolint:errcheck // Ignore error, as it is already logged and we can continue
+	// Server-initiated reload must re-run benchmarks (not use stale cache)
+	viper.Set("force_benchmark_run", true)
+	if err := lib.UpdateBenchmarks(); err != nil {
+		agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
+			"error", err)
+		lib.SendAgentError("Benchmark update failed during reload: "+err.Error(), nil, api.SeverityMajor)
+	}
+	viper.Set("force_benchmark_run", false)
 	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
 	agentstate.State.Reload = false
 }

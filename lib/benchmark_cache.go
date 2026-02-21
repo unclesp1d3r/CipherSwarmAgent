@@ -15,8 +15,9 @@ const (
 )
 
 // saveBenchmarkCache marshals the benchmark results to JSON and writes them
-// atomically to the cache file. Logs a warning on failure but does not
-// propagate the error as fatal — the benchmarks can be re-run on next startup.
+// atomically to the cache file via a temporary file and rename. Returns an
+// error on any failure; callers decide whether to treat it as fatal since
+// benchmarks can be re-run on next startup.
 func saveBenchmarkCache(results []benchmarkResult) error {
 	cachePath := agentstate.State.BenchmarkCachePath
 	if cachePath == "" {
@@ -41,7 +42,10 @@ func saveBenchmarkCache(results []benchmarkResult) error {
 		agentstate.Logger.Warn("Failed to rename benchmark cache temp file",
 			"error", err, "tmp_path", tmpPath, "cache_path", cachePath)
 		// Clean up the temp file on rename failure
-		_ = os.Remove(tmpPath)
+		if removeErr := os.Remove(tmpPath); removeErr != nil && !os.IsNotExist(removeErr) {
+			agentstate.Logger.Warn("Failed to clean up temp cache file",
+				"error", removeErr, "path", tmpPath)
+		}
 		return fmt.Errorf("failed to rename benchmark cache: %w", err)
 	}
 
@@ -57,8 +61,10 @@ func saveBenchmarkCache(results []benchmarkResult) error {
 }
 
 // loadBenchmarkCache reads and unmarshals the cached benchmark results.
-// Returns (nil, nil) when the file does not exist or contains corrupt/empty
-// data, so the caller treats all three cases as "no usable cache".
+// Returns (nil, nil) when no usable cache exists: cache path is empty, file
+// does not exist, file contains corrupt JSON, or the result slice is empty.
+// Returns a non-nil error only for unexpected I/O failures (e.g., permission
+// denied).
 func loadBenchmarkCache() ([]benchmarkResult, error) {
 	cachePath := agentstate.State.BenchmarkCachePath
 	if cachePath == "" {
@@ -78,8 +84,9 @@ func loadBenchmarkCache() ([]benchmarkResult, error) {
 
 	var results []benchmarkResult
 	if err := json.Unmarshal(data, &results); err != nil {
-		agentstate.Logger.Warn("Benchmark cache file is corrupt, will re-run benchmarks",
+		agentstate.Logger.Warn("Benchmark cache file is corrupt, removing and will re-run benchmarks",
 			"error", err, "path", cachePath)
+		_ = os.Remove(cachePath)
 		return nil, nil
 	}
 
@@ -95,8 +102,9 @@ func loadBenchmarkCache() ([]benchmarkResult, error) {
 	return results, nil
 }
 
-// clearBenchmarkCache removes the cache file. Logs a warning if removal fails
-// but does not propagate the error.
+// clearBenchmarkCache removes the cache file. Silently ignores "not exist"
+// errors (idempotent), and logs a warning for other removal failures without
+// propagating the error.
 func clearBenchmarkCache() {
 	cachePath := agentstate.State.BenchmarkCachePath
 	if cachePath == "" {
@@ -114,8 +122,10 @@ func clearBenchmarkCache() {
 }
 
 // TrySubmitCachedBenchmarks attempts to submit previously cached benchmark
-// results to the server. Returns true if submission succeeded (and clears the
-// cache), false otherwise (cache is preserved for the next attempt).
+// results to the server. Returns false immediately if the force-benchmark
+// flag is set (stale results should not be submitted). Returns true if
+// submission succeeded (and clears the cache), false otherwise (cache is
+// preserved for the next attempt).
 func TrySubmitCachedBenchmarks() bool {
 	if viper.GetBool("force_benchmark_run") {
 		agentstate.Logger.Debug("Force benchmark flag set, skipping cache submission")

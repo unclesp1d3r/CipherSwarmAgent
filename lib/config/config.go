@@ -129,7 +129,7 @@ func SetupSharedState() {
 	) // Set the extra debugging flag in the shared state
 	agentstate.State.StatusTimer = viper.GetInt(
 		"status_timer",
-	) // Set the status timer in the shared state to 3 seconds
+	) // Set the status timer in the shared state
 	agentstate.State.WriteZapsToFile = viper.GetBool(
 		"write_zaps_to_file",
 	) // Set the write zaps to file flag in the shared state
