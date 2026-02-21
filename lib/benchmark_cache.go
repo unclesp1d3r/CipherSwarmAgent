@@ -86,7 +86,10 @@ func loadBenchmarkCache() ([]benchmarkResult, error) {
 	if err := json.Unmarshal(data, &results); err != nil {
 		agentstate.Logger.Warn("Benchmark cache file is corrupt, removing and will re-run benchmarks",
 			"error", err, "path", cachePath)
-		_ = os.Remove(cachePath)
+		if removeErr := os.Remove(cachePath); removeErr != nil && !os.IsNotExist(removeErr) {
+			agentstate.Logger.Warn("Failed to remove corrupt benchmark cache file",
+				"error", removeErr, "path", cachePath)
+		}
 		return nil, nil
 	}
 

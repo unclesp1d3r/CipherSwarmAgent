@@ -323,10 +323,8 @@ func (sess *Session) Cleanup() {
 	agentstate.Logger.Info("Cleaning up session files")
 
 	removeFile := func(filePath string) {
-		if err := os.Remove(
-			filePath,
-		); err != nil &&
-			!os.IsNotExist(err) { //nolint:gosec // G703 - internal session paths
+		//nolint:gosec // G703 - internal session paths
+		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 			agentstate.Logger.Error("couldn't remove file", "file", filePath, "error", err)
 		}
 	}
@@ -372,7 +370,9 @@ func createOutFile(dir, id string, perm os.FileMode) (*os.File, error) {
 
 	if err := file.Chmod(perm); err != nil {
 		_ = file.Close()
-		return nil, err
+
+		_ = os.Remove(outFilePath)
+		return nil, fmt.Errorf("setting output file permissions: %w", err)
 	}
 
 	return file, nil

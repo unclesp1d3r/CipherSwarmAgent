@@ -98,22 +98,9 @@ func displayJobError(stdErrLine string) {
 const minStatusFields = 2
 
 // displayJobStatus logs the current status of a hashcat operation, including progress, speed, and cracked hashes.
+// Callers must validate that Progress and RecoveredHashes have at least minStatusFields elements.
 func displayJobStatus(update hashcat.Status) {
 	agentstate.Logger.Debug("Job status update", "status", update)
-
-	if len(update.Progress) < minStatusFields {
-		agentstate.Logger.Warn("Status update has incomplete progress data", "progress_len", len(update.Progress))
-		return
-	}
-
-	if len(update.RecoveredHashes) < minStatusFields {
-		agentstate.Logger.Warn(
-			"Status update has incomplete recovered hashes data",
-			"recovered_len",
-			len(update.RecoveredHashes),
-		)
-		return
-	}
 
 	relativeProgress := progress.CalculatePercentage(float64(update.Progress[0]), float64(update.Progress[1]))
 

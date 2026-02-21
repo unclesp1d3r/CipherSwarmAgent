@@ -26,7 +26,7 @@ const (
 // Creates a SubmitBenchmarkJSONRequestBody with the HashcatBenchmarks slice and submits it via the API client interface.
 // Returns an error if submission or the response received is not successful.
 func sendBenchmarkResults(benchmarkResults []benchmarkResult) error {
-	var benchmarks []api.HashcatBenchmark //nolint:prealloc // Size unknown until after parsing
+	benchmarks := make([]api.HashcatBenchmark, 0, len(benchmarkResults))
 
 	for _, result := range benchmarkResults {
 		benchmark, err := createBenchmark(result)

@@ -107,9 +107,22 @@ func handleStdErrLine(stdErrLine string, task *api.Task) {
 	}
 }
 
-// handleStatusUpdate processes a status update for a hashcat task and session.
-// It does this by displaying the job status and sending the status update.
+// handleStatusUpdate validates and processes a status update for a hashcat task and session.
+// It validates that Progress and RecoveredHashes have the minimum required fields before
+// forwarding to display and send functions.
 func handleStatusUpdate(statusUpdate hashcat.Status, task *api.Task, sess *hashcat.Session) {
+	if len(statusUpdate.Progress) < minStatusFields {
+		agentstate.Logger.Warn("Status update has incomplete progress data",
+			"progress_len", len(statusUpdate.Progress))
+		return
+	}
+
+	if len(statusUpdate.RecoveredHashes) < minStatusFields {
+		agentstate.Logger.Warn("Status update has incomplete recovered hashes data",
+			"recovered_len", len(statusUpdate.RecoveredHashes))
+		return
+	}
+
 	displayJobStatus(statusUpdate)
 	sendStatusUpdate(statusUpdate, task, sess)
 }

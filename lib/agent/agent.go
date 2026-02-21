@@ -193,6 +193,12 @@ func startAgentLoop() {
 						"Benchmark cache retry limit reached, will not retry until reload",
 						"attempts", benchmarkRetryFailures,
 					)
+					lib.SendAgentError(
+						fmt.Sprintf("Benchmark submission retry limit reached after %d attempts",
+							benchmarkRetryFailures),
+						nil,
+						api.SeverityMajor,
+					)
 				}
 			}
 		}
@@ -231,14 +237,15 @@ func handleReload() {
 	}
 
 	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
-	// Server-initiated reload must re-run benchmarks (not use stale cache)
+	// Server-initiated reload must re-run benchmarks (not use stale cache).
+	// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
 	viper.Set("force_benchmark_run", true)
+	defer viper.Set("force_benchmark_run", false)
 	if err := lib.UpdateBenchmarks(); err != nil {
 		agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
 			"error", err)
 		lib.SendAgentError("Benchmark update failed during reload: "+err.Error(), nil, api.SeverityMajor)
 	}
-	viper.Set("force_benchmark_run", false)
 	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
 	agentstate.State.Reload = false
 }

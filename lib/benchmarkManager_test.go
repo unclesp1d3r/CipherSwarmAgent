@@ -82,7 +82,7 @@ func TestCreateBenchmark(t *testing.T) {
 			benchmark, err := createBenchmark(tt.result)
 
 			if tt.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				if tt.checkFields {
@@ -197,9 +197,9 @@ func TestSendBenchmarkResults(t *testing.T) {
 			err := sendBenchmarkResults(tt.results)
 
 			if tt.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
