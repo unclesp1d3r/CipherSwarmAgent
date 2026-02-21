@@ -16,6 +16,9 @@ var (
 	ErrNoDisplayDevices = errors.New("no display devices found")
 	// ErrNoValidDeviceNames is returned when no valid display device names can be extracted.
 	ErrNoValidDeviceNames = errors.New("no valid display device names extracted")
+
+	// chipsetPattern matches the Chipset Model line in system_profiler output.
+	chipsetPattern = regexp.MustCompile(`Chipset Model: (.*)`)
 )
 
 // GetDevices retrieves a list of display device names on a macOS system.
@@ -35,14 +38,12 @@ func GetDevices(ctx context.Context) ([]string, error) {
 	}
 
 	commandResult := string(out)
-	re := regexp.MustCompile(`Chipset Model: (.*)`)
-
-	matches := re.FindAllStringSubmatch(commandResult, -1)
+	matches := chipsetPattern.FindAllStringSubmatch(commandResult, -1)
 	if matches == nil {
 		return nil, ErrNoDisplayDevices
 	}
 
-	var newArray []string
+	newArray := make([]string, 0, len(matches))
 
 	for _, match := range matches {
 		if len(match) > 1 {

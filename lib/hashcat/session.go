@@ -244,9 +244,10 @@ func (sess *Session) handleStdout() {
 		}
 
 		if !sess.SkipStatusUpdates {
-			if json.Valid([]byte(line)) {
+			lineBytes := []byte(line)
+			if json.Valid(lineBytes) {
 				var status Status
-				if err := json.Unmarshal([]byte(line), &status); err != nil {
+				if err := json.Unmarshal(lineBytes, &status); err != nil {
 					agentstate.Logger.Error("couldn't unmarshal hashcat status", "error", err)
 
 					continue
@@ -322,10 +323,11 @@ func (sess *Session) Cleanup() {
 	agentstate.Logger.Info("Cleaning up session files")
 
 	removeFile := func(filePath string) {
-		if _, err := os.Stat(filePath); err == nil { //nolint:gosec // G703 - paths from internal session config
-			if err := os.Remove(filePath); err != nil { //nolint:gosec // G703 - paths from internal session config
-				agentstate.Logger.Error("couldn't remove file", "file", filePath, "error", err)
-			}
+		if err := os.Remove(
+			filePath,
+		); err != nil &&
+			!os.IsNotExist(err) { //nolint:gosec // G703 - internal session paths
+			agentstate.Logger.Error("couldn't remove file", "file", filePath, "error", err)
 		}
 	}
 

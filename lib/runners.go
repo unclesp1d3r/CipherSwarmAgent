@@ -29,7 +29,7 @@ func runAttackTask(sess *hashcat.Session, task *api.Task) {
 	taskTimeout := viper.GetDuration("task_timeout")
 	timeoutChan := time.After(taskTimeout)
 
-	waitChan := make(chan int)
+	waitChan := make(chan struct{})
 
 	go func() {
 		defer close(waitChan)
@@ -78,9 +78,10 @@ func runAttackTask(sess *hashcat.Session, task *api.Task) {
 // so this function only reports JSON parse failures. Non-JSON lines are ignored here
 // (they are already logged by session.handleStdout).
 func handleStdOutLine(stdoutLine string, task *api.Task, _ *hashcat.Session) {
-	if json.Valid([]byte(stdoutLine)) {
+	lineBytes := []byte(stdoutLine)
+	if json.Valid(lineBytes) {
 		var update hashcat.Status
-		if err := json.Unmarshal([]byte(stdoutLine), &update); err != nil {
+		if err := json.Unmarshal(lineBytes, &update); err != nil {
 			agentstate.Logger.Error("Failed to parse status update", "error", err)
 			SendClassifiedError(
 				"Failed to parse hashcat status update: "+err.Error(),

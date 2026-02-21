@@ -235,7 +235,7 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 
 	var benchmarkResults []benchmarkResult
 
-	waitChan := make(chan int)
+	waitChan := make(chan struct{})
 
 	go func() {
 		defer close(waitChan)
