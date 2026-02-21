@@ -12,17 +12,27 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
+// Default configuration values — the single source of truth for all defaults.
+// cmd/root.go references these exported constants for CLI flag defaults.
 const (
-	// Default configuration values.
-	defaultGPUTempThreshold    = 80               // Default GPU temperature threshold in Celsius
-	defaultSleepOnFailure      = 60 * time.Second // Default sleep duration after task failure
-	defaultStatusTimer         = 10               // Default status update interval in seconds (10 seconds)
-	defaultHeartbeatInterval   = 10 * time.Second // Default heartbeat interval (10 seconds)
-	defaultTaskTimeout         = 24 * time.Hour   // Default task timeout (long-running tasks are expected)
-	defaultDownloadMaxRetries  = 3                // Default max download retry attempts
-	defaultDownloadRetryDelay  = 2 * time.Second  // Default base delay between download retries
-	defaultInsecureDownloads   = false            // Default to secure TLS verification for downloads
-	defaultMaxHeartbeatBackoff = 6                // Default max heartbeat backoff multiplier (caps at 64x)
+	// DefaultGPUTempThreshold is the GPU temperature threshold in Celsius.
+	DefaultGPUTempThreshold = 80
+	// DefaultSleepOnFailure is the sleep duration after task failure.
+	DefaultSleepOnFailure = 60 * time.Second
+	// DefaultStatusTimer is the status update interval in seconds.
+	DefaultStatusTimer = 10
+	// DefaultHeartbeatInterval is the heartbeat interval.
+	DefaultHeartbeatInterval = 10 * time.Second
+	// DefaultTaskTimeout is the task timeout (long-running tasks are expected).
+	DefaultTaskTimeout = 24 * time.Hour
+	// DefaultDownloadMaxRetries is the max download retry attempts.
+	DefaultDownloadMaxRetries = 3
+	// DefaultDownloadRetryDelay is the base delay between download retries.
+	DefaultDownloadRetryDelay = 2 * time.Second
+	// DefaultInsecureDownloads controls TLS certificate verification for downloads.
+	DefaultInsecureDownloads = false
+	// DefaultMaxHeartbeatBackoff is the max heartbeat backoff multiplier (caps at 64x).
+	DefaultMaxHeartbeatBackoff = 6
 )
 
 var scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // Configuration scope
@@ -150,23 +160,23 @@ func SetDefaultConfigValues() {
 	cobra.CheckErr(err)
 
 	viper.SetDefault("data_path", path.Join(cwd, "data"))
-	viper.SetDefault("gpu_temp_threshold", defaultGPUTempThreshold)
+	viper.SetDefault("gpu_temp_threshold", DefaultGPUTempThreshold)
 	viper.SetDefault("always_use_native_hashcat", false)
-	viper.SetDefault("sleep_on_failure", defaultSleepOnFailure)
+	viper.SetDefault("sleep_on_failure", DefaultSleepOnFailure)
 	viper.SetDefault("always_trust_files", false)
 	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files"))
 	viper.SetDefault("extra_debugging", false)
-	viper.SetDefault("status_timer", defaultStatusTimer)
-	viper.SetDefault("heartbeat_interval", defaultHeartbeatInterval)
+	viper.SetDefault("status_timer", DefaultStatusTimer)
+	viper.SetDefault("heartbeat_interval", DefaultHeartbeatInterval)
 	viper.SetDefault("write_zaps_to_file", false)
 	viper.SetDefault("zap_path", path.Join(viper.GetString("data_path"), "zaps"))
 	viper.SetDefault("retain_zaps_on_completion", false)
 	viper.SetDefault("enable_additional_hash_types", true)
 	viper.SetDefault("use_legacy_device_technique", false)
-	viper.SetDefault("task_timeout", defaultTaskTimeout)
-	viper.SetDefault("download_max_retries", defaultDownloadMaxRetries)
-	viper.SetDefault("download_retry_delay", defaultDownloadRetryDelay)
-	viper.SetDefault("insecure_downloads", defaultInsecureDownloads)
-	viper.SetDefault("max_heartbeat_backoff", defaultMaxHeartbeatBackoff)
+	viper.SetDefault("task_timeout", DefaultTaskTimeout)
+	viper.SetDefault("download_max_retries", DefaultDownloadMaxRetries)
+	viper.SetDefault("download_retry_delay", DefaultDownloadRetryDelay)
+	viper.SetDefault("insecure_downloads", DefaultInsecureDownloads)
+	viper.SetDefault("max_heartbeat_backoff", DefaultMaxHeartbeatBackoff)
 	viper.SetDefault("force_benchmark_run", false)
 }
