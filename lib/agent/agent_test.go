@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
@@ -368,4 +370,179 @@ func TestCalculateHeartbeatBackoff_DefaultConfig(t *testing.T) {
 		assert.Equal(t, expected, result,
 			"failure %d: expected %v, got %v", failures, expected, result)
 	}
+}
+
+// TestCleanupLockFile_NonexistentFile verifies that cleaning up a nonexistent
+// file does not panic or produce errors (idempotent operation).
+func TestCleanupLockFile_NonexistentFile(t *testing.T) {
+	tempDir := t.TempDir()
+	pidFile := filepath.Join(tempDir, "nonexistent.pid")
+
+	// Should not panic
+	cleanupLockFile(pidFile)
+
+	// File should still not exist
+	assert.NoFileExists(t, pidFile)
+}
+
+// TestCleanupLockFile_EmptyPath verifies that cleaning up with an empty path
+// does not panic.
+func TestCleanupLockFile_EmptyPath(_ *testing.T) {
+	// Should not panic
+	cleanupLockFile("")
+}
+
+// TestHeartbeat_StatePending verifies that a StatePending heartbeat response
+// sets the Reload flag when the agent is not benchmarking.
+func TestHeartbeat_StatePending(t *testing.T) {
+	cleanup := saveAndRestoreState(t)
+	defer cleanup()
+
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+
+	testhelpers.MockHeartbeatResponse(123, api.StatePending)
+
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
+	agentstate.State.Reload = false
+
+	signChan := make(chan os.Signal, 1)
+	err := heartbeat(signChan)
+	require.NoError(t, err)
+	assert.True(t, agentstate.State.Reload, "StatePending should set Reload=true")
+}
+
+// TestHeartbeat_StatePending_WhileBenchmarking verifies that a StatePending
+// heartbeat response does NOT set Reload when the agent is benchmarking.
+func TestHeartbeat_StatePending_WhileBenchmarking(t *testing.T) {
+	cleanup := saveAndRestoreState(t)
+	defer cleanup()
+
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+
+	testhelpers.MockHeartbeatResponse(123, api.StatePending)
+
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
+	agentstate.State.Reload = false
+
+	signChan := make(chan os.Signal, 1)
+	err := heartbeat(signChan)
+	require.NoError(t, err)
+	assert.False(t, agentstate.State.Reload, "StatePending during benchmarking should NOT set Reload")
+}
+
+// TestHeartbeat_StateStopped verifies that a StateStopped heartbeat response
+// sets JobCheckingStopped and changes activity to Stopping.
+func TestHeartbeat_StateStopped(t *testing.T) {
+	cleanup := saveAndRestoreState(t)
+	defer cleanup()
+
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+
+	testhelpers.MockHeartbeatResponse(123, api.StateStopped)
+
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
+	agentstate.State.JobCheckingStopped = false
+
+	signChan := make(chan os.Signal, 1)
+	err := heartbeat(signChan)
+	require.NoError(t, err)
+	assert.True(t, agentstate.State.JobCheckingStopped, "StateStopped should set JobCheckingStopped=true")
+	assert.Equal(t, agentstate.CurrentActivityStopping, agentstate.State.CurrentActivity)
+}
+
+// TestHeartbeat_StateStopped_WhileCracking verifies that a StateStopped
+// heartbeat response does NOT change state when the agent is cracking.
+func TestHeartbeat_StateStopped_WhileCracking(t *testing.T) {
+	cleanup := saveAndRestoreState(t)
+	defer cleanup()
+
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+
+	testhelpers.MockHeartbeatResponse(123, api.StateStopped)
+
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityCracking
+	agentstate.State.JobCheckingStopped = false
+
+	signChan := make(chan os.Signal, 1)
+	err := heartbeat(signChan)
+	require.NoError(t, err)
+	assert.False(
+		t,
+		agentstate.State.JobCheckingStopped,
+		"StateStopped during cracking should NOT set JobCheckingStopped",
+	)
+	assert.Equal(t, agentstate.CurrentActivityCracking, agentstate.State.CurrentActivity)
+}
+
+// TestHeartbeat_StateError verifies that a StateError heartbeat response
+// sends a SIGTERM signal to the signal channel.
+func TestHeartbeat_StateError(t *testing.T) {
+	cleanup := saveAndRestoreState(t)
+	defer cleanup()
+
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+
+	testhelpers.MockHeartbeatResponse(123, api.StateError)
+
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
+
+	signChan := make(chan os.Signal, 1)
+	err := heartbeat(signChan)
+	require.NoError(t, err)
+
+	// Verify SIGTERM was sent to the channel
+	select {
+	case sig := <-signChan:
+		assert.Equal(t, syscall.SIGTERM, sig, "StateError should send SIGTERM")
+	default:
+		t.Fatal("expected SIGTERM signal on signChan, but channel was empty")
+	}
+}
+
+// TestHeartbeat_NoContent verifies that a 204 No Content heartbeat response
+// returns nil state and nil error without modifying agent state.
+func TestHeartbeat_NoContent(t *testing.T) {
+	cleanup := saveAndRestoreState(t)
+	defer cleanup()
+
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+
+	testhelpers.MockHeartbeatNoContent(123)
+
+	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
+	agentstate.State.Reload = false
+	agentstate.State.JobCheckingStopped = false
+
+	signChan := make(chan os.Signal, 1)
+	err := heartbeat(signChan)
+	require.NoError(t, err)
+
+	// State should be unchanged
+	assert.False(t, agentstate.State.Reload)
+	assert.False(t, agentstate.State.JobCheckingStopped)
+	assert.Equal(t, agentstate.CurrentActivityWaiting, agentstate.State.CurrentActivity)
 }
