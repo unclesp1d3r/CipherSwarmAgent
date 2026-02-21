@@ -75,7 +75,7 @@ func TestSaveBenchmarkCache(t *testing.T) {
 			err := saveBenchmarkCache(tt.results)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 
@@ -180,7 +180,7 @@ func TestLoadBenchmarkCache(t *testing.T) {
 			results, err := loadBenchmarkCache()
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 

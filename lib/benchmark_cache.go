@@ -57,8 +57,8 @@ func saveBenchmarkCache(results []benchmarkResult) error {
 }
 
 // loadBenchmarkCache reads and unmarshals the cached benchmark results.
-// Returns (nil, nil) when the file does not exist, allowing callers to
-// distinguish "no cache" from "corrupt cache".
+// Returns (nil, nil) when the file does not exist or contains corrupt/empty
+// data, so the caller treats all three cases as "no usable cache".
 func loadBenchmarkCache() ([]benchmarkResult, error) {
 	cachePath := agentstate.State.BenchmarkCachePath
 	if cachePath == "" {
