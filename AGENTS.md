@@ -56,6 +56,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint comments short (e.g., `// G704 - trusted URL`) so total line stays under 120 chars.
 - **Gotcha:** A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep doc comments contiguous with their declaration.
 - **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
+- **Gotcha:** `revive` requires each exported constant in a `const` block to have its own doc comment starting with the constant name (e.g., `// DefaultFoo is...`). A group comment alone doesn't satisfy it.
 
 ### Naming Conventions
 
@@ -88,6 +89,14 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `context.Context` for cancellation and deadlines in all long-running or networked operations.
 - Run tests with the `-race` flag in CI to detect data races.
 
+### Performance
+
+- Always compile `regexp.MustCompile` at package level, never inside functions.
+- Prefer `os.Remove` + `os.IsNotExist(err)` check over `os.Stat` then `os.Remove` — avoids redundant syscall.
+- Cache `[]byte(str)` conversions when the same string is passed to both `json.Valid` and `json.Unmarshal`.
+- Use `chan struct{}` (not `chan int`) for signal-only channels — zero allocation.
+- Configuration defaults live in `lib/config/config.go` as exported constants — `cmd/root.go` references them (no duplication).
+
 ### Logging & Configuration
 
 - **Logging:** Use a structured logger (e.g., `charmbracelet/log`). Never log secrets or sensitive data.
@@ -111,6 +120,12 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **CI Validation:** Run `just ci-check` to validate all checks pass before committing.
 - **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
 - **Vendor Sync:** After `go fix` or dependency changes, run `go mod tidy && go mod vendor` to sync the vendor directory.
+- **Gotcha:** `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
+
+### Dependencies
+
+- `hashicorp/go-getter` pulls ~78 transitive deps (AWS SDK, GCS, gRPC). See #122 for lightweight replacement plan.
+- `shirou/gopsutil/v3` is maintenance-only; v4 is actively developed. See #123 for upgrade plan.
 
 ### Testing
 
