@@ -265,6 +265,8 @@ func (sess *Session) handleStdout() {
 
 	done := sess.proc.Wait()
 
+	// Allow brief time for channel consumers to drain remaining stdout/stderr
+	// messages before signaling completion via DoneChan.
 	time.Sleep(time.Second)
 
 	sess.DoneChan <- done
@@ -363,7 +365,7 @@ func createOutFile(dir, id string, perm os.FileMode) (*os.File, error) {
 		outFilePath,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating output file %s: %w", outFilePath, err)
 	}
 
 	if err := file.Chmod(perm); err != nil {
@@ -383,7 +385,9 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 	}
 
 	if err := file.Chmod(perm); err != nil {
-		return nil, err
+		_ = file.Close()
+		_ = os.Remove(file.Name()) //nolint:gosec // G703 - cleaning up temp file we just created
+		return nil, fmt.Errorf("setting temp file permissions: %w", err)
 	}
 
 	return file, nil
@@ -392,8 +396,17 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 // createCharsetFiles creates temporary files for custom charsets used in mask attacks.
 // Each charset string is written to a separate temporary file.
 // Empty charset strings are skipped. Returns file handles or an error if creation fails.
+// NOTE: Intentionally mutates charsets[i] in-place, replacing charset strings with
+// the temp file paths so that toCmdArgs can reference them in --custom-charset flags.
 func createCharsetFiles(charsets []string) ([]*os.File, error) {
 	charsetFiles := make([]*os.File, 0, len(charsets))
+
+	closeAll := func() {
+		for _, f := range charsetFiles {
+			_ = f.Close()
+			_ = os.Remove(f.Name()) //nolint:gosec // G703 - cleaning up temp files we created
+		}
+	}
 
 	for i, charset := range charsets {
 		if strings.TrimSpace(charset) == "" {
@@ -402,11 +415,15 @@ func createCharsetFiles(charsets []string) ([]*os.File, error) {
 
 		charsetFile, err := createTempFile(agentstate.State.OutPath, "charset*", filePermissions)
 		if err != nil {
+			closeAll()
 			return nil, fmt.Errorf("couldn't create charset file: %w", err)
 		}
 
 		if _, err := charsetFile.WriteString(charset); err != nil {
-			return nil, err
+			_ = charsetFile.Close()
+			_ = os.Remove(charsetFile.Name()) //nolint:gosec // G703 - cleaning up temp file we just created
+			closeAll()
+			return nil, fmt.Errorf("writing charset file: %w", err)
 		}
 
 		charsets[i] = charsetFile.Name()

@@ -73,15 +73,15 @@ func runAttackTask(sess *hashcat.Session, task *api.Task) {
 	<-waitChan
 }
 
-// handleStdOutLine handles a line of standard output, parses it if it's JSON, and updates the task and session status.
-func handleStdOutLine(stdoutLine string, task *api.Task, sess *hashcat.Session) {
+// handleStdOutLine handles a line of standard output from hashcat.
+// Valid JSON status lines are handled by the StatusUpdates channel (via handleStatusUpdate),
+// so this function only reports JSON parse failures. Non-JSON lines are ignored here
+// (they are already logged by session.handleStdout).
+func handleStdOutLine(stdoutLine string, task *api.Task, _ *hashcat.Session) {
 	if json.Valid([]byte(stdoutLine)) {
-		update := hashcat.Status{}
-
-		err := json.Unmarshal([]byte(stdoutLine), &update)
-		if err != nil {
+		var update hashcat.Status
+		if err := json.Unmarshal([]byte(stdoutLine), &update); err != nil {
 			agentstate.Logger.Error("Failed to parse status update", "error", err)
-			// Notify server of parse failure so it has visibility into agent issues
 			SendClassifiedError(
 				"Failed to parse hashcat status update: "+err.Error(),
 				task,
@@ -89,10 +89,8 @@ func handleStdOutLine(stdoutLine string, task *api.Task, sess *hashcat.Session) 
 				"parse_error",
 				true, // Retryable - this is likely a transient or version mismatch issue
 			)
-		} else {
-			displayJobStatus(update)
-			sendStatusUpdate(update, task, sess)
 		}
+		// Valid JSON status is processed via sess.StatusUpdates → handleStatusUpdate
 	}
 }
 

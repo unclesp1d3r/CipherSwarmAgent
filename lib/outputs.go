@@ -93,9 +93,27 @@ func displayJobError(stdErrLine string) {
 	}, stdErrLine))
 }
 
+// minStatusFields is the minimum number of elements required in hashcat status
+// Progress and RecoveredHashes slices (current value and total).
+const minStatusFields = 2
+
 // displayJobStatus logs the current status of a hashcat operation, including progress, speed, and cracked hashes.
 func displayJobStatus(update hashcat.Status) {
 	agentstate.Logger.Debug("Job status update", "status", update)
+
+	if len(update.Progress) < minStatusFields {
+		agentstate.Logger.Warn("Status update has incomplete progress data", "progress_len", len(update.Progress))
+		return
+	}
+
+	if len(update.RecoveredHashes) < minStatusFields {
+		agentstate.Logger.Warn(
+			"Status update has incomplete recovered hashes data",
+			"recovered_len",
+			len(update.RecoveredHashes),
+		)
+		return
+	}
 
 	relativeProgress := progress.CalculatePercentage(float64(update.Progress[0]), float64(update.Progress[1]))
 
