@@ -24,8 +24,9 @@ const (
 )
 
 var (
-	cfgFile     string //nolint:gochecknoglobals // CLI flag variable
-	enableDebug bool   //nolint:gochecknoglobals // CLI flag variable
+	cfgFile           string //nolint:gochecknoglobals // CLI flag variable
+	enableDebug       bool   //nolint:gochecknoglobals // CLI flag variable
+	forceBenchmarkRun bool   //nolint:gochecknoglobals // CLI flag variable
 )
 
 // RootCmd represents the base command for the CipherSwarm Agent CLI application.
@@ -138,6 +139,11 @@ func init() {
 	RootCmd.PersistentFlags().
 		Int("max_heartbeat_backoff", defaultMaxHeartbeatBackoff, "Maximum heartbeat backoff multiplier (caps exponential backoff)")
 	err = viper.BindPFlag("max_heartbeat_backoff", RootCmd.PersistentFlags().Lookup("max_heartbeat_backoff"))
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		BoolVar(&forceBenchmarkRun, "force-benchmark", false, "Force re-run of benchmarks, bypassing cache")
+	err = viper.BindPFlag("force_benchmark_run", RootCmd.PersistentFlags().Lookup("force-benchmark"))
 	cobra.CheckErr(err)
 
 	config.SetDefaultConfigValues()

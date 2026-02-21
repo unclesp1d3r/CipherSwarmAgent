@@ -88,9 +88,7 @@ type CrackersClient interface {
 
 // APIClient is the aggregate interface combining all API subsystems.
 // This can be implemented by the AgentClient wrapper or by mocks in tests.
-//
-//nolint:revive // Client name is taken by oapi-codegen generated struct in client.gen.go
-type APIClient interface {
+type APIClient interface { //nolint:revive // stutter with api.APIClient is intentional for clarity
 	Tasks() TasksClient
 	Attacks() AttacksClient
 	Agents() AgentsClient

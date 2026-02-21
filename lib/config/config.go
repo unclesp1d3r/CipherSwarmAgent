@@ -114,6 +114,10 @@ func SetupSharedState() {
 		dataRoot,
 		"restore",
 	) // Set the restore file path in the shared state
+	agentstate.State.BenchmarkCachePath = path.Join(
+		dataRoot,
+		"benchmark_cache.json",
+	) // Set the benchmark cache file path in the shared state
 	agentstate.State.Debug = viper.GetBool(
 		"debug",
 	) // Set the debug flag in the shared state
@@ -164,4 +168,5 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("download_retry_delay", defaultDownloadRetryDelay)
 	viper.SetDefault("insecure_downloads", defaultInsecureDownloads)
 	viper.SetDefault("max_heartbeat_backoff", defaultMaxHeartbeatBackoff)
+	viper.SetDefault("force_benchmark_run", false)
 }

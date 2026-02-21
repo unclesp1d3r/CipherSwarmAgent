@@ -54,6 +54,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** When removing global gosec exclusions, run `mise x -- golangci-lint run ./...` to find ALL violation sites before adding per-site `//nolint:gosec` comments.
 - **gosec nolint style:** Use per-site `//nolint:gosec // G7XX - <reason>` with specific rule ID rather than global exclusions in `.golangci.yml`.
 - **Gotcha:** `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint comments short (e.g., `// G704 - trusted URL`) so total line stays under 120 chars.
+- **Gotcha:** A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep doc comments contiguous with their declaration.
 - **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
 
 ### Naming Conventions
@@ -77,6 +78,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - When checking `err != nil || obj == nil` for API responses, handle `obj == nil && err == nil` as a separate error case to prevent nil pointer dereferences.
 - In deferred cleanup functions (e.g., lock file removal), use `os.IsNotExist` to skip already-removed files and include file paths in error messages.
 - **Gotcha:** Generated types with an `Error` field (e.g., `ErrorObject`) can't implement Go's `error` interface (`Error()` method) — use a wrapper type like `api.APIError` instead.
+- **Gotcha:** `cserrors.LogAndSendError` returns the `err` parameter directly — always pass a non-nil error in error paths, or callers will see success.
+- For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding with `_ = file.Close()`.
 
 ### Concurrency
 
@@ -95,7 +98,10 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - **Code Generation:** `oapi-codegen` is declared as a Go tool in `go.mod` — invoke via `go tool oapi-codegen`, not bare binary. `just generate` runs it from `lib/api/config.yaml` against `docs/swagger.json`. After regenerating, run `go mod tidy && go mod vendor`.
 - **Gotcha:** oapi-codegen v2 config does NOT support `input-spec` — the spec path must be a positional CLI argument.
+- **Gotcha:** `docs/swagger.json` is downloaded from the CipherSwarm server — never modify it locally. Open issues on `unclesp1d3r/CipherSwarm` for spec problems.
+- **Gotcha:** `lib/api/client.gen.go` is auto-generated — never manually modify. Regenerate with `just generate`.
 - **Gotcha:** oapi-codegen generates a `Client` struct in `lib/api/client.gen.go` — the hand-written aggregate interface is named `APIClient` (with `//nolint:revive` for stutter) to avoid the conflict.
+- **Gotcha:** `APIError` in `errors.go` also has `//nolint:revive` for stutter. `SetTaskAbandonedError.Error_` has `//nolint:revive` because the underscore avoids a name collision with the `Error()` method.
 - **Gotcha:** Use `exclude-schemas` in `lib/api/config.yaml` when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface in `errors.go`).
 - **API Client Architecture:** `AgentClient` in `client.go` wraps the generated `ClientWithResponses`, implements `APIClient` interface. Error types (`APIError`, `SetTaskAbandonedError`, `Severity`) live in `errors.go`. Use `errors.As` to extract `*api.APIError` from returned errors.
 - **Gotcha:** oapi-codegen's generated `Parse*Response` methods read and close `HTTPResponse.Body` during parsing. Helper functions must use the parsed `Body` byte slice (`resp.Body`), not `resp.HTTPResponse.Body` (already drained and closed).
@@ -110,6 +116,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - Write table-driven tests for core logic and place them in `_test.go` files within the same package.
 - Use mocks for network and OS-level interactions to ensure testability.
+- When a function combines external-process invocation (e.g., hashcat) with business logic, extract the business logic into a separate unexported function so it can be tested independently.
 - Use `lib/testhelpers/` package for shared test fixtures, HTTP mocking (`SetupHTTPMock`), and state setup (`SetupTestState`).
 - Use `any` instead of `interface{}` (enforced by modernize linter).
 - Aim for high test coverage on core logic.

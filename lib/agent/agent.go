@@ -175,6 +175,11 @@ func startHeartbeatLoop(signChan chan os.Signal) {
 
 func startAgentLoop() {
 	for {
+		// Retry cached benchmark submission if benchmarks haven't been submitted yet
+		if !agentstate.State.BenchmarksSubmitted {
+			lib.TrySubmitCachedBenchmarks()
+		}
+
 		if agentstate.State.Reload {
 			handleReload()
 		}
