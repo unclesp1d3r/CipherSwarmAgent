@@ -104,8 +104,8 @@ func CheckForExistingClient(pidFilePath string) bool {
 
 		pidRunning, err := process.PidExistsWithContext(
 			context.Background(),
-			int32(pidValue),
-		) //nolint:gosec // PID from file
+			int32(pidValue), //nolint:gosec // G115 - PID from file
+		)
 		if err != nil {
 			agentstate.Logger.Error("Error checking if process is running", "pid", pidValue)
 
