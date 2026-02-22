@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/v2/pointer"
-	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v4/host"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
@@ -116,7 +116,7 @@ func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration) age
 // It retrieves host information, device list, constructs the agent update request body,
 // and sends the updated metadata to the API. Logs relevant information and handles any API errors.
 func UpdateAgentMetadata() error {
-	info, err := host.Info()
+	info, err := host.InfoWithContext(context.Background())
 	if err != nil {
 		return cserrors.LogAndSendError("Error getting host info", err, api.SeverityCritical, nil)
 	}
