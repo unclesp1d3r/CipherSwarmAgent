@@ -9,10 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 
-	"github.com/duke-git/lancet/v2/convertor"
-	"github.com/duke-git/lancet/v2/fileutil"
-	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/shirou/gopsutil/v4/process"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -87,17 +86,17 @@ func GetCurrentHashcatVersion(ctx context.Context) (string, error) {
 // It reads the PID file and verifies if the process is still active.
 // Returns true if a running process is found or if errors occur during checks.
 func CheckForExistingClient(pidFilePath string) bool {
-	if fileutil.IsExist(pidFilePath) {
-		pidString, err := fileutil.ReadFileToString(pidFilePath)
+	if _, err := os.Stat(pidFilePath); err == nil {
+		pidBytes, err := os.ReadFile(pidFilePath)
 		if err != nil {
 			agentstate.Logger.Error("Error reading PID file", "path", pidFilePath)
 
 			return true
 		}
 
-		pidValue, err := convertor.ToInt(strutil.Trim(pidString))
+		pidValue, err := strconv.Atoi(strings.TrimSpace(string(pidBytes)))
 		if err != nil {
-			agentstate.Logger.Error("Error converting PID to integer", "pid", pidString)
+			agentstate.Logger.Error("Error converting PID to integer", "pid", string(pidBytes))
 
 			return true
 		}
@@ -131,9 +130,10 @@ func CreateLockFile() error {
 	lockFilePath := agentstate.State.PidFile
 
 	pidValue := os.Getpid()
-	pidString := convertor.ToString(pidValue)
+	pidString := strconv.Itoa(pidValue)
 
-	err := fileutil.WriteStringToFile(lockFilePath, pidString, false)
+	//nolint:gosec // G306 - lock file, not sensitive
+	err := os.WriteFile(lockFilePath, []byte(pidString), 0o644)
 	if err != nil {
 		agentstate.Logger.Error("Error writing PID to file", "path", lockFilePath)
 
@@ -159,14 +159,15 @@ func CreateDataDirs() error {
 	}
 
 	for _, dir := range dataDirs {
-		if strutil.IsBlank(dir) {
+		if strings.TrimSpace(dir) == "" {
 			agentstate.Logger.Error("Data directory not set")
 
 			continue
 		}
 
-		if !fileutil.IsDir(dir) {
-			if err := fileutil.CreateDir(dir); err != nil {
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				agentstate.Logger.Error("Error creating directory", "path", dir, "error", err)
 
 				return err
