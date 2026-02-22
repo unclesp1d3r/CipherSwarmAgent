@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	benchmarkFieldCount = 6 // Expected number of fields in benchmark output line
+	benchmarkFieldCount = 6  // Expected number of fields in benchmark output line
+	benchmarkBatchSize  = 10 // benchmarkBatchSize is the number of benchmark results to accumulate before submitting an incremental batch to the server.
 )
 
 // sendBenchmarkResults sends the collected benchmark results to a server endpoint.
@@ -150,6 +151,12 @@ func UpdateBenchmarks() error {
 // cache was saved but submission fails, it returns nil to allow retry via
 // TrySubmitCachedBenchmarks.
 func cacheAndSubmitBenchmarks(benchmarkResults []benchmarkResult) error {
+	if agentstate.State.BenchmarksSubmitted {
+		agentstate.Logger.Info("Benchmarks already submitted incrementally, skipping bulk submission")
+
+		return nil
+	}
+
 	cacheSaved := true
 
 	if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
@@ -240,10 +247,22 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 	go func() {
 		defer close(waitChan)
 
+		submittedUpTo := 0
+		allSendsSucceeded := true
+
 		for {
 			select {
 			case stdOutLine := <-sess.StdoutLines:
 				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults)
+
+				if len(benchmarkResults)-submittedUpTo >= benchmarkBatchSize {
+					if sendErr := sendBenchmarkResults(benchmarkResults[submittedUpTo:]); sendErr != nil {
+						agentstate.Logger.Warn("Failed to submit incremental benchmark batch", "error", sendErr)
+						allSendsSucceeded = false
+					} else {
+						submittedUpTo = len(benchmarkResults)
+					}
+				}
 			case stdErrLine := <-sess.StderrMessages:
 				handleBenchmarkStdErrLine(stdErrLine)
 			case statusUpdate := <-sess.StatusUpdates:
@@ -255,6 +274,15 @@ func runBenchmarkTask(sess *hashcat.Session) ([]benchmarkResult, bool) {
 					agentstate.Logger.Error("Benchmark session failed", "error", err)
 					SendAgentError(err.Error(), nil, api.SeverityFatal)
 				}
+
+				if len(benchmarkResults) > submittedUpTo {
+					if sendErr := sendBenchmarkResults(benchmarkResults[submittedUpTo:]); sendErr != nil {
+						agentstate.Logger.Warn("Failed to submit final benchmark batch", "error", sendErr)
+						allSendsSucceeded = false
+					}
+				}
+
+				agentstate.State.BenchmarksSubmitted = allSendsSucceeded
 
 				return
 			}
