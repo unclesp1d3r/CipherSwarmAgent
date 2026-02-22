@@ -84,8 +84,9 @@ func handleConfigurationError(err error) error {
 // 6. Validates the new cracker directory and executable.
 // 7. Updates the configuration with the new executable path.
 // Returns an error if any step in the process fails.
-func handleCrackerUpdate(update *api.CrackerUpdate) error {
+func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 	if update.GetDownloadURL() == nil || update.GetExecName() == nil {
+		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
 		return cserrors.LogAndSendError(
 			"Cracker update missing download URL or exec name",
 			stderrors.New("incomplete cracker update response"),
@@ -98,29 +99,43 @@ func handleCrackerUpdate(update *api.CrackerUpdate) error {
 
 	tempDir, err := os.MkdirTemp("", "cipherswarm-*")
 	if err != nil {
-		return cserrors.LogAndSendError("Error creating temporary directory", err, api.SeverityCritical, nil)
+		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
+		return cserrors.LogAndSendError(
+			"Error creating temporary directory",
+			err,
+			api.SeverityCritical,
+			nil,
+		)
 	}
 	defer func(tempDir string) {
 		_ = downloader.CleanupTempDir(tempDir) //nolint:errcheck // Cleanup in defer, error not critical
 	}(tempDir)
 
 	tempArchivePath := path.Join(tempDir, "hashcat.7z")
-	// TODO: propagate cancellable context for graceful shutdown support
-	if err := downloader.DownloadFile(context.TODO(), *update.GetDownloadURL(), tempArchivePath, ""); err != nil {
-		return cserrors.LogAndSendError("Error downloading cracker", err, api.SeverityCritical, nil)
+	if err := downloader.DownloadFile(ctx, *update.GetDownloadURL(), tempArchivePath, ""); err != nil {
+		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
+		return cserrors.LogAndSendError(
+			"Error downloading cracker",
+			err,
+			api.SeverityCritical,
+			nil,
+		)
 	}
 
 	newArchivePath, err := cracker.MoveArchiveFile(tempArchivePath)
 	if err != nil {
+		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
 		return cserrors.LogAndSendError("Error moving file", err, api.SeverityCritical, nil)
 	}
 
-	hashcatDirectory, err := cracker.ExtractHashcatArchive(context.Background(), newArchivePath)
+	hashcatDirectory, err := cracker.ExtractHashcatArchive(ctx, newArchivePath)
 	if err != nil {
+		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
 		return cserrors.LogAndSendError("Error extracting file", err, api.SeverityCritical, nil)
 	}
 
 	if !validateHashcatDirectory(hashcatDirectory, *update.GetExecName()) {
+		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
 		return cserrors.LogAndSendError(
 			"Hashcat directory validation failed after extraction",
 			stderrors.New("hashcat binary validation failed"),
@@ -130,7 +145,7 @@ func handleCrackerUpdate(update *api.CrackerUpdate) error {
 	}
 
 	if err := os.Remove(newArchivePath); err != nil {
-		//nolint:errcheck // Error already being handled
+		//nolint:errcheck,contextcheck // Error already being handled; LogAndSendError can't accept ctx
 		_ = cserrors.LogAndSendError(
 			"Error removing 7z file",
 			err,
@@ -139,10 +154,11 @@ func handleCrackerUpdate(update *api.CrackerUpdate) error {
 		)
 	}
 
-	viper.Set("hashcat_path", path.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName()))
+	agentstate.State.HashcatPath = path.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName())
+	viper.Set("hashcat_path", agentstate.State.HashcatPath)
 	if err := viper.WriteConfig(); err != nil {
 		agentstate.Logger.Warn("Failed to persist hashcat path to config; update will be lost on restart",
-			"error", err, "hashcat_path", viper.GetString("hashcat_path"))
+			"error", err, "hashcat_path", agentstate.State.HashcatPath)
 	}
 
 	return nil
@@ -227,8 +243,34 @@ func handleTaskGone(task *api.Task, sess *hashcat.Session) {
 	}
 }
 
+// errorReportConfig holds optional configuration for error reporting.
+type errorReportConfig struct {
+	category          string
+	retryable         bool
+	hasClassification bool
+}
+
+// ErrorOption configures optional error reporting behavior.
+type ErrorOption func(*errorReportConfig)
+
+// WithClassification adds error classification metadata (category and retryable flag)
+// for better error handling on the server side.
+func WithClassification(category string, retryable bool) ErrorOption {
+	return func(c *errorReportConfig) {
+		c.category = category
+		c.retryable = retryable
+		c.hasClassification = true
+	}
+}
+
 // SendAgentError sends an error message to the centralized server, including metadata and severity level.
-func SendAgentError(stdErrLine string, task *api.Task, severity api.Severity) {
+// Optional ErrorOption arguments can enhance the error with classification metadata.
+func SendAgentError(stdErrLine string, task *api.Task, severity api.Severity, opts ...ErrorOption) {
+	var cfg errorReportConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	var taskID *int64
 	if task != nil {
 		taskID = &task.Id
@@ -239,52 +281,13 @@ func SendAgentError(stdErrLine string, task *api.Task, severity api.Severity) {
 		"version":  AgentVersion,
 	}
 
+	if cfg.hasClassification {
+		otherMap["category"] = cfg.category
+		otherMap["retryable"] = cfg.retryable
+	}
+
 	agentError := api.SubmitErrorAgentJSONRequestBody{
 		Message:  stdErrLine,
-		Severity: severity,
-		AgentId:  agentstate.State.AgentID,
-		TaskId:   taskID,
-		Metadata: &struct {
-			ErrorDate time.Time       `json:"error_date"`
-			Other     *map[string]any `json:"other"`
-		}{
-			ErrorDate: time.Now(),
-			Other:     &otherMap,
-		},
-	}
-
-	if _, err := agentstate.State.APIClient.Agents().SubmitErrorAgent(
-		context.Background(),
-		agentstate.State.AgentID,
-		agentError,
-	); err != nil {
-		handleSendError(err)
-	}
-}
-
-// SendClassifiedError sends a classified error message to the server with enhanced metadata.
-// It includes the error category and retryable flag for better error handling on the server side.
-func SendClassifiedError(
-	message string,
-	task *api.Task,
-	severity api.Severity,
-	category string,
-	retryable bool,
-) {
-	var taskID *int64
-	if task != nil {
-		taskID = &task.Id
-	}
-
-	otherMap := map[string]any{
-		"platform":  agentPlatform,
-		"version":   AgentVersion,
-		"category":  category,
-		"retryable": retryable,
-	}
-
-	agentError := api.SubmitErrorAgentJSONRequestBody{
-		Message:  message,
 		Severity: severity,
 		AgentId:  agentstate.State.AgentID,
 		TaskId:   taskID,

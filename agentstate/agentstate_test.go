@@ -24,21 +24,35 @@ func TestState_DefaultValues(t *testing.T) {
 	assert.Equal(t, int64(0), State.AgentID)
 	assert.Empty(t, State.URL)
 	assert.Empty(t, State.APIToken)
-	assert.False(t, State.Reload)
+	assert.False(t, State.GetReload())
 	assert.False(t, State.AlwaysTrustFiles)
 	assert.False(t, State.ExtraDebugging)
 	assert.Equal(t, 0, State.StatusTimer)
 	assert.False(t, State.WriteZapsToFile)
 	assert.False(t, State.RetainZapsOnCompletion)
 	assert.False(t, State.EnableAdditionalHashTypes)
-	assert.False(t, State.JobCheckingStopped)
+	assert.False(t, State.GetJobCheckingStopped())
 	assert.False(t, State.UseLegacyDeviceIdentificationMethod)
-	assert.False(t, State.BenchmarksSubmitted)
+	assert.False(t, State.GetBenchmarksSubmitted())
 }
 
 func TestState_Modification(t *testing.T) {
-	// Save original values
-	original := State
+	// Save original values (non-synchronized fields only)
+	origAgentID := State.AgentID
+	origURL := State.URL
+	origAPIToken := State.APIToken
+	origDebug := State.Debug
+	origStatusTimer := State.StatusTimer
+	origWriteZaps := State.WriteZapsToFile
+
+	defer func() {
+		State.AgentID = origAgentID
+		State.URL = origURL
+		State.APIToken = origAPIToken
+		State.Debug = origDebug
+		State.StatusTimer = origStatusTimer
+		State.WriteZapsToFile = origWriteZaps
+	}()
 
 	// Modify state
 	State.AgentID = 12345
@@ -55,42 +69,37 @@ func TestState_Modification(t *testing.T) {
 	assert.True(t, State.Debug)
 	assert.Equal(t, 10, State.StatusTimer)
 	assert.True(t, State.WriteZapsToFile)
-
-	// Restore original
-	State = original
 }
 
 func TestActivityConstants(t *testing.T) {
-	assert.Equal(t, CurrentActivityStarting, activity("starting"))
-	assert.Equal(t, CurrentActivityBenchmarking, activity("benchmarking"))
-	assert.Equal(t, CurrentActivityUpdating, activity("updating"))
-	assert.Equal(t, CurrentActivityWaiting, activity("waiting"))
-	assert.Equal(t, CurrentActivityCracking, activity("cracking"))
-	assert.Equal(t, CurrentActivityStopping, activity("stopping"))
+	assert.Equal(t, CurrentActivityStarting, Activity("starting"))
+	assert.Equal(t, CurrentActivityBenchmarking, Activity("benchmarking"))
+	assert.Equal(t, CurrentActivityUpdating, Activity("updating"))
+	assert.Equal(t, CurrentActivityWaiting, Activity("waiting"))
+	assert.Equal(t, CurrentActivityCracking, Activity("cracking"))
+	assert.Equal(t, CurrentActivityStopping, Activity("stopping"))
 }
 
 func TestState_ActivityTracking(t *testing.T) {
 	// Save original
-	original := State.CurrentActivity
+	original := State.GetCurrentActivity()
+	defer State.SetCurrentActivity(original)
 
 	// Test activity transitions
-	State.CurrentActivity = CurrentActivityStarting
-	assert.Equal(t, CurrentActivityStarting, State.CurrentActivity)
+	State.SetCurrentActivity(CurrentActivityStarting)
+	assert.Equal(t, CurrentActivityStarting, State.GetCurrentActivity())
 
-	State.CurrentActivity = CurrentActivityBenchmarking
-	assert.Equal(t, CurrentActivityBenchmarking, State.CurrentActivity)
+	State.SetCurrentActivity(CurrentActivityBenchmarking)
+	assert.Equal(t, CurrentActivityBenchmarking, State.GetCurrentActivity())
 
-	State.CurrentActivity = CurrentActivityWaiting
-	assert.Equal(t, CurrentActivityWaiting, State.CurrentActivity)
+	State.SetCurrentActivity(CurrentActivityWaiting)
+	assert.Equal(t, CurrentActivityWaiting, State.GetCurrentActivity())
 
-	State.CurrentActivity = CurrentActivityCracking
-	assert.Equal(t, CurrentActivityCracking, State.CurrentActivity)
+	State.SetCurrentActivity(CurrentActivityCracking)
+	assert.Equal(t, CurrentActivityCracking, State.GetCurrentActivity())
 
-	State.CurrentActivity = CurrentActivityStopping
-	assert.Equal(t, CurrentActivityStopping, State.CurrentActivity)
-
-	// Restore
-	State.CurrentActivity = original
+	State.SetCurrentActivity(CurrentActivityStopping)
+	assert.Equal(t, CurrentActivityStopping, State.GetCurrentActivity())
 }
 
 func TestState_PathConfiguration(t *testing.T) {
@@ -98,6 +107,12 @@ func TestState_PathConfiguration(t *testing.T) {
 	originalDataPath := State.DataPath
 	originalCrackersPath := State.CrackersPath
 	originalFilePath := State.FilePath
+
+	defer func() {
+		State.DataPath = originalDataPath
+		State.CrackersPath = originalCrackersPath
+		State.FilePath = originalFilePath
+	}()
 
 	// Configure paths
 	State.DataPath = "/var/lib/cipherswarm"
@@ -108,11 +123,6 @@ func TestState_PathConfiguration(t *testing.T) {
 	assert.Equal(t, "/var/lib/cipherswarm", State.DataPath)
 	assert.Equal(t, "/var/lib/cipherswarm/crackers", State.CrackersPath)
 	assert.Equal(t, "/var/lib/cipherswarm/files", State.FilePath)
-
-	// Restore
-	State.DataPath = originalDataPath
-	State.CrackersPath = originalCrackersPath
-	State.FilePath = originalFilePath
 }
 
 func TestLogger_NotNil(t *testing.T) {
@@ -124,16 +134,30 @@ func TestErrorLogger_NotNil(t *testing.T) {
 }
 
 func TestState_BooleanFlags(t *testing.T) {
-	// Save originals
+	// Save originals (non-synchronized fields)
 	origDebug := State.Debug
 	origAlwaysTrust := State.AlwaysTrustFiles
 	origExtraDebug := State.ExtraDebugging
 	origWriteZaps := State.WriteZapsToFile
 	origRetainZaps := State.RetainZapsOnCompletion
 	origEnableHash := State.EnableAdditionalHashTypes
-	origJobStopped := State.JobCheckingStopped
 	origLegacy := State.UseLegacyDeviceIdentificationMethod
-	origBenchmarks := State.BenchmarksSubmitted
+
+	// Save synchronized fields via getters
+	origJobStopped := State.GetJobCheckingStopped()
+	origBenchmarks := State.GetBenchmarksSubmitted()
+
+	defer func() {
+		State.Debug = origDebug
+		State.AlwaysTrustFiles = origAlwaysTrust
+		State.ExtraDebugging = origExtraDebug
+		State.WriteZapsToFile = origWriteZaps
+		State.RetainZapsOnCompletion = origRetainZaps
+		State.EnableAdditionalHashTypes = origEnableHash
+		State.UseLegacyDeviceIdentificationMethod = origLegacy
+		State.SetJobCheckingStopped(origJobStopped)
+		State.SetBenchmarksSubmitted(origBenchmarks)
+	}()
 
 	// Test toggling all boolean flags
 	State.Debug = true
@@ -142,9 +166,9 @@ func TestState_BooleanFlags(t *testing.T) {
 	State.WriteZapsToFile = true
 	State.RetainZapsOnCompletion = true
 	State.EnableAdditionalHashTypes = true
-	State.JobCheckingStopped = true
+	State.SetJobCheckingStopped(true)
 	State.UseLegacyDeviceIdentificationMethod = true
-	State.BenchmarksSubmitted = true
+	State.SetBenchmarksSubmitted(true)
 
 	assert.True(t, State.Debug)
 	assert.True(t, State.AlwaysTrustFiles)
@@ -152,18 +176,7 @@ func TestState_BooleanFlags(t *testing.T) {
 	assert.True(t, State.WriteZapsToFile)
 	assert.True(t, State.RetainZapsOnCompletion)
 	assert.True(t, State.EnableAdditionalHashTypes)
-	assert.True(t, State.JobCheckingStopped)
+	assert.True(t, State.GetJobCheckingStopped())
 	assert.True(t, State.UseLegacyDeviceIdentificationMethod)
-	assert.True(t, State.BenchmarksSubmitted)
-
-	// Restore
-	State.Debug = origDebug
-	State.AlwaysTrustFiles = origAlwaysTrust
-	State.ExtraDebugging = origExtraDebug
-	State.WriteZapsToFile = origWriteZaps
-	State.RetainZapsOnCompletion = origRetainZaps
-	State.EnableAdditionalHashTypes = origEnableHash
-	State.JobCheckingStopped = origJobStopped
-	State.UseLegacyDeviceIdentificationMethod = origLegacy
-	State.BenchmarksSubmitted = origBenchmarks
+	assert.True(t, State.GetBenchmarksSubmitted())
 }

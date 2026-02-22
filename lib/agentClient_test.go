@@ -424,7 +424,7 @@ func TestSendHeartBeat(t *testing.T) {
 
 			tt.setupMock(123)
 
-			state, err := SendHeartBeat()
+			state, err := SendHeartBeat(context.Background())
 			if tt.expectedError {
 				require.Error(t, err)
 			} else {
@@ -1131,13 +1131,13 @@ func TestLogHeartbeatSent(t *testing.T) {
 
 			// Set initial state
 			agentstate.State.ExtraDebugging = tt.extraDebugging
-			agentstate.State.JobCheckingStopped = true
+			agentstate.State.SetJobCheckingStopped(true)
 
 			// Call logHeartbeatSent - should not panic
 			logHeartbeatSent()
 
 			// Verify JobCheckingStopped is set to false
-			assert.False(t, agentstate.State.JobCheckingStopped, "JobCheckingStopped should be set to false")
+			assert.False(t, agentstate.State.GetJobCheckingStopped(), "JobCheckingStopped should be set to false")
 		})
 	}
 }
