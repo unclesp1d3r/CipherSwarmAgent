@@ -10,6 +10,9 @@ queue_rules:
       - check-success = Build and test (stable, macos-latest)
       - check-success = Build and test (stable, windows-latest)
       - check-success = DCO
+      - or:
+          - label = lgtm
+          - author = dependabot[bot]
     # merge_conditions: validated again after the queue rebases onto main
     merge_conditions:
       - check-success = lint
@@ -17,6 +20,9 @@ queue_rules:
       - check-success = Build and test (stable, macos-latest)
       - check-success = Build and test (stable, windows-latest)
       - check-success = DCO
+      - or:
+          - label = lgtm
+          - author = dependabot[bot]
     autoqueue: true
 pull_request_rules:
   - name: Queue maintainer PRs with lgtm label
