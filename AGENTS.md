@@ -50,10 +50,12 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Linting:** We use `golangci-lint` for static analysis. Run checks with `just ci-check`.
 - **Note:** Use `mise x -- golangci-lint run ./...` to ensure correct linter version (v2).
 - **Gotcha:** `//go:fix inline` directives conflict with `gocheckcompilerdirectives` linter — avoid adding them.
+- **Gotcha:** `just ci-check` includes a `go fix -diff` dry-run whose output is informational only, not a failure. Do not apply its suggested `//go:fix inline` directives (see above).
 - **Gotcha:** `contextcheck` linter flags functions not propagating context — use `//nolint:contextcheck` when callee doesn't accept context yet.
 - **Gotcha:** When removing global gosec exclusions, run `mise x -- golangci-lint run ./...` to find ALL violation sites before adding per-site `//nolint:gosec` comments.
 - **gosec nolint style:** Use per-site `//nolint:gosec // G7XX - <reason>` with specific rule ID rather than global exclusions in `.golangci.yml`.
 - **Gotcha:** `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint comments short (e.g., `// G704 - trusted URL`) so total line stays under 120 chars.
+- **Gotcha:** When `golines` splits a multi-line expression (e.g., `if err := os.Remove(\n\tpath\n); err != nil`), even short inline `//nolint:` comments get displaced. Place nolint as a standalone comment on the line above instead: `//nolint:gosec // G703 - reason` followed by the flagged statement.
 - **Gotcha:** A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep doc comments contiguous with their declaration.
 - **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
 - **Gotcha:** `revive` requires each exported constant in a `const` block to have its own doc comment starting with the constant name (e.g., `// DefaultFoo is...`). A group comment alone doesn't satisfy it.
@@ -80,6 +82,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - In deferred cleanup functions (e.g., lock file removal), use `os.IsNotExist` to skip already-removed files and include file paths in error messages.
 - **Gotcha:** Generated types with an `Error` field (e.g., `ErrorObject`) can't implement Go's `error` interface (`Error()` method) — use a wrapper type like `api.APIError` instead.
 - **Gotcha:** `cserrors.LogAndSendError` returns the `err` parameter directly — always pass a non-nil error in error paths, or callers will see success.
+- `cserrors.LogAndSendError` sends errors to the server even without a task (nil task → nil TaskId). Only skipped when APIClient is not yet initialized.
 - For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding with `_ = file.Close()`.
 
 ### Concurrency

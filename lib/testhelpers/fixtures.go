@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v4/host"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
