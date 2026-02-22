@@ -14,6 +14,9 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
+// vgaPattern matches VGA compatible controller lines in lspci output.
+var vgaPattern = regexp.MustCompile(`VGA compatible controller: (.+?) \(`)
+
 // GetDevices retrieves a list of GPU devices available on a Linux system.
 // It executes the "lspci" command to list all PCI devices and filters out
 // the ones that are VGA compatible controllers (typically GPUs).
@@ -35,16 +38,14 @@ func GetDevices(ctx context.Context) ([]string, error) {
 	}
 
 	commandResult := string(out)
-	// Improved regular expression to match VGA compatible controllers more reliably
-	re := regexp.MustCompile(`VGA compatible controller: (.+?) \(`)
-	matches := re.FindAllStringSubmatch(commandResult, -1)
+	matches := vgaPattern.FindAllStringSubmatch(commandResult, -1)
 
 	if matches == nil {
 		agentstate.Logger.Warn("No GPU devices found")
 		return nil, nil
 	}
 
-	var devices []string
+	devices := make([]string, 0, len(matches))
 	for _, match := range matches {
 		if len(match) > 1 {
 			devices = append(devices, strings.TrimSpace(match[1]))

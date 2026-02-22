@@ -29,7 +29,7 @@ func runAttackTask(sess *hashcat.Session, task *api.Task) {
 	taskTimeout := viper.GetDuration("task_timeout")
 	timeoutChan := time.After(taskTimeout)
 
-	waitChan := make(chan int)
+	waitChan := make(chan struct{})
 
 	go func() {
 		defer close(waitChan)
@@ -73,15 +73,16 @@ func runAttackTask(sess *hashcat.Session, task *api.Task) {
 	<-waitChan
 }
 
-// handleStdOutLine handles a line of standard output, parses it if it's JSON, and updates the task and session status.
-func handleStdOutLine(stdoutLine string, task *api.Task, sess *hashcat.Session) {
-	if json.Valid([]byte(stdoutLine)) {
-		update := hashcat.Status{}
-
-		err := json.Unmarshal([]byte(stdoutLine), &update)
-		if err != nil {
+// handleStdOutLine handles a line of standard output from hashcat.
+// Valid JSON status lines are handled by the StatusUpdates channel (via handleStatusUpdate),
+// so this function only reports JSON parse failures. Non-JSON lines are ignored here
+// (they are already logged by session.handleStdout).
+func handleStdOutLine(stdoutLine string, task *api.Task, _ *hashcat.Session) {
+	lineBytes := []byte(stdoutLine)
+	if json.Valid(lineBytes) {
+		var update hashcat.Status
+		if err := json.Unmarshal(lineBytes, &update); err != nil {
 			agentstate.Logger.Error("Failed to parse status update", "error", err)
-			// Notify server of parse failure so it has visibility into agent issues
 			SendClassifiedError(
 				"Failed to parse hashcat status update: "+err.Error(),
 				task,
@@ -89,10 +90,8 @@ func handleStdOutLine(stdoutLine string, task *api.Task, sess *hashcat.Session) 
 				"parse_error",
 				true, // Retryable - this is likely a transient or version mismatch issue
 			)
-		} else {
-			displayJobStatus(update)
-			sendStatusUpdate(update, task, sess)
 		}
+		// Valid JSON status is processed via sess.StatusUpdates → handleStatusUpdate
 	}
 }
 
@@ -108,9 +107,22 @@ func handleStdErrLine(stdErrLine string, task *api.Task) {
 	}
 }
 
-// handleStatusUpdate processes a status update for a hashcat task and session.
-// It does this by displaying the job status and sending the status update.
+// handleStatusUpdate validates and processes a status update for a hashcat task and session.
+// It validates that Progress and RecoveredHashes have the minimum required fields before
+// forwarding to display and send functions.
 func handleStatusUpdate(statusUpdate hashcat.Status, task *api.Task, sess *hashcat.Session) {
+	if len(statusUpdate.Progress) < minStatusFields {
+		agentstate.Logger.Warn("Status update has incomplete progress data",
+			"progress_len", len(statusUpdate.Progress))
+		return
+	}
+
+	if len(statusUpdate.RecoveredHashes) < minStatusFields {
+		agentstate.Logger.Warn("Status update has incomplete recovered hashes data",
+			"recovered_len", len(statusUpdate.RecoveredHashes))
+		return
+	}
+
 	displayJobStatus(statusUpdate)
 	sendStatusUpdate(statusUpdate, task, sess)
 }
