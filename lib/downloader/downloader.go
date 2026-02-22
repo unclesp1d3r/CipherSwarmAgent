@@ -108,12 +108,18 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 		}
 	}
 
+	insecure := viper.GetBool("insecure_downloads")
+	if insecure {
+		agentstate.Logger.Warn("TLS certificate verification disabled for download",
+			"url", fileURL, "dst", filePath)
+	}
+
 	client := &getter.Client{
 		Ctx:      ctx,
 		Dst:      filePath,
 		Src:      fileURL,
 		Pwd:      agentstate.State.CrackersPath,
-		Insecure: viper.GetBool("insecure_downloads"),
+		Insecure: insecure,
 		Mode:     getter.ClientModeFile,
 	}
 
@@ -282,14 +288,14 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	if err != nil {
 		return fmt.Errorf("error creating file: %w", err)
 	}
-	defer func(f *os.File) {
-		if err := f.Close(); err != nil {
-			agentstate.Logger.Error("Error closing file", "error", err)
-		}
-	}(file)
 
 	if _, err := io.Copy(file, responseStream); err != nil {
+		_ = file.Close()
 		return fmt.Errorf("error writing file: %w", err)
+	}
+
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("error closing file %s: %w", filePath, err)
 	}
 
 	return nil

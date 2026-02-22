@@ -41,6 +41,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	agentstate.State.OutPath = filepath.Join(testDataDir, "out")
 	agentstate.State.FilePath = filepath.Join(testDataDir, "files")
 	agentstate.State.RestoreFilePath = filepath.Join(testDataDir, "restore")
+	agentstate.State.BenchmarkCachePath = filepath.Join(testDataDir, "benchmark_cache.json")
 	agentstate.State.Debug = false
 	agentstate.State.ExtraDebugging = false
 	// Initialize API client using generated client wrapper
@@ -76,6 +77,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.OutPath = ""
 		agentstate.State.FilePath = ""
 		agentstate.State.RestoreFilePath = ""
+		agentstate.State.BenchmarkCachePath = ""
 		agentstate.State.Debug = false
 		agentstate.State.AgentID = 0
 		agentstate.State.URL = ""
@@ -111,6 +113,7 @@ func ResetTestState() {
 	agentstate.State.OutPath = ""
 	agentstate.State.FilePath = ""
 	agentstate.State.RestoreFilePath = ""
+	agentstate.State.BenchmarkCachePath = ""
 	agentstate.State.Debug = false
 	agentstate.State.AgentID = 0
 	agentstate.State.URL = ""
@@ -149,6 +152,7 @@ func SetupMinimalTestState(agentID int64) func() {
 	agentstate.State.OutPath = filepath.Join(testDataDir, "out")
 	agentstate.State.FilePath = filepath.Join(testDataDir, "files")
 	agentstate.State.RestoreFilePath = filepath.Join(testDataDir, "restore")
+	agentstate.State.BenchmarkCachePath = filepath.Join(testDataDir, "benchmark_cache.json")
 
 	return func() {
 		_ = os.RemoveAll(testDataDir)
@@ -162,6 +166,7 @@ func SetupMinimalTestState(agentID int64) func() {
 		agentstate.State.OutPath = ""
 		agentstate.State.FilePath = ""
 		agentstate.State.RestoreFilePath = ""
+		agentstate.State.BenchmarkCachePath = ""
 	}
 }
 
