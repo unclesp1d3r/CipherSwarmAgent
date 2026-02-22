@@ -126,9 +126,10 @@ func clearBenchmarkCache() {
 
 // TrySubmitCachedBenchmarks attempts to submit previously cached benchmark
 // results to the server. Returns false immediately if the force-benchmark
-// flag is set (stale results should not be submitted). Returns true if
-// submission succeeded (and clears the cache), false otherwise (cache is
-// preserved for the next attempt).
+// flag is set (stale results should not be submitted). Filters to only
+// unsubmitted results, sends them, marks as submitted, and updates the cache.
+// Returns true if all results are now submitted (and clears the cache),
+// false otherwise (cache is preserved for the next attempt).
 func TrySubmitCachedBenchmarks() bool {
 	if viper.GetBool("force_benchmark_run") {
 		agentstate.Logger.Debug("Force benchmark flag set, skipping cache submission")
@@ -145,10 +146,24 @@ func TrySubmitCachedBenchmarks() bool {
 		return false
 	}
 
-	if err := sendBenchmarkResults(cached); err != nil {
+	if allSubmitted(cached) {
+		clearBenchmarkCache()
+		agentstate.State.BenchmarksSubmitted = true
+		agentstate.Logger.Info("All cached benchmarks already submitted, clearing cache")
+
+		return true
+	}
+
+	pending := unsubmittedResults(cached)
+	if err := sendBenchmarkResults(pending); err != nil {
 		agentstate.Logger.Warn("Cached benchmark submission failed, will retry next interval",
 			"error", err)
 		return false
+	}
+
+	// Mark all as submitted
+	for i := range cached {
+		cached[i].Submitted = true
 	}
 
 	clearBenchmarkCache()

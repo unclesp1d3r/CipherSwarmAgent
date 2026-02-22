@@ -1,8 +1,12 @@
 package lib
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"regexp"
+	"sync/atomic"
 	"testing"
 
 	"github.com/jarcoal/httpmock"
@@ -11,6 +15,28 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
+
+// benchmarkSubmitPattern matches the benchmark submission API endpoint.
+var benchmarkSubmitPattern = regexp.MustCompile(
+	`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`,
+)
+
+// makeBenchmarkLine creates a valid 6-field hashcat benchmark output line
+// for the given device ID, hash type, and speed.
+func makeBenchmarkLine(device, hashType int, speed float64) string {
+	return fmt.Sprintf("%d:%d:name:100:50:%.2f", device, hashType, speed)
+}
+
+// makeBenchmarkLines creates n valid benchmark output lines using the given
+// device ID, with hash types 0..n-1 and speeds derived from the index.
+func makeBenchmarkLines(n, device int) []string {
+	lines := make([]string, n)
+	for i := range n {
+		lines[i] = makeBenchmarkLine(device, i, float64(i*1000))
+	}
+
+	return lines
+}
 
 // TestCreateBenchmark tests the createBenchmark function.
 func TestCreateBenchmark(t *testing.T) {
@@ -121,9 +147,8 @@ func TestSendBenchmarkResults(t *testing.T) {
 				},
 			},
 			setupMock: func(_ int64) {
-				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+					httpmock.NewStringResponder(http.StatusNoContent, ""))
 			},
 			expectedError: false,
 		},
@@ -147,9 +172,8 @@ func TestSendBenchmarkResults(t *testing.T) {
 			},
 			setupMock: func(_ int64) {
 				// Use 400 Bad Request to test client error handling
-				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+					httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request"))
 			},
 			expectedError: true,
 		},
@@ -176,9 +200,8 @@ func TestSendBenchmarkResults(t *testing.T) {
 				},
 			},
 			setupMock: func(_ int64) {
-				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+					httpmock.NewStringResponder(http.StatusNoContent, ""))
 			},
 			expectedError: false, // Invalid entries are skipped, not causing error
 		},
@@ -375,8 +398,7 @@ func TestUpdateBenchmarks_CachedSubmissionSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mock successful benchmark submission
-	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
-	httpmock.RegisterRegexpResponder("POST", pattern,
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
 	err = UpdateBenchmarks()
@@ -398,8 +420,7 @@ func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mock failed benchmark submission
-	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
-	httpmock.RegisterRegexpResponder("POST", pattern,
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusInternalServerError, "Server Error"))
 
 	err = UpdateBenchmarks()
@@ -410,4 +431,382 @@ func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 	cached, loadErr := loadBenchmarkCache()
 	require.NoError(t, loadErr)
 	assert.NotNil(t, cached, "cache should be preserved for retry")
+}
+
+// TestUpdateBenchmarks_CachedAllAlreadySubmitted verifies that UpdateBenchmarks
+// skips submission when all cached results are already marked as submitted.
+func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	// Pre-populate cache with all-submitted results
+	submitted := []benchmarkResult{
+		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "12345.67", Submitted: true},
+		{Device: "2", HashType: "100", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "54321.09", Submitted: true},
+	}
+	err := saveBenchmarkCache(submitted)
+	require.NoError(t, err)
+
+	// No API mock needed — should not make any calls
+	err = UpdateBenchmarks()
+	require.NoError(t, err)
+	assert.True(t, agentstate.State.BenchmarksSubmitted)
+
+	// Cache should be cleared
+	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
+	assert.True(t, os.IsNotExist(statErr), "cache should be cleared")
+}
+
+// TestUpdateBenchmarks_CachedPartiallySubmitted verifies that UpdateBenchmarks
+// only sends unsubmitted results from a partially submitted cache.
+func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	// Pre-populate cache with mixed submitted/unsubmitted
+	mixed := []benchmarkResult{
+		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "12345.67", Submitted: true},
+		{Device: "2", HashType: "100", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "54321.09"},
+	}
+	err := saveBenchmarkCache(mixed)
+	require.NoError(t, err)
+
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+		httpmock.NewStringResponder(http.StatusNoContent, ""))
+
+	err = UpdateBenchmarks()
+	require.NoError(t, err)
+	assert.True(t, agentstate.State.BenchmarksSubmitted)
+}
+
+// --- Helper function tests ---
+
+// TestUnsubmittedResults tests filtering of benchmark results by Submitted flag.
+func TestUnsubmittedResults(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []benchmarkResult
+		expected int
+	}{
+		{
+			name:     "all unsubmitted",
+			input:    []benchmarkResult{{HashType: "0"}, {HashType: "1"}},
+			expected: 2,
+		},
+		{
+			name:     "all submitted",
+			input:    []benchmarkResult{{HashType: "0", Submitted: true}, {HashType: "1", Submitted: true}},
+			expected: 0,
+		},
+		{
+			name:     "mixed",
+			input:    []benchmarkResult{{HashType: "0", Submitted: true}, {HashType: "1"}},
+			expected: 1,
+		},
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: 0,
+		},
+		{
+			name:     "empty input",
+			input:    []benchmarkResult{},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := unsubmittedResults(tt.input)
+			assert.Len(t, result, tt.expected)
+		})
+	}
+}
+
+// TestAllSubmitted tests the allSubmitted predicate.
+func TestAllSubmitted(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []benchmarkResult
+		expected bool
+	}{
+		{name: "all submitted", input: []benchmarkResult{{Submitted: true}, {Submitted: true}}, expected: true},
+		{name: "none submitted", input: []benchmarkResult{{}, {}}, expected: false},
+		{name: "mixed", input: []benchmarkResult{{Submitted: true}, {}}, expected: false},
+		{name: "nil", input: nil, expected: true},
+		{name: "empty", input: []benchmarkResult{}, expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, allSubmitted(tt.input))
+		})
+	}
+}
+
+// TestMarkSubmitted tests marking a range of results as submitted.
+func TestMarkSubmitted(t *testing.T) {
+	tests := []struct {
+		name     string
+		count    int
+		startIdx int
+		endIdx   int
+		expected []bool
+	}{
+		{
+			name:     "mark middle range",
+			count:    4,
+			startIdx: 1,
+			endIdx:   3,
+			expected: []bool{false, true, true, false},
+		},
+		{
+			name:     "endIdx beyond length",
+			count:    2,
+			startIdx: 0,
+			endIdx:   5,
+			expected: []bool{true, true},
+		},
+		{
+			name:     "empty range",
+			count:    2,
+			startIdx: 1,
+			endIdx:   1,
+			expected: []bool{false, false},
+		},
+		{
+			name:     "mark all",
+			count:    3,
+			startIdx: 0,
+			endIdx:   3,
+			expected: []bool{true, true, true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := make([]benchmarkResult, tt.count)
+			markSubmitted(results, tt.startIdx, tt.endIdx)
+			for i, r := range results {
+				assert.Equal(t, tt.expected[i], r.Submitted, "index %d", i)
+			}
+		})
+	}
+}
+
+// --- processBenchmarkOutput tests ---
+
+// TestProcessBenchmarkOutput_AllBatchesSucceed verifies that multiple batches
+// are sent and all results are marked as Submitted.
+func TestProcessBenchmarkOutput_AllBatchesSucceed(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	var callCount atomic.Int32
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+		func(_ *http.Request) (*http.Response, error) {
+			callCount.Add(1)
+			return httpmock.NewStringResponse(http.StatusNoContent, ""), nil
+		})
+
+	sess, err := testhelpers.NewMockSession("bench-test")
+	require.NoError(t, err)
+
+	lines := makeBenchmarkLines(15, 1)
+
+	go func() {
+		for _, line := range lines {
+			sess.StdoutLines <- line
+		}
+		sess.DoneChan <- nil
+	}()
+
+	results := processBenchmarkOutput(sess)
+
+	assert.Len(t, results, 15)
+	assert.True(t, allSubmitted(results), "all results should be marked as submitted")
+	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.Equal(t, int32(2), callCount.Load(), "expected 2 API calls (batch of 10 + final 5)")
+}
+
+// TestProcessBenchmarkOutput_SingleBatch verifies that fewer than benchmarkBatchSize
+// results are submitted as a single final batch.
+func TestProcessBenchmarkOutput_SingleBatch(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	var callCount atomic.Int32
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+		func(_ *http.Request) (*http.Response, error) {
+			callCount.Add(1)
+			return httpmock.NewStringResponse(http.StatusNoContent, ""), nil
+		})
+
+	sess, err := testhelpers.NewMockSession("bench-test")
+	require.NoError(t, err)
+
+	lines := makeBenchmarkLines(5, 2)
+
+	go func() {
+		for _, line := range lines {
+			sess.StdoutLines <- line
+		}
+		sess.DoneChan <- nil
+	}()
+
+	results := processBenchmarkOutput(sess)
+
+	assert.Len(t, results, 5)
+	assert.True(t, allSubmitted(results))
+	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.Equal(t, int32(1), callCount.Load(), "expected 1 API call (final batch only)")
+}
+
+// TestProcessBenchmarkOutput_BatchFailsFinalSucceeds verifies that when the first
+// batch fails, the final send includes all unsubmitted results and marks them.
+func TestProcessBenchmarkOutput_BatchFailsFinalSucceeds(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	// First call fails, second succeeds
+	var callCount atomic.Int32
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+		func(_ *http.Request) (*http.Response, error) {
+			n := callCount.Add(1)
+			if n == 1 {
+				return httpmock.NewStringResponse(http.StatusInternalServerError, "error"), nil
+			}
+			return httpmock.NewStringResponse(http.StatusNoContent, ""), nil
+		})
+
+	lines := makeBenchmarkLines(15, 3)
+
+	sess, err := testhelpers.NewMockSession("bench-test")
+	require.NoError(t, err)
+
+	go func() {
+		for _, line := range lines {
+			sess.StdoutLines <- line
+		}
+		sess.DoneChan <- nil
+	}()
+
+	results := processBenchmarkOutput(sess)
+
+	assert.Len(t, results, 15)
+	// First batch (10 items) fails, retry triggers on next line (11 items), succeeds.
+	// Final batch sends remaining items on DoneChan.
+	assert.True(t, allSubmitted(results), "all results should be submitted after retry")
+	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.GreaterOrEqual(t, callCount.Load(), int32(2), "at least 2 API calls expected")
+}
+
+// TestProcessBenchmarkOutput_AllSendsFail verifies that BenchmarksSubmitted
+// stays false when all submissions fail.
+func TestProcessBenchmarkOutput_AllSendsFail(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+		httpmock.NewStringResponder(http.StatusInternalServerError, "error"))
+
+	sess, err := testhelpers.NewMockSession("bench-test")
+	require.NoError(t, err)
+
+	lines := makeBenchmarkLines(15, 4)
+
+	go func() {
+		for _, line := range lines {
+			sess.StdoutLines <- line
+		}
+		sess.DoneChan <- nil
+	}()
+
+	results := processBenchmarkOutput(sess)
+
+	assert.Len(t, results, 15)
+	assert.False(t, allSubmitted(results), "no results should be marked submitted")
+	assert.False(t, agentstate.State.BenchmarksSubmitted)
+
+	// Cache should be saved with all unsubmitted
+	cached, loadErr := loadBenchmarkCache()
+	require.NoError(t, loadErr)
+	require.NotNil(t, cached)
+	assert.False(t, allSubmitted(cached))
+}
+
+// TestProcessBenchmarkOutput_EmptyResults verifies behavior when the session
+// completes without producing any results.
+func TestProcessBenchmarkOutput_EmptyResults(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	sess, err := testhelpers.NewMockSession("bench-test")
+	require.NoError(t, err)
+
+	go func() {
+		sess.DoneChan <- nil
+	}()
+
+	results := processBenchmarkOutput(sess)
+
+	assert.Empty(t, results)
+	assert.True(t, agentstate.State.BenchmarksSubmitted, "nothing to submit = done")
+}
+
+// TestProcessBenchmarkOutput_SessionError verifies that session errors are
+// reported and partial results are still cached.
+func TestProcessBenchmarkOutput_SessionError(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+		httpmock.NewStringResponder(http.StatusNoContent, ""))
+	testhelpers.MockSubmitErrorSuccess(789)
+
+	sess, err := testhelpers.NewMockSession("bench-test")
+	require.NoError(t, err)
+
+	lines := makeBenchmarkLines(5, 5)
+
+	go func() {
+		for _, line := range lines {
+			sess.StdoutLines <- line
+		}
+		sess.DoneChan <- errors.New("hashcat process exited with code 1")
+	}()
+
+	results := processBenchmarkOutput(sess)
+
+	assert.Len(t, results, 5)
+	assert.True(t, allSubmitted(results), "results should still be submitted despite error")
+	assert.True(t, agentstate.State.BenchmarksSubmitted)
+
+	// Verify error was reported
+	callCount := testhelpers.GetSubmitErrorCallCount(789, "https://test.api")
+	assert.Positive(t, callCount, "session error should be reported")
 }
