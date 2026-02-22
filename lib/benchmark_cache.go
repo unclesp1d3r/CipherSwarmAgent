@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
@@ -131,7 +130,7 @@ func clearBenchmarkCache() {
 // Returns true if all results are now submitted (and clears the cache),
 // false otherwise (cache is preserved for the next attempt).
 func TrySubmitCachedBenchmarks() bool {
-	if viper.GetBool("force_benchmark_run") {
+	if agentstate.State.ForceBenchmarkRun {
 		agentstate.Logger.Debug("Force benchmark flag set, skipping cache submission")
 		return false
 	}
@@ -148,7 +147,7 @@ func TrySubmitCachedBenchmarks() bool {
 
 	if allSubmitted(cached) {
 		clearBenchmarkCache()
-		agentstate.State.BenchmarksSubmitted = true
+		agentstate.State.SetBenchmarksSubmitted(true)
 		agentstate.Logger.Info("All cached benchmarks already submitted, clearing cache")
 
 		return true
@@ -167,7 +166,7 @@ func TrySubmitCachedBenchmarks() bool {
 	}
 
 	clearBenchmarkCache()
-	agentstate.State.BenchmarksSubmitted = true
+	agentstate.State.SetBenchmarksSubmitted(true)
 	agentstate.Logger.Info("Cached benchmarks successfully submitted to server")
 
 	return true

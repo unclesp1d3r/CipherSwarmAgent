@@ -13,6 +13,11 @@ import (
 // When task is nil, the error is reported without a task context. API submission is
 // skipped only when the APIClient has not been initialized yet.
 // Returns the original error for further handling.
+//
+// Note: This function intentionally duplicates some logic from lib.SendAgentError because
+// cserrors cannot import lib (circular dependency). It omits platform/version metadata,
+// which is acceptable for the critical startup errors it reports. Uses context.Background()
+// because these errors must be delivered even during shutdown.
 func LogAndSendError(message string, err error, severity api.Severity, task *api.Task) error {
 	agentstate.ErrorLogger.Error(message, "error", err)
 

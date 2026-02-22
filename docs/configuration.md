@@ -73,6 +73,7 @@ zap_path: /opt/cipherswarm/data/zaps
 retain_zaps_on_completion: false
 enable_additional_hash_types: true
 use_legacy_device_technique: false
+hashcat_path: ''  # Leave empty for auto-detection
 
 # Fault tolerance settings
 task_timeout: 24h
@@ -166,6 +167,14 @@ You can specify a custom config file location:
 - **Default**: `{data_path}/files`
 - **Description**: Directory for storing attack files (wordlists, rules, masks)
 
+#### `hashcat_path` / `HASHCAT_PATH`
+
+- **Flag**: `--hashcat-path`
+- **Type**: String
+- **Default**: `""` (empty — auto-detect)
+- **Description**: Path to a custom Hashcat binary. When set, overrides automatic detection from `crackers_path` and system PATH. Useful when multiple Hashcat versions are installed or the binary is in a non-standard location.
+- **Example**: `/usr/local/bin/hashcat` or `C:\hashcat\hashcat.exe`
+
 ### Debugging and Logging
 
 #### `debug` / `DEBUG`
@@ -252,18 +261,21 @@ These settings control retry behavior, timeouts, and circuit breakers for improv
 
 #### `enable_additional_hash_types` / `ENABLE_ADDITIONAL_HASH_TYPES`
 
+- **Flag**: `--enable-additional-hash-types`
 - **Type**: Boolean
 - **Default**: `true`
 - **Description**: Enable support for additional hash types during benchmarking
 
 #### `use_legacy_device_technique` / `USE_LEGACY_DEVICE_TECHNIQUE`
 
+- **Flag**: `--use-legacy-device-technique`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Use legacy method for device identification (not recommended)
 
 #### `always_trust_files` / `ALWAYS_TRUST_FILES`
 
+- **Flag**: `--always-trust-files`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Skip checksum verification for downloaded files (not recommended)
@@ -328,6 +340,7 @@ environment:
   - GPU_TEMP_THRESHOLD=80
   - ALWAYS_USE_NATIVE_HASHCAT=true
   - EXTRA_DEBUGGING=false
+  - HASHCAT_PATH=  # Leave empty for auto-detection
   # Fault tolerance settings
   - TASK_TIMEOUT=24h
   - DOWNLOAD_MAX_RETRIES=3

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
 func TestSetDefaultConfigValues(t *testing.T) {
@@ -200,4 +201,40 @@ func TestSetDefaultConfigValues_ResetBetweenCalls(t *testing.T) {
 	assert.Equal(t, 3, viper.GetInt("download_max_retries"), "download_max_retries should be reset to default")
 	assert.Equal(t, 24*time.Hour, viper.GetDuration("task_timeout"), "task_timeout should be reset to default")
 	assert.False(t, viper.GetBool("insecure_downloads"), "insecure_downloads should be reset to default")
+}
+
+func TestSetupSharedState_ValidationClampsInvalidValues(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	// Set invalid values
+	viper.Set("download_max_retries", 0)
+	viper.Set("task_timeout", 0)
+	viper.Set("max_heartbeat_backoff", -1)
+
+	SetupSharedState()
+
+	// Should be clamped to defaults
+	assert.Equal(t, DefaultDownloadMaxRetries, agentstate.State.DownloadMaxRetries,
+		"download_max_retries should be clamped to default when < 1")
+	assert.Equal(t, DefaultTaskTimeout, agentstate.State.TaskTimeout,
+		"task_timeout should be clamped to default when <= 0")
+	assert.Equal(t, DefaultMaxHeartbeatBackoff, agentstate.State.MaxHeartbeatBackoff,
+		"max_heartbeat_backoff should be clamped to default when < 0")
+}
+
+func TestSetupSharedState_ValidationAcceptsValidValues(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	// Set valid non-default values
+	viper.Set("download_max_retries", 10)
+	viper.Set("task_timeout", 1*time.Hour)
+	viper.Set("max_heartbeat_backoff", 10)
+
+	SetupSharedState()
+
+	assert.Equal(t, 10, agentstate.State.DownloadMaxRetries)
+	assert.Equal(t, 1*time.Hour, agentstate.State.TaskTimeout)
+	assert.Equal(t, 10, agentstate.State.MaxHeartbeatBackoff)
 }

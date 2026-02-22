@@ -12,13 +12,32 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
-// saveAndRestoreState saves the current agentstate and returns a cleanup function.
+// saveAndRestoreState saves modifiable agentstate fields and returns a cleanup function.
+// Uses per-field save/restore to avoid copying sync primitives (atomic.Bool, sync.RWMutex).
 func saveAndRestoreState(t *testing.T) func() {
 	t.Helper()
-	original := agentstate.State
+	origCrackersPath := agentstate.State.CrackersPath
+	origPidFile := agentstate.State.PidFile
+	origFilePath := agentstate.State.FilePath
+	origHashlistPath := agentstate.State.HashlistPath
+	origZapsPath := agentstate.State.ZapsPath
+	origPreprocessorsPath := agentstate.State.PreprocessorsPath
+	origToolsPath := agentstate.State.ToolsPath
+	origOutPath := agentstate.State.OutPath
+	origRestoreFilePath := agentstate.State.RestoreFilePath
+	origHashcatPath := agentstate.State.HashcatPath
 
 	return func() {
-		agentstate.State = original
+		agentstate.State.CrackersPath = origCrackersPath
+		agentstate.State.PidFile = origPidFile
+		agentstate.State.FilePath = origFilePath
+		agentstate.State.HashlistPath = origHashlistPath
+		agentstate.State.ZapsPath = origZapsPath
+		agentstate.State.PreprocessorsPath = origPreprocessorsPath
+		agentstate.State.ToolsPath = origToolsPath
+		agentstate.State.OutPath = origOutPath
+		agentstate.State.RestoreFilePath = origRestoreFilePath
+		agentstate.State.HashcatPath = origHashcatPath
 	}
 }
 

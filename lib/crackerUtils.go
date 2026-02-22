@@ -25,6 +25,7 @@ func setNativeHashcatPath() error {
 	}
 
 	agentstate.Logger.Info("Found Hashcat binary", "path", binPath)
+	agentstate.State.HashcatPath = binPath
 	viper.Set("hashcat_path", binPath)
 
 	if err := viper.WriteConfig(); err != nil {
@@ -39,10 +40,10 @@ func setNativeHashcatPath() error {
 // It starts by logging the beginning of the update process and attempts to fetch the current version of Hashcat.
 // It then calls the API to check if there are any updates available. Depending on the API response, it either handles
 // the update process or logs the absence of any new updates. If any errors occur during these steps, they are logged and handled accordingly.
-func UpdateCracker() {
+func UpdateCracker(ctx context.Context) {
 	agentstate.Logger.Info("Checking for updated cracker")
 
-	currentVersion, err := cracker.GetCurrentHashcatVersion(context.Background())
+	currentVersion, err := cracker.GetCurrentHashcatVersion(ctx)
 	if err != nil {
 		agentstate.Logger.Error("Error getting current hashcat version", "error", err)
 
@@ -50,7 +51,7 @@ func UpdateCracker() {
 	}
 
 	response, err := agentstate.State.APIClient.Crackers().CheckForCrackerUpdate(
-		context.Background(),
+		ctx,
 		&agentPlatform,
 		&currentVersion,
 	)
@@ -74,7 +75,7 @@ func UpdateCracker() {
 			return
 		}
 		if update.GetAvailable() {
-			if err := handleCrackerUpdate(update); err != nil {
+			if err := handleCrackerUpdate(ctx, update); err != nil {
 				agentstate.Logger.Error("Failed to apply cracker update", "error", err)
 			}
 		} else {

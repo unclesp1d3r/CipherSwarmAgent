@@ -403,7 +403,7 @@ func TestUpdateBenchmarks_CachedSubmissionSuccess(t *testing.T) {
 
 	err = UpdateBenchmarks()
 	require.NoError(t, err)
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 }
 
 // TestUpdateBenchmarks_CachedSubmissionFailure verifies that UpdateBenchmarks
@@ -425,7 +425,7 @@ func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 
 	err = UpdateBenchmarks()
 	require.NoError(t, err, "cached submission failure should be non-fatal")
-	assert.False(t, agentstate.State.BenchmarksSubmitted)
+	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
 
 	// Cache should be preserved
 	cached, loadErr := loadBenchmarkCache()
@@ -453,7 +453,7 @@ func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 	// No API mock needed — should not make any calls
 	err = UpdateBenchmarks()
 	require.NoError(t, err)
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
 	// Cache should be cleared
 	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
@@ -482,7 +482,7 @@ func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 
 	err = UpdateBenchmarks()
 	require.NoError(t, err)
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 }
 
 // --- Helper function tests ---
@@ -634,7 +634,7 @@ func TestProcessBenchmarkOutput_AllBatchesSucceed(t *testing.T) {
 
 	assert.Len(t, results, 15)
 	assert.True(t, allSubmitted(results), "all results should be marked as submitted")
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 	assert.Equal(t, int32(2), callCount.Load(), "expected 2 API calls (batch of 10 + final 5)")
 }
 
@@ -670,7 +670,7 @@ func TestProcessBenchmarkOutput_SingleBatch(t *testing.T) {
 
 	assert.Len(t, results, 5)
 	assert.True(t, allSubmitted(results))
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 	assert.Equal(t, int32(1), callCount.Load(), "expected 1 API call (final batch only)")
 }
 
@@ -712,7 +712,7 @@ func TestProcessBenchmarkOutput_BatchFailsFinalSucceeds(t *testing.T) {
 	// First batch (10 items) fails, retry triggers on next line (11 items), succeeds.
 	// Final batch sends remaining items on DoneChan.
 	assert.True(t, allSubmitted(results), "all results should be submitted after retry")
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 	assert.GreaterOrEqual(t, callCount.Load(), int32(2), "at least 2 API calls expected")
 }
 
@@ -744,7 +744,7 @@ func TestProcessBenchmarkOutput_AllSendsFail(t *testing.T) {
 
 	assert.Len(t, results, 15)
 	assert.False(t, allSubmitted(results), "no results should be marked submitted")
-	assert.False(t, agentstate.State.BenchmarksSubmitted)
+	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
 
 	// Cache should be saved with all unsubmitted
 	cached, loadErr := loadBenchmarkCache()
@@ -772,7 +772,7 @@ func TestProcessBenchmarkOutput_EmptyResults(t *testing.T) {
 	results := processBenchmarkOutput(sess)
 
 	assert.Empty(t, results)
-	assert.True(t, agentstate.State.BenchmarksSubmitted, "nothing to submit = done")
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted(), "nothing to submit = done")
 }
 
 // TestProcessBenchmarkOutput_SessionError verifies that session errors are
@@ -804,7 +804,7 @@ func TestProcessBenchmarkOutput_SessionError(t *testing.T) {
 
 	assert.Len(t, results, 5)
 	assert.True(t, allSubmitted(results), "results should still be submitted despite error")
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
 	// Verify error was reported
 	callCount := testhelpers.GetSubmitErrorCallCount(789, "https://test.api")

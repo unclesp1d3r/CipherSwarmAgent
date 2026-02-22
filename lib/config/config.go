@@ -149,9 +149,41 @@ func SetupSharedState() {
 	agentstate.State.EnableAdditionalHashTypes = viper.GetBool(
 		"enable_additional_hash_types",
 	) // Set the enable additional hash types flag in the shared state
+	agentstate.State.HashcatPath = viper.GetString(
+		"hashcat_path",
+	) // Set the hashcat binary path in the shared state
 	agentstate.State.UseLegacyDeviceIdentificationMethod = viper.GetBool(
 		"use_legacy_device_technique",
 	) // Set the use legacy device identification method flag in the shared state
+	agentstate.State.ForceBenchmarkRun = viper.GetBool("force_benchmark_run")
+	agentstate.State.InsecureDownloads = viper.GetBool("insecure_downloads")
+	agentstate.State.AlwaysUseNativeHashcat = viper.GetBool("always_use_native_hashcat")
+
+	// Validate numeric/duration config fields — clamp to defaults with a warning.
+	agentstate.State.DownloadMaxRetries = viper.GetInt("download_max_retries")
+	if agentstate.State.DownloadMaxRetries < 1 {
+		agentstate.Logger.Warn("download_max_retries must be >= 1, using default",
+			"configured", agentstate.State.DownloadMaxRetries, "default", DefaultDownloadMaxRetries)
+		agentstate.State.DownloadMaxRetries = DefaultDownloadMaxRetries
+	}
+
+	agentstate.State.DownloadRetryDelay = viper.GetDuration("download_retry_delay")
+
+	agentstate.State.TaskTimeout = viper.GetDuration("task_timeout")
+	if agentstate.State.TaskTimeout <= 0 {
+		agentstate.Logger.Warn("task_timeout must be > 0, using default",
+			"configured", agentstate.State.TaskTimeout, "default", DefaultTaskTimeout)
+		agentstate.State.TaskTimeout = DefaultTaskTimeout
+	}
+
+	agentstate.State.MaxHeartbeatBackoff = viper.GetInt("max_heartbeat_backoff")
+	if agentstate.State.MaxHeartbeatBackoff < 0 {
+		agentstate.Logger.Warn("max_heartbeat_backoff must be >= 0, using default",
+			"configured", agentstate.State.MaxHeartbeatBackoff, "default", DefaultMaxHeartbeatBackoff)
+		agentstate.State.MaxHeartbeatBackoff = DefaultMaxHeartbeatBackoff
+	}
+
+	agentstate.State.SleepOnFailure = viper.GetDuration("sleep_on_failure")
 }
 
 // SetDefaultConfigValues sets default configuration values.
@@ -162,6 +194,7 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("data_path", path.Join(cwd, "data"))
 	viper.SetDefault("gpu_temp_threshold", DefaultGPUTempThreshold)
 	viper.SetDefault("always_use_native_hashcat", false)
+	viper.SetDefault("hashcat_path", "")
 	viper.SetDefault("sleep_on_failure", DefaultSleepOnFailure)
 	viper.SetDefault("always_trust_files", false)
 	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files"))
