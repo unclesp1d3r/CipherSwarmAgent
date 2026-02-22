@@ -6,13 +6,13 @@ package cracker
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 
-	"github.com/duke-git/lancet/v2/convertor"
-	"github.com/duke-git/lancet/v2/fileutil"
-	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/shirou/gopsutil/v4/process"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -87,41 +87,54 @@ func GetCurrentHashcatVersion(ctx context.Context) (string, error) {
 // It reads the PID file and verifies if the process is still active.
 // Returns true if a running process is found or if errors occur during checks.
 func CheckForExistingClient(pidFilePath string) bool {
-	if fileutil.IsExist(pidFilePath) {
-		pidString, err := fileutil.ReadFileToString(pidFilePath)
-		if err != nil {
-			agentstate.Logger.Error("Error reading PID file", "path", pidFilePath)
+	if _, err := os.Stat(pidFilePath); err != nil {
+		if !os.IsNotExist(err) {
+			agentstate.Logger.Error("Could not check PID file, assuming existing client",
+				"path", pidFilePath, "error", err)
 
 			return true
 		}
 
-		pidValue, err := convertor.ToInt(strutil.Trim(pidString))
-		if err != nil {
-			agentstate.Logger.Error("Error converting PID to integer", "pid", pidString)
-
-			return true
-		}
-
-		pidRunning, err := process.PidExistsWithContext(
-			context.Background(),
-			int32(pidValue), //nolint:gosec // G115 - PID from file
-		)
-		if err != nil {
-			agentstate.Logger.Error("Error checking if process is running", "pid", pidValue)
-
-			return true
-		}
-
-		agentstate.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
-
-		if !pidRunning {
-			agentstate.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
-		}
-
-		return pidRunning
+		return false
 	}
 
-	return false
+	pidBytes, err := os.ReadFile(pidFilePath)
+	if err != nil {
+		agentstate.Logger.Error("Error reading PID file", "path", pidFilePath)
+
+		return true
+	}
+
+	pidValue, err := strconv.Atoi(strings.TrimSpace(string(pidBytes)))
+	if err != nil {
+		agentstate.Logger.Error("Error converting PID to integer", "pid", string(pidBytes))
+
+		return true
+	}
+
+	if pidValue < 0 || pidValue > math.MaxInt32 {
+		agentstate.Logger.Error("PID value out of int32 range", "pid", pidValue)
+
+		return true
+	}
+
+	pidRunning, err := process.PidExistsWithContext(
+		context.Background(),
+		int32(pidValue), //nolint:gosec // G115 - bounds checked above
+	)
+	if err != nil {
+		agentstate.Logger.Error("Error checking if process is running", "pid", pidValue)
+
+		return true
+	}
+
+	agentstate.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
+
+	if !pidRunning {
+		agentstate.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
+	}
+
+	return pidRunning
 }
 
 // CreateLockFile creates a lock file containing the current process ID.
@@ -131,9 +144,10 @@ func CreateLockFile() error {
 	lockFilePath := agentstate.State.PidFile
 
 	pidValue := os.Getpid()
-	pidString := convertor.ToString(pidValue)
+	pidString := strconv.Itoa(pidValue)
 
-	err := fileutil.WriteStringToFile(lockFilePath, pidString, false)
+	//nolint:gosec // G306 - lock file, not sensitive
+	err := os.WriteFile(lockFilePath, []byte(pidString), 0o644)
 	if err != nil {
 		agentstate.Logger.Error("Error writing PID to file", "path", lockFilePath)
 
@@ -159,14 +173,27 @@ func CreateDataDirs() error {
 	}
 
 	for _, dir := range dataDirs {
-		if strutil.IsBlank(dir) {
+		if strings.TrimSpace(dir) == "" {
 			agentstate.Logger.Error("Data directory not set")
 
 			continue
 		}
 
-		if !fileutil.IsDir(dir) {
-			if err := fileutil.CreateDir(dir); err != nil {
+		info, err := os.Stat(dir)
+		if err != nil {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
+				agentstate.Logger.Error("Error creating directory", "path", dir, "error", err)
+
+				return err
+			}
+
+			agentstate.Logger.Info("Created directory", "path", dir)
+
+			continue
+		}
+
+		if !info.IsDir() {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				agentstate.Logger.Error("Error creating directory", "path", dir, "error", err)
 
 				return err

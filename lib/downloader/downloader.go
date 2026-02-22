@@ -3,6 +3,7 @@ package downloader
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec // G501 - checksum verification
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -12,10 +13,9 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"time"
 
-	"github.com/duke-git/lancet/v2/cryptor"
-	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/hashicorp/go-getter"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -59,15 +59,19 @@ func DownloadFile(ctx context.Context, fileURL, filePath, checksum string) error
 // The function returns true if the file exists and matches the given checksum, or if no checksum is provided.
 // If the file does not exist or the checksum verification fails, appropriate error messages are logged.
 func FileExistsAndValid(filePath, checksum string) bool {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); err != nil {
+		if !os.IsNotExist(err) {
+			agentstate.Logger.Error("Error checking file existence", "path", filePath, "error", err)
+		}
+
 		return false
 	}
 
-	if strutil.IsBlank(checksum) {
+	if strings.TrimSpace(checksum) == "" {
 		return true
 	}
 
-	fileChecksum, err := cryptor.Md5File(filePath)
+	fileChecksum, err := fileMD5(filePath)
 	if err != nil {
 		agentstate.Logger.Error("Error calculating file checksum", "path", filePath, "error", err)
 
@@ -99,7 +103,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 // If a checksum is provided, it is appended to the URL for server-side verification,
 // and the downloaded file is verified locally after download. Uses retry logic for transient failures.
 func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum string) error {
-	if strutil.IsNotBlank(checksum) {
+	if strings.TrimSpace(checksum) != "" {
 		var err error
 
 		fileURL, err = appendChecksumToURL(fileURL, checksum)
@@ -141,7 +145,7 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 		return err
 	}
 
-	if strutil.IsNotBlank(checksum) && !FileExistsAndValid(filePath, checksum) {
+	if strings.TrimSpace(checksum) != "" && !FileExistsAndValid(filePath, checksum) {
 		return errors.New("downloaded file checksum does not match")
 	}
 
@@ -299,6 +303,28 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	}
 
 	return nil
+}
+
+// fileMD5 computes the MD5 hex digest of the file at the given path.
+func fileMD5(filePath string) (string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			agentstate.Logger.Error("Error closing file after checksum",
+				"path", filePath, "error", cerr)
+		}
+	}()
+
+	h := md5.New() //nolint:gosec // G401 - MD5 used for file integrity check, not security
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // CleanupTempDir removes the specified temporary directory and its contents.

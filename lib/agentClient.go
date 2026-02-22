@@ -11,7 +11,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/duke-git/lancet/v2/pointer"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
@@ -102,14 +101,23 @@ func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration) age
 	agentConfig := agentConfiguration{
 		APIVersion: int64(apiVersion),
 		Config: agentConfig{
-			UseNativeHashcat:    pointer.UnwrapOr(config.UseNativeHashcat, false),
-			AgentUpdateInterval: int64(pointer.UnwrapOr(config.AgentUpdateInterval, defaultAgentUpdateInterval)),
-			BackendDevices:      pointer.UnwrapOr(config.BackendDevice, ""),
-			OpenCLDevices:       pointer.UnwrapOr(config.OpenclDevices, ""),
+			UseNativeHashcat:    unwrapOr(config.UseNativeHashcat, false),
+			AgentUpdateInterval: int64(unwrapOr(config.AgentUpdateInterval, defaultAgentUpdateInterval)),
+			BackendDevices:      unwrapOr(config.BackendDevice, ""),
+			OpenCLDevices:       unwrapOr(config.OpenclDevices, ""),
 		},
 	}
 
 	return agentConfig
+}
+
+// unwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
+func unwrapOr[T any](ptr *T, defaultVal T) T {
+	if ptr != nil {
+		return *ptr
+	}
+
+	return defaultVal
 }
 
 // UpdateAgentMetadata updates the agent's metadata and sends it to the CipherSwarm API.

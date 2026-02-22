@@ -82,22 +82,6 @@ func GetAttackParameters(attackID int64) (*api.Attack, error) {
 // from the Task and Attack objects. It includes path settings for various resources
 // like hash files, word lists, rule lists, and restore files.
 func createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
-	unwrapOr := func(val *int64) int64 {
-		if val == nil {
-			return 0
-		}
-
-		return *val
-	}
-
-	unwrapOrString := func(val *string) string {
-		if val == nil {
-			return ""
-		}
-
-		return *val
-	}
-
 	return hashcat.Params{
 		AttackMode: int64(attack.AttackModeHashcat),
 		HashType:   int64(attack.HashMode),
@@ -105,15 +89,15 @@ func createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
 			agentstate.State.HashlistPath,
 			strconv.FormatInt(attack.Id, 10)+".hsh",
 		),
-		Mask:             unwrapOrString(attack.Mask),
+		Mask:             unwrapOr(attack.Mask, ""),
 		MaskIncrement:    attack.IncrementMode,
 		MaskIncrementMin: int64(attack.IncrementMinimum),
 		MaskIncrementMax: int64(attack.IncrementMaximum),
 		MaskCustomCharsets: []string{
-			unwrapOrString(attack.CustomCharset1),
-			unwrapOrString(attack.CustomCharset2),
-			unwrapOrString(attack.CustomCharset3),
-			unwrapOrString(attack.CustomCharset4),
+			unwrapOr(attack.CustomCharset1, ""),
+			unwrapOr(attack.CustomCharset2, ""),
+			unwrapOr(attack.CustomCharset3, ""),
+			unwrapOr(attack.CustomCharset4, ""),
 		},
 		WordListFilename: resourceNameOrBlank(attack.WordList),
 		RuleListFilename: resourceNameOrBlank(attack.RuleList),
@@ -121,8 +105,8 @@ func createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
 		AdditionalArgs:   arch.GetAdditionalHashcatArgs(),
 		OptimizedKernels: attack.Optimized,
 		SlowCandidates:   attack.SlowCandidateGenerators,
-		Skip:             unwrapOr(task.Skip),
-		Limit:            unwrapOr(task.Limit),
+		Skip:             unwrapOr(task.Skip, 0),
+		Limit:            unwrapOr(task.Limit, 0),
 		BackendDevices:   Configuration.Config.BackendDevices,
 		OpenCLDevices:    Configuration.Config.OpenCLDevices,
 		RestoreFilePath:  path.Join(agentstate.State.RestoreFilePath, strconv.FormatInt(attack.Id, 10)+".restore"),
