@@ -155,6 +155,14 @@ func SetupSharedState() {
 	agentstate.State.UseLegacyDeviceIdentificationMethod = viper.GetBool(
 		"use_legacy_device_technique",
 	) // Set the use legacy device identification method flag in the shared state
+	agentstate.State.ForceBenchmarkRun = viper.GetBool("force_benchmark_run")
+	agentstate.State.InsecureDownloads = viper.GetBool("insecure_downloads")
+	agentstate.State.DownloadMaxRetries = viper.GetInt("download_max_retries")
+	agentstate.State.DownloadRetryDelay = viper.GetDuration("download_retry_delay")
+	agentstate.State.TaskTimeout = viper.GetDuration("task_timeout")
+	agentstate.State.MaxHeartbeatBackoff = viper.GetInt("max_heartbeat_backoff")
+	agentstate.State.SleepOnFailure = viper.GetDuration("sleep_on_failure")
+	agentstate.State.AlwaysUseNativeHashcat = viper.GetBool("always_use_native_hashcat")
 }
 
 // SetDefaultConfigValues sets default configuration values.

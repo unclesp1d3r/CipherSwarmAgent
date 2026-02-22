@@ -85,12 +85,16 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** `cserrors.LogAndSendError` returns the `err` parameter directly — always pass a non-nil error in error paths, or callers will see success.
 - `cserrors.LogAndSendError` sends errors to the server even without a task (nil task → nil TaskId). Only skipped when APIClient is not yet initialized.
 - For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding with `_ = file.Close()`.
+- **Error reporting options:** Use `SendAgentError(msg, task, severity, opts ...ErrorOption)` for all error reporting. Add classification metadata via `WithClassification(category, retryable)`. Do NOT create separate error-sending functions — extend via `ErrorOption` functional options instead.
+- `cserrors.LogAndSendError` intentionally duplicates some `SendAgentError` logic because `cserrors` cannot import `lib` (circular dependency). It omits platform/version metadata, which is acceptable for the critical startup errors it reports.
 
 ### Concurrency
 
 - Use goroutines and channels for asynchronous operations like monitoring hashcat.
 - Protect shared state with mutexes where necessary, but prefer channel-based communication.
 - Use `context.Context` for cancellation and deadlines in all long-running or networked operations.
+- **Synchronized state access:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` (for `Reload`, `JobCheckingStopped`, `BenchmarksSubmitted`) or `sync.RWMutex` (for `CurrentActivity`). Always use getter/setter methods (`GetReload()`, `SetReload()`, etc.) — never access these fields directly.
+- **Context propagation:** `StartAgent()` creates a cancellable context (`context.WithCancel`) that is threaded through all goroutine functions. Use `ctx` for operations that should stop on shutdown; use `context.Background()` for error reports and shutdown notifications that must complete.
 - Run tests with the `-race` flag in CI to detect data races.
 
 ### Performance
@@ -147,6 +151,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `lib/testhelpers/error_helpers.go` for constructing test errors (`NewAPIError`, `NewValidationAPIError`, `NewSetTaskAbandonedError`).
 - MockClient sub-client accessors (`Tasks()`, `Agents()`, etc.) return default unconfigured mocks (not nil) to prevent nil pointer panics when code paths call sub-clients the test didn't explicitly mock.
 - When removing a field from global state (`agentstate.State`), grep all test helpers, cleanup functions, and reset functions for references.
+- Use getter/setter methods for synchronized `agentstate.State` fields in tests — do not copy the struct (it contains `sync.RWMutex` and `atomic.Bool`).
 - Run `go test -race ./...` to detect data races.
 
 ## Git

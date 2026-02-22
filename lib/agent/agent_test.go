@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -16,13 +17,36 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
-// saveAndRestoreState saves the current agentstate and returns a cleanup function.
+// saveAndRestoreState saves the current agentstate fields and returns a cleanup function
+// that restores them. Uses per-field save/restore to avoid copying sync primitives.
 func saveAndRestoreState(t *testing.T) func() {
 	t.Helper()
-	original := agentstate.State
+	// Save plain (non-synchronized) fields
+	origDebug := agentstate.State.Debug
+	origExtraDebugging := agentstate.State.ExtraDebugging
+	origAgentID := agentstate.State.AgentID
+	origURL := agentstate.State.URL
+	origAPIToken := agentstate.State.APIToken
+	origAPIClient := agentstate.State.APIClient
+
+	// Save synchronized fields via getters
+	origReload := agentstate.State.GetReload()
+	origJobCheckingStopped := agentstate.State.GetJobCheckingStopped()
+	origBenchmarksSubmitted := agentstate.State.GetBenchmarksSubmitted()
+	origCurrentActivity := agentstate.State.GetCurrentActivity()
 
 	return func() {
-		agentstate.State = original
+		agentstate.State.Debug = origDebug
+		agentstate.State.ExtraDebugging = origExtraDebugging
+		agentstate.State.AgentID = origAgentID
+		agentstate.State.URL = origURL
+		agentstate.State.APIToken = origAPIToken
+		agentstate.State.APIClient = origAPIClient
+
+		agentstate.State.SetReload(origReload)
+		agentstate.State.SetJobCheckingStopped(origJobCheckingStopped)
+		agentstate.State.SetBenchmarksSubmitted(origBenchmarksSubmitted)
+		agentstate.State.SetCurrentActivity(origCurrentActivity)
 	}
 }
 
@@ -85,13 +109,13 @@ func TestHandleNewTask_BenchmarksNotSubmitted(t *testing.T) {
 	cleanup := saveAndRestoreState(t)
 	defer cleanup()
 
-	agentstate.State.BenchmarksSubmitted = false
+	agentstate.State.SetBenchmarksSubmitted(false)
 
 	// This should return early without error
-	handleNewTask()
+	handleNewTask(context.Background())
 
 	// No assertion needed - just verifying it doesn't panic
-	assert.False(t, agentstate.State.BenchmarksSubmitted)
+	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
 }
 
 func TestActivityConstants_AreValid(t *testing.T) {
@@ -105,33 +129,33 @@ func TestAgentActivityTransitions(t *testing.T) {
 
 	// Test that activity transitions are valid
 	t.Run("Starting", func(t *testing.T) {
-		agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
-		assert.Equal(t, agentstate.CurrentActivityStarting, agentstate.State.CurrentActivity)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
+		assert.Equal(t, agentstate.CurrentActivityStarting, agentstate.State.GetCurrentActivity())
 	})
 
 	t.Run("Benchmarking", func(t *testing.T) {
-		agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
-		assert.Equal(t, agentstate.CurrentActivityBenchmarking, agentstate.State.CurrentActivity)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
+		assert.Equal(t, agentstate.CurrentActivityBenchmarking, agentstate.State.GetCurrentActivity())
 	})
 
 	t.Run("Updating", func(t *testing.T) {
-		agentstate.State.CurrentActivity = agentstate.CurrentActivityUpdating
-		assert.Equal(t, agentstate.CurrentActivityUpdating, agentstate.State.CurrentActivity)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityUpdating)
+		assert.Equal(t, agentstate.CurrentActivityUpdating, agentstate.State.GetCurrentActivity())
 	})
 
 	t.Run("Waiting", func(t *testing.T) {
-		agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
-		assert.Equal(t, agentstate.CurrentActivityWaiting, agentstate.State.CurrentActivity)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
+		assert.Equal(t, agentstate.CurrentActivityWaiting, agentstate.State.GetCurrentActivity())
 	})
 
 	t.Run("Cracking", func(t *testing.T) {
-		agentstate.State.CurrentActivity = agentstate.CurrentActivityCracking
-		assert.Equal(t, agentstate.CurrentActivityCracking, agentstate.State.CurrentActivity)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
+		assert.Equal(t, agentstate.CurrentActivityCracking, agentstate.State.GetCurrentActivity())
 	})
 
 	t.Run("Stopping", func(t *testing.T) {
-		agentstate.State.CurrentActivity = agentstate.CurrentActivityStopping
-		assert.Equal(t, agentstate.CurrentActivityStopping, agentstate.State.CurrentActivity)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStopping)
+		assert.Equal(t, agentstate.CurrentActivityStopping, agentstate.State.GetCurrentActivity())
 	})
 }
 
@@ -140,15 +164,15 @@ func TestJobCheckingStoppedFlag(t *testing.T) {
 	defer cleanup()
 
 	// Initial state
-	agentstate.State.JobCheckingStopped = false
+	agentstate.State.SetJobCheckingStopped(false)
 
 	// Set to true
-	agentstate.State.JobCheckingStopped = true
-	assert.True(t, agentstate.State.JobCheckingStopped)
+	agentstate.State.SetJobCheckingStopped(true)
+	assert.True(t, agentstate.State.GetJobCheckingStopped())
 
 	// Set back to false
-	agentstate.State.JobCheckingStopped = false
-	assert.False(t, agentstate.State.JobCheckingStopped)
+	agentstate.State.SetJobCheckingStopped(false)
+	assert.False(t, agentstate.State.GetJobCheckingStopped())
 }
 
 func TestReloadFlag(t *testing.T) {
@@ -156,15 +180,15 @@ func TestReloadFlag(t *testing.T) {
 	defer cleanup()
 
 	// Initial state
-	agentstate.State.Reload = false
+	agentstate.State.SetReload(false)
 
 	// Set to true
-	agentstate.State.Reload = true
-	assert.True(t, agentstate.State.Reload)
+	agentstate.State.SetReload(true)
+	assert.True(t, agentstate.State.GetReload())
 
 	// Set back to false
-	agentstate.State.Reload = false
-	assert.False(t, agentstate.State.Reload)
+	agentstate.State.SetReload(false)
+	assert.False(t, agentstate.State.GetReload())
 }
 
 func TestExtraDebuggingFlag(t *testing.T) {
@@ -192,7 +216,7 @@ func TestExtraDebuggingFlag(t *testing.T) {
 	signChan := make(chan os.Signal, 1)
 
 	agentstate.State.ExtraDebugging = true
-	err := heartbeat(signChan)
+	err := heartbeat(context.Background(), signChan)
 	require.NoError(t, err)
 	logOutput := buf.String()
 	assert.Contains(t, logOutput, "Sending heartbeat")
@@ -200,7 +224,7 @@ func TestExtraDebuggingFlag(t *testing.T) {
 
 	buf.Reset()
 	agentstate.State.ExtraDebugging = false
-	err = heartbeat(signChan)
+	err = heartbeat(context.Background(), signChan)
 	require.NoError(t, err)
 	logOutput = buf.String()
 	assert.NotContains(t, logOutput, "Sending heartbeat")
@@ -406,13 +430,13 @@ func TestHeartbeat_StatePending(t *testing.T) {
 
 	testhelpers.MockHeartbeatResponse(123, api.StatePending)
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
-	agentstate.State.Reload = false
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
+	agentstate.State.SetReload(false)
 
 	signChan := make(chan os.Signal, 1)
-	err := heartbeat(signChan)
+	err := heartbeat(context.Background(), signChan)
 	require.NoError(t, err)
-	assert.True(t, agentstate.State.Reload, "StatePending should set Reload=true")
+	assert.True(t, agentstate.State.GetReload(), "StatePending should set Reload=true")
 }
 
 // TestHeartbeat_StatePending_WhileBenchmarking verifies that a StatePending
@@ -429,13 +453,13 @@ func TestHeartbeat_StatePending_WhileBenchmarking(t *testing.T) {
 
 	testhelpers.MockHeartbeatResponse(123, api.StatePending)
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
-	agentstate.State.Reload = false
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
+	agentstate.State.SetReload(false)
 
 	signChan := make(chan os.Signal, 1)
-	err := heartbeat(signChan)
+	err := heartbeat(context.Background(), signChan)
 	require.NoError(t, err)
-	assert.False(t, agentstate.State.Reload, "StatePending during benchmarking should NOT set Reload")
+	assert.False(t, agentstate.State.GetReload(), "StatePending during benchmarking should NOT set Reload")
 }
 
 // TestHeartbeat_StateStopped verifies that a StateStopped heartbeat response
@@ -452,14 +476,14 @@ func TestHeartbeat_StateStopped(t *testing.T) {
 
 	testhelpers.MockHeartbeatResponse(123, api.StateStopped)
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
-	agentstate.State.JobCheckingStopped = false
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
+	agentstate.State.SetJobCheckingStopped(false)
 
 	signChan := make(chan os.Signal, 1)
-	err := heartbeat(signChan)
+	err := heartbeat(context.Background(), signChan)
 	require.NoError(t, err)
-	assert.True(t, agentstate.State.JobCheckingStopped, "StateStopped should set JobCheckingStopped=true")
-	assert.Equal(t, agentstate.CurrentActivityStopping, agentstate.State.CurrentActivity)
+	assert.True(t, agentstate.State.GetJobCheckingStopped(), "StateStopped should set JobCheckingStopped=true")
+	assert.Equal(t, agentstate.CurrentActivityStopping, agentstate.State.GetCurrentActivity())
 }
 
 // TestHeartbeat_StateStopped_WhileCracking verifies that a StateStopped
@@ -476,18 +500,18 @@ func TestHeartbeat_StateStopped_WhileCracking(t *testing.T) {
 
 	testhelpers.MockHeartbeatResponse(123, api.StateStopped)
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityCracking
-	agentstate.State.JobCheckingStopped = false
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
+	agentstate.State.SetJobCheckingStopped(false)
 
 	signChan := make(chan os.Signal, 1)
-	err := heartbeat(signChan)
+	err := heartbeat(context.Background(), signChan)
 	require.NoError(t, err)
 	assert.False(
 		t,
-		agentstate.State.JobCheckingStopped,
+		agentstate.State.GetJobCheckingStopped(),
 		"StateStopped during cracking should NOT set JobCheckingStopped",
 	)
-	assert.Equal(t, agentstate.CurrentActivityCracking, agentstate.State.CurrentActivity)
+	assert.Equal(t, agentstate.CurrentActivityCracking, agentstate.State.GetCurrentActivity())
 }
 
 // TestHeartbeat_StateError verifies that a StateError heartbeat response
@@ -504,10 +528,10 @@ func TestHeartbeat_StateError(t *testing.T) {
 
 	testhelpers.MockHeartbeatResponse(123, api.StateError)
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 
 	signChan := make(chan os.Signal, 1)
-	err := heartbeat(signChan)
+	err := heartbeat(context.Background(), signChan)
 	require.NoError(t, err)
 
 	// Verify SIGTERM was sent to the channel
@@ -533,16 +557,16 @@ func TestHeartbeat_NoContent(t *testing.T) {
 
 	testhelpers.MockHeartbeatNoContent(123)
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
-	agentstate.State.Reload = false
-	agentstate.State.JobCheckingStopped = false
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
+	agentstate.State.SetReload(false)
+	agentstate.State.SetJobCheckingStopped(false)
 
 	signChan := make(chan os.Signal, 1)
-	err := heartbeat(signChan)
+	err := heartbeat(context.Background(), signChan)
 	require.NoError(t, err)
 
 	// State should be unchanged
-	assert.False(t, agentstate.State.Reload)
-	assert.False(t, agentstate.State.JobCheckingStopped)
-	assert.Equal(t, agentstate.CurrentActivityWaiting, agentstate.State.CurrentActivity)
+	assert.False(t, agentstate.State.GetReload())
+	assert.False(t, agentstate.State.GetJobCheckingStopped())
+	assert.Equal(t, agentstate.CurrentActivityWaiting, agentstate.State.GetCurrentActivity())
 }

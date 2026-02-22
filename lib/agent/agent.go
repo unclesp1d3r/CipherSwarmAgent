@@ -86,16 +86,20 @@ func StartAgent() {
 
 	agentstate.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
+	// Create cancellable context for graceful shutdown propagation
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Start heartbeat loop early so UI can see agent is connected
-	go startHeartbeatLoop(signChan)
+	go startHeartbeatLoop(ctx, signChan)
 
 	// Submit initial benchmarks to the server
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	if err := lib.UpdateBenchmarks(); err != nil {
 		agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
 	}
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 
 	// Kill any dangling hashcat processes
 	if cracker.CheckForExistingClient(agentstate.State.HashcatPidFile) {
@@ -103,10 +107,11 @@ func StartAgent() {
 	}
 
 	// Start agent loop (heartbeat loop already started above)
-	go startAgentLoop()
+	go startAgentLoop(ctx)
 
 	// Wait for termination signal
 	sig := <-signChan
+	cancel() // Cancel context to signal goroutines
 	agentstate.Logger.Debug("Received signal", "signal", sig)
 	lib.SendAgentError("Received signal to terminate. Shutting down", nil, api.SeverityInfo)
 	lib.SendAgentShutdown()
@@ -150,12 +155,12 @@ func calculateHeartbeatBackoff(
 
 // startHeartbeatLoop runs the heartbeat loop with exponential backoff on failures.
 // On consecutive failures, it backs off exponentially up to a maximum multiplier.
-func startHeartbeatLoop(signChan chan os.Signal) {
+func startHeartbeatLoop(ctx context.Context, signChan chan os.Signal) {
 	consecutiveFailures := 0
-	maxBackoffMultiplier := viper.GetInt("max_heartbeat_backoff")
+	maxBackoffMultiplier := agentstate.State.MaxHeartbeatBackoff
 
 	for {
-		err := heartbeat(signChan)
+		err := heartbeat(ctx, signChan)
 		baseInterval := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
 
 		if err != nil {
@@ -177,13 +182,14 @@ func startHeartbeatLoop(signChan chan os.Signal) {
 	}
 }
 
-func startAgentLoop() {
+func startAgentLoop(ctx context.Context) {
 	benchmarkRetryFailures := 0
 
 	for {
 		// Retry cached benchmark submission if benchmarks haven't been submitted yet.
 		// TrySubmitCachedBenchmarks is a no-op when force-benchmark flag is set.
-		if !agentstate.State.BenchmarksSubmitted {
+		if !agentstate.State.GetBenchmarksSubmitted() {
+			//nolint:contextcheck // callee lacks ctx param
 			if lib.TrySubmitCachedBenchmarks() {
 				benchmarkRetryFailures = 0
 			} else if benchmarkRetryFailures < maxBenchmarkRetries {
@@ -193,6 +199,7 @@ func startAgentLoop() {
 						"Benchmark cache retry limit reached, will not retry until reload",
 						"attempts", benchmarkRetryFailures,
 					)
+					//nolint:contextcheck // callee lacks ctx param
 					lib.SendAgentError(
 						fmt.Sprintf("Benchmark submission retry limit reached after %d attempts",
 							benchmarkRetryFailures),
@@ -203,17 +210,17 @@ func startAgentLoop() {
 			}
 		}
 
-		if agentstate.State.Reload {
-			handleReload()
+		if agentstate.State.GetReload() {
+			handleReload(ctx)
 			benchmarkRetryFailures = 0 // Reset retry counter after reload
 		}
 
 		if !lib.Configuration.Config.UseNativeHashcat {
-			handleCrackerUpdate()
+			handleCrackerUpdate(ctx)
 		}
 
-		if !agentstate.State.JobCheckingStopped {
-			handleNewTask()
+		if !agentstate.State.GetJobCheckingStopped() {
+			handleNewTask(ctx)
 		}
 
 		sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
@@ -222,48 +229,58 @@ func startAgentLoop() {
 	}
 }
 
-func handleReload() {
+func handleReload(_ context.Context) {
+	//nolint:contextcheck // callee lacks ctx param
 	lib.SendAgentError("Reloading config and performing new benchmark", nil, api.SeverityInfo)
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 	agentstate.Logger.Info("Reloading agent")
 
+	//nolint:contextcheck // callee lacks ctx param
 	if err := fetchAgentConfig(); err != nil {
 		agentstate.Logger.Error("Failed to fetch agent configuration, skipping reload", "error", err)
+		//nolint:contextcheck // callee lacks ctx param
 		lib.SendAgentError("Failed to fetch agent configuration", nil, api.SeverityFatal)
-		agentstate.State.Reload = false
+		agentstate.State.SetReload(false)
 
 		return
 	}
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityBenchmarking
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	// Server-initiated reload must re-run benchmarks (not use stale cache).
 	// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
-	viper.Set("force_benchmark_run", true)
-	defer viper.Set("force_benchmark_run", false)
+	agentstate.State.ForceBenchmarkRun = true
+	defer func() { agentstate.State.ForceBenchmarkRun = false }()
+	//nolint:contextcheck // callee lacks ctx param
 	if err := lib.UpdateBenchmarks(); err != nil {
 		agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
 			"error", err)
-		lib.SendAgentError("Benchmark update failed during reload: "+err.Error(), nil, api.SeverityMajor)
+		//nolint:contextcheck // callee lacks ctx param
+		lib.SendAgentError(
+			"Benchmark update failed during reload: "+err.Error(),
+			nil,
+			api.SeverityMajor,
+		)
 	}
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
-	agentstate.State.Reload = false
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
+	agentstate.State.SetReload(false)
 }
 
-func handleCrackerUpdate() {
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityUpdating
+func handleCrackerUpdate(ctx context.Context) {
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityUpdating)
 
-	lib.UpdateCracker()
+	lib.UpdateCracker(ctx)
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityStarting
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 }
 
-func handleNewTask() {
-	if !agentstate.State.BenchmarksSubmitted {
+func handleNewTask(ctx context.Context) {
+	if !agentstate.State.GetBenchmarksSubmitted() {
 		agentstate.Logger.Debug("Benchmarks not yet submitted, skipping task retrieval")
 		return
 	}
 
+	//nolint:contextcheck // callee lacks ctx param
 	task, err := lib.GetNewTask()
 	if err != nil {
 		if errors.Is(err, lib.ErrNoTaskAvailable) {
@@ -272,21 +289,22 @@ func handleNewTask() {
 		}
 
 		agentstate.Logger.Error("Failed to get new task", "error", err)
-		time.Sleep(viper.GetDuration("sleep_on_failure"))
+		time.Sleep(agentstate.State.SleepOnFailure)
 
 		return
 	}
 
 	if task != nil {
-		_ = processTask(task) //nolint:errcheck // Ignore error, as it is already logged and we can continue
+		_ = processTask(ctx, task) //nolint:errcheck // Ignore error, as it is already logged and we can continue
 	}
 }
 
-func processTask(task *api.Task) error {
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityCracking
+func processTask(ctx context.Context, task *api.Task) error {
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
 
 	lib.DisplayNewTask(task)
 
+	//nolint:contextcheck // callee lacks ctx param
 	attack, err := lib.GetAttackParameters(task.AttackId)
 	if err != nil || attack == nil {
 		agentstate.Logger.Error("Failed to get attack parameters", "error", err)
@@ -296,9 +314,11 @@ func processTask(task *api.Task) error {
 			errMsg = err.Error()
 		}
 
+		//nolint:contextcheck // callee lacks ctx param
 		lib.SendAgentError(errMsg, task, api.SeverityFatal)
+		//nolint:contextcheck // callee lacks ctx param
 		lib.AbandonTask(task)
-		time.Sleep(viper.GetDuration("sleep_on_failure"))
+		time.Sleep(agentstate.State.SleepOnFailure)
 
 		if err != nil {
 			return err
@@ -309,6 +329,7 @@ func processTask(task *api.Task) error {
 
 	lib.DisplayNewAttack(attack)
 
+	//nolint:contextcheck // callee lacks ctx param
 	err = lib.AcceptTask(task)
 	if err != nil {
 		agentstate.Logger.Error("Failed to accept task", "task_id", task.Id)
@@ -318,34 +339,36 @@ func processTask(task *api.Task) error {
 
 	lib.DisplayRunTaskAccepted(task)
 
-	// TODO: propagate cancellable context from startAgentLoop for graceful shutdown support
-	if err := lib.DownloadFiles(context.TODO(), attack); err != nil {
+	if err := lib.DownloadFiles(ctx, attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
+		//nolint:contextcheck // callee lacks ctx param
 		lib.SendAgentError(err.Error(), task, api.SeverityFatal)
+		//nolint:contextcheck // callee lacks ctx param
 		lib.AbandonTask(task)
-		time.Sleep(viper.GetDuration("sleep_on_failure"))
+		time.Sleep(agentstate.State.SleepOnFailure)
 
 		return err
 	}
 
+	//nolint:contextcheck // callee lacks ctx param
 	err = lib.RunTask(task, attack)
 	if err != nil {
 		return err
 	}
 
-	agentstate.State.CurrentActivity = agentstate.CurrentActivityWaiting
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 
 	return nil
 }
 
 // heartbeat sends a heartbeat to the server and processes the response.
 // It returns an error if the heartbeat failed.
-func heartbeat(signChan chan os.Signal) error {
+func heartbeat(ctx context.Context, signChan chan os.Signal) error {
 	if agentstate.State.ExtraDebugging {
 		agentstate.Logger.Debug("Sending heartbeat")
 	}
 
-	state, err := lib.SendHeartBeat()
+	state, err := lib.SendHeartBeat(ctx)
 	if err != nil {
 		return err
 	}
@@ -361,22 +384,22 @@ func heartbeat(signChan chan os.Signal) error {
 
 	switch *state {
 	case api.StatePending:
-		if agentstate.State.CurrentActivity != agentstate.CurrentActivityBenchmarking {
+		if agentstate.State.GetCurrentActivity() != agentstate.CurrentActivityBenchmarking {
 			agentstate.Logger.Info("Agent is pending, performing reload")
-			agentstate.State.Reload = true
+			agentstate.State.SetReload(true)
 		}
 	case api.StateStopped:
-		if agentstate.State.CurrentActivity != agentstate.CurrentActivityCracking {
-			agentstate.State.CurrentActivity = agentstate.CurrentActivityStopping
+		if agentstate.State.GetCurrentActivity() != agentstate.CurrentActivityCracking {
+			agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStopping)
 			agentstate.Logger.Debug("Agent is stopped, stopping processing")
 
-			if !agentstate.State.JobCheckingStopped {
+			if !agentstate.State.GetJobCheckingStopped() {
 				agentstate.Logger.Warn(
 					"Job checking stopped, per server directive. Waiting for further instructions.",
 				)
 			}
 
-			agentstate.State.JobCheckingStopped = true
+			agentstate.State.SetJobCheckingStopped(true)
 		}
 	case api.StateError:
 		agentstate.Logger.Info("Agent is in error state, stopping processing")
@@ -393,7 +416,7 @@ func fetchAgentConfig() error {
 		return fmt.Errorf("failed to get agent configuration from the CipherSwarm API: %w", err)
 	}
 
-	if viper.GetBool("always_use_native_hashcat") {
+	if agentstate.State.AlwaysUseNativeHashcat {
 		lib.Configuration.Config.UseNativeHashcat = true
 	}
 

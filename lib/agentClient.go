@@ -32,8 +32,10 @@ var (
 	Configuration agentConfiguration //nolint:gochecknoglobals // Global agent configuration
 
 	// setNativeHashcatPathFn allows stubbing setNativeHashcatPath for testing.
+	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
 	setNativeHashcatPathFn = setNativeHashcatPath //nolint:gochecknoglobals // Used for testing
 	// getDevicesListFn allows stubbing getDevicesList for testing.
+	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
 	getDevicesListFn = getDevicesList //nolint:gochecknoglobals // Used for testing
 )
 
@@ -265,8 +267,8 @@ func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile)
 // SendHeartBeat sends a heartbeat signal to the server and processes the server's response.
 // It handles different response status codes and logs relevant messages.
 // It returns the agent's state object (or nil for no state change) and an error if the heartbeat failed.
-func SendHeartBeat() (*api.SendHeartbeat200State, error) {
-	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(context.Background(), agentstate.State.AgentID)
+func SendHeartBeat(ctx context.Context) (*api.SendHeartbeat200State, error) {
+	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(ctx, agentstate.State.AgentID)
 	if err != nil {
 		handleHeartbeatError(err)
 
@@ -297,7 +299,7 @@ func logHeartbeatSent() {
 		agentstate.Logger.Debug("Heartbeat sent")
 	}
 
-	agentstate.State.JobCheckingStopped = false
+	agentstate.State.SetJobCheckingStopped(false)
 }
 
 // handleStateResponse processes the given state response and performs logging based on the agent state.

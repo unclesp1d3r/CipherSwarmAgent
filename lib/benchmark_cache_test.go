@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/jarcoal/httpmock"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -410,7 +409,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 			defer cleanupState()
 
 			agentstate.State.BenchmarkCachePath = tt.setupCachePath(t)
-			agentstate.State.BenchmarksSubmitted = false
+			agentstate.State.SetBenchmarksSubmitted(false)
 
 			tt.setupMock()
 
@@ -419,11 +418,11 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 			if tt.expectError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "benchmark submission failed with no cache for retry")
-				assert.False(t, agentstate.State.BenchmarksSubmitted,
+				assert.False(t, agentstate.State.GetBenchmarksSubmitted(),
 					"BenchmarksSubmitted must remain false when error is returned")
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectBenchmarksSubmit, agentstate.State.BenchmarksSubmitted)
+				assert.Equal(t, tt.expectBenchmarksSubmit, agentstate.State.GetBenchmarksSubmitted())
 			}
 		})
 	}
@@ -486,8 +485,8 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 			defer cleanupState()
 
 			if tt.forceBenchmark {
-				viper.Set("force_benchmark_run", true)
-				defer viper.Set("force_benchmark_run", false)
+				agentstate.State.ForceBenchmarkRun = true
+				defer func() { agentstate.State.ForceBenchmarkRun = false }()
 			}
 
 			if tt.setupCache {
@@ -501,7 +500,7 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 			assert.Equal(t, tt.expectSuccess, result)
 
 			if tt.expectSubmit {
-				assert.True(t, agentstate.State.BenchmarksSubmitted)
+				assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 				// Cache should be cleared after successful submission
 				_, err := os.Stat(agentstate.State.BenchmarkCachePath)
 				assert.True(t, os.IsNotExist(err), "cache should be cleared after successful submission")
@@ -535,7 +534,7 @@ func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
 	// No API mock — should not make any calls
 	result := TrySubmitCachedBenchmarks()
 	assert.True(t, result)
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
 	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
 	assert.True(t, os.IsNotExist(statErr), "cache should be cleared")
@@ -563,7 +562,7 @@ func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
 
 	result := TrySubmitCachedBenchmarks()
 	assert.True(t, result)
-	assert.True(t, agentstate.State.BenchmarksSubmitted)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
 	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
 	assert.True(t, os.IsNotExist(statErr), "cache should be cleared after all submitted")
@@ -591,7 +590,7 @@ func TestTrySubmitCachedBenchmarks_MixedCacheServerFailure(t *testing.T) {
 
 	result := TrySubmitCachedBenchmarks()
 	assert.False(t, result)
-	assert.False(t, agentstate.State.BenchmarksSubmitted)
+	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
 
 	// Cache should be preserved with original flags
 	cached, loadErr := loadBenchmarkCache()

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
@@ -141,10 +140,10 @@ func createBenchmark(result benchmarkResult) (api.HashcatBenchmark, error) {
 // session and delegates to cacheAndSubmitBenchmarks, which may return an error
 // if both the cache save and submission fail simultaneously.
 func UpdateBenchmarks() error {
-	agentstate.State.BenchmarksSubmitted = false
+	agentstate.State.SetBenchmarksSubmitted(false)
 
 	// Try submitting from cache first (unless force re-run is requested)
-	if !viper.GetBool("force_benchmark_run") {
+	if !agentstate.State.ForceBenchmarkRun {
 		cached, loadErr := loadBenchmarkCache()
 		if loadErr != nil {
 			agentstate.Logger.Warn("Failed to load benchmark cache, will re-run benchmarks",
@@ -154,7 +153,7 @@ func UpdateBenchmarks() error {
 		if cached != nil {
 			if allSubmitted(cached) {
 				clearBenchmarkCache()
-				agentstate.State.BenchmarksSubmitted = true
+				agentstate.State.SetBenchmarksSubmitted(true)
 				agentstate.Logger.Info("All cached benchmarks already submitted")
 
 				return nil
@@ -179,7 +178,7 @@ func UpdateBenchmarks() error {
 			}
 
 			clearBenchmarkCache()
-			agentstate.State.BenchmarksSubmitted = true
+			agentstate.State.SetBenchmarksSubmitted(true)
 			agentstate.Logger.Info("Cached benchmarks successfully submitted to server")
 
 			return nil
@@ -205,7 +204,7 @@ func cacheAndSubmitBenchmarks(benchmarkResults []benchmarkResult) error {
 	if allSubmitted(benchmarkResults) {
 		agentstate.Logger.Info("All benchmarks already submitted incrementally, skipping bulk submission")
 		clearBenchmarkCache()
-		agentstate.State.BenchmarksSubmitted = true
+		agentstate.State.SetBenchmarksSubmitted(true)
 
 		return nil
 	}
@@ -241,7 +240,7 @@ func cacheAndSubmitBenchmarks(benchmarkResults []benchmarkResult) error {
 	}
 
 	clearBenchmarkCache()
-	agentstate.State.BenchmarksSubmitted = true
+	agentstate.State.SetBenchmarksSubmitted(true)
 	agentstate.Logger.Info("Benchmarks successfully submitted to server")
 
 	return nil
@@ -356,7 +355,7 @@ func processBenchmarkOutput(sess *hashcat.Session) []benchmarkResult {
 					}
 				}
 
-				agentstate.State.BenchmarksSubmitted = allSubmitted(benchmarkResults)
+				agentstate.State.SetBenchmarksSubmitted(allSubmitted(benchmarkResults))
 
 				// Always persist cache with Submitted flags for retry
 				if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {

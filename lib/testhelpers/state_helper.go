@@ -65,7 +65,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	return func() {
 		// Cleanup: remove temporary directories
 		_ = os.RemoveAll(testDataDir)
-		// Reset agentstate.State to zero values by setting each field individually
+		// Reset agentstate.State to zero values
 		agentstate.State.PidFile = ""
 		agentstate.State.HashcatPidFile = ""
 		agentstate.State.DataPath = ""
@@ -82,18 +82,27 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.AgentID = 0
 		agentstate.State.URL = ""
 		agentstate.State.APIToken = ""
-		agentstate.State.Reload = false
-		agentstate.State.CurrentActivity = ""
 		agentstate.State.AlwaysTrustFiles = false
 		agentstate.State.ExtraDebugging = false
 		agentstate.State.StatusTimer = 0
 		agentstate.State.WriteZapsToFile = false
 		agentstate.State.RetainZapsOnCompletion = false
 		agentstate.State.EnableAdditionalHashTypes = false
-		agentstate.State.JobCheckingStopped = false
 		agentstate.State.UseLegacyDeviceIdentificationMethod = false
-		agentstate.State.BenchmarksSubmitted = false
 		agentstate.State.APIClient = nil
+		agentstate.State.ForceBenchmarkRun = false
+		agentstate.State.InsecureDownloads = false
+		agentstate.State.DownloadMaxRetries = 0
+		agentstate.State.DownloadRetryDelay = 0
+		agentstate.State.TaskTimeout = 0
+		agentstate.State.MaxHeartbeatBackoff = 0
+		agentstate.State.SleepOnFailure = 0
+		agentstate.State.AlwaysUseNativeHashcat = false
+		// Reset synchronized fields via setters
+		agentstate.State.SetReload(false)
+		agentstate.State.SetCurrentActivity("")
+		agentstate.State.SetJobCheckingStopped(false)
+		agentstate.State.SetBenchmarksSubmitted(false)
 		// Deactivate httpmock
 		httpmock.DeactivateAndReset()
 	}
@@ -118,18 +127,27 @@ func ResetTestState() {
 	agentstate.State.AgentID = 0
 	agentstate.State.URL = ""
 	agentstate.State.APIToken = ""
-	agentstate.State.Reload = false
-	agentstate.State.CurrentActivity = ""
 	agentstate.State.AlwaysTrustFiles = false
 	agentstate.State.ExtraDebugging = false
 	agentstate.State.StatusTimer = 0
 	agentstate.State.WriteZapsToFile = false
 	agentstate.State.RetainZapsOnCompletion = false
 	agentstate.State.EnableAdditionalHashTypes = false
-	agentstate.State.JobCheckingStopped = false
 	agentstate.State.UseLegacyDeviceIdentificationMethod = false
-	agentstate.State.BenchmarksSubmitted = false
 	agentstate.State.APIClient = nil
+	agentstate.State.ForceBenchmarkRun = false
+	agentstate.State.InsecureDownloads = false
+	agentstate.State.DownloadMaxRetries = 0
+	agentstate.State.DownloadRetryDelay = 0
+	agentstate.State.TaskTimeout = 0
+	agentstate.State.MaxHeartbeatBackoff = 0
+	agentstate.State.SleepOnFailure = 0
+	agentstate.State.AlwaysUseNativeHashcat = false
+	// Reset synchronized fields via setters
+	agentstate.State.SetReload(false)
+	agentstate.State.SetCurrentActivity("")
+	agentstate.State.SetJobCheckingStopped(false)
+	agentstate.State.SetBenchmarksSubmitted(false)
 }
 
 // SetupMinimalTestState sets up minimal state (just AgentID and basic paths)

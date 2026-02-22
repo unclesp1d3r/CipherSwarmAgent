@@ -137,44 +137,44 @@ func TestParseExitCode_AllHashcatCodes(t *testing.T) {
 // output and sends classified errors to the server.
 func TestHandleStdErrLine(t *testing.T) {
 	tests := []struct {
-		name                      string
-		stdErrLine                string
-		expectSendClassifiedError bool
+		name                 string
+		stdErrLine           string
+		expectSendAgentError bool
 	}{
 		{
-			name:                      "empty line should not send error",
-			stdErrLine:                "",
-			expectSendClassifiedError: false,
+			name:                 "empty line should not send error",
+			stdErrLine:           "",
+			expectSendAgentError: false,
 		},
 		{
-			name:                      "whitespace only should not send error",
-			stdErrLine:                "   ",
-			expectSendClassifiedError: false,
+			name:                 "whitespace only should not send error",
+			stdErrLine:           "   ",
+			expectSendAgentError: false,
 		},
 		{
-			name:                      "tab only should not send error",
-			stdErrLine:                "\t",
-			expectSendClassifiedError: false,
+			name:                 "tab only should not send error",
+			stdErrLine:           "\t",
+			expectSendAgentError: false,
 		},
 		{
-			name:                      "non-empty line should send error",
-			stdErrLine:                "Some error message",
-			expectSendClassifiedError: true,
+			name:                 "non-empty line should send error",
+			stdErrLine:           "Some error message",
+			expectSendAgentError: true,
 		},
 		{
-			name:                      "hash format error should be classified",
-			stdErrLine:                "Hash 'test': Separator unmatched",
-			expectSendClassifiedError: true,
+			name:                 "hash format error should be classified",
+			stdErrLine:           "Hash 'test': Separator unmatched",
+			expectSendAgentError: true,
 		},
 		{
-			name:                      "device error should be classified",
-			stdErrLine:                "Device #1: ATTENTION! out of memory",
-			expectSendClassifiedError: true,
+			name:                 "device error should be classified",
+			stdErrLine:           "Device #1: ATTENTION! out of memory",
+			expectSendAgentError: true,
 		},
 		{
-			name:                      "file access error should be classified",
-			stdErrLine:                "ERROR: No such file or directory",
-			expectSendClassifiedError: true,
+			name:                 "file access error should be classified",
+			stdErrLine:           "ERROR: No such file or directory",
+			expectSendAgentError: true,
 		},
 	}
 
@@ -198,15 +198,15 @@ func TestHandleStdErrLine(t *testing.T) {
 			// Call handleStdErrLine
 			handleStdErrLine(tt.stdErrLine, task)
 
-			// Verify SendClassifiedError behavior
+			// Verify SendAgentError behavior
 			finalCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 
-			if tt.expectSendClassifiedError {
+			if tt.expectSendAgentError {
 				assert.Greater(t, finalCount, initialCount,
-					"SendClassifiedError should be called for non-empty stderr: %q", tt.stdErrLine)
+					"SendAgentError should be called for non-empty stderr: %q", tt.stdErrLine)
 			} else {
 				assert.Equal(t, initialCount, finalCount,
-					"SendClassifiedError should not be called for empty/whitespace stderr: %q", tt.stdErrLine)
+					"SendAgentError should not be called for empty/whitespace stderr: %q", tt.stdErrLine)
 			}
 		})
 	}

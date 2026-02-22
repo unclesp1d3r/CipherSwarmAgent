@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-getter"
-	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
@@ -112,7 +111,7 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 		}
 	}
 
-	insecure := viper.GetBool("insecure_downloads")
+	insecure := agentstate.State.InsecureDownloads
 	if insecure {
 		agentstate.Logger.Warn("TLS certificate verification disabled for download",
 			"url", fileURL, "dst", filePath)
@@ -138,8 +137,8 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 		)
 	}
 
-	maxRetries := viper.GetInt("download_max_retries")
-	baseDelay := viper.GetDuration("download_retry_delay")
+	maxRetries := agentstate.State.DownloadMaxRetries
+	baseDelay := agentstate.State.DownloadRetryDelay
 
 	if err := downloadWithRetry(client, maxRetries, baseDelay); err != nil {
 		return err

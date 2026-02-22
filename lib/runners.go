@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
@@ -26,7 +25,7 @@ func runAttackTask(sess *hashcat.Session, task *api.Task) {
 	}
 
 	// Create timeout channel with configurable duration
-	taskTimeout := viper.GetDuration("task_timeout")
+	taskTimeout := agentstate.State.TaskTimeout
 	timeoutChan := time.After(taskTimeout)
 
 	waitChan := make(chan struct{})
@@ -83,12 +82,11 @@ func handleStdOutLine(stdoutLine string, task *api.Task, _ *hashcat.Session) {
 		var update hashcat.Status
 		if err := json.Unmarshal(lineBytes, &update); err != nil {
 			agentstate.Logger.Error("Failed to parse status update", "error", err)
-			SendClassifiedError(
+			SendAgentError(
 				"Failed to parse hashcat status update: "+err.Error(),
 				task,
 				api.SeverityWarning,
-				"parse_error",
-				true, // Retryable - this is likely a transient or version mismatch issue
+				WithClassification("parse_error", true), // Retryable - transient or version mismatch
 			)
 		}
 		// Valid JSON status is processed via sess.StatusUpdates → handleStatusUpdate
@@ -103,7 +101,8 @@ func handleStdErrLine(stdErrLine string, task *api.Task) {
 	if strings.TrimSpace(stdErrLine) != "" {
 		// Classify the stderr line to determine appropriate severity
 		errorInfo := hashcat.ClassifyStderr(stdErrLine)
-		SendClassifiedError(stdErrLine, task, errorInfo.Severity, errorInfo.Category.String(), errorInfo.Retryable)
+		SendAgentError(stdErrLine, task, errorInfo.Severity,
+			WithClassification(errorInfo.Category.String(), errorInfo.Retryable))
 	}
 }
 
@@ -194,19 +193,19 @@ func handleNonExhaustedError(err error, task *api.Task, sess *hashcat.Session, e
 		// of the retryable failure (the task can be retried now that the corrupt
 		// restore file has been removed)
 		errorInfo := hashcat.ClassifyStderr(err.Error())
-		SendClassifiedError(err.Error(), task, errorInfo.Severity, errorInfo.Category.String(), errorInfo.Retryable)
+		SendAgentError(err.Error(), task, errorInfo.Severity,
+			WithClassification(errorInfo.Category.String(), errorInfo.Retryable))
 		displayJobFailed(err)
 
 		return
 	}
 
 	// Send error with classified severity and metadata
-	SendClassifiedError(
+	SendAgentError(
 		err.Error(),
 		task,
 		exitInfo.Severity,
-		exitInfo.Category.String(),
-		exitInfo.Retryable,
+		WithClassification(exitInfo.Category.String(), exitInfo.Retryable),
 	)
 	displayJobFailed(err)
 }
