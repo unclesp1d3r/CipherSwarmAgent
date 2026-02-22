@@ -42,4 +42,5 @@ type benchmarkResult struct {
 	RuntimeMs  string `json:"runtime,omitempty"`    // RuntimeMs is the runtime of the benchmark in milliseconds.
 	HashTimeMs string `json:"hash_time,omitempty"`  // HashTimeMs is the time taken to hash in milliseconds.
 	SpeedHs    string `json:"hash_speed,omitempty"` // SpeedHs is the hash speed in hashes per second.
+	Submitted  bool   `json:"submitted,omitempty"`  // Submitted indicates whether this result has been accepted by the server.
 }

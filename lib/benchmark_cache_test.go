@@ -108,6 +108,29 @@ func TestSaveBenchmarkCache_AtomicWrite(t *testing.T) {
 	assert.True(t, os.IsNotExist(statErr), "temp file should not exist after successful save")
 }
 
+// TestSaveBenchmarkCache_SubmittedField verifies that the Submitted flag is
+// correctly persisted and loaded from the cache.
+func TestSaveBenchmarkCache_SubmittedField(t *testing.T) {
+	tmpDir := t.TempDir()
+	agentstate.State.BenchmarkCachePath = filepath.Join(tmpDir, "benchmark_cache.json")
+
+	defer func() { agentstate.State.BenchmarkCachePath = "" }()
+
+	results := []benchmarkResult{
+		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "100.0", Submitted: true},
+		{Device: "2", HashType: "1", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "200.0"},
+	}
+
+	err := saveBenchmarkCache(results)
+	require.NoError(t, err)
+
+	loaded, loadErr := loadBenchmarkCache()
+	require.NoError(t, loadErr)
+	require.Len(t, loaded, 2)
+	assert.True(t, loaded[0].Submitted, "first result should be marked submitted")
+	assert.False(t, loaded[1].Submitted, "second result should not be marked submitted")
+}
+
 func TestLoadBenchmarkCache(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -196,6 +219,25 @@ func TestLoadBenchmarkCache(t *testing.T) {
 	}
 }
 
+// TestLoadBenchmarkCache_BackwardCompatible verifies that old cache files without
+// the Submitted field load correctly with Submitted defaulting to false.
+func TestLoadBenchmarkCache_BackwardCompatible(t *testing.T) {
+	tmpDir := t.TempDir()
+	cachePath := filepath.Join(tmpDir, "benchmark_cache.json")
+	agentstate.State.BenchmarkCachePath = cachePath
+
+	defer func() { agentstate.State.BenchmarkCachePath = "" }()
+
+	// Write JSON without Submitted field (simulates old cache format)
+	oldFormat := `[{"device":"1","hash_type":"0","runtime":"100","hash_time":"50","hash_speed":"12345.67"}]`
+	require.NoError(t, os.WriteFile(cachePath, []byte(oldFormat), 0o600))
+
+	loaded, err := loadBenchmarkCache()
+	require.NoError(t, err)
+	require.Len(t, loaded, 1)
+	assert.False(t, loaded[0].Submitted, "old cache entries should default to unsubmitted")
+}
+
 func TestClearBenchmarkCache(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -260,13 +302,15 @@ func TestSaveThenLoadBenchmarkCache(t *testing.T) {
 func TestCacheAndSubmitBenchmarks(t *testing.T) {
 	tests := []struct {
 		name                   string
+		results                []benchmarkResult
 		setupCachePath         func(t *testing.T) string
 		setupMock              func()
 		expectError            bool
 		expectBenchmarksSubmit bool
 	}{
 		{
-			name: "cache saved and submission succeeds",
+			name:    "cache saved and submission succeeds",
+			results: sampleBenchmarkResults,
 			setupCachePath: func(t *testing.T) string {
 				t.Helper()
 				return filepath.Join(t.TempDir(), "benchmark_cache.json")
@@ -280,7 +324,8 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 			expectBenchmarksSubmit: true,
 		},
 		{
-			name: "cache saved but submission fails returns nil for retry",
+			name:    "cache saved but submission fails returns nil for retry",
+			results: sampleBenchmarkResults,
 			setupCachePath: func(t *testing.T) string {
 				t.Helper()
 				return filepath.Join(t.TempDir(), "benchmark_cache.json")
@@ -294,7 +339,8 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 			expectBenchmarksSubmit: false,
 		},
 		{
-			name: "cache write failure and submission failure returns error",
+			name:    "cache write failure and submission failure returns error",
+			results: sampleBenchmarkResults,
 			setupCachePath: func(_ *testing.T) string {
 				// Empty path causes saveBenchmarkCache to fail
 				return ""
@@ -308,9 +354,42 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 			expectBenchmarksSubmit: false,
 		},
 		{
-			name: "cache write failure but submission succeeds",
+			name:    "cache write failure but submission succeeds",
+			results: sampleBenchmarkResults,
 			setupCachePath: func(_ *testing.T) string {
 				return ""
+			},
+			setupMock: func() {
+				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
+				httpmock.RegisterRegexpResponder("POST", pattern,
+					httpmock.NewStringResponder(http.StatusNoContent, ""))
+			},
+			expectError:            false,
+			expectBenchmarksSubmit: true,
+		},
+		{
+			name: "all already submitted skips send",
+			results: []benchmarkResult{
+				{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
+				{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0", Submitted: true},
+			},
+			setupCachePath: func(t *testing.T) string {
+				t.Helper()
+				return filepath.Join(t.TempDir(), "benchmark_cache.json")
+			},
+			setupMock:              func() {},
+			expectError:            false,
+			expectBenchmarksSubmit: true,
+		},
+		{
+			name: "partially submitted sends only unsubmitted",
+			results: []benchmarkResult{
+				{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
+				{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
+			},
+			setupCachePath: func(t *testing.T) string {
+				t.Helper()
+				return filepath.Join(t.TempDir(), "benchmark_cache.json")
 			},
 			setupMock: func() {
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
@@ -335,7 +414,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 
 			tt.setupMock()
 
-			err := cacheAndSubmitBenchmarks(sampleBenchmarkResults)
+			err := cacheAndSubmitBenchmarks(tt.results)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -435,4 +514,89 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestTrySubmitCachedBenchmarks_AllSubmittedInCache verifies that when all
+// cached results are already marked as submitted, no API call is made.
+func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	submitted := []benchmarkResult{
+		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
+		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0", Submitted: true},
+	}
+	err := saveBenchmarkCache(submitted)
+	require.NoError(t, err)
+
+	// No API mock — should not make any calls
+	result := TrySubmitCachedBenchmarks()
+	assert.True(t, result)
+	assert.True(t, agentstate.State.BenchmarksSubmitted)
+
+	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
+	assert.True(t, os.IsNotExist(statErr), "cache should be cleared")
+}
+
+// TestTrySubmitCachedBenchmarks_PartiallySubmitted verifies that only
+// unsubmitted items are sent from a partially submitted cache.
+func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	mixed := []benchmarkResult{
+		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
+		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
+	}
+	err := saveBenchmarkCache(mixed)
+	require.NoError(t, err)
+
+	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
+	httpmock.RegisterRegexpResponder("POST", pattern,
+		httpmock.NewStringResponder(http.StatusNoContent, ""))
+
+	result := TrySubmitCachedBenchmarks()
+	assert.True(t, result)
+	assert.True(t, agentstate.State.BenchmarksSubmitted)
+
+	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
+	assert.True(t, os.IsNotExist(statErr), "cache should be cleared after all submitted")
+}
+
+// TestTrySubmitCachedBenchmarks_MixedCacheServerFailure verifies that when
+// the server rejects a submission of unsubmitted items, the cache is preserved.
+func TestTrySubmitCachedBenchmarks_MixedCacheServerFailure(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	defer cleanupState()
+
+	mixed := []benchmarkResult{
+		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
+		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
+	}
+	err := saveBenchmarkCache(mixed)
+	require.NoError(t, err)
+
+	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/agents/\d+/submit_benchmark$`)
+	httpmock.RegisterRegexpResponder("POST", pattern,
+		httpmock.NewStringResponder(http.StatusInternalServerError, "error"))
+
+	result := TrySubmitCachedBenchmarks()
+	assert.False(t, result)
+	assert.False(t, agentstate.State.BenchmarksSubmitted)
+
+	// Cache should be preserved with original flags
+	cached, loadErr := loadBenchmarkCache()
+	require.NoError(t, loadErr)
+	require.Len(t, cached, 2)
+	assert.True(t, cached[0].Submitted, "first item should still be marked submitted")
+	assert.False(t, cached[1].Submitted, "second item should still be unsubmitted")
 }
