@@ -13,7 +13,7 @@ import (
 	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/fileutil"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
@@ -102,7 +102,10 @@ func CheckForExistingClient(pidFilePath string) bool {
 			return true
 		}
 
-		pidRunning, err := process.PidExists(int32(pidValue)) //nolint:gosec // PID conversion from file is safe
+		pidRunning, err := process.PidExistsWithContext(
+			context.Background(),
+			int32(pidValue),
+		) //nolint:gosec // PID from file
 		if err != nil {
 			agentstate.Logger.Error("Error checking if process is running", "pid", pidValue)
 
