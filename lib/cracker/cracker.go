@@ -86,41 +86,46 @@ func GetCurrentHashcatVersion(ctx context.Context) (string, error) {
 // It reads the PID file and verifies if the process is still active.
 // Returns true if a running process is found or if errors occur during checks.
 func CheckForExistingClient(pidFilePath string) bool {
-	if _, err := os.Stat(pidFilePath); err == nil {
-		pidBytes, err := os.ReadFile(pidFilePath)
-		if err != nil {
-			agentstate.Logger.Error("Error reading PID file", "path", pidFilePath)
-
-			return true
+	if _, err := os.Stat(pidFilePath); err != nil {
+		if !os.IsNotExist(err) {
+			agentstate.Logger.Warn("Could not check PID file, assuming no existing client",
+				"path", pidFilePath, "error", err)
 		}
 
-		pidValue, err := strconv.Atoi(strings.TrimSpace(string(pidBytes)))
-		if err != nil {
-			agentstate.Logger.Error("Error converting PID to integer", "pid", string(pidBytes))
-
-			return true
-		}
-
-		pidRunning, err := process.PidExistsWithContext(
-			context.Background(),
-			int32(pidValue), //nolint:gosec // G115 - PID from file
-		)
-		if err != nil {
-			agentstate.Logger.Error("Error checking if process is running", "pid", pidValue)
-
-			return true
-		}
-
-		agentstate.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
-
-		if !pidRunning {
-			agentstate.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
-		}
-
-		return pidRunning
+		return false
 	}
 
-	return false
+	pidBytes, err := os.ReadFile(pidFilePath)
+	if err != nil {
+		agentstate.Logger.Error("Error reading PID file", "path", pidFilePath)
+
+		return true
+	}
+
+	pidValue, err := strconv.Atoi(strings.TrimSpace(string(pidBytes)))
+	if err != nil {
+		agentstate.Logger.Error("Error converting PID to integer", "pid", string(pidBytes))
+
+		return true
+	}
+
+	pidRunning, err := process.PidExistsWithContext(
+		context.Background(),
+		int32(pidValue), //nolint:gosec // G115 - PID from file
+	)
+	if err != nil {
+		agentstate.Logger.Error("Error checking if process is running", "pid", pidValue)
+
+		return true
+	}
+
+	agentstate.Logger.Warn("Existing lock file found", "path", pidFilePath, "pid", pidValue)
+
+	if !pidRunning {
+		agentstate.Logger.Warn("Existing process is not running, cleaning up file", "pid", pidValue)
+	}
+
+	return pidRunning
 }
 
 // CreateLockFile creates a lock file containing the current process ID.
