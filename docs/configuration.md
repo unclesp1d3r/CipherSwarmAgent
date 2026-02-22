@@ -73,7 +73,7 @@ zap_path: /opt/cipherswarm/data/zaps
 retain_zaps_on_completion: false
 enable_additional_hash_types: true
 use_legacy_device_technique: false
-hashcat_path: ""  # Leave empty for auto-detection
+hashcat_path: ''  # Leave empty for auto-detection
 
 # Fault tolerance settings
 task_timeout: 24h
@@ -169,7 +169,7 @@ You can specify a custom config file location:
 
 #### `hashcat_path` / `HASHCAT_PATH`
 
-- **Flag**: `--hashcat_path`
+- **Flag**: `--hashcat-path`
 - **Type**: String
 - **Default**: `""` (empty — auto-detect)
 - **Description**: Path to a custom Hashcat binary. When set, overrides automatic detection from `crackers_path` and system PATH. Useful when multiple Hashcat versions are installed or the binary is in a non-standard location.
@@ -261,21 +261,21 @@ These settings control retry behavior, timeouts, and circuit breakers for improv
 
 #### `enable_additional_hash_types` / `ENABLE_ADDITIONAL_HASH_TYPES`
 
-- **Flag**: `--enable_additional_hash_types`
+- **Flag**: `--enable-additional-hash-types`
 - **Type**: Boolean
 - **Default**: `true`
 - **Description**: Enable support for additional hash types during benchmarking
 
 #### `use_legacy_device_technique` / `USE_LEGACY_DEVICE_TECHNIQUE`
 
-- **Flag**: `--use_legacy_device_technique`
+- **Flag**: `--use-legacy-device-technique`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Use legacy method for device identification (not recommended)
 
 #### `always_trust_files` / `ALWAYS_TRUST_FILES`
 
-- **Flag**: `--always_trust_files`
+- **Flag**: `--always-trust-files`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Skip checksum verification for downloaded files (not recommended)

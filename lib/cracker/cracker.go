@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/shirou/gopsutil/v4/process"
-	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 )
@@ -31,7 +30,7 @@ func FindHashcatBinary() (string, error) {
 	foundPath := ""
 
 	possiblePaths := []string{
-		viper.GetString("hashcat_path"),
+		agentstate.State.HashcatPath,
 		filepath.Join(agentstate.State.CrackersPath, "hashcat", arch.GetDefaultHashcatBinaryName()),
 		filepath.Join(filepath.Dir(os.Args[0]), arch.GetDefaultHashcatBinaryName()),
 		filepath.Join(agentstate.State.CrackersPath, "hashcat", "hashcat"),

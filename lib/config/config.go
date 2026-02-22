@@ -149,6 +149,9 @@ func SetupSharedState() {
 	agentstate.State.EnableAdditionalHashTypes = viper.GetBool(
 		"enable_additional_hash_types",
 	) // Set the enable additional hash types flag in the shared state
+	agentstate.State.HashcatPath = viper.GetString(
+		"hashcat_path",
+	) // Set the hashcat binary path in the shared state
 	agentstate.State.UseLegacyDeviceIdentificationMethod = viper.GetBool(
 		"use_legacy_device_technique",
 	) // Set the use legacy device identification method flag in the shared state

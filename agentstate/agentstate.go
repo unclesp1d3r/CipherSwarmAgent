@@ -38,6 +38,7 @@ type agentState struct {
 	RetainZapsOnCompletion              bool          // RetainZapsOnCompletion specifies whether the agent should retain zaps after a job is completed.
 	EnableAdditionalHashTypes           bool          // EnableAdditionalHashTypes specifies whether the agent should enable additional hash types.
 	JobCheckingStopped                  bool          // JobCheckingStopped indicates that the server has directed the agent to stop checking for new jobs.
+	HashcatPath                         string        // HashcatPath is the path to the Hashcat binary (empty for auto-detection).
 	UseLegacyDeviceIdentificationMethod bool          // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
 	BenchmarksSubmitted                 bool          // BenchmarksSubmitted indicates whether the agent has successfully submitted its benchmark data to the server.
 	APIClient                           api.APIClient // APIClient is the interface-based client for API operations (enables dependency injection).

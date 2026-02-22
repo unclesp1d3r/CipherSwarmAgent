@@ -139,10 +139,11 @@ func handleCrackerUpdate(update *api.CrackerUpdate) error {
 		)
 	}
 
-	viper.Set("hashcat_path", path.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName()))
+	agentstate.State.HashcatPath = path.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName())
+	viper.Set("hashcat_path", agentstate.State.HashcatPath)
 	if err := viper.WriteConfig(); err != nil {
 		agentstate.Logger.Warn("Failed to persist hashcat path to config; update will be lost on restart",
-			"error", err, "hashcat_path", viper.GetString("hashcat_path"))
+			"error", err, "hashcat_path", agentstate.State.HashcatPath)
 	}
 
 	return nil

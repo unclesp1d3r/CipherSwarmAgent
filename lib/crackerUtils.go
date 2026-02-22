@@ -25,6 +25,7 @@ func setNativeHashcatPath() error {
 	}
 
 	agentstate.Logger.Info("Found Hashcat binary", "path", binPath)
+	agentstate.State.HashcatPath = binPath
 	viper.Set("hashcat_path", binPath)
 
 	if err := viper.WriteConfig(); err != nil {

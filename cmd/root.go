@@ -133,23 +133,29 @@ func init() {
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		BoolP("always_trust_files", "", false, "Skip checksum verification for downloaded files (not recommended)")
-	err = viper.BindPFlag("always_trust_files", RootCmd.PersistentFlags().Lookup("always_trust_files"))
+		Bool("always-trust-files", false, "Skip checksum verification for downloaded files (not recommended)")
+	err = viper.BindPFlag("always_trust_files", RootCmd.PersistentFlags().Lookup("always-trust-files"))
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		BoolP("enable_additional_hash_types", "", true, "Enable support for additional hash types during benchmarking")
-	err = viper.BindPFlag("enable_additional_hash_types", RootCmd.PersistentFlags().Lookup("enable_additional_hash_types"))
+		Bool("enable-additional-hash-types", true, "Enable support for additional hash types during benchmarking")
+	err = viper.BindPFlag(
+		"enable_additional_hash_types",
+		RootCmd.PersistentFlags().Lookup("enable-additional-hash-types"),
+	)
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		BoolP("use_legacy_device_technique", "", false, "Use legacy device identification method (not recommended)")
-	err = viper.BindPFlag("use_legacy_device_technique", RootCmd.PersistentFlags().Lookup("use_legacy_device_technique"))
+		Bool("use-legacy-device-technique", false, "Use legacy device identification method (not recommended)")
+	err = viper.BindPFlag(
+		"use_legacy_device_technique",
+		RootCmd.PersistentFlags().Lookup("use-legacy-device-technique"),
+	)
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		StringP("hashcat_path", "", "", "Path to custom hashcat binary (overrides automatic detection)")
-	err = viper.BindPFlag("hashcat_path", RootCmd.PersistentFlags().Lookup("hashcat_path"))
+		String("hashcat-path", "", "Path to custom hashcat binary (overrides automatic detection)")
+	err = viper.BindPFlag("hashcat_path", RootCmd.PersistentFlags().Lookup("hashcat-path"))
 	cobra.CheckErr(err)
 
 	config.SetDefaultConfigValues()
