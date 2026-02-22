@@ -59,6 +59,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep doc comments contiguous with their declaration.
 - **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
 - **Gotcha:** `revive` requires each exported constant in a `const` block to have its own doc comment starting with the constant name (e.g., `// DefaultFoo is...`). A group comment alone doesn't satisfy it.
+- **Gotcha:** `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation (e.g., `//nolint:contextcheck // callee lacks ctx param`). Bare `//nolint:linter` directives fail CI.
+- **Gotcha:** Adding `ctx context.Context` to a function causes `contextcheck` to flag all downstream calls that don't propagate it. Use above-line `//nolint:contextcheck // callee lacks ctx param` — these resolve as context propagation completes.
 
 ### Naming Conventions
 
@@ -95,6 +97,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `context.Context` for cancellation and deadlines in all long-running or networked operations.
 - **Synchronized state access:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` (for `Reload`, `JobCheckingStopped`, `BenchmarksSubmitted`) or `sync.RWMutex` (for `CurrentActivity`). Always use getter/setter methods (`GetReload()`, `SetReload()`, etc.) — never access these fields directly.
 - **Context propagation:** `StartAgent()` creates a cancellable context (`context.WithCancel`) that is threaded through all goroutine functions. Use `ctx` for operations that should stop on shutdown; use `context.Background()` for error reports and shutdown notifications that must complete.
+- **Context-aware sleep:** Use `sleepWithContext(ctx, duration)` (defined in `lib/agent/agent.go`) instead of `time.Sleep` in goroutine loops — enables graceful shutdown on context cancellation.
 - Run tests with the `-race` flag in CI to detect data races.
 
 ### Performance
@@ -111,6 +114,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Configuration:** Use `spf13/viper` to manage configuration from files, environment variables, and CLI flags.
 - Treat `viper.WriteConfig()` failures as non-fatal warnings (log + continue) — the in-memory config is correct and a read-only filesystem should not block agent operation.
 - **Config access pattern:** Read config values from `agentstate.State` (wired in `SetupSharedState()`), not `viper.GetString()`/`viper.GetBool()` directly. Use `viper.Set()` only when persisting runtime changes via `viper.WriteConfig()`.
+- Numeric/duration config fields are validated in `SetupSharedState()` — invalid values are clamped to defaults with a warning log. Add validation when introducing new numeric config fields.
 
 ### Tooling
 
@@ -151,7 +155,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `lib/testhelpers/error_helpers.go` for constructing test errors (`NewAPIError`, `NewValidationAPIError`, `NewSetTaskAbandonedError`).
 - MockClient sub-client accessors (`Tasks()`, `Agents()`, etc.) return default unconfigured mocks (not nil) to prevent nil pointer panics when code paths call sub-clients the test didn't explicitly mock.
 - When removing a field from global state (`agentstate.State`), grep all test helpers, cleanup functions, and reset functions for references.
-- Use getter/setter methods for synchronized `agentstate.State` fields in tests — do not copy the struct (it contains `sync.RWMutex` and `atomic.Bool`).
+- **Gotcha:** `agentstate.State` contains `atomic.Bool` and `sync.RWMutex` — never copy the struct (`original := agentstate.State` triggers `go vet copylocks`). Use per-field save/restore in test helpers and getter/setter methods for synchronized fields.
 - Run `go test -race ./...` to detect data races.
 
 ## Git
