@@ -171,7 +171,19 @@ func CreateDataDirs() error {
 		}
 
 		info, err := os.Stat(dir)
-		if err != nil || !info.IsDir() {
+		if err != nil {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
+				agentstate.Logger.Error("Error creating directory", "path", dir, "error", err)
+
+				return err
+			}
+
+			agentstate.Logger.Info("Created directory", "path", dir)
+
+			continue
+		}
+
+		if !info.IsDir() {
 			if err := os.MkdirAll(dir, 0o750); err != nil {
 				agentstate.Logger.Error("Error creating directory", "path", dir, "error", err)
 

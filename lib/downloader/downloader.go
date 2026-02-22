@@ -307,7 +307,13 @@ func fileMD5(filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			agentstate.Logger.Error("Error closing file after checksum",
+				"path", filePath, "error", cerr)
+		}
+	}()
 
 	h := md5.New() //nolint:gosec // G401 - MD5 used for file integrity check, not security
 	if _, err := io.Copy(h, f); err != nil {
