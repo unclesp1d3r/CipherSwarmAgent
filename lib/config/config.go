@@ -162,6 +162,7 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("data_path", path.Join(cwd, "data"))
 	viper.SetDefault("gpu_temp_threshold", DefaultGPUTempThreshold)
 	viper.SetDefault("always_use_native_hashcat", false)
+	viper.SetDefault("hashcat_path", "")
 	viper.SetDefault("sleep_on_failure", DefaultSleepOnFailure)
 	viper.SetDefault("always_trust_files", false)
 	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files"))

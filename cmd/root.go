@@ -132,5 +132,25 @@ func init() {
 	err = viper.BindPFlag("force_benchmark_run", RootCmd.PersistentFlags().Lookup("force-benchmark"))
 	cobra.CheckErr(err)
 
+	RootCmd.PersistentFlags().
+		BoolP("always_trust_files", "", false, "Skip checksum verification for downloaded files (not recommended)")
+	err = viper.BindPFlag("always_trust_files", RootCmd.PersistentFlags().Lookup("always_trust_files"))
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		BoolP("enable_additional_hash_types", "", true, "Enable support for additional hash types during benchmarking")
+	err = viper.BindPFlag("enable_additional_hash_types", RootCmd.PersistentFlags().Lookup("enable_additional_hash_types"))
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		BoolP("use_legacy_device_technique", "", false, "Use legacy device identification method (not recommended)")
+	err = viper.BindPFlag("use_legacy_device_technique", RootCmd.PersistentFlags().Lookup("use_legacy_device_technique"))
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		StringP("hashcat_path", "", "", "Path to custom hashcat binary (overrides automatic detection)")
+	err = viper.BindPFlag("hashcat_path", RootCmd.PersistentFlags().Lookup("hashcat_path"))
+	cobra.CheckErr(err)
+
 	config.SetDefaultConfigValues()
 }
