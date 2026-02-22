@@ -59,7 +59,11 @@ func DownloadFile(ctx context.Context, fileURL, filePath, checksum string) error
 // The function returns true if the file exists and matches the given checksum, or if no checksum is provided.
 // If the file does not exist or the checksum verification fails, appropriate error messages are logged.
 func FileExistsAndValid(filePath, checksum string) bool {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); err != nil {
+		if !os.IsNotExist(err) {
+			agentstate.Logger.Error("Error checking file existence", "path", filePath, "error", err)
+		}
+
 		return false
 	}
 

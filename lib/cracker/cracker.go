@@ -6,6 +6,7 @@ package cracker
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,8 +89,10 @@ func GetCurrentHashcatVersion(ctx context.Context) (string, error) {
 func CheckForExistingClient(pidFilePath string) bool {
 	if _, err := os.Stat(pidFilePath); err != nil {
 		if !os.IsNotExist(err) {
-			agentstate.Logger.Warn("Could not check PID file, assuming no existing client",
+			agentstate.Logger.Error("Could not check PID file, assuming existing client",
 				"path", pidFilePath, "error", err)
+
+			return true
 		}
 
 		return false
@@ -109,9 +112,15 @@ func CheckForExistingClient(pidFilePath string) bool {
 		return true
 	}
 
+	if pidValue < 0 || pidValue > math.MaxInt32 {
+		agentstate.Logger.Error("PID value out of int32 range", "pid", pidValue)
+
+		return true
+	}
+
 	pidRunning, err := process.PidExistsWithContext(
 		context.Background(),
-		int32(pidValue), //nolint:gosec // G115 - PID from file
+		int32(pidValue), //nolint:gosec // G115 - bounds checked above
 	)
 	if err != nil {
 		agentstate.Logger.Error("Error checking if process is running", "pid", pidValue)
