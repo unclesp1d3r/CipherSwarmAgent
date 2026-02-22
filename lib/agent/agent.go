@@ -153,6 +153,17 @@ func calculateHeartbeatBackoff(
 	return baseInterval * time.Duration(1<<multiplier)
 }
 
+// sleepWithContext blocks for the given duration or until the context is cancelled.
+// Returns true if the context was cancelled (caller should return).
+func sleepWithContext(ctx context.Context, d time.Duration) bool {
+	select {
+	case <-time.After(d):
+		return false
+	case <-ctx.Done():
+		return true
+	}
+}
+
 // startHeartbeatLoop runs the heartbeat loop with exponential backoff on failures.
 // On consecutive failures, it backs off exponentially up to a maximum multiplier.
 func startHeartbeatLoop(ctx context.Context, signChan chan os.Signal) {
@@ -168,7 +179,10 @@ func startHeartbeatLoop(ctx context.Context, signChan chan os.Signal) {
 			backoff := calculateHeartbeatBackoff(baseInterval, consecutiveFailures, maxBackoffMultiplier)
 			agentstate.Logger.Warn("Heartbeat failed, backing off",
 				"failures", consecutiveFailures, "next_retry", backoff)
-			time.Sleep(backoff)
+
+			if sleepWithContext(ctx, backoff) {
+				return
+			}
 
 			continue
 		}
@@ -178,7 +192,10 @@ func startHeartbeatLoop(ctx context.Context, signChan chan os.Signal) {
 		}
 
 		consecutiveFailures = 0
-		time.Sleep(baseInterval)
+
+		if sleepWithContext(ctx, baseInterval) {
+			return
+		}
 	}
 }
 
@@ -225,7 +242,10 @@ func startAgentLoop(ctx context.Context) {
 
 		sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
 		lib.DisplayInactive(sleepTime)
-		time.Sleep(sleepTime)
+
+		if sleepWithContext(ctx, sleepTime) {
+			return
+		}
 	}
 }
 
@@ -289,7 +309,7 @@ func handleNewTask(ctx context.Context) {
 		}
 
 		agentstate.Logger.Error("Failed to get new task", "error", err)
-		time.Sleep(agentstate.State.SleepOnFailure)
+		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return
 	}
@@ -318,7 +338,7 @@ func processTask(ctx context.Context, task *api.Task) error {
 		lib.SendAgentError(errMsg, task, api.SeverityFatal)
 		//nolint:contextcheck // callee lacks ctx param
 		lib.AbandonTask(task)
-		time.Sleep(agentstate.State.SleepOnFailure)
+		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		if err != nil {
 			return err
@@ -345,7 +365,7 @@ func processTask(ctx context.Context, task *api.Task) error {
 		lib.SendAgentError(err.Error(), task, api.SeverityFatal)
 		//nolint:contextcheck // callee lacks ctx param
 		lib.AbandonTask(task)
-		time.Sleep(agentstate.State.SleepOnFailure)
+		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return err
 	}

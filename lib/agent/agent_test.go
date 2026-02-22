@@ -28,6 +28,15 @@ func saveAndRestoreState(t *testing.T) func() {
 	origURL := agentstate.State.URL
 	origAPIToken := agentstate.State.APIToken
 	origAPIClient := agentstate.State.APIClient
+	origHashcatPath := agentstate.State.HashcatPath
+	origForceBenchmarkRun := agentstate.State.ForceBenchmarkRun
+	origInsecureDownloads := agentstate.State.InsecureDownloads
+	origDownloadMaxRetries := agentstate.State.DownloadMaxRetries
+	origDownloadRetryDelay := agentstate.State.DownloadRetryDelay
+	origTaskTimeout := agentstate.State.TaskTimeout
+	origMaxHeartbeatBackoff := agentstate.State.MaxHeartbeatBackoff
+	origSleepOnFailure := agentstate.State.SleepOnFailure
+	origAlwaysUseNativeHashcat := agentstate.State.AlwaysUseNativeHashcat
 
 	// Save synchronized fields via getters
 	origReload := agentstate.State.GetReload()
@@ -42,6 +51,15 @@ func saveAndRestoreState(t *testing.T) func() {
 		agentstate.State.URL = origURL
 		agentstate.State.APIToken = origAPIToken
 		agentstate.State.APIClient = origAPIClient
+		agentstate.State.HashcatPath = origHashcatPath
+		agentstate.State.ForceBenchmarkRun = origForceBenchmarkRun
+		agentstate.State.InsecureDownloads = origInsecureDownloads
+		agentstate.State.DownloadMaxRetries = origDownloadMaxRetries
+		agentstate.State.DownloadRetryDelay = origDownloadRetryDelay
+		agentstate.State.TaskTimeout = origTaskTimeout
+		agentstate.State.MaxHeartbeatBackoff = origMaxHeartbeatBackoff
+		agentstate.State.SleepOnFailure = origSleepOnFailure
+		agentstate.State.AlwaysUseNativeHashcat = origAlwaysUseNativeHashcat
 
 		agentstate.State.SetReload(origReload)
 		agentstate.State.SetJobCheckingStopped(origJobCheckingStopped)
@@ -569,4 +587,22 @@ func TestHeartbeat_NoContent(t *testing.T) {
 	assert.False(t, agentstate.State.GetReload())
 	assert.False(t, agentstate.State.GetJobCheckingStopped())
 	assert.Equal(t, agentstate.CurrentActivityWaiting, agentstate.State.GetCurrentActivity())
+}
+
+func TestSleepWithContext_Completes(t *testing.T) {
+	ctx := context.Background()
+	cancelled := sleepWithContext(ctx, 10*time.Millisecond)
+	assert.False(t, cancelled, "should return false when sleep completes normally")
+}
+
+func TestSleepWithContext_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	start := time.Now()
+	cancelled := sleepWithContext(ctx, 10*time.Second)
+	elapsed := time.Since(start)
+
+	assert.True(t, cancelled, "should return true when context is cancelled")
+	assert.Less(t, elapsed, 1*time.Second, "should return promptly on cancellation")
 }

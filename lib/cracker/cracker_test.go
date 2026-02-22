@@ -25,6 +25,7 @@ func saveAndRestoreState(t *testing.T) func() {
 	origToolsPath := agentstate.State.ToolsPath
 	origOutPath := agentstate.State.OutPath
 	origRestoreFilePath := agentstate.State.RestoreFilePath
+	origHashcatPath := agentstate.State.HashcatPath
 
 	return func() {
 		agentstate.State.CrackersPath = origCrackersPath
@@ -36,6 +37,7 @@ func saveAndRestoreState(t *testing.T) func() {
 		agentstate.State.ToolsPath = origToolsPath
 		agentstate.State.OutPath = origOutPath
 		agentstate.State.RestoreFilePath = origRestoreFilePath
+		agentstate.State.HashcatPath = origHashcatPath
 	}
 }
 

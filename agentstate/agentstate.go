@@ -35,7 +35,7 @@ type agentState struct {
 	URL                                 string        // URL is the URL of the CipherSwarm API.
 	APIToken                            string        // APIToken is the token used to authenticate with the CipherSwarm API.
 	AlwaysTrustFiles                    bool          // AlwaysTrustFiles specifies whether the agent should trust all files in the files directory and not check checksums.
-	ExtraDebugging                      bool          // ExtraDebugging specifies whether the agent should show extra debugging information.
+	ExtraDebugging                      bool          // ExtraDebugging specifies whether the agent should show extra debugging information. Set once at init; safe to read from any goroutine.
 	StatusTimer                         int           // StatusTimer is the interval in seconds between status updates.
 	WriteZapsToFile                     bool          // WriteZapsToFile specifies whether the agent should write zaps to a file.
 	RetainZapsOnCompletion              bool          // RetainZapsOnCompletion specifies whether the agent should retain zaps after a job is completed.
@@ -43,7 +43,7 @@ type agentState struct {
 	HashcatPath                         string        // HashcatPath is the path to the Hashcat binary (empty for auto-detection).
 	UseLegacyDeviceIdentificationMethod bool          // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
 	APIClient                           api.APIClient // APIClient is the interface-based client for API operations (enables dependency injection).
-	ForceBenchmarkRun                   bool          // ForceBenchmarkRun forces a fresh benchmark run instead of using cached results.
+	ForceBenchmarkRun                   bool          // ForceBenchmarkRun forces a fresh benchmark run instead of using cached results. Agent-loop-only; no cross-goroutine access.
 	InsecureDownloads                   bool          // InsecureDownloads skips TLS certificate verification for downloads.
 	DownloadMaxRetries                  int           // DownloadMaxRetries is the max number of download retry attempts.
 	DownloadRetryDelay                  time.Duration // DownloadRetryDelay is the base delay between download retries.
