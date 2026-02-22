@@ -64,6 +64,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - **Packages**: `snake_case`
 - **Files**: `snake_case` (e.g., `agent_client.go`).
+- **CLI Flags**: `kebab-case` (e.g., `--force-benchmark`, `--always-trust-files`). Use `Bool`/`String`/`Int`/`Duration` for flags without shorthand — only use `BoolP`/`StringP` variants when providing a short flag letter.
 - **Interfaces**: `PascalCase`, often with an `-er` suffix (e.g., `Reader`, `Writer`).
 - **Structs**: `PascalCase`.
 - **Functions/Methods**: `camelCase` for unexported, `PascalCase` for exported.
@@ -105,6 +106,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Logging:** Use a structured logger (e.g., `charmbracelet/log`). Never log secrets or sensitive data.
 - **Configuration:** Use `spf13/viper` to manage configuration from files, environment variables, and CLI flags.
 - Treat `viper.WriteConfig()` failures as non-fatal warnings (log + continue) — the in-memory config is correct and a read-only filesystem should not block agent operation.
+- **Config access pattern:** Read config values from `agentstate.State` (wired in `SetupSharedState()`), not `viper.GetString()`/`viper.GetBool()` directly. Use `viper.Set()` only when persisting runtime changes via `viper.WriteConfig()`.
 
 ### Tooling
 
@@ -121,6 +123,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** Do not name directories `gen/` — the user's global gitignore excludes them.
 - **Dev Tool Management:** Use `mise` to install and manage development toolchains (e.g., Go, Bun) via `mise.toml`.
 - **CI Validation:** Run `just ci-check` to validate all checks pass before committing.
+- **Gotcha:** `mdformat` pre-commit hook auto-fixes markdown files on first run, causing `just ci-check` to fail. Re-run after the auto-fix passes.
 - **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
 - **Vendor Sync:** After `go fix` or dependency changes, run `go mod tidy && go mod vendor` to sync the vendor directory.
 - **Gotcha:** `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
