@@ -67,9 +67,9 @@ func TestHandleAuthenticationError(t *testing.T) {
 			result := handleAuthenticationError(context.Background(), tt.err)
 
 			if tt.expectError {
-				assert.Error(t, result)
+				require.Error(t, result)
 			} else {
-				assert.NoError(t, result)
+				require.NoError(t, result)
 			}
 		})
 	}

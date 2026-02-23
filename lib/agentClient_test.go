@@ -138,7 +138,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 	defer func() {
 		setNativeHashcatPathFn = originalFn
 	}()
-	setNativeHashcatPathFn = func() error {
+	setNativeHashcatPathFn = func(_ context.Context) error {
 		return nil // No-op for tests
 	}
 

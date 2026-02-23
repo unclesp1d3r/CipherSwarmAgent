@@ -39,6 +39,23 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 
 		for {
 			select {
+			case <-ctx.Done():
+				agentstate.Logger.Warn("Context cancelled, killing session")
+
+				if err := sess.Kill(); err != nil {
+					agentstate.Logger.Error("Failed to kill session on context cancellation", "error", err)
+					//nolint:contextcheck // must-complete: parent ctx already cancelled
+					cserrors.SendAgentError(
+						context.Background(),
+						"Context cancelled; failed to kill session: "+err.Error(),
+						task,
+						api.SeverityFatal,
+					)
+				}
+
+				sess.Cleanup()
+
+				return
 			case <-timeoutChan:
 				agentstate.Logger.Warn("Task timeout reached, killing session", "timeout", taskTimeout)
 

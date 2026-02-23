@@ -77,12 +77,15 @@ func createAndWriteZapFile(ctx context.Context, zapFilePath string, responseStre
 		return fmt.Errorf("error creating zap file: %w", err)
 	}
 
+	defer func() {
+		if cerr := outFile.Close(); cerr != nil {
+			//nolint:errcheck // LogAndSendError handles logging+sending internally
+			_ = cserrors.LogAndSendError(ctx, "Error closing zap file", cerr, api.SeverityCritical, task)
+		}
+	}()
+
 	if _, err := io.Copy(outFile, responseStream); err != nil {
 		return fmt.Errorf("error writing zap file: %w", err)
-	}
-
-	if cerr := outFile.Close(); cerr != nil {
-		return cserrors.LogAndSendError(ctx, "Error closing zap file", cerr, api.SeverityCritical, task)
 	}
 
 	return nil

@@ -71,6 +71,11 @@ func runTestTask(ctx context.Context, sess *hashcat.Session) (*hashcat.Status, e
 
 		for {
 			select {
+			case <-ctx.Done():
+				errorResult = ctx.Err()
+				sess.Cleanup()
+
+				return
 			case stdoutLine := <-sess.StdoutLines:
 				handleTestStdOutLine(stdoutLine)
 			case stdErrLine := <-sess.StderrMessages:

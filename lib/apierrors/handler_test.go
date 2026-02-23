@@ -42,7 +42,7 @@ func TestHandler_Handle_NilError(t *testing.T) {
 
 	result := h.Handle(context.Background(), nil, opts)
 
-	assert.NoError(t, result)
+	require.NoError(t, result)
 }
 
 func TestHandler_Handle_APIError_ClientError(t *testing.T) {

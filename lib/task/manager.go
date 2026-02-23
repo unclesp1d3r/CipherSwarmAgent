@@ -45,7 +45,7 @@ var (
 )
 
 // GetNewTask retrieves a new task from the server.
-// If the server responds with no content, it means no new task is available, and the function returns nil without error.
+// If the server responds with HTTP 204 (no content), it returns (nil, ErrNoTaskAvailable).
 // For any other unexpected response status, an error is returned.
 func (m *Manager) GetNewTask(ctx context.Context) (*api.Task, error) {
 	response, err := m.tasksClient.GetNewTask(ctx)

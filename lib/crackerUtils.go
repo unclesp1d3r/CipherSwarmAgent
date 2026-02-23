@@ -17,15 +17,13 @@ import (
 )
 
 // setNativeHashcatPath sets the path for the native Hashcat binary if it is found in the system, otherwise logs and reports error.
-func setNativeHashcatPath() error {
+func setNativeHashcatPath(ctx context.Context) error {
 	agentstate.Logger.Debug("Using native Hashcat")
 
 	binPath, err := cracker.FindHashcatBinary()
 	if err != nil {
 		agentstate.Logger.Error("Error finding hashcat binary: ", err)
-		// context.Background() because setNativeHashcatPath has no ctx param
-		// (called via function variable from config-mapping path)
-		cserrors.SendAgentError(context.Background(), err.Error(), nil, api.SeverityCritical)
+		cserrors.SendAgentError(ctx, err.Error(), nil, api.SeverityCritical)
 
 		return err
 	}

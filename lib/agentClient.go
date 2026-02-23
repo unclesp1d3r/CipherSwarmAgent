@@ -80,7 +80,7 @@ func GetAgentConfiguration(ctx context.Context) error {
 	agentConfig := mapConfiguration(response.JSON200.ApiVersion, response.JSON200.Config)
 
 	if agentConfig.Config.UseNativeHashcat {
-		if err := setNativeHashcatPathFn(); err != nil {
+		if err := setNativeHashcatPathFn(ctx); err != nil {
 			return err
 		}
 	} else {
@@ -204,6 +204,12 @@ func SendHeartBeat(ctx context.Context) (*api.SendHeartbeat200State, error) {
 	}
 
 	if resp.StatusCode() == http.StatusOK {
+		if resp.JSON200 == nil {
+			agentstate.Logger.Warn("Heartbeat returned HTTP 200 but JSON body was nil or unparseable")
+
+			return nil, fmt.Errorf("%w: heartbeat returned HTTP 200 with nil JSON body", ErrBadResponse)
+		}
+
 		logHeartbeatSent()
 
 		return handleStateResponse(resp.JSON200), nil
