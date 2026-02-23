@@ -5,13 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
-// setupSessionTestState sets up minimal agentstate paths for session tests
-// and returns a cleanup function. Uses t.TempDir() for automatic cleanup.
+// setupSessionTestState sets up minimal agentstate paths for session tests.
+// Uses t.TempDir() for automatic cleanup and t.Cleanup() to restore state.
 func setupSessionTestState(t *testing.T) {
 	t.Helper()
 	tempDir := t.TempDir()
@@ -42,7 +41,7 @@ func TestCleanup_RemovesRestoreFile(t *testing.T) {
 	sess.Cleanup()
 
 	_, err := os.Stat(restoreFile)
-	assert.True(t, os.IsNotExist(err), "restore file should be removed after Cleanup")
+	require.True(t, os.IsNotExist(err), "restore file should be removed after Cleanup")
 }
 
 // TestCleanup_SkipsMissingRestoreFile verifies that Cleanup does not error

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path"
+	"path/filepath"
 	"strconv"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -174,7 +174,7 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 	return hashcat.Params{
 		AttackMode: int64(attack.AttackModeHashcat),
 		HashType:   int64(attack.HashMode),
-		HashFile: path.Join(
+		HashFile: filepath.Join(
 			agentstate.State.HashlistPath,
 			strconv.FormatInt(attack.Id, 10)+".hsh",
 		),
@@ -198,7 +198,7 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 		Limit:            unwrapOr(task.Limit, 0),
 		BackendDevices:   m.BackendDevices,
 		OpenCLDevices:    m.OpenCLDevices,
-		RestoreFilePath:  path.Join(agentstate.State.RestoreFilePath, strconv.FormatInt(attack.Id, 10)+".restore"),
+		RestoreFilePath:  filepath.Join(agentstate.State.RestoreFilePath, strconv.FormatInt(attack.Id, 10)+".restore"),
 	}
 }
 

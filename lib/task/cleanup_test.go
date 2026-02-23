@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
@@ -25,7 +24,7 @@ func TestCleanupTaskFiles_RemovesHashFile(t *testing.T) {
 	CleanupTaskFiles(attackID)
 
 	_, err := os.Stat(hashFile)
-	assert.True(t, os.IsNotExist(err), "hash file should be removed")
+	require.True(t, os.IsNotExist(err), "hash file should be removed")
 }
 
 // TestCleanupTaskFiles_RemovesRestoreFile verifies that CleanupTaskFiles
@@ -42,7 +41,7 @@ func TestCleanupTaskFiles_RemovesRestoreFile(t *testing.T) {
 	CleanupTaskFiles(attackID)
 
 	_, err := os.Stat(restoreFile)
-	assert.True(t, os.IsNotExist(err), "restore file should be removed")
+	require.True(t, os.IsNotExist(err), "restore file should be removed")
 }
 
 // TestCleanupTaskFiles_HandlesNonexistentFiles verifies that CleanupTaskFiles
@@ -73,8 +72,8 @@ func TestCleanupTaskFiles_RemovesBothFiles(t *testing.T) {
 	CleanupTaskFiles(attackID)
 
 	_, hashErr := os.Stat(hashFile)
-	assert.True(t, os.IsNotExist(hashErr), "hash file should be removed")
+	require.True(t, os.IsNotExist(hashErr), "hash file should be removed")
 
 	_, restoreErr := os.Stat(restoreFile)
-	assert.True(t, os.IsNotExist(restoreErr), "restore file should be removed")
+	require.True(t, os.IsNotExist(restoreErr), "restore file should be removed")
 }

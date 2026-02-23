@@ -55,6 +55,7 @@ func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
 				}
 
 				cserrors.SendAgentError("Task timed out", task, api.SeverityWarning)
+				sess.Cleanup()
 
 				return
 			case stdoutLine := <-sess.StdoutLines:
@@ -189,7 +190,7 @@ func handleNonExhaustedError(err error, task *api.Task, sess *hashcat.Session, e
 		strings.Contains(err.Error(), "Cannot read "+sess.RestoreFilePath) {
 		agentstate.Logger.Info("Removing restore file", "file", sess.RestoreFilePath)
 
-		if removeErr := os.Remove(sess.RestoreFilePath); removeErr != nil {
+		if removeErr := os.Remove(sess.RestoreFilePath); removeErr != nil && !os.IsNotExist(removeErr) {
 			agentstate.Logger.Error("Failed to remove restore file", "error", removeErr)
 		}
 
