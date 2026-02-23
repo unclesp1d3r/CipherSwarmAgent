@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,11 +18,11 @@ import (
 // runAttackTask starts the attack session and handles real-time outputs and status updates.
 // It processes stdout, stderr, status updates, cracked hashes, and handles session completion.
 // A configurable timeout (task_timeout) prevents indefinite blocking if hashcat hangs.
-func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
+func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task *api.Task) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start attack session", "error", err)
-		cserrors.SendAgentError(err.Error(), task, api.SeverityFatal)
+		cserrors.SendAgentError(ctx, err.Error(), task, api.SeverityFatal)
 		sess.Cleanup()
 
 		return
@@ -38,6 +39,23 @@ func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
 
 		for {
 			select {
+			case <-ctx.Done():
+				agentstate.Logger.Warn("Context cancelled, killing session")
+
+				if err := sess.Kill(); err != nil {
+					agentstate.Logger.Error("Failed to kill session on context cancellation", "error", err)
+					//nolint:contextcheck // must-complete: parent ctx already cancelled
+					cserrors.SendAgentError(
+						context.Background(),
+						"Context cancelled; failed to kill session: "+err.Error(),
+						task,
+						api.SeverityFatal,
+					)
+				}
+
+				sess.Cleanup()
+
+				return
 			case <-timeoutChan:
 				agentstate.Logger.Warn("Task timeout reached, killing session", "timeout", taskTimeout)
 
@@ -45,6 +63,7 @@ func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
 					agentstate.Logger.Error("Failed to kill session on timeout", "error", err)
 					// Report kill failure with higher severity - session may still be running
 					cserrors.SendAgentError(
+						ctx,
 						"Task timed out; failed to kill session: "+err.Error(),
 						task,
 						api.SeverityFatal,
@@ -54,20 +73,20 @@ func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
 					return
 				}
 
-				cserrors.SendAgentError("Task timed out", task, api.SeverityWarning)
+				cserrors.SendAgentError(ctx, "Task timed out", task, api.SeverityWarning)
 				sess.Cleanup()
 
 				return
 			case stdoutLine := <-sess.StdoutLines:
-				handleStdOutLine(stdoutLine, task)
+				handleStdOutLine(ctx, stdoutLine, task)
 			case stdErrLine := <-sess.StderrMessages:
-				handleStdErrLine(stdErrLine, task)
+				handleStdErrLine(ctx, stdErrLine, task)
 			case statusUpdate := <-sess.StatusUpdates:
-				m.handleStatusUpdate(statusUpdate, task, sess)
+				m.handleStatusUpdate(ctx, statusUpdate, task, sess)
 			case crackedHash := <-sess.CrackedHashes:
-				m.handleCrackedHash(crackedHash, task)
+				m.handleCrackedHash(ctx, crackedHash, task)
 			case err := <-sess.DoneChan:
-				m.handleDoneChan(err, task, sess)
+				m.handleDoneChan(ctx, err, task, sess)
 
 				return
 			}
@@ -81,13 +100,14 @@ func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
 // Valid JSON status lines are handled by the StatusUpdates channel (via handleStatusUpdate),
 // so this function only reports JSON parse failures. Non-JSON lines are ignored here
 // (they are already logged by session.handleStdout).
-func handleStdOutLine(stdoutLine string, task *api.Task) {
+func handleStdOutLine(ctx context.Context, stdoutLine string, task *api.Task) {
 	lineBytes := []byte(stdoutLine)
 	if json.Valid(lineBytes) {
 		var update hashcat.Status
 		if err := json.Unmarshal(lineBytes, &update); err != nil {
 			agentstate.Logger.Error("Failed to parse status update", "error", err)
 			cserrors.SendAgentError(
+				ctx,
 				"Failed to parse hashcat status update: "+err.Error(),
 				task,
 				api.SeverityWarning,
@@ -100,13 +120,13 @@ func handleStdOutLine(stdoutLine string, task *api.Task) {
 
 // handleStdErrLine handles a single line of standard error output by classifying it
 // and sending it to the server with the appropriate severity level.
-func handleStdErrLine(stdErrLine string, task *api.Task) {
+func handleStdErrLine(ctx context.Context, stdErrLine string, task *api.Task) {
 	display.JobError(stdErrLine)
 
 	if strings.TrimSpace(stdErrLine) != "" {
 		// Classify the stderr line to determine appropriate severity
 		errorInfo := hashcat.ClassifyStderr(stdErrLine)
-		cserrors.SendAgentError(stdErrLine, task, errorInfo.Severity,
+		cserrors.SendAgentError(ctx, stdErrLine, task, errorInfo.Severity,
 			cserrors.WithClassification(errorInfo.Category.String(), errorInfo.Retryable))
 	}
 }
@@ -114,7 +134,12 @@ func handleStdErrLine(stdErrLine string, task *api.Task) {
 // handleStatusUpdate validates and processes a status update for a hashcat task and session.
 // It validates that Progress and RecoveredHashes have the minimum required fields before
 // forwarding to display and send functions.
-func (m *Manager) handleStatusUpdate(statusUpdate hashcat.Status, task *api.Task, sess *hashcat.Session) {
+func (m *Manager) handleStatusUpdate(
+	ctx context.Context,
+	statusUpdate hashcat.Status,
+	task *api.Task,
+	sess *hashcat.Session,
+) {
 	if len(statusUpdate.Progress) < display.MinStatusFields {
 		agentstate.Logger.Warn("Status update has incomplete progress data",
 			"progress_len", len(statusUpdate.Progress))
@@ -128,13 +153,13 @@ func (m *Manager) handleStatusUpdate(statusUpdate hashcat.Status, task *api.Task
 	}
 
 	display.JobStatus(statusUpdate)
-	m.sendStatusUpdate(statusUpdate, task, sess)
+	m.sendStatusUpdate(ctx, statusUpdate, task, sess)
 }
 
 // handleCrackedHash processes a cracked hash by displaying it and then sending it to a task server.
-func (m *Manager) handleCrackedHash(crackedHash hashcat.Result, task *api.Task) {
+func (m *Manager) handleCrackedHash(ctx context.Context, crackedHash hashcat.Result, task *api.Task) {
 	display.JobCrackedHash(crackedHash)
-	m.sendCrackedHash(crackedHash.Timestamp, crackedHash.Hash, crackedHash.Plaintext, task)
+	m.sendCrackedHash(ctx, crackedHash.Timestamp, crackedHash.Hash, crackedHash.Plaintext, task)
 }
 
 // handleDoneChan handles the completion of a task, classifying the exit code
@@ -142,7 +167,7 @@ func (m *Manager) handleCrackedHash(crackedHash hashcat.Result, task *api.Task) 
 // Note: When hashcat completes successfully with exit code 0, proc.Wait() returns nil,
 // so the err != nil block only handles non-zero exit codes. Successful completion
 // (nil error) proceeds directly to cleanup.
-func (m *Manager) handleDoneChan(err error, task *api.Task, sess *hashcat.Session) {
+func (m *Manager) handleDoneChan(ctx context.Context, err error, task *api.Task, sess *hashcat.Session) {
 	if err != nil {
 		exitCode := parseExitCode(err.Error())
 		exitInfo := hashcat.ClassifyExitCode(exitCode)
@@ -150,14 +175,14 @@ func (m *Manager) handleDoneChan(err error, task *api.Task, sess *hashcat.Sessio
 		switch {
 		case hashcat.IsExhausted(exitCode):
 			display.JobExhausted()
-			m.markTaskExhausted(task)
+			m.markTaskExhausted(ctx, task)
 		case hashcat.IsSuccess(exitCode):
 			// Success case - hashcat process exited cleanly
 			// Note: This branch is reached when exit code 0 is returned as an error,
 			// which may happen in some edge cases.
 			agentstate.Logger.Info("Hashcat process completed successfully")
 		default:
-			handleNonExhaustedError(err, task, sess, exitInfo)
+			handleNonExhaustedError(ctx, err, task, sess, exitInfo)
 		}
 	}
 
@@ -183,7 +208,13 @@ func parseExitCode(errMsg string) int {
 
 // handleNonExhaustedError handles errors which are not related to exhaustion
 // by performing specific actions based on the error category and message.
-func handleNonExhaustedError(err error, task *api.Task, sess *hashcat.Session, exitInfo hashcat.ExitCodeInfo) {
+func handleNonExhaustedError(
+	ctx context.Context,
+	err error,
+	task *api.Task,
+	sess *hashcat.Session,
+	exitInfo hashcat.ExitCodeInfo,
+) {
 	// Handle restore file issues specially.
 	// Check path is non-empty first to avoid matching unrelated "Cannot read " errors.
 	if strings.TrimSpace(sess.RestoreFilePath) != "" &&
@@ -200,7 +231,7 @@ func handleNonExhaustedError(err error, task *api.Task, sess *hashcat.Session, e
 		// of the retryable failure (the task can be retried now that the corrupt
 		// restore file has been removed)
 		errorInfo := hashcat.ClassifyStderr(err.Error())
-		cserrors.SendAgentError(err.Error(), task, errorInfo.Severity,
+		cserrors.SendAgentError(ctx, err.Error(), task, errorInfo.Severity,
 			cserrors.WithClassification(errorInfo.Category.String(), errorInfo.Retryable))
 		display.JobFailed(err)
 
@@ -209,6 +240,7 @@ func handleNonExhaustedError(err error, task *api.Task, sess *hashcat.Session, e
 
 	// Send error with classified severity and metadata
 	cserrors.SendAgentError(
+		ctx,
 		err.Error(),
 		task,
 		exitInfo.Severity,

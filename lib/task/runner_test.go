@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -197,7 +198,7 @@ func TestHandleStdErrLine(t *testing.T) {
 			initialCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 
 			// Call handleStdErrLine
-			handleStdErrLine(tt.stdErrLine, task)
+			handleStdErrLine(context.Background(), tt.stdErrLine, task)
 
 			// Verify SendAgentError behavior
 			finalCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
@@ -319,7 +320,7 @@ func TestHandleDoneChan(t *testing.T) {
 			}
 
 			mgr := newTestManager()
-			mgr.handleDoneChan(tt.err, task, sess)
+			mgr.handleDoneChan(context.Background(), tt.err, task, sess)
 
 			if tt.expectExhausted {
 				t.Log("exhausted path exercised for exit code 1")
@@ -347,7 +348,7 @@ func TestHandleDoneChan_CleansRestoreFile(t *testing.T) {
 	sess.RestoreFilePath = restoreFile
 
 	mgr := newTestManager()
-	mgr.handleDoneChan(nil, task, sess)
+	mgr.handleDoneChan(context.Background(), nil, task, sess)
 
 	_, statErr := os.Stat(restoreFile)
 	require.True(t, os.IsNotExist(statErr), "restore file should be removed after handleDoneChan")
@@ -373,7 +374,7 @@ func TestHandleDoneChan_CleansRestoreFile_OnError(t *testing.T) {
 
 	mgr := newTestManager()
 	// Use exit status 2 (general hashcat error) to exercise the error path
-	mgr.handleDoneChan(errors.New("exit status 2"), task, sess)
+	mgr.handleDoneChan(context.Background(), errors.New("exit status 2"), task, sess)
 
 	_, statErr := os.Stat(restoreFile)
 	require.True(t, os.IsNotExist(statErr), "restore file should be removed after handleDoneChan with error")

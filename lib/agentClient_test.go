@@ -114,7 +114,7 @@ func TestAuthenticateAgent(t *testing.T) {
 
 			tt.setupMock(123)
 
-			err := AuthenticateAgent()
+			err := AuthenticateAgent(context.Background())
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 	defer func() {
 		setNativeHashcatPathFn = originalFn
 	}()
-	setNativeHashcatPathFn = func() error {
+	setNativeHashcatPathFn = func(_ context.Context) error {
 		return nil // No-op for tests
 	}
 
@@ -211,7 +211,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 
 			tt.setupMock()
 
-			err := GetAgentConfiguration()
+			err := GetAgentConfiguration(context.Background())
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
@@ -282,7 +282,7 @@ func TestUpdateAgentMetadata(t *testing.T) {
 
 			tt.setupMock(123)
 
-			err := UpdateAgentMetadata()
+			err := UpdateAgentMetadata(context.Background())
 
 			if tt.expectedError {
 				require.Error(t, err, "Expected an error but got nil")

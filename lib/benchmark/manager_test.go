@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -219,7 +220,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 			tt.setupMock(789)
 
 			mgr := NewManager(agentstate.State.APIClient.Agents())
-			err := mgr.sendBenchmarkResults(tt.results)
+			err := mgr.sendBenchmarkResults(context.Background(), tt.results)
 
 			if tt.expectedError {
 				require.Error(t, err)
@@ -246,7 +247,7 @@ func TestSendBenchmarkResults_AllInvalid(t *testing.T) {
 	}
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	err := mgr.sendBenchmarkResults(allInvalid)
+	err := mgr.sendBenchmarkResults(context.Background(), allInvalid)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -358,7 +359,7 @@ func TestHandleBenchmarkStdErrLine(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(789)
 
 			// Should not panic
-			handleBenchmarkStdErrLine(tt.line)
+			handleBenchmarkStdErrLine(context.Background(), tt.line)
 
 			if tt.expectAPICall {
 				callCount := testhelpers.GetSubmitErrorCallCount(789, "https://test.api")
@@ -405,7 +406,7 @@ func TestUpdateBenchmarks_CachedSubmissionSuccess(t *testing.T) {
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	err = mgr.UpdateBenchmarks()
+	err = mgr.UpdateBenchmarks(context.Background())
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 }
@@ -428,7 +429,7 @@ func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 		httpmock.NewStringResponder(http.StatusInternalServerError, "Server Error"))
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	err = mgr.UpdateBenchmarks()
+	err = mgr.UpdateBenchmarks(context.Background())
 	require.NoError(t, err, "cached submission failure should be non-fatal")
 	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
 
@@ -457,7 +458,7 @@ func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 
 	// No API mock needed — should not make any calls
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	err = mgr.UpdateBenchmarks()
+	err = mgr.UpdateBenchmarks(context.Background())
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
@@ -487,7 +488,7 @@ func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	err = mgr.UpdateBenchmarks()
+	err = mgr.UpdateBenchmarks(context.Background())
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 }
@@ -638,7 +639,7 @@ func TestProcessBenchmarkOutput_AllBatchesSucceed(t *testing.T) {
 	}()
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	results := mgr.processBenchmarkOutput(sess)
+	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 15)
 	assert.True(t, allSubmitted(results), "all results should be marked as submitted")
@@ -675,7 +676,7 @@ func TestProcessBenchmarkOutput_SingleBatch(t *testing.T) {
 	}()
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	results := mgr.processBenchmarkOutput(sess)
+	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 5)
 	assert.True(t, allSubmitted(results))
@@ -716,7 +717,7 @@ func TestProcessBenchmarkOutput_BatchFailsFinalSucceeds(t *testing.T) {
 	}()
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	results := mgr.processBenchmarkOutput(sess)
+	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 15)
 	// First batch (10 items) fails, retry triggers on next line (11 items), succeeds.
@@ -751,7 +752,7 @@ func TestProcessBenchmarkOutput_AllSendsFail(t *testing.T) {
 	}()
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	results := mgr.processBenchmarkOutput(sess)
+	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 15)
 	assert.False(t, allSubmitted(results), "no results should be marked submitted")
@@ -781,7 +782,7 @@ func TestProcessBenchmarkOutput_EmptyResults(t *testing.T) {
 	}()
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	results := mgr.processBenchmarkOutput(sess)
+	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Empty(t, results)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted(), "nothing to submit = done")
@@ -813,7 +814,7 @@ func TestProcessBenchmarkOutput_SessionError(t *testing.T) {
 	}()
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	results := mgr.processBenchmarkOutput(sess)
+	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 5)
 	assert.True(t, allSubmitted(results), "results should still be submitted despite error")

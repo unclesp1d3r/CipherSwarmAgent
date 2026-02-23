@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -22,7 +22,7 @@ const (
 // sendStatusUpdate sends a status update to the server for a given task and session.
 // It ensures the update time is set, converts device statuses, and converts hashcat.Status to api.TaskStatus.
 // Finally, it sends the status update to the server and handles the response.
-func (m *Manager) sendStatusUpdate(update hashcat.Status, task *api.Task, sess *hashcat.Session) {
+func (m *Manager) sendStatusUpdate(ctx context.Context, update hashcat.Status, task *api.Task, sess *hashcat.Session) {
 	// Ensure the update time is set
 	if update.Time.IsZero() {
 		update.Time = time.Now()
@@ -36,13 +36,13 @@ func (m *Manager) sendStatusUpdate(update hashcat.Status, task *api.Task, sess *
 	taskStatus := convertToTaskStatus(update, deviceStatuses)
 
 	// Send status update to the server
-	resp, err := m.tasksClient.SendStatus(context.Background(), task.Id, taskStatus)
+	resp, err := m.tasksClient.SendStatus(ctx, task.Id, taskStatus)
 	if err != nil {
-		handleStatusUpdateError(err, task, sess)
+		handleStatusUpdateError(ctx, err, task, sess)
 		return
 	}
 
-	m.handleSendStatusResponse(resp, task)
+	m.handleSendStatusResponse(ctx, resp, task)
 }
 
 func convertDeviceStatuses(devices []hashcat.StatusDevice) []api.DeviceStatus {
@@ -100,7 +100,7 @@ func convertAndWarn(s []int64, field string) []int {
 	return result
 }
 
-func (m *Manager) handleSendStatusResponse(resp *api.SendStatusResponse, task *api.Task) {
+func (m *Manager) handleSendStatusResponse(ctx context.Context, resp *api.SendStatusResponse, task *api.Task) {
 	switch resp.StatusCode() {
 	case http.StatusNoContent:
 		if agentstate.State.ExtraDebugging {
@@ -108,13 +108,13 @@ func (m *Manager) handleSendStatusResponse(resp *api.SendStatusResponse, task *a
 		}
 	case http.StatusAccepted:
 		agentstate.Logger.Debug("Status update sent, but stale")
-		zap.GetZaps(task, m.sendCrackedHash)
+		zap.GetZaps(ctx, task, m.sendCrackedHash)
 	default:
 		if resp.StatusCode() >= http.StatusOK && resp.StatusCode() < http.StatusMultipleChoices {
 			agentstate.Logger.Warn("Unexpected success status code for status update",
 				"status_code", resp.StatusCode(), "task_id", task.Id)
 			// Defensively fetch zaps for any other 2xx success code to avoid losing cracked hashes
-			zap.GetZaps(task, m.sendCrackedHash)
+			zap.GetZaps(ctx, task, m.sendCrackedHash)
 		} else {
 			agentstate.Logger.Error("Failed to send status update",
 				"status_code", resp.StatusCode(), "task_id", task.Id)
@@ -128,7 +128,7 @@ func (m *Manager) handleSendStatusResponse(resp *api.SendStatusResponse, task *a
 // Logs and handles any errors encountered during the sending process.
 // If configured, writes the cracked hash to a file.
 // Logs additional information based on the HTTP response status.
-func (m *Manager) sendCrackedHash(timestamp time.Time, hash, plaintext string, task *api.Task) {
+func (m *Manager) sendCrackedHash(ctx context.Context, timestamp time.Time, hash, plaintext string, task *api.Task) {
 	if task == nil {
 		agentstate.Logger.Error("Task is nil")
 
@@ -143,15 +143,15 @@ func (m *Manager) sendCrackedHash(timestamp time.Time, hash, plaintext string, t
 
 	agentstate.Logger.Info("Cracked hash", "hash", hash)
 
-	response, err := m.tasksClient.SendCrack(context.Background(), task.Id, hashcatResult)
+	response, err := m.tasksClient.SendCrack(ctx, task.Id, hashcatResult)
 	if err != nil {
-		handleSendCrackError(err)
+		handleSendCrackError(ctx, err)
 
 		return
 	}
 
 	if agentstate.State.WriteZapsToFile {
-		hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
+		hashFile := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
 
 		file, err := os.OpenFile(
 			hashFile,
@@ -159,8 +159,9 @@ func (m *Manager) sendCrackedHash(timestamp time.Time, hash, plaintext string, t
 			filePermissions,
 		)
 		if err != nil {
-			//nolint:errcheck // Error already being handled
+			//nolint:errcheck // LogAndSendError handles logging+sending internally
 			_ = cserrors.LogAndSendError(
+				ctx,
 				"Error opening cracked hash file",
 				err,
 				api.SeverityCritical,
@@ -178,8 +179,9 @@ func (m *Manager) sendCrackedHash(timestamp time.Time, hash, plaintext string, t
 
 		_, err = file.WriteString(fmt.Sprintf("%s:%s", hash, plaintext) + "\n")
 		if err != nil {
-			//nolint:errcheck // Error already being handled
+			//nolint:errcheck // LogAndSendError handles logging+sending internally
 			_ = cserrors.LogAndSendError(
+				ctx,
 				"Error writing cracked hash to file",
 				err,
 				api.SeverityCritical,

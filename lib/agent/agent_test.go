@@ -5,7 +5,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
@@ -231,10 +230,10 @@ func TestExtraDebuggingFlag(t *testing.T) {
 		agentstate.Logger.SetOutput(os.Stdout)
 	}()
 
-	signChan := make(chan os.Signal, 1)
+	cancel := func() {} // no-op cancel for test
 
 	agentstate.State.ExtraDebugging = true
-	err := heartbeat(context.Background(), signChan)
+	err := heartbeat(context.Background(), cancel)
 	require.NoError(t, err)
 	logOutput := buf.String()
 	assert.Contains(t, logOutput, "Sending heartbeat")
@@ -242,7 +241,7 @@ func TestExtraDebuggingFlag(t *testing.T) {
 
 	buf.Reset()
 	agentstate.State.ExtraDebugging = false
-	err = heartbeat(context.Background(), signChan)
+	err = heartbeat(context.Background(), cancel)
 	require.NoError(t, err)
 	logOutput = buf.String()
 	assert.NotContains(t, logOutput, "Sending heartbeat")
@@ -451,8 +450,8 @@ func TestHeartbeat_StatePending(t *testing.T) {
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 	agentstate.State.SetReload(false)
 
-	signChan := make(chan os.Signal, 1)
-	err := heartbeat(context.Background(), signChan)
+	cancel := func() {} // no-op cancel for test
+	err := heartbeat(context.Background(), cancel)
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetReload(), "StatePending should set Reload=true")
 }
@@ -474,8 +473,8 @@ func TestHeartbeat_StatePending_WhileBenchmarking(t *testing.T) {
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	agentstate.State.SetReload(false)
 
-	signChan := make(chan os.Signal, 1)
-	err := heartbeat(context.Background(), signChan)
+	cancel := func() {} // no-op cancel for test
+	err := heartbeat(context.Background(), cancel)
 	require.NoError(t, err)
 	assert.False(t, agentstate.State.GetReload(), "StatePending during benchmarking should NOT set Reload")
 }
@@ -497,8 +496,8 @@ func TestHeartbeat_StateStopped(t *testing.T) {
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 	agentstate.State.SetJobCheckingStopped(false)
 
-	signChan := make(chan os.Signal, 1)
-	err := heartbeat(context.Background(), signChan)
+	cancel := func() {} // no-op cancel for test
+	err := heartbeat(context.Background(), cancel)
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetJobCheckingStopped(), "StateStopped should set JobCheckingStopped=true")
 	assert.Equal(t, agentstate.CurrentActivityStopping, agentstate.State.GetCurrentActivity())
@@ -521,8 +520,8 @@ func TestHeartbeat_StateStopped_WhileCracking(t *testing.T) {
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
 	agentstate.State.SetJobCheckingStopped(false)
 
-	signChan := make(chan os.Signal, 1)
-	err := heartbeat(context.Background(), signChan)
+	cancel := func() {} // no-op cancel for test
+	err := heartbeat(context.Background(), cancel)
 	require.NoError(t, err)
 	assert.False(
 		t,
@@ -533,7 +532,7 @@ func TestHeartbeat_StateStopped_WhileCracking(t *testing.T) {
 }
 
 // TestHeartbeat_StateError verifies that a StateError heartbeat response
-// sends a SIGTERM signal to the signal channel.
+// calls the cancel function to trigger shutdown.
 func TestHeartbeat_StateError(t *testing.T) {
 	cleanup := saveAndRestoreState(t)
 	defer cleanup()
@@ -548,16 +547,16 @@ func TestHeartbeat_StateError(t *testing.T) {
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 
-	signChan := make(chan os.Signal, 1)
-	err := heartbeat(context.Background(), signChan)
+	ctx, cancel := context.WithCancel(context.Background())
+	err := heartbeat(ctx, cancel)
 	require.NoError(t, err)
 
-	// Verify SIGTERM was sent to the channel
+	// Verify cancel was called by checking ctx.Done()
 	select {
-	case sig := <-signChan:
-		assert.Equal(t, syscall.SIGTERM, sig, "StateError should send SIGTERM")
+	case <-ctx.Done():
+		// Expected — cancel() was called
 	default:
-		t.Fatal("expected SIGTERM signal on signChan, but channel was empty")
+		t.Fatal("expected context to be cancelled after StateError, but it was not")
 	}
 }
 
@@ -579,8 +578,8 @@ func TestHeartbeat_NoContent(t *testing.T) {
 	agentstate.State.SetReload(false)
 	agentstate.State.SetJobCheckingStopped(false)
 
-	signChan := make(chan os.Signal, 1)
-	err := heartbeat(context.Background(), signChan)
+	cancel := func() {} // no-op cancel for test
+	err := heartbeat(context.Background(), cancel)
 	require.NoError(t, err)
 
 	// State should be unchanged

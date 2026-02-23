@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"context"
 	"strings"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -49,10 +50,10 @@ func drainStdout(sess *hashcat.Session, results *[]display.BenchmarkResult) {
 }
 
 // handleBenchmarkStdErrLine processes each line from the benchmark's standard error output, logs it, and reports warnings to the server.
-func handleBenchmarkStdErrLine(line string) {
+func handleBenchmarkStdErrLine(ctx context.Context, line string) {
 	display.BenchmarkError(line)
 
 	if strings.TrimSpace(line) != "" {
-		cserrors.SendAgentError(line, nil, api.SeverityWarning)
+		cserrors.SendAgentError(ctx, line, nil, api.SeverityWarning)
 	}
 }

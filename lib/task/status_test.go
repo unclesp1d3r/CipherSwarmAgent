@@ -1,11 +1,12 @@
 package task
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -119,7 +120,7 @@ func TestSendStatusUpdate(t *testing.T) {
 			defer sess.Cleanup()
 
 			mgr := newTestManager()
-			mgr.sendStatusUpdate(tt.status, task, sess)
+			mgr.sendStatusUpdate(context.Background(), tt.status, task, sess)
 
 			// Verify httpmock call count for send_status endpoint
 			info := httpmock.GetCallCountInfo()
@@ -282,7 +283,7 @@ func TestSendCrackedHash(t *testing.T) {
 					require.NoError(t, os.Chmod(tempDir, 0o755)) //nolint:gosec // adjusting temp dir perms for cleanup
 				})
 
-				hashFile := path.Join(tempDir, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
+				hashFile := filepath.Join(tempDir, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
 
 				file, err := os.OpenFile(hashFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 				require.NoError(t, err)
@@ -298,7 +299,7 @@ func TestSendCrackedHash(t *testing.T) {
 			}
 
 			mgr := newTestManager()
-			mgr.sendCrackedHash(time.Now(), "testhash", "plaintext", tt.task)
+			mgr.sendCrackedHash(context.Background(), time.Now(), "testhash", "plaintext", tt.task)
 
 			// Verify httpmock call counts
 			if tt.task != nil && !tt.expectSubmitError {
@@ -313,7 +314,7 @@ func TestSendCrackedHash(t *testing.T) {
 
 			// Verify file was created if WriteZapsToFile is enabled and no errors expected
 			if tt.writeZapsToFile && tt.task != nil && !tt.expectSubmitError {
-				hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
+				hashFile := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
 				_, err := os.Stat(hashFile)
 				require.NoError(t, err, "zap file should be created")
 			}
@@ -550,7 +551,7 @@ func TestHandleSendStatusResponse(t *testing.T) {
 			}
 
 			mgr := newTestManager()
-			mgr.handleSendStatusResponse(resp, tt.task)
+			mgr.handleSendStatusResponse(context.Background(), resp, tt.task)
 		})
 	}
 }
