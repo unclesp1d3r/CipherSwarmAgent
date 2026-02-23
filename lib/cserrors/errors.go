@@ -62,7 +62,15 @@ func WithClassification(category string, retryable bool) ErrorOption {
 
 // SendAgentError sends an error message to the centralized server, including metadata and severity level.
 // Optional ErrorOption arguments can enhance the error with classification metadata.
+// Safe to call before API client initialization — logs locally and returns if client is nil.
 func SendAgentError(stdErrLine string, task *api.Task, severity api.Severity, opts ...ErrorOption) {
+	if agentstate.State.APIClient == nil {
+		agentstate.ErrorLogger.Error("Cannot send error to server: API client not initialized",
+			"message", stdErrLine, "severity", severity)
+
+		return
+	}
+
 	var cfg errorReportConfig
 	for _, opt := range opts {
 		opt(&cfg)
