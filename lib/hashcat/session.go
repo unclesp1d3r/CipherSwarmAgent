@@ -314,9 +314,9 @@ func (sess *Session) Kill() error {
 	return err
 }
 
-// Cleanup removes all session-related temporary files and directories.
-// It removes the output file, charset files, hash file, restore file,
-// and optionally the zaps directory.
+// Cleanup cancels the session context and removes all session-related temporary
+// files: output file, charset files, hash file, restore file, and optionally
+// the zaps directory. It is idempotent — already-removed files are silently skipped.
 // Errors during cleanup are logged but don't halt the cleanup process.
 func (sess *Session) Cleanup() {
 	sess.Cancel()

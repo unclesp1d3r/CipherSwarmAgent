@@ -331,11 +331,8 @@ func TestHandleDoneChan(t *testing.T) {
 // TestHandleDoneChan_CleansRestoreFile verifies that handleDoneChan removes
 // the session's restore file as part of cleanup.
 func TestHandleDoneChan_CleansRestoreFile(t *testing.T) {
-	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
-
-	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(testhelpers.SetupHTTPMock())
+	t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 	testhelpers.MockSubmitErrorSuccess(123)
 
@@ -359,11 +356,8 @@ func TestHandleDoneChan_CleansRestoreFile(t *testing.T) {
 // TestHandleDoneChan_CleansRestoreFile_OnError verifies that handleDoneChan
 // removes the restore file even when a non-nil error (e.g., exhausted) is passed.
 func TestHandleDoneChan_CleansRestoreFile_OnError(t *testing.T) {
-	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
-
-	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-	t.Cleanup(cleanupState)
+	t.Cleanup(testhelpers.SetupHTTPMock())
+	t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 	testhelpers.MockSubmitErrorSuccess(123)
 
