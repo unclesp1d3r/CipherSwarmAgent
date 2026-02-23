@@ -16,7 +16,7 @@ import (
 // getDevices initializes a test Hashcat session and runs a test task, returning the names of available OpenCL devices.
 // An error is logged and returned if the session creation or test task execution fails.
 //
-//nolint:contextcheck // NewHashcatSession, LogAndSendError, and SendAgentError will be updated to accept context in a future refactor
+//nolint:contextcheck // NewHashcatSession, LogAndSendError, and cserrors.SendAgentError will be updated to accept context in a future refactor
 func getDevices(ctx context.Context) ([]string, error) {
 	_ = ctx // Context will be used when underlying functions are updated
 	jobParams := hashcat.Params{
@@ -55,7 +55,7 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start hashcat startup test session", "error", err)
-		SendAgentError(err.Error(), nil, api.SeverityFatal)
+		cserrors.SendAgentError(err.Error(), nil, api.SeverityFatal)
 
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func handleTestStdOutLine(stdoutLine string) {
 // handleTestStdErrLine sends the specified stderr line to the central server and returns an error if the line is not empty.
 func handleTestStdErrLine(stdErrLine string) error {
 	if strings.TrimSpace(stdErrLine) != "" {
-		SendAgentError(stdErrLine, nil, api.SeverityMinor)
+		cserrors.SendAgentError(stdErrLine, nil, api.SeverityMinor)
 		return errors.New(stdErrLine)
 	}
 
@@ -130,7 +130,7 @@ func handleTestCrackedHash(crackedHash hashcat.Result) error {
 // handleTestDoneChan handles errors from the test session's done channel, sends them to central server if not exit status 1.
 func handleTestDoneChan(err error) error {
 	if err != nil && err.Error() != "exit status 1" {
-		SendAgentError(err.Error(), nil, api.SeverityCritical)
+		cserrors.SendAgentError(err.Error(), nil, api.SeverityCritical)
 		return err
 	}
 

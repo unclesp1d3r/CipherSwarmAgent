@@ -151,12 +151,15 @@ const (
 
 // SendHeartbeat200State constants for heartbeat response state values.
 // The generated code defines the type but not constants.
-// Note: The swagger enum only includes "pending", "stopped", and "error".
-// "active" is described in the API prose but is not part of the response enum;
-// it may not be returned by current server versions.
 const (
+	// StateActive indicates the agent is ready to accept tasks.
+	StateActive SendHeartbeat200State = "active"
+	// StateError indicates the agent has encountered an error.
+	StateError SendHeartbeat200State = "error"
+	// StateOffline indicates the agent has not checked in recently.
+	StateOffline SendHeartbeat200State = "offline"
+	// StatePending indicates the agent needs to perform setup again.
 	StatePending SendHeartbeat200State = "pending"
-	StateActive  SendHeartbeat200State = "active" // Not in swagger enum; see block comment above
-	StateError   SendHeartbeat200State = "error"
+	// StateStopped indicates the agent has been stopped by the user.
 	StateStopped SendHeartbeat200State = "stopped"
 )

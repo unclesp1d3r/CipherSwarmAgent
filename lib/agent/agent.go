@@ -15,12 +15,22 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/benchmark"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/task"
 )
 
 const (
 	maxBenchmarkRetries = 10 // Stop retrying cached benchmark submission after this many failures
+)
+
+//nolint:gochecknoglobals // Package-level managers, initialized in StartAgent
+var (
+	benchmarkMgr *benchmark.Manager
+	taskMgr      *task.Manager
 )
 
 // StartAgent initializes and starts the CipherSwarm agent.
@@ -45,7 +55,7 @@ func StartAgent() {
 	}
 	agentstate.State.APIClient = apiClient
 
-	lib.DisplayStartup()
+	display.Startup()
 
 	// Set up signal handling for graceful shutdown
 	signChan := make(chan os.Signal, 1)
@@ -72,7 +82,7 @@ func StartAgent() {
 		agentstate.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
 	}
 
-	lib.DisplayAuthenticated()
+	display.Authenticated()
 
 	// Fetch agent configuration and update metadata
 	if err := fetchAgentConfig(); err != nil {
@@ -93,9 +103,17 @@ func StartAgent() {
 	// Start heartbeat loop early so UI can see agent is connected
 	go startHeartbeatLoop(ctx, signChan)
 
-	// Submit initial benchmarks to the server
+	// Initialize managers
+	benchmarkMgr = benchmark.NewManager(agentstate.State.APIClient.Agents())
+	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
+	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+
+	taskMgr = task.NewManager(agentstate.State.APIClient.Tasks(), agentstate.State.APIClient.Attacks())
+	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
+	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
-	if err := lib.UpdateBenchmarks(); err != nil {
+	if err := benchmarkMgr.UpdateBenchmarks(); err != nil {
 		agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
 	}
 
@@ -113,9 +131,9 @@ func StartAgent() {
 	sig := <-signChan
 	cancel() // Cancel context to signal goroutines
 	agentstate.Logger.Debug("Received signal", "signal", sig)
-	lib.SendAgentError("Received signal to terminate. Shutting down", nil, api.SeverityInfo)
+	cserrors.SendAgentError("Received signal to terminate. Shutting down", nil, api.SeverityInfo)
 	lib.SendAgentShutdown()
-	lib.DisplayShuttingDown()
+	display.ShuttingDown()
 }
 
 func cleanupLockFile(pidFile string) {
@@ -207,7 +225,7 @@ func startAgentLoop(ctx context.Context) {
 		// TrySubmitCachedBenchmarks is a no-op when force-benchmark flag is set.
 		if !agentstate.State.GetBenchmarksSubmitted() {
 			//nolint:contextcheck // callee lacks ctx param
-			if lib.TrySubmitCachedBenchmarks() {
+			if benchmarkMgr.TrySubmitCachedBenchmarks() {
 				benchmarkRetryFailures = 0
 			} else if benchmarkRetryFailures < maxBenchmarkRetries {
 				benchmarkRetryFailures++
@@ -217,7 +235,7 @@ func startAgentLoop(ctx context.Context) {
 						"attempts", benchmarkRetryFailures,
 					)
 					//nolint:contextcheck // callee lacks ctx param
-					lib.SendAgentError(
+					cserrors.SendAgentError(
 						fmt.Sprintf("Benchmark submission retry limit reached after %d attempts",
 							benchmarkRetryFailures),
 						nil,
@@ -241,7 +259,7 @@ func startAgentLoop(ctx context.Context) {
 		}
 
 		sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
-		lib.DisplayInactive(sleepTime)
+		display.Inactive(sleepTime)
 
 		if sleepWithContext(ctx, sleepTime) {
 			return
@@ -251,7 +269,7 @@ func startAgentLoop(ctx context.Context) {
 
 func handleReload(_ context.Context) {
 	//nolint:contextcheck // callee lacks ctx param
-	lib.SendAgentError("Reloading config and performing new benchmark", nil, api.SeverityInfo)
+	cserrors.SendAgentError("Reloading config and performing new benchmark", nil, api.SeverityInfo)
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 	agentstate.Logger.Info("Reloading agent")
@@ -260,23 +278,28 @@ func handleReload(_ context.Context) {
 	if err := fetchAgentConfig(); err != nil {
 		agentstate.Logger.Error("Failed to fetch agent configuration, skipping reload", "error", err)
 		//nolint:contextcheck // callee lacks ctx param
-		lib.SendAgentError("Failed to fetch agent configuration", nil, api.SeverityFatal)
+		cserrors.SendAgentError("Failed to fetch agent configuration", nil, api.SeverityFatal)
 		agentstate.State.SetReload(false)
 
 		return
 	}
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
+	// Update manager configs after reload
+	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
+	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
+	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 	// Server-initiated reload must re-run benchmarks (not use stale cache).
 	// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
 	agentstate.State.ForceBenchmarkRun = true
 	defer func() { agentstate.State.ForceBenchmarkRun = false }()
 	//nolint:contextcheck // callee lacks ctx param
-	if err := lib.UpdateBenchmarks(); err != nil {
+	if err := benchmarkMgr.UpdateBenchmarks(); err != nil {
 		agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
 			"error", err)
 		//nolint:contextcheck // callee lacks ctx param
-		lib.SendAgentError(
+		cserrors.SendAgentError(
 			"Benchmark update failed during reload: "+err.Error(),
 			nil,
 			api.SeverityMajor,
@@ -301,9 +324,9 @@ func handleNewTask(ctx context.Context) {
 	}
 
 	//nolint:contextcheck // callee lacks ctx param
-	task, err := lib.GetNewTask()
+	newTask, err := taskMgr.GetNewTask()
 	if err != nil {
-		if errors.Is(err, lib.ErrNoTaskAvailable) {
+		if errors.Is(err, task.ErrNoTaskAvailable) {
 			agentstate.Logger.Debug("No new task available")
 			return
 		}
@@ -314,18 +337,18 @@ func handleNewTask(ctx context.Context) {
 		return
 	}
 
-	if task != nil {
-		_ = processTask(ctx, task) //nolint:errcheck // Ignore error, as it is already logged and we can continue
+	if newTask != nil {
+		_ = processTask(ctx, newTask) //nolint:errcheck // Ignore error, as it is already logged and we can continue
 	}
 }
 
-func processTask(ctx context.Context, task *api.Task) error {
+func processTask(ctx context.Context, t *api.Task) error {
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
 
-	lib.DisplayNewTask(task)
+	display.NewTask(t)
 
 	//nolint:contextcheck // callee lacks ctx param
-	attack, err := lib.GetAttackParameters(task.AttackId)
+	attack, err := taskMgr.GetAttackParameters(t.AttackId)
 	if err != nil || attack == nil {
 		agentstate.Logger.Error("Failed to get attack parameters", "error", err)
 
@@ -335,9 +358,9 @@ func processTask(ctx context.Context, task *api.Task) error {
 		}
 
 		//nolint:contextcheck // callee lacks ctx param
-		lib.SendAgentError(errMsg, task, api.SeverityFatal)
+		cserrors.SendAgentError(errMsg, t, api.SeverityFatal)
 		//nolint:contextcheck // callee lacks ctx param
-		lib.AbandonTask(task)
+		taskMgr.AbandonTask(t)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		if err != nil {
@@ -347,31 +370,31 @@ func processTask(ctx context.Context, task *api.Task) error {
 		return errors.New("attack parameters are nil")
 	}
 
-	lib.DisplayNewAttack(attack)
+	display.NewAttack(attack)
 
 	//nolint:contextcheck // callee lacks ctx param
-	err = lib.AcceptTask(task)
+	err = taskMgr.AcceptTask(t)
 	if err != nil {
-		agentstate.Logger.Error("Failed to accept task", "task_id", task.Id)
+		agentstate.Logger.Error("Failed to accept task", "task_id", t.Id)
 
 		return err
 	}
 
-	lib.DisplayRunTaskAccepted(task)
+	display.RunTaskAccepted(t)
 
-	if err := lib.DownloadFiles(ctx, attack); err != nil {
+	if err := task.DownloadFiles(ctx, attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		//nolint:contextcheck // callee lacks ctx param
-		lib.SendAgentError(err.Error(), task, api.SeverityFatal)
+		cserrors.SendAgentError(err.Error(), t, api.SeverityFatal)
 		//nolint:contextcheck // callee lacks ctx param
-		lib.AbandonTask(task)
+		taskMgr.AbandonTask(t)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return err
 	}
 
 	//nolint:contextcheck // callee lacks ctx param
-	err = lib.RunTask(task, attack)
+	err = taskMgr.RunTask(t, attack)
 	if err != nil {
 		return err
 	}

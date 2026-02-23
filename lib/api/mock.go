@@ -185,7 +185,7 @@ func (m *MockAttacksClient) GetHashList(ctx context.Context, id int64) (*GetHash
 
 // MockAgentsClient is a configurable mock for AgentsClient.
 type MockAgentsClient struct {
-	SendHeartbeatFunc    func(ctx context.Context, id int64) (*SendHeartbeatResponse, error)
+	SendHeartbeatFunc    func(ctx context.Context, id int64, activity string) (*SendHeartbeatResponse, error)
 	UpdateAgentFunc      func(ctx context.Context, id int64, body UpdateAgentJSONRequestBody) (*UpdateAgentResponse, error)
 	SubmitBenchmarkFunc  func(ctx context.Context, id int64, body SubmitBenchmarkJSONRequestBody) (*SubmitBenchmarkResponse, error)
 	SubmitErrorAgentFunc func(ctx context.Context, id int64, body SubmitErrorAgentJSONRequestBody) (*SubmitErrorAgentResponse, error)
@@ -193,9 +193,13 @@ type MockAgentsClient struct {
 }
 
 // SendHeartbeat calls the configured function or returns an error if not configured.
-func (m *MockAgentsClient) SendHeartbeat(ctx context.Context, id int64) (*SendHeartbeatResponse, error) {
+func (m *MockAgentsClient) SendHeartbeat(
+	ctx context.Context,
+	id int64,
+	activity string,
+) (*SendHeartbeatResponse, error) {
 	if m.SendHeartbeatFunc != nil {
-		return m.SendHeartbeatFunc(ctx, id)
+		return m.SendHeartbeatFunc(ctx, id, activity)
 	}
 
 	return nil, fmt.Errorf("mock method not configured: %T", m)

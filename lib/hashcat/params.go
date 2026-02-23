@@ -232,7 +232,11 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.WordListFilename) != "" {
-		wordList := filepath.Join(agentstate.State.FilePath, filepath.Clean(params.WordListFilename))
+		wordList, err := safePath(agentstate.State.FilePath, params.WordListFilename)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrWordlistNotOpened, err)
+		}
+
 		if _, err := os.Stat(wordList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrWordlistNotOpened, wordList)
 		}
@@ -241,7 +245,11 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.RuleListFilename) != "" {
-		ruleList := filepath.Join(agentstate.State.FilePath, filepath.Clean(params.RuleListFilename))
+		ruleList, err := safePath(agentstate.State.FilePath, params.RuleListFilename)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrRuleListNotOpened, err)
+		}
+
 		if _, err := os.Stat(ruleList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrRuleListNotOpened, ruleList)
 		}
@@ -250,7 +258,11 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.MaskListFilename) != "" {
-		maskList := filepath.Join(agentstate.State.FilePath, filepath.Clean(params.MaskListFilename))
+		maskList, err := safePath(agentstate.State.FilePath, params.MaskListFilename)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrMaskListNotOpened, err)
+		}
+
 		if _, err := os.Stat(maskList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrMaskListNotOpened, maskList)
 		}
@@ -307,4 +319,27 @@ func (params Params) toRestoreArgs(session string) []string {
 		"--restore-file-path", params.RestoreFilePath,
 		"--restore",
 	}
+}
+
+// safePath joins base and filename, then verifies the result stays within base.
+// This prevents path traversal attacks via filenames like "../../etc/passwd".
+func safePath(base, filename string) (string, error) {
+	joined := filepath.Join(base, filepath.Clean(filename))
+
+	absBase, err := filepath.Abs(base)
+	if err != nil {
+		return "", fmt.Errorf("resolving base path: %w", err)
+	}
+
+	absJoined, err := filepath.Abs(joined)
+	if err != nil {
+		return "", fmt.Errorf("resolving joined path: %w", err)
+	}
+
+	prefix := absBase + string(filepath.Separator)
+	if !strings.HasPrefix(absJoined, prefix) && absJoined != absBase {
+		return "", fmt.Errorf("path %q escapes base directory %q", filename, base)
+	}
+
+	return absJoined, nil
 }

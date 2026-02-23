@@ -25,6 +25,7 @@ const (
 const (
 	Active  AgentState = "active"
 	Error   AgentState = "error"
+	Offline AgentState = "offline"
 	Pending AgentState = "pending"
 	Stopped AgentState = "stopped"
 )
@@ -53,7 +54,7 @@ const (
 	Warning  SubmitErrorAgentJSONBodySeverity = "warning"
 )
 
-// AdvancedAgentConfiguration defines model for AdvancedAgentConfiguration.
+// AdvancedAgentConfiguration Advanced hashcat and agent configuration options
 type AdvancedAgentConfiguration struct {
 	// AgentUpdateInterval The interval in seconds to check for agent updates
 	AgentUpdateInterval *int `json:"agent_update_interval"`
@@ -71,8 +72,9 @@ type AdvancedAgentConfiguration struct {
 	UseNativeHashcat *bool `json:"use_native_hashcat"`
 }
 
-// Agent defines model for Agent.
+// Agent A cracking agent registered with CipherSwarm
 type Agent struct {
+	// AdvancedConfiguration Advanced hashcat and agent configuration options
 	AdvancedConfiguration AdvancedAgentConfiguration `json:"advanced_configuration"`
 
 	// ClientSignature The signature of the client
@@ -98,7 +100,7 @@ type Agent struct {
 // AgentState The state of the agent
 type AgentState string
 
-// Attack defines model for Attack.
+// Attack A hashcat attack configuration assigned to an agent
 type Attack struct {
 	// AttackMode Attack mode name
 	AttackMode AttackAttackMode `json:"attack_mode"`
@@ -155,21 +157,27 @@ type Attack struct {
 	MarkovThreshold *int `json:"markov_threshold,omitempty"`
 
 	// Mask A hashcat mask string
-	Mask     *string             `json:"mask"`
+	Mask *string `json:"mask"`
+
+	// MaskList A downloadable resource file (word list, rule list, or mask list) used by an attack
 	MaskList *AttackResourceFile `json:"mask_list"`
 
 	// Optimized Enable hashcat optimized mode
 	Optimized bool `json:"optimized"`
 
 	// RightRule The right-hand rule for combinator attacks
-	RightRule *string             `json:"right_rule"`
-	RuleList  *AttackResourceFile `json:"rule_list"`
+	RightRule *string `json:"right_rule"`
+
+	// RuleList A downloadable resource file (word list, rule list, or mask list) used by an attack
+	RuleList *AttackResourceFile `json:"rule_list"`
 
 	// SlowCandidateGenerators Enable hashcat slow candidate generators
 	SlowCandidateGenerators bool `json:"slow_candidate_generators"`
 
 	// Url The URL to the attack
-	Url      *string             `json:"url"`
+	Url *string `json:"url"`
+
+	// WordList A downloadable resource file (word list, rule list, or mask list) used by an attack
 	WordList *AttackResourceFile `json:"word_list"`
 
 	// WorkloadProfile The hashcat workload profile
@@ -179,7 +187,7 @@ type Attack struct {
 // AttackAttackMode Attack mode name
 type AttackAttackMode string
 
-// AttackResourceFile defines model for AttackResourceFile.
+// AttackResourceFile A downloadable resource file (word list, rule list, or mask list) used by an attack
 type AttackResourceFile struct {
 	// Checksum The MD5 checksum of the resource file
 	Checksum []byte `json:"checksum"`
@@ -194,7 +202,7 @@ type AttackResourceFile struct {
 	Id int64 `json:"id"`
 }
 
-// DeviceStatus defines model for DeviceStatus.
+// DeviceStatus Status and performance metrics for a single GPU or CPU device
 type DeviceStatus struct {
 	// DeviceId The id of the device
 	DeviceId int `json:"device_id"`
@@ -218,7 +226,7 @@ type DeviceStatus struct {
 // DeviceStatusDeviceType The type of the device
 type DeviceStatusDeviceType string
 
-// HashcatBenchmark defines model for HashcatBenchmark.
+// HashcatBenchmark A single hashcat benchmark result for a specific hash type and device
 type HashcatBenchmark struct {
 	// Device The device used for the benchmark
 	Device int `json:"device"`
@@ -233,7 +241,7 @@ type HashcatBenchmark struct {
 	Runtime int64 `json:"runtime"`
 }
 
-// HashcatGuess defines model for HashcatGuess.
+// HashcatGuess Current hashcat guess progress including base and modifier values
 type HashcatGuess struct {
 	// GuessBase The base value used for the guess (for example, the mask)
 	GuessBase string `json:"guess_base"`
@@ -263,7 +271,7 @@ type HashcatGuess struct {
 	GuessMode int `json:"guess_mode"`
 }
 
-// HashcatResult defines model for HashcatResult.
+// HashcatResult A cracked hash result submitted by an agent
 type HashcatResult struct {
 	// Hash The hash value
 	Hash string `json:"hash"`
@@ -275,7 +283,7 @@ type HashcatResult struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Task defines model for Task.
+// Task A unit of work assigned to an agent for a specific attack
 type Task struct {
 	// AttackId The id of the attack
 	AttackId int64 `json:"attack_id"`
@@ -296,14 +304,16 @@ type Task struct {
 	Status string `json:"status"`
 }
 
-// TaskStatus defines model for TaskStatus.
+// TaskStatus A hashcat status update submitted by an agent during task execution
 type TaskStatus struct {
 	// DeviceStatuses The status of the devices used for the task
 	DeviceStatuses []DeviceStatus `json:"device_statuses"`
 
 	// EstimatedStop The estimated time of completion.
-	EstimatedStop time.Time    `json:"estimated_stop"`
-	HashcatGuess  HashcatGuess `json:"hashcat_guess"`
+	EstimatedStop time.Time `json:"estimated_stop"`
+
+	// HashcatGuess Current hashcat guess progress including base and modifier values
+	HashcatGuess HashcatGuess `json:"hashcat_guess"`
 
 	// OriginalLine The original line from hashcat
 	OriginalLine string `json:"original_line"`
@@ -355,6 +365,12 @@ type UpdateAgentJSONBody struct {
 	OperatingSystem string `json:"operating_system"`
 }
 
+// SendHeartbeatJSONBody defines parameters for SendHeartbeat.
+type SendHeartbeatJSONBody struct {
+	// Activity Current agent activity state. Known values: starting, benchmarking, updating, downloading, waiting, cracking, stopping. Future versions may support additional values.
+	Activity *string `json:"activity"`
+}
+
 // SubmitBenchmarkJSONBody defines parameters for SubmitBenchmark.
 type SubmitBenchmarkJSONBody struct {
 	HashcatBenchmarks []HashcatBenchmark `json:"hashcat_benchmarks"`
@@ -395,6 +411,9 @@ type SubmitErrorAgentJSONBodySeverity string
 
 // UpdateAgentJSONRequestBody defines body for UpdateAgent for application/json ContentType.
 type UpdateAgentJSONRequestBody UpdateAgentJSONBody
+
+// SendHeartbeatJSONRequestBody defines body for SendHeartbeat for application/json ContentType.
+type SendHeartbeatJSONRequestBody SendHeartbeatJSONBody
 
 // SubmitBenchmarkJSONRequestBody defines body for SubmitBenchmark for application/json ContentType.
 type SubmitBenchmarkJSONRequestBody SubmitBenchmarkJSONBody
@@ -489,8 +508,10 @@ type ClientInterface interface {
 
 	UpdateAgent(ctx context.Context, id int64, body UpdateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// SendHeartbeat request
-	SendHeartbeat(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// SendHeartbeatWithBody request with any body
+	SendHeartbeatWithBody(ctx context.Context, id int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SendHeartbeat(ctx context.Context, id int64, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetAgentShutdown request
 	SetAgentShutdown(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -582,8 +603,20 @@ func (c *Client) UpdateAgent(ctx context.Context, id int64, body UpdateAgentJSON
 	return c.Client.Do(req)
 }
 
-func (c *Client) SendHeartbeat(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSendHeartbeatRequest(c.Server, id)
+func (c *Client) SendHeartbeatWithBody(ctx context.Context, id int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendHeartbeatRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SendHeartbeat(ctx context.Context, id int64, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendHeartbeatRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -903,8 +936,19 @@ func NewUpdateAgentRequestWithBody(server string, id int64, contentType string, 
 	return req, nil
 }
 
-// NewSendHeartbeatRequest generates requests for SendHeartbeat
-func NewSendHeartbeatRequest(server string, id int64) (*http.Request, error) {
+// NewSendHeartbeatRequest calls the generic SendHeartbeat builder with application/json body
+func NewSendHeartbeatRequest(server string, id int64, body SendHeartbeatJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSendHeartbeatRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewSendHeartbeatRequestWithBody generates requests for SendHeartbeat with any type of body
+func NewSendHeartbeatRequestWithBody(server string, id int64, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -929,10 +973,12 @@ func NewSendHeartbeatRequest(server string, id int64) (*http.Request, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -1529,8 +1575,10 @@ type ClientWithResponsesInterface interface {
 
 	UpdateAgentWithResponse(ctx context.Context, id int64, body UpdateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentResponse, error)
 
-	// SendHeartbeatWithResponse request
-	SendHeartbeatWithResponse(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error)
+	// SendHeartbeatWithBodyWithResponse request with any body
+	SendHeartbeatWithBodyWithResponse(ctx context.Context, id int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error)
+
+	SendHeartbeatWithResponse(ctx context.Context, id int64, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error)
 
 	// SetAgentShutdownWithResponse request
 	SetAgentShutdownWithResponse(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*SetAgentShutdownResponse, error)
@@ -1641,6 +1689,7 @@ type SendHeartbeatResponse struct {
 		//                        * `active` - The agent is ready to accept tasks, all is good.
 		//                        * `error` - The agent has encountered an error and needs to be checked.
 		//                        * `stopped` - The agent has been stopped by the user.
+		//                        * `offline` - The agent has not checked in recently and is considered offline.
 		State SendHeartbeat200State `json:"state"`
 	}
 	JSON401 *ErrorObject
@@ -1806,8 +1855,10 @@ type GetConfigurationResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		// ApiVersion The minimum accepted version of the API
-		ApiVersion int                        `json:"api_version"`
-		Config     AdvancedAgentConfiguration `json:"config"`
+		ApiVersion int `json:"api_version"`
+
+		// Config Advanced hashcat and agent configuration options
+		Config AdvancedAgentConfiguration `json:"config"`
 	}
 	JSON401 *ErrorObject
 }
@@ -2044,9 +2095,17 @@ func (c *ClientWithResponses) UpdateAgentWithResponse(ctx context.Context, id in
 	return ParseUpdateAgentResponse(rsp)
 }
 
-// SendHeartbeatWithResponse request returning *SendHeartbeatResponse
-func (c *ClientWithResponses) SendHeartbeatWithResponse(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error) {
-	rsp, err := c.SendHeartbeat(ctx, id, reqEditors...)
+// SendHeartbeatWithBodyWithResponse request with arbitrary body returning *SendHeartbeatResponse
+func (c *ClientWithResponses) SendHeartbeatWithBodyWithResponse(ctx context.Context, id int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error) {
+	rsp, err := c.SendHeartbeatWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendHeartbeatResponse(rsp)
+}
+
+func (c *ClientWithResponses) SendHeartbeatWithResponse(ctx context.Context, id int64, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error) {
+	rsp, err := c.SendHeartbeat(ctx, id, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2307,6 +2366,7 @@ func ParseSendHeartbeatResponse(rsp *http.Response) (*SendHeartbeatResponse, err
 			//                        * `active` - The agent is ready to accept tasks, all is good.
 			//                        * `error` - The agent has encountered an error and needs to be checked.
 			//                        * `stopped` - The agent has been stopped by the user.
+			//                        * `offline` - The agent has not checked in recently and is considered offline.
 			State SendHeartbeat200State `json:"state"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2520,8 +2580,10 @@ func ParseGetConfigurationResponse(rsp *http.Response) (*GetConfigurationRespons
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			// ApiVersion The minimum accepted version of the API
-			ApiVersion int                        `json:"api_version"`
-			Config     AdvancedAgentConfiguration `json:"config"`
+			ApiVersion int `json:"api_version"`
+
+			// Config Advanced hashcat and agent configuration options
+			Config AdvancedAgentConfiguration `json:"config"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

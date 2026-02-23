@@ -88,7 +88,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - `cserrors.LogAndSendError` sends errors to the server even without a task (nil task → nil TaskId). Only skipped when APIClient is not yet initialized.
 - For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding with `_ = file.Close()`.
 - **Error reporting options:** Use `SendAgentError(msg, task, severity, opts ...ErrorOption)` for all error reporting. Add classification metadata via `WithClassification(category, retryable)`. Do NOT create separate error-sending functions — extend via `ErrorOption` functional options instead.
-- `cserrors.LogAndSendError` intentionally duplicates some `SendAgentError` logic because `cserrors` cannot import `lib` (circular dependency). It omits platform/version metadata, which is acceptable for the critical startup errors it reports.
+- `cserrors.LogAndSendError` delegates to `SendAgentError`, which includes platform/version metadata. API submission is skipped only when `APIClient` has not been initialized yet.
 
 ### Concurrency
 
