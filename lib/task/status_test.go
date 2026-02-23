@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -119,7 +120,7 @@ func TestSendStatusUpdate(t *testing.T) {
 			defer sess.Cleanup()
 
 			mgr := newTestManager()
-			mgr.sendStatusUpdate(tt.status, task, sess)
+			mgr.sendStatusUpdate(context.Background(), tt.status, task, sess)
 
 			// Verify httpmock call count for send_status endpoint
 			info := httpmock.GetCallCountInfo()
@@ -298,7 +299,7 @@ func TestSendCrackedHash(t *testing.T) {
 			}
 
 			mgr := newTestManager()
-			mgr.sendCrackedHash(time.Now(), "testhash", "plaintext", tt.task)
+			mgr.sendCrackedHash(context.Background(), time.Now(), "testhash", "plaintext", tt.task)
 
 			// Verify httpmock call counts
 			if tt.task != nil && !tt.expectSubmitError {
@@ -550,7 +551,7 @@ func TestHandleSendStatusResponse(t *testing.T) {
 			}
 
 			mgr := newTestManager()
-			mgr.handleSendStatusResponse(resp, tt.task)
+			mgr.handleSendStatusResponse(context.Background(), resp, tt.task)
 		})
 	}
 }

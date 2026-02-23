@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,7 +18,7 @@ import (
 // runAttackTask starts the attack session and handles real-time outputs and status updates.
 // It processes stdout, stderr, status updates, cracked hashes, and handles session completion.
 // A configurable timeout (task_timeout) prevents indefinite blocking if hashcat hangs.
-func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
+func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task *api.Task) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start attack session", "error", err)
@@ -63,11 +64,11 @@ func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
 			case stdErrLine := <-sess.StderrMessages:
 				handleStdErrLine(stdErrLine, task)
 			case statusUpdate := <-sess.StatusUpdates:
-				m.handleStatusUpdate(statusUpdate, task, sess)
+				m.handleStatusUpdate(ctx, statusUpdate, task, sess)
 			case crackedHash := <-sess.CrackedHashes:
-				m.handleCrackedHash(crackedHash, task)
+				m.handleCrackedHash(ctx, crackedHash, task)
 			case err := <-sess.DoneChan:
-				m.handleDoneChan(err, task, sess)
+				m.handleDoneChan(ctx, err, task, sess)
 
 				return
 			}
@@ -114,7 +115,7 @@ func handleStdErrLine(stdErrLine string, task *api.Task) {
 // handleStatusUpdate validates and processes a status update for a hashcat task and session.
 // It validates that Progress and RecoveredHashes have the minimum required fields before
 // forwarding to display and send functions.
-func (m *Manager) handleStatusUpdate(statusUpdate hashcat.Status, task *api.Task, sess *hashcat.Session) {
+func (m *Manager) handleStatusUpdate(ctx context.Context, statusUpdate hashcat.Status, task *api.Task, sess *hashcat.Session) {
 	if len(statusUpdate.Progress) < display.MinStatusFields {
 		agentstate.Logger.Warn("Status update has incomplete progress data",
 			"progress_len", len(statusUpdate.Progress))
@@ -128,13 +129,13 @@ func (m *Manager) handleStatusUpdate(statusUpdate hashcat.Status, task *api.Task
 	}
 
 	display.JobStatus(statusUpdate)
-	m.sendStatusUpdate(statusUpdate, task, sess)
+	m.sendStatusUpdate(ctx, statusUpdate, task, sess)
 }
 
 // handleCrackedHash processes a cracked hash by displaying it and then sending it to a task server.
-func (m *Manager) handleCrackedHash(crackedHash hashcat.Result, task *api.Task) {
+func (m *Manager) handleCrackedHash(ctx context.Context, crackedHash hashcat.Result, task *api.Task) {
 	display.JobCrackedHash(crackedHash)
-	m.sendCrackedHash(crackedHash.Timestamp, crackedHash.Hash, crackedHash.Plaintext, task)
+	m.sendCrackedHash(ctx, crackedHash.Timestamp, crackedHash.Hash, crackedHash.Plaintext, task)
 }
 
 // handleDoneChan handles the completion of a task, classifying the exit code
@@ -142,7 +143,7 @@ func (m *Manager) handleCrackedHash(crackedHash hashcat.Result, task *api.Task) 
 // Note: When hashcat completes successfully with exit code 0, proc.Wait() returns nil,
 // so the err != nil block only handles non-zero exit codes. Successful completion
 // (nil error) proceeds directly to cleanup.
-func (m *Manager) handleDoneChan(err error, task *api.Task, sess *hashcat.Session) {
+func (m *Manager) handleDoneChan(ctx context.Context, err error, task *api.Task, sess *hashcat.Session) {
 	if err != nil {
 		exitCode := parseExitCode(err.Error())
 		exitInfo := hashcat.ClassifyExitCode(exitCode)
@@ -150,7 +151,7 @@ func (m *Manager) handleDoneChan(err error, task *api.Task, sess *hashcat.Sessio
 		switch {
 		case hashcat.IsExhausted(exitCode):
 			display.JobExhausted()
-			m.markTaskExhausted(task)
+			m.markTaskExhausted(ctx, task)
 		case hashcat.IsSuccess(exitCode):
 			// Success case - hashcat process exited cleanly
 			// Note: This branch is reached when exit code 0 is returned as an error,

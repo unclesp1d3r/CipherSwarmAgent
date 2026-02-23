@@ -42,11 +42,11 @@ var (
 // It sends an authentication request to the API, processes the response, and updates the shared state.
 // On error, it logs the error and returns it. If the response is nil or indicates a failed authentication,
 // an error is logged and returned.
-func AuthenticateAgent() error {
+func AuthenticateAgent(ctx context.Context) error {
 	// Set agent version in shared state so cserrors.SendAgentError can include it in error reports.
 	agentstate.State.AgentVersion = AgentVersion
 
-	response, err := agentstate.State.APIClient.Auth().Authenticate(context.Background())
+	response, err := agentstate.State.APIClient.Auth().Authenticate(ctx)
 	if err != nil {
 		return handleAuthenticationError(err)
 	}
@@ -65,8 +65,8 @@ func AuthenticateAgent() error {
 // GetAgentConfiguration retrieves the agent configuration from the CipherSwarm API and handles errors.
 // It updates the global Configuration variable with the fetched configuration.
 // If UseNativeHashcat is true in the configuration, it sets the native Hashcat path.
-func GetAgentConfiguration() error {
-	response, err := agentstate.State.APIClient.Auth().GetConfiguration(context.Background())
+func GetAgentConfiguration(ctx context.Context) error {
+	response, err := agentstate.State.APIClient.Auth().GetConfiguration(ctx)
 	if err != nil {
 		return handleConfigurationError(err)
 	}
@@ -120,15 +120,15 @@ func unwrapOr[T any](ptr *T, defaultVal T) T {
 // UpdateAgentMetadata updates the agent's metadata and sends it to the CipherSwarm API.
 // It retrieves host information, device list, constructs the agent update request body,
 // and sends the updated metadata to the API. Logs relevant information and handles any API errors.
-func UpdateAgentMetadata() error {
-	info, err := host.InfoWithContext(context.Background())
+func UpdateAgentMetadata(ctx context.Context) error {
+	info, err := host.InfoWithContext(ctx)
 	if err != nil {
 		return cserrors.LogAndSendError("Error getting host info", err, api.SeverityCritical, nil)
 	}
 
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
-	devices, err := getDevicesListFn(context.Background())
+	devices, err := getDevicesListFn(ctx)
 	if err != nil {
 		return cserrors.LogAndSendError("Error getting devices", err, api.SeverityCritical, nil)
 	}
@@ -153,7 +153,7 @@ func UpdateAgentMetadata() error {
 		"has_token", agentstate.State.APIToken != "")
 
 	response, err := agentstate.State.APIClient.Agents().UpdateAgent(
-		context.Background(),
+		ctx,
 		agentstate.State.AgentID,
 		agentUpdate,
 	)

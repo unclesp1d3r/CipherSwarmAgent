@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -415,7 +416,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 			tt.setupMock()
 
 			mgr := NewManager(agentstate.State.APIClient.Agents())
-			err := mgr.cacheAndSubmitBenchmarks(tt.results)
+			err := mgr.cacheAndSubmitBenchmarks(context.Background(), tt.results)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -499,7 +500,7 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 			tt.setupMock()
 
 			mgr := NewManager(agentstate.State.APIClient.Agents())
-			result := mgr.TrySubmitCachedBenchmarks()
+			result := mgr.TrySubmitCachedBenchmarks(context.Background())
 			assert.Equal(t, tt.expectSuccess, result)
 
 			if tt.expectSubmit {
@@ -536,7 +537,7 @@ func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
 
 	// No API mock — should not make any calls
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	result := mgr.TrySubmitCachedBenchmarks()
+	result := mgr.TrySubmitCachedBenchmarks(context.Background())
 	assert.True(t, result)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
@@ -565,7 +566,7 @@ func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	result := mgr.TrySubmitCachedBenchmarks()
+	result := mgr.TrySubmitCachedBenchmarks(context.Background())
 	assert.True(t, result)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
@@ -594,7 +595,7 @@ func TestTrySubmitCachedBenchmarks_MixedCacheServerFailure(t *testing.T) {
 		httpmock.NewStringResponder(http.StatusInternalServerError, "error"))
 
 	mgr := NewManager(agentstate.State.APIClient.Agents())
-	result := mgr.TrySubmitCachedBenchmarks()
+	result := mgr.TrySubmitCachedBenchmarks(context.Background())
 	assert.False(t, result)
 	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
 

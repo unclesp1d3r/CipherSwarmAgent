@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"regexp"
@@ -83,7 +84,7 @@ func TestGetNewTask(t *testing.T) {
 			tt.setupMock()
 
 			mgr := newTestManager()
-			task, err := mgr.GetNewTask()
+			task, err := mgr.GetNewTask(context.Background())
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -156,7 +157,7 @@ func TestGetAttackParameters(t *testing.T) {
 			tt.setupMock(tt.attackID)
 
 			mgr := newTestManager()
-			attack, err := mgr.GetAttackParameters(tt.attackID)
+			attack, err := mgr.GetAttackParameters(context.Background(), tt.attackID)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -229,7 +230,7 @@ func TestAcceptTask(t *testing.T) {
 			}
 
 			mgr := newTestManager()
-			err := mgr.AcceptTask(tt.task)
+			err := mgr.AcceptTask(context.Background(), tt.task)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -294,7 +295,7 @@ func TestAbandonTask(t *testing.T) {
 
 			mgr := newTestManager()
 			// AbandonTask doesn't return an error, it just logs
-			mgr.AbandonTask(tt.task)
+			mgr.AbandonTask(context.Background(), tt.task)
 		})
 	}
 }

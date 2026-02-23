@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -130,7 +131,7 @@ func clearBenchmarkCache() {
 // unsubmitted results, sends them, marks as submitted, and updates the cache.
 // Returns true if all results are now submitted (and clears the cache),
 // false otherwise (cache is preserved for the next attempt).
-func (m *Manager) TrySubmitCachedBenchmarks() bool {
+func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
 	if agentstate.State.ForceBenchmarkRun {
 		agentstate.Logger.Debug("Force benchmark flag set, skipping cache submission")
 		return false
@@ -155,7 +156,7 @@ func (m *Manager) TrySubmitCachedBenchmarks() bool {
 	}
 
 	pending := unsubmittedResults(cached)
-	if err := m.sendBenchmarkResults(pending); err != nil {
+	if err := m.sendBenchmarkResults(ctx, pending); err != nil {
 		agentstate.Logger.Warn("Cached benchmark submission failed, will retry next interval",
 			"error", err)
 		return false

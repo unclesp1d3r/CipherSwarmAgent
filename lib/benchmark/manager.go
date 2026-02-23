@@ -76,7 +76,7 @@ func markSubmitted(results []display.BenchmarkResult, startIdx, endIdx int) {
 // If the conversion fails for a result, it continues to the next result.
 // Creates a SubmitBenchmarkJSONRequestBody with the HashcatBenchmarks slice and submits it via the API client interface.
 // Returns an error if submission or the response received is not successful.
-func (m *Manager) sendBenchmarkResults(benchmarkResults []display.BenchmarkResult) error {
+func (m *Manager) sendBenchmarkResults(ctx context.Context, benchmarkResults []display.BenchmarkResult) error {
 	benchmarks := make([]api.HashcatBenchmark, 0, len(benchmarkResults))
 
 	for _, result := range benchmarkResults {
@@ -99,7 +99,7 @@ func (m *Manager) sendBenchmarkResults(benchmarkResults []display.BenchmarkResul
 	}
 
 	res, err := m.agentsClient.SubmitBenchmark(
-		context.Background(),
+		ctx,
 		agentstate.State.AgentID,
 		results,
 	)
@@ -156,7 +156,7 @@ func createBenchmark(result display.BenchmarkResult) (api.HashcatBenchmark, erro
 // When no cache exists (or force re-run is requested), it runs a new benchmark
 // session and delegates to cacheAndSubmitBenchmarks, which may return an error
 // if both the cache save and submission fail simultaneously.
-func (m *Manager) UpdateBenchmarks() error {
+func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 	agentstate.State.SetBenchmarksSubmitted(false)
 
 	// Try submitting from cache first (unless force re-run is requested)
@@ -180,7 +180,7 @@ func (m *Manager) UpdateBenchmarks() error {
 			agentstate.Logger.Info("Found cached benchmark results, submitting unsubmitted to server",
 				"total", len(cached), "pending", len(pending))
 
-			if err := m.sendBenchmarkResults(pending); err != nil {
+			if err := m.sendBenchmarkResults(ctx, pending); err != nil {
 				agentstate.Logger.Warn(
 					"Failed to submit cached benchmarks; task processing paused until submission succeeds",
 					"error", err,
@@ -203,12 +203,12 @@ func (m *Manager) UpdateBenchmarks() error {
 	}
 
 	// No cache (or force re-run): run benchmarks from scratch
-	benchmarkResults, err := m.runBenchmarks()
+	benchmarkResults, err := m.runBenchmarks(ctx)
 	if err != nil {
 		return err
 	}
 
-	return m.cacheAndSubmitBenchmarks(benchmarkResults)
+	return m.cacheAndSubmitBenchmarks(ctx, benchmarkResults)
 }
 
 // cacheAndSubmitBenchmarks saves benchmark results to the disk cache and then
@@ -217,7 +217,7 @@ func (m *Manager) UpdateBenchmarks() error {
 // both the cache save and submission fail, it returns the submission error so
 // the caller can fail fast. When the cache was saved but submission fails, it
 // returns nil to allow retry via TrySubmitCachedBenchmarks.
-func (m *Manager) cacheAndSubmitBenchmarks(benchmarkResults []display.BenchmarkResult) error {
+func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults []display.BenchmarkResult) error {
 	if allSubmitted(benchmarkResults) {
 		agentstate.Logger.Info("All benchmarks already submitted incrementally, skipping bulk submission")
 		clearBenchmarkCache()
@@ -236,7 +236,7 @@ func (m *Manager) cacheAndSubmitBenchmarks(benchmarkResults []display.BenchmarkR
 
 	// Only send unsubmitted results
 	pending := unsubmittedResults(benchmarkResults)
-	if err := m.sendBenchmarkResults(pending); err != nil {
+	if err := m.sendBenchmarkResults(ctx, pending); err != nil {
 		if cacheSaved {
 			agentstate.Logger.Warn(
 				"Failed to submit benchmarks, cached results preserved for retry",
@@ -266,7 +266,7 @@ func (m *Manager) cacheAndSubmitBenchmarks(benchmarkResults []display.BenchmarkR
 // runBenchmarks creates and runs a hashcat benchmark session, returning the
 // parsed results. Returns an error (reported as SeverityMajor to the server)
 // if the session cannot be created or fails to produce results.
-func (m *Manager) runBenchmarks() ([]display.BenchmarkResult, error) {
+func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult, error) {
 	additionalArgs := arch.GetAdditionalHashcatArgs()
 
 	jobParams := hashcat.Params{
@@ -287,7 +287,7 @@ func (m *Manager) runBenchmarks() ([]display.BenchmarkResult, error) {
 	agentstate.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
 	display.BenchmarkStarting()
 
-	results, done := m.runBenchmarkTask(sess)
+	results, done := m.runBenchmarkTask(ctx, sess)
 	if done {
 		return nil, cserrors.LogAndSendError(
 			"Benchmark session failed to produce results",
@@ -304,7 +304,7 @@ func (m *Manager) runBenchmarks() ([]display.BenchmarkResult, error) {
 
 // runBenchmarkTask starts a hashcat benchmark session and processes its output.
 // It returns a slice of benchmark results and a boolean indicating an error state.
-func (m *Manager) runBenchmarkTask(sess *hashcat.Session) ([]display.BenchmarkResult, bool) {
+func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) ([]display.BenchmarkResult, bool) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start benchmark session", "error", err)
@@ -312,14 +312,14 @@ func (m *Manager) runBenchmarkTask(sess *hashcat.Session) ([]display.BenchmarkRe
 		return nil, true
 	}
 
-	return m.processBenchmarkOutput(sess), false
+	return m.processBenchmarkOutput(ctx, sess), false
 }
 
 // processBenchmarkOutput reads from the session's channels, collects benchmark
 // results, and submits them incrementally in batches. It marks each result as
 // Submitted after successful server acknowledgment and persists the cache after
 // each batch. Returns the collected results (with Submitted flags set).
-func (m *Manager) processBenchmarkOutput(sess *hashcat.Session) []display.BenchmarkResult {
+func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Session) []display.BenchmarkResult {
 	var benchmarkResults []display.BenchmarkResult
 
 	waitChan := make(chan struct{})
@@ -336,7 +336,7 @@ func (m *Manager) processBenchmarkOutput(sess *hashcat.Session) []display.Benchm
 
 				if len(benchmarkResults)-submittedUpTo >= benchmarkBatchSize {
 					batch := benchmarkResults[submittedUpTo:]
-					if sendErr := m.sendBenchmarkResults(batch); sendErr != nil {
+					if sendErr := m.sendBenchmarkResults(ctx, batch); sendErr != nil {
 						agentstate.Logger.Warn("Failed to submit incremental benchmark batch", "error", sendErr)
 					} else {
 						markSubmitted(benchmarkResults, submittedUpTo, len(benchmarkResults))
@@ -365,7 +365,7 @@ func (m *Manager) processBenchmarkOutput(sess *hashcat.Session) []display.Benchm
 				// Submit any remaining unsubmitted results
 				if len(benchmarkResults) > submittedUpTo {
 					batch := benchmarkResults[submittedUpTo:]
-					if sendErr := m.sendBenchmarkResults(batch); sendErr != nil {
+					if sendErr := m.sendBenchmarkResults(ctx, batch); sendErr != nil {
 						agentstate.Logger.Warn("Failed to submit final benchmark batch", "error", sendErr)
 					} else {
 						markSubmitted(benchmarkResults, submittedUpTo, len(benchmarkResults))

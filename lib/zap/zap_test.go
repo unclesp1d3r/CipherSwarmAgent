@@ -1,6 +1,7 @@
 package zap
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -140,14 +141,14 @@ invalidline
 			require.NoError(t, err)
 
 			callCount := 0
-			mockSendFunc := func(_ time.Time, hash, plaintext string, _ *api.Task) {
+			mockSendFunc := func(_ context.Context, _ time.Time, hash, plaintext string, _ *api.Task) {
 				callCount++
 				assert.NotEmpty(t, hash)
 				assert.NotEmpty(t, plaintext)
 			}
 
 			task := testhelpers.NewTestTask(123, 456)
-			err = processZapFile(zapFilePath, task, mockSendFunc)
+			err = processZapFile(context.Background(), zapFilePath, task, mockSendFunc)
 
 			if tt.expectedError {
 				assert.Error(t, err)
