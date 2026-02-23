@@ -189,7 +189,8 @@ func getDevicesList(ctx context.Context) ([]string, error) {
 // It handles different response status codes and logs relevant messages.
 // It returns the agent's state object (or nil for no state change) and an error if the heartbeat failed.
 func SendHeartBeat(ctx context.Context) (*api.SendHeartbeat200State, error) {
-	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(ctx, agentstate.State.AgentID)
+	activity := string(agentstate.State.GetCurrentActivity())
+	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(ctx, agentstate.State.AgentID, activity)
 	if err != nil {
 		handleHeartbeatError(err)
 

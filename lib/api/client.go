@@ -233,8 +233,13 @@ type agentAgentsClient struct {
 	client *ClientWithResponses
 }
 
-func (a *agentAgentsClient) SendHeartbeat(ctx context.Context, id int64) (*SendHeartbeatResponse, error) {
-	resp, err := a.client.SendHeartbeatWithResponse(ctx, id)
+func (a *agentAgentsClient) SendHeartbeat(
+	ctx context.Context,
+	id int64,
+	activity string,
+) (*SendHeartbeatResponse, error) {
+	body := SendHeartbeatJSONRequestBody{Activity: &activity}
+	resp, err := a.client.SendHeartbeatWithResponse(ctx, id, body)
 	if err != nil {
 		return nil, err
 	}
