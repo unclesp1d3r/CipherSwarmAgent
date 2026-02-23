@@ -38,21 +38,21 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - `cmd/`: Main application entry points using the Cobra framework.
 - `lib/`: Core agent logic, decomposed into focused sub-packages:
-    - `agent/`: Top-level agent lifecycle — startup, heartbeat loop, task polling, shutdown.
-    - `api/`: API client layer — generated OpenAPI client (`client.gen.go`), hand-written wrapper (`client.go`), error types (`errors.go`), interfaces (`interfaces.go`), and mocks (`mock.go`). Regenerate with `just generate`.
-    - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
-    - `arch/`: OS-specific abstractions for handling different platforms (Linux, macOS, Windows).
-    - `benchmark/`: Benchmark execution, caching, and submission to the server.
-    - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
-    - `cracker/`: Hashcat binary discovery, archive extraction, and version detection.
-    - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
-    - `display/`: User-facing output (status messages, progress, benchmark results).
-    - `downloader/`: File download utilities with checksum verification.
-    - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
-    - `progress/`: Progress calculation utilities.
-    - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
-    - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
-    - `zap/`: Zap file monitoring for cracked hashes.
+  - `agent/`: Top-level agent lifecycle — startup, heartbeat loop, task polling, shutdown.
+  - `api/`: API client layer — generated OpenAPI client (`client.gen.go`), hand-written wrapper (`client.go`), error types (`errors.go`), interfaces (`interfaces.go`), and mocks (`mock.go`). Regenerate with `just generate`.
+  - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
+  - `arch/`: OS-specific abstractions for handling different platforms (Linux, macOS, Windows).
+  - `benchmark/`: Benchmark execution, caching, and submission to the server.
+  - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
+  - `cracker/`: Hashcat binary discovery, archive extraction, and version detection.
+  - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
+  - `display/`: User-facing output (status messages, progress, benchmark results).
+  - `downloader/`: File download utilities with checksum verification.
+  - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
+  - `progress/`: Progress calculation utilities.
+  - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
+  - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
+  - `zap/`: Zap file monitoring for cracked hashes.
 - `agentstate/`: Global agent state, loggers, and synchronized fields.
 - `docs/`: Project documentation, including the OpenAPI specification.
 
@@ -194,8 +194,8 @@ The `CHANGELOG.md` is automatically generated from commit messages using `git-ch
 
 - **GitHub Actions:** Workflows in `.github/workflows/` automate linting, testing, building, and releases.
 - **Docker:**
-    - `Dockerfile`: Used for building the main application container.
-    - `Dockerfile.releaser`: Used within the GoReleaser pipeline for creating releases.
+  - `Dockerfile`: Used for building the main application container.
+  - `Dockerfile.releaser`: Used within the GoReleaser pipeline for creating releases.
 
 ## Documentation
 
