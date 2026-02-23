@@ -109,6 +109,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `context.Context` for cancellation and deadlines in all long-running or networked operations.
 - **Synchronized state access:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` (for `Reload`, `JobCheckingStopped`, `BenchmarksSubmitted`) or `sync.RWMutex` (for `CurrentActivity`). Always use getter/setter methods (`GetReload()`, `SetReload()`, etc.) — never access these fields directly.
 - **Context propagation:** `StartAgent()` creates a cancellable context (`context.WithCancel`) that is threaded through all goroutine functions. Use `ctx` for operations that should stop on shutdown; use `context.Background()` for error reports and shutdown notifications that must complete.
+- **Must-complete operations:** When using `context.Background()` intentionally in a function that has `ctx` (e.g., `AbandonTask` to prevent server-side task starvation), add `//nolint:contextcheck // must-complete: reason`.
 - **Context-aware sleep:** Use `sleepWithContext(ctx, duration)` (defined in `lib/agent/agent.go`) instead of `time.Sleep` in goroutine loops — enables graceful shutdown on context cancellation.
 - Run tests with the `-race` flag in CI to detect data races.
 
@@ -149,6 +150,14 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Vendor Sync:** After `go fix` or dependency changes, run `go mod tidy && go mod vendor` to sync the vendor directory.
 - **Gotcha:** `go get` fails in vendored projects (Go defaults to `-mod=vendor`). Use `GOFLAGS='-mod=mod' go get <pkg>` then `go mod tidy && go mod vendor`.
 - **Gotcha:** `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
+
+### Releasing
+
+- **Process:** Merge to `main`, tag (`git tag vX.Y.Z`), push tag, run `just release` locally.
+- **Prereqs:** `GITHUB_TOKEN` env var with `write:packages` scope; `docker login ghcr.io` for container images.
+- **Skip docker:** `mise x -- goreleaser release --clean --skip docker` to ship binaries without container images.
+- **Gotcha:** `go generate ./...` was removed from `.goreleaser.yaml` hooks — `oapi-codegen` is a mise tool, not a Go tool. Generated code is already committed.
+- **Gotcha:** Goreleaser's `milestones.close` looks for `vX.Y.Z` format — if you close the milestone manually with a different name (e.g., `v0.6`), the auto-close will warn but not fail.
 
 ### Dependencies
 
