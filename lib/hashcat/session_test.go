@@ -42,6 +42,7 @@ func TestCleanup_RemovesRestoreFile(t *testing.T) {
 
 	_, err := os.Stat(restoreFile)
 	require.True(t, os.IsNotExist(err), "restore file should be removed after Cleanup")
+	require.Empty(t, sess.RestoreFilePath, "RestoreFilePath should be cleared after Cleanup")
 }
 
 // TestCleanup_SkipsMissingRestoreFile verifies that Cleanup does not error

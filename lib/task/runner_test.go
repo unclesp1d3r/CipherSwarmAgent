@@ -353,7 +353,36 @@ func TestHandleDoneChan_CleansRestoreFile(t *testing.T) {
 	mgr.handleDoneChan(nil, task, sess)
 
 	_, statErr := os.Stat(restoreFile)
-	assert.True(t, os.IsNotExist(statErr), "restore file should be removed after handleDoneChan")
+	require.True(t, os.IsNotExist(statErr), "restore file should be removed after handleDoneChan")
+}
+
+// TestHandleDoneChan_CleansRestoreFile_OnError verifies that handleDoneChan
+// removes the restore file even when a non-nil error (e.g., exhausted) is passed.
+func TestHandleDoneChan_CleansRestoreFile_OnError(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	testhelpers.MockSubmitErrorSuccess(123)
+
+	task := testhelpers.NewTestTask(456, 789)
+
+	sess, err := testhelpers.NewMockSession("test-session-err")
+	require.NoError(t, err)
+
+	// Create a real restore file on disk
+	restoreFile := filepath.Join(t.TempDir(), "test.restore")
+	require.NoError(t, os.WriteFile(restoreFile, []byte("data"), 0o600))
+	sess.RestoreFilePath = restoreFile
+
+	mgr := newTestManager()
+	// Use exit status 2 (general hashcat error) to exercise the error path
+	mgr.handleDoneChan(errors.New("exit status 2"), task, sess)
+
+	_, statErr := os.Stat(restoreFile)
+	require.True(t, os.IsNotExist(statErr), "restore file should be removed after handleDoneChan with error")
 }
 
 // TestHandleDoneChan_ExitCodeHandling verifies that handleDoneChan
