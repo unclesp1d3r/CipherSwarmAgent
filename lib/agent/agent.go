@@ -376,6 +376,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 	err = taskMgr.AcceptTask(t)
 	if err != nil {
 		agentstate.Logger.Error("Failed to accept task", "task_id", t.Id)
+		task.CleanupTaskFiles(attack.Id)
 
 		return err
 	}
@@ -397,6 +398,9 @@ func processTask(ctx context.Context, t *api.Task) error {
 	//nolint:contextcheck // callee lacks ctx param
 	err = taskMgr.RunTask(t, attack)
 	if err != nil {
+		// Note: RunTask returns nil from runAttackTask (which handles its own
+		// cleanup via sess.Cleanup()). This fallback only triggers for
+		// NewHashcatSession failures.
 		task.CleanupTaskFiles(attack.Id)
 
 		return err

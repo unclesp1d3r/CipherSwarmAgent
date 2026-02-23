@@ -194,6 +194,8 @@ func handleNonExhaustedError(err error, task *api.Task, sess *hashcat.Session, e
 			agentstate.Logger.Error("Failed to remove restore file", "error", removeErr)
 		}
 
+		sess.RestoreFilePath = ""
+
 		// Report the restore-file failure before returning so the server is aware
 		// of the retryable failure (the task can be retried now that the corrupt
 		// restore file has been removed)
