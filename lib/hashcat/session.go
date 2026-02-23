@@ -348,6 +348,11 @@ func (sess *Session) Cleanup() {
 
 	removeFile(sess.hashFile)
 	sess.hashFile = ""
+
+	if strings.TrimSpace(sess.RestoreFilePath) != "" {
+		removeFile(sess.RestoreFilePath)
+		sess.RestoreFilePath = ""
+	}
 }
 
 // CmdLine returns the command line string used to start the hashcat process.

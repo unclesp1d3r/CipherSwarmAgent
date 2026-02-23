@@ -388,6 +388,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 		cserrors.SendAgentError(err.Error(), t, api.SeverityFatal)
 		//nolint:contextcheck // callee lacks ctx param
 		taskMgr.AbandonTask(t)
+		task.CleanupTaskFiles(attack.Id)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return err
@@ -396,6 +397,8 @@ func processTask(ctx context.Context, t *api.Task) error {
 	//nolint:contextcheck // callee lacks ctx param
 	err = taskMgr.RunTask(t, attack)
 	if err != nil {
+		task.CleanupTaskFiles(attack.Id)
+
 		return err
 	}
 

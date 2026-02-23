@@ -3,9 +3,12 @@ package task
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
@@ -323,6 +326,34 @@ func TestHandleDoneChan(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestHandleDoneChan_CleansRestoreFile verifies that handleDoneChan removes
+// the session's restore file as part of cleanup.
+func TestHandleDoneChan_CleansRestoreFile(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	defer cleanupHTTP()
+
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	defer cleanupState()
+
+	testhelpers.MockSubmitErrorSuccess(123)
+
+	task := testhelpers.NewTestTask(456, 789)
+
+	sess, err := testhelpers.NewMockSession("test-session")
+	require.NoError(t, err)
+
+	// Create a real restore file on disk
+	restoreFile := filepath.Join(t.TempDir(), "test.restore")
+	require.NoError(t, os.WriteFile(restoreFile, []byte("data"), 0o600))
+	sess.RestoreFilePath = restoreFile
+
+	mgr := newTestManager()
+	mgr.handleDoneChan(nil, task, sess)
+
+	_, statErr := os.Stat(restoreFile)
+	assert.True(t, os.IsNotExist(statErr), "restore file should be removed after handleDoneChan")
 }
 
 // TestHandleDoneChan_ExitCodeHandling verifies that handleDoneChan

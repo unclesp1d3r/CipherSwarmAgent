@@ -22,6 +22,7 @@ func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
 	if err != nil {
 		agentstate.Logger.Error("Failed to start attack session", "error", err)
 		cserrors.SendAgentError(err.Error(), task, api.SeverityFatal)
+		sess.Cleanup()
 
 		return
 	}
