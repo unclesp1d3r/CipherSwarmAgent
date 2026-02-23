@@ -12,8 +12,7 @@ import (
 )
 
 // apiErrorHandler is the shared error handler instance.
-// It's initialized lazily to avoid circular dependency with SendAgentError.
-// Uses sync.Once for thread-safe initialization.
+// Uses sync.Once for thread-safe lazy initialization.
 var (
 	apiErrorHandler     *apierrors.Handler //nolint:gochecknoglobals // Singleton error handler
 	apiErrorHandlerOnce sync.Once          //nolint:gochecknoglobals // Singleton initialization guard

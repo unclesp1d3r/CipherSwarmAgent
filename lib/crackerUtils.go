@@ -103,7 +103,7 @@ func UpdateCracker(ctx context.Context) {
 // Returns an error if any step in the process fails.
 func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 	if update.GetDownloadURL() == nil || update.GetExecName() == nil {
-		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
 			"Cracker update missing download URL or exec name",
 			stderrors.New("incomplete cracker update response"),
@@ -116,7 +116,7 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 
 	tempDir, err := os.MkdirTemp("", "cipherswarm-*")
 	if err != nil {
-		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
 			"Error creating temporary directory",
 			err,
@@ -130,7 +130,7 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 
 	tempArchivePath := path.Join(tempDir, "hashcat.7z")
 	if err := downloader.DownloadFile(ctx, *update.GetDownloadURL(), tempArchivePath, ""); err != nil {
-		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
 			"Error downloading cracker",
 			err,
@@ -141,18 +141,18 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 
 	newArchivePath, err := cracker.MoveArchiveFile(tempArchivePath)
 	if err != nil {
-		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError("Error moving file", err, api.SeverityCritical, nil)
 	}
 
 	hashcatDirectory, err := cracker.ExtractHashcatArchive(ctx, newArchivePath)
 	if err != nil {
-		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError("Error extracting file", err, api.SeverityCritical, nil)
 	}
 
 	if !validateHashcatDirectory(hashcatDirectory, *update.GetExecName()) {
-		//nolint:contextcheck // LogAndSendError can't accept ctx (circular dependency)
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
 			"Hashcat directory validation failed after extraction",
 			stderrors.New("hashcat binary validation failed"),
@@ -162,7 +162,7 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 	}
 
 	if err := os.Remove(newArchivePath); err != nil {
-		//nolint:errcheck,contextcheck // Error already being handled; LogAndSendError can't accept ctx
+		//nolint:errcheck,contextcheck // LogAndSendError handles logging+sending internally
 		_ = cserrors.LogAndSendError(
 			"Error removing 7z file",
 			err,
