@@ -72,7 +72,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
 - **Gotcha:** `revive` requires each exported constant in a `const` block to have its own doc comment starting with the constant name (e.g., `// DefaultFoo is...`). A group comment alone doesn't satisfy it.
 - **Gotcha:** `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation (e.g., `//nolint:contextcheck // callee lacks ctx param`). Bare `//nolint:linter` directives fail CI.
-- **Gotcha:** Adding `ctx context.Context` to a function causes `contextcheck` to flag all downstream calls that don't propagate it. Use above-line `//nolint:contextcheck // callee lacks ctx param` — these resolve as context propagation completes.
+- **Gotcha:** `contextcheck` flags calls that don't propagate context. Use `//nolint:contextcheck // reason` when the callee genuinely cannot accept a context parameter (e.g., `NewHashcatSession`).
 
 ### Naming Conventions
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -283,7 +283,7 @@ func TestSendCrackedHash(t *testing.T) {
 					require.NoError(t, os.Chmod(tempDir, 0o755)) //nolint:gosec // adjusting temp dir perms for cleanup
 				})
 
-				hashFile := path.Join(tempDir, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
+				hashFile := filepath.Join(tempDir, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
 
 				file, err := os.OpenFile(hashFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 				require.NoError(t, err)
@@ -314,7 +314,7 @@ func TestSendCrackedHash(t *testing.T) {
 
 			// Verify file was created if WriteZapsToFile is enabled and no errors expected
 			if tt.writeZapsToFile && tt.task != nil && !tt.expectSubmitError {
-				hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
+				hashFile := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", tt.task.Id))
 				_, err := os.Stat(hashFile)
 				require.NoError(t, err, "zap file should be created")
 			}

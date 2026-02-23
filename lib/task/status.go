@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -151,7 +151,7 @@ func (m *Manager) sendCrackedHash(ctx context.Context, timestamp time.Time, hash
 	}
 
 	if agentstate.State.WriteZapsToFile {
-		hashFile := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
+		hashFile := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
 
 		file, err := os.OpenFile(
 			hashFile,

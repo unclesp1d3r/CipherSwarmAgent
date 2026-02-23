@@ -184,6 +184,7 @@ func sleepWithContext(ctx context.Context, d time.Duration) bool {
 
 // startHeartbeatLoop runs the heartbeat loop with exponential backoff on failures.
 // On consecutive failures, it backs off exponentially up to a maximum multiplier.
+// cancel is invoked when the server reports StateError, triggering agent shutdown.
 func startHeartbeatLoop(ctx context.Context, cancel context.CancelFunc) {
 	consecutiveFailures := 0
 	maxBackoffMultiplier := agentstate.State.MaxHeartbeatBackoff
@@ -351,7 +352,8 @@ func processTask(ctx context.Context, t *api.Task) error {
 		}
 
 		cserrors.SendAgentError(ctx, errMsg, t, api.SeverityFatal)
-		taskMgr.AbandonTask(ctx, t)
+		//nolint:contextcheck // must-complete: prevents task starvation on server
+		taskMgr.AbandonTask(context.Background(), t)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		if err != nil {
@@ -366,7 +368,8 @@ func processTask(ctx context.Context, t *api.Task) error {
 	err = taskMgr.AcceptTask(ctx, t)
 	if err != nil {
 		agentstate.Logger.Error("Failed to accept task", "task_id", t.Id)
-		taskMgr.AbandonTask(ctx, t)
+		//nolint:contextcheck // must-complete: prevents task starvation on server
+		taskMgr.AbandonTask(context.Background(), t)
 		task.CleanupTaskFiles(attack.Id)
 
 		return err
@@ -377,7 +380,8 @@ func processTask(ctx context.Context, t *api.Task) error {
 	if err := task.DownloadFiles(ctx, attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		cserrors.SendAgentError(ctx, err.Error(), t, api.SeverityFatal)
-		taskMgr.AbandonTask(ctx, t)
+		//nolint:contextcheck // must-complete: prevents task starvation on server
+		taskMgr.AbandonTask(context.Background(), t)
 		task.CleanupTaskFiles(attack.Id)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
@@ -400,7 +404,8 @@ func processTask(ctx context.Context, t *api.Task) error {
 }
 
 // heartbeat sends a heartbeat to the server and processes the response.
-// It returns an error if the heartbeat failed.
+// It returns an error if the heartbeat failed. On StateError, it calls cancel
+// to initiate agent shutdown.
 func heartbeat(ctx context.Context, cancel context.CancelFunc) error {
 	if agentstate.State.ExtraDebugging {
 		agentstate.Logger.Debug("Sending heartbeat")

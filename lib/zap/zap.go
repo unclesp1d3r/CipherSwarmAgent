@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -89,7 +89,7 @@ func createAndWriteZapFile(ctx context.Context, zapFilePath string, responseStre
 }
 
 // handleResponseStream processes the response stream from a zap request.
-// It creates a temporary file, writes the stream to it, and then processes the zap file.
+// It writes the stream to a zap file on disk and then processes its contents.
 func handleResponseStream(
 	ctx context.Context,
 	task *api.Task,
@@ -103,7 +103,7 @@ func handleResponseStream(
 		}
 	}(responseStream)
 
-	zapFilePath := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d.zap", task.Id))
+	zapFilePath := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d.zap", task.Id))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
 		// Log but continue — os.Create in createAndWriteZapFile will truncate the file anyway.
 		//nolint:errcheck // LogAndSendError handles logging+sending internally

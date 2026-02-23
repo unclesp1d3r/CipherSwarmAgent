@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
@@ -52,7 +52,7 @@ func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile)
 		return nil
 	}
 
-	filePath := path.Join(agentstate.State.FilePath, resource.FileName)
+	filePath := filepath.Join(agentstate.State.FilePath, resource.FileName)
 	agentstate.Logger.Debug("Downloading resource file", "url", resource.DownloadUrl, "path", filePath)
 
 	checksum := ""

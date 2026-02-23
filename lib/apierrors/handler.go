@@ -88,6 +88,10 @@ func (h *Handler) handleAPIError(ctx context.Context, ae *api.APIError, opts Opt
 	}
 
 	if opts.SendToServer && h.SendError != nil {
+		// Skip server reporting for context cancellation (expected during shutdown)
+		if ctx.Err() != nil {
+			return
+		}
 		h.SendError(ctx, ae.Error(), opts.Severity)
 	}
 }

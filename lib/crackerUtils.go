@@ -5,7 +5,7 @@ import (
 	stderrors "errors"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -23,6 +23,8 @@ func setNativeHashcatPath() error {
 	binPath, err := cracker.FindHashcatBinary()
 	if err != nil {
 		agentstate.Logger.Error("Error finding hashcat binary: ", err)
+		// context.Background() because setNativeHashcatPath has no ctx param
+		// (called via function variable from config-mapping path)
 		cserrors.SendAgentError(context.Background(), err.Error(), nil, api.SeverityCritical)
 
 		return err
@@ -128,7 +130,7 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 		_ = downloader.CleanupTempDir(tempDir) //nolint:errcheck // Cleanup in defer, error not critical
 	}(tempDir)
 
-	tempArchivePath := path.Join(tempDir, "hashcat.7z")
+	tempArchivePath := filepath.Join(tempDir, "hashcat.7z")
 	if err := downloader.DownloadFile(ctx, *update.GetDownloadURL(), tempArchivePath, ""); err != nil {
 		return cserrors.LogAndSendError(
 			ctx,
@@ -170,7 +172,7 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 		)
 	}
 
-	agentstate.State.HashcatPath = path.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName())
+	agentstate.State.HashcatPath = filepath.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName())
 	viper.Set("hashcat_path", agentstate.State.HashcatPath)
 	if err := viper.WriteConfig(); err != nil {
 		agentstate.Logger.Warn("Failed to persist hashcat path to config; update will be lost on restart",
@@ -188,7 +190,7 @@ func validateHashcatDirectory(hashcatDirectory, execName string) bool {
 		return false
 	}
 
-	hashcatBinaryPath := path.Join(hashcatDirectory, execName)
+	hashcatBinaryPath := filepath.Join(hashcatDirectory, execName)
 
 	fileInfo, err := os.Stat(hashcatBinaryPath)
 	if err != nil || fileInfo.Mode()&0o111 == 0 {
