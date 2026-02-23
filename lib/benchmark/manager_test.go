@@ -1,4 +1,4 @@
-package lib
+package benchmark
 
 import (
 	"errors"
@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
@@ -42,13 +43,13 @@ func makeBenchmarkLines(n, device int) []string {
 func TestCreateBenchmark(t *testing.T) {
 	tests := []struct {
 		name          string
-		result        benchmarkResult
+		result        display.BenchmarkResult
 		expectedError bool
 		checkFields   bool
 	}{
 		{
 			name: "valid benchmark result",
-			result: benchmarkResult{
+			result: display.BenchmarkResult{
 				HashType:  "0",
 				RuntimeMs: "100",
 				SpeedHs:   "12345.67",
@@ -59,7 +60,7 @@ func TestCreateBenchmark(t *testing.T) {
 		},
 		{
 			name: "invalid hash type",
-			result: benchmarkResult{
+			result: display.BenchmarkResult{
 				HashType:  "invalid",
 				RuntimeMs: "100",
 				SpeedHs:   "12345.67",
@@ -70,7 +71,7 @@ func TestCreateBenchmark(t *testing.T) {
 		},
 		{
 			name: "invalid runtime",
-			result: benchmarkResult{
+			result: display.BenchmarkResult{
 				HashType:  "0",
 				RuntimeMs: "invalid",
 				SpeedHs:   "12345.67",
@@ -81,7 +82,7 @@ func TestCreateBenchmark(t *testing.T) {
 		},
 		{
 			name: "invalid speed",
-			result: benchmarkResult{
+			result: display.BenchmarkResult{
 				HashType:  "0",
 				RuntimeMs: "100",
 				SpeedHs:   "invalid",
@@ -92,7 +93,7 @@ func TestCreateBenchmark(t *testing.T) {
 		},
 		{
 			name: "invalid device",
-			result: benchmarkResult{
+			result: display.BenchmarkResult{
 				HashType:  "0",
 				RuntimeMs: "100",
 				SpeedHs:   "12345.67",
@@ -126,13 +127,13 @@ func TestCreateBenchmark(t *testing.T) {
 func TestSendBenchmarkResults(t *testing.T) {
 	tests := []struct {
 		name          string
-		results       []benchmarkResult
+		results       []display.BenchmarkResult
 		setupMock     func(agentID int64)
 		expectedError bool
 	}{
 		{
 			name: "successful benchmark submission",
-			results: []benchmarkResult{
+			results: []display.BenchmarkResult{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -154,7 +155,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name:    "empty benchmark results",
-			results: []benchmarkResult{},
+			results: []display.BenchmarkResult{},
 			setupMock: func(_ int64) {
 				// No mock needed — function returns early before API call
 			},
@@ -162,7 +163,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name: "API error during submission",
-			results: []benchmarkResult{
+			results: []display.BenchmarkResult{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -179,7 +180,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name: "benchmark results with invalid entries",
-			results: []benchmarkResult{
+			results: []display.BenchmarkResult{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -217,7 +218,8 @@ func TestSendBenchmarkResults(t *testing.T) {
 
 			tt.setupMock(789)
 
-			err := sendBenchmarkResults(tt.results)
+			mgr := NewManager(agentstate.State.APIClient.Agents())
+			err := mgr.sendBenchmarkResults(tt.results)
 
 			if tt.expectedError {
 				require.Error(t, err)
@@ -237,13 +239,14 @@ func TestSendBenchmarkResults_AllInvalid(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	defer cleanupState()
 
-	allInvalid := []benchmarkResult{
+	allInvalid := []display.BenchmarkResult{
 		{HashType: "bad", RuntimeMs: "100", SpeedHs: "100.0", Device: "1"},
 		{HashType: "0", RuntimeMs: "bad", SpeedHs: "100.0", Device: "1"},
 		{HashType: "0", RuntimeMs: "100", SpeedHs: "bad", Device: "1"},
 	}
 
-	err := sendBenchmarkResults(allInvalid)
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	err := mgr.sendBenchmarkResults(allInvalid)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -290,7 +293,7 @@ func TestHandleBenchmarkStdOutLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var results []benchmarkResult
+			var results []display.BenchmarkResult
 			handleBenchmarkStdOutLine(tt.line, &results)
 			assert.Len(t, results, tt.expectedCount)
 
@@ -308,7 +311,7 @@ func TestHandleBenchmarkStdOutLine(t *testing.T) {
 // TestHandleBenchmarkStdOutLine_MultipleLines verifies that successive valid lines
 // are appended to the same results slice.
 func TestHandleBenchmarkStdOutLine_MultipleLines(t *testing.T) {
-	var results []benchmarkResult
+	var results []display.BenchmarkResult
 
 	handleBenchmarkStdOutLine("1:0:md5:100:50:12345.67", &results)
 	handleBenchmarkStdOutLine("2:100:sha1:200:100:54321.09", &results)
@@ -365,10 +368,10 @@ func TestHandleBenchmarkStdErrLine(t *testing.T) {
 	}
 }
 
-// TestCreateBenchmark_FieldMapping verifies that all fields from benchmarkResult
+// TestCreateBenchmark_FieldMapping verifies that all fields from display.BenchmarkResult
 // are correctly mapped to the api.HashcatBenchmark struct.
 func TestCreateBenchmark_FieldMapping(t *testing.T) {
-	result := benchmarkResult{
+	result := display.BenchmarkResult{
 		HashType:  "1000",
 		RuntimeMs: "5000",
 		SpeedHs:   "999999.99",
@@ -401,7 +404,8 @@ func TestUpdateBenchmarks_CachedSubmissionSuccess(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
-	err = UpdateBenchmarks()
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	err = mgr.UpdateBenchmarks()
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 }
@@ -423,7 +427,8 @@ func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusInternalServerError, "Server Error"))
 
-	err = UpdateBenchmarks()
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	err = mgr.UpdateBenchmarks()
 	require.NoError(t, err, "cached submission failure should be non-fatal")
 	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
 
@@ -443,7 +448,7 @@ func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 	defer cleanupState()
 
 	// Pre-populate cache with all-submitted results
-	submitted := []benchmarkResult{
+	submitted := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "12345.67", Submitted: true},
 		{Device: "2", HashType: "100", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "54321.09", Submitted: true},
 	}
@@ -451,7 +456,8 @@ func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 	require.NoError(t, err)
 
 	// No API mock needed — should not make any calls
-	err = UpdateBenchmarks()
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	err = mgr.UpdateBenchmarks()
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
@@ -470,7 +476,7 @@ func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 	defer cleanupState()
 
 	// Pre-populate cache with mixed submitted/unsubmitted
-	mixed := []benchmarkResult{
+	mixed := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "12345.67", Submitted: true},
 		{Device: "2", HashType: "100", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "54321.09"},
 	}
@@ -480,7 +486,8 @@ func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
-	err = UpdateBenchmarks()
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	err = mgr.UpdateBenchmarks()
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 }
@@ -491,22 +498,22 @@ func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 func TestUnsubmittedResults(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    []benchmarkResult
+		input    []display.BenchmarkResult
 		expected int
 	}{
 		{
 			name:     "all unsubmitted",
-			input:    []benchmarkResult{{HashType: "0"}, {HashType: "1"}},
+			input:    []display.BenchmarkResult{{HashType: "0"}, {HashType: "1"}},
 			expected: 2,
 		},
 		{
 			name:     "all submitted",
-			input:    []benchmarkResult{{HashType: "0", Submitted: true}, {HashType: "1", Submitted: true}},
+			input:    []display.BenchmarkResult{{HashType: "0", Submitted: true}, {HashType: "1", Submitted: true}},
 			expected: 0,
 		},
 		{
 			name:     "mixed",
-			input:    []benchmarkResult{{HashType: "0", Submitted: true}, {HashType: "1"}},
+			input:    []display.BenchmarkResult{{HashType: "0", Submitted: true}, {HashType: "1"}},
 			expected: 1,
 		},
 		{
@@ -516,7 +523,7 @@ func TestUnsubmittedResults(t *testing.T) {
 		},
 		{
 			name:     "empty input",
-			input:    []benchmarkResult{},
+			input:    []display.BenchmarkResult{},
 			expected: 0,
 		},
 	}
@@ -533,14 +540,14 @@ func TestUnsubmittedResults(t *testing.T) {
 func TestAllSubmitted(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    []benchmarkResult
+		input    []display.BenchmarkResult
 		expected bool
 	}{
-		{name: "all submitted", input: []benchmarkResult{{Submitted: true}, {Submitted: true}}, expected: true},
-		{name: "none submitted", input: []benchmarkResult{{}, {}}, expected: false},
-		{name: "mixed", input: []benchmarkResult{{Submitted: true}, {}}, expected: false},
+		{name: "all submitted", input: []display.BenchmarkResult{{Submitted: true}, {Submitted: true}}, expected: true},
+		{name: "none submitted", input: []display.BenchmarkResult{{}, {}}, expected: false},
+		{name: "mixed", input: []display.BenchmarkResult{{Submitted: true}, {}}, expected: false},
 		{name: "nil", input: nil, expected: true},
-		{name: "empty", input: []benchmarkResult{}, expected: true},
+		{name: "empty", input: []display.BenchmarkResult{}, expected: true},
 	}
 
 	for _, tt := range tests {
@@ -591,7 +598,7 @@ func TestMarkSubmitted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := make([]benchmarkResult, tt.count)
+			results := make([]display.BenchmarkResult, tt.count)
 			markSubmitted(results, tt.startIdx, tt.endIdx)
 			for i, r := range results {
 				assert.Equal(t, tt.expected[i], r.Submitted, "index %d", i)
@@ -630,7 +637,8 @@ func TestProcessBenchmarkOutput_AllBatchesSucceed(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	results := processBenchmarkOutput(sess)
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(sess)
 
 	assert.Len(t, results, 15)
 	assert.True(t, allSubmitted(results), "all results should be marked as submitted")
@@ -666,7 +674,8 @@ func TestProcessBenchmarkOutput_SingleBatch(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	results := processBenchmarkOutput(sess)
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(sess)
 
 	assert.Len(t, results, 5)
 	assert.True(t, allSubmitted(results))
@@ -706,7 +715,8 @@ func TestProcessBenchmarkOutput_BatchFailsFinalSucceeds(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	results := processBenchmarkOutput(sess)
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(sess)
 
 	assert.Len(t, results, 15)
 	// First batch (10 items) fails, retry triggers on next line (11 items), succeeds.
@@ -740,7 +750,8 @@ func TestProcessBenchmarkOutput_AllSendsFail(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	results := processBenchmarkOutput(sess)
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(sess)
 
 	assert.Len(t, results, 15)
 	assert.False(t, allSubmitted(results), "no results should be marked submitted")
@@ -769,7 +780,8 @@ func TestProcessBenchmarkOutput_EmptyResults(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	results := processBenchmarkOutput(sess)
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(sess)
 
 	assert.Empty(t, results)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted(), "nothing to submit = done")
@@ -800,7 +812,8 @@ func TestProcessBenchmarkOutput_SessionError(t *testing.T) {
 		sess.DoneChan <- errors.New("hashcat process exited with code 1")
 	}()
 
-	results := processBenchmarkOutput(sess)
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(sess)
 
 	assert.Len(t, results, 5)
 	assert.True(t, allSubmitted(results), "results should still be submitted despite error")

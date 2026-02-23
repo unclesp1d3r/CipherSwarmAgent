@@ -98,6 +98,8 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.MaxHeartbeatBackoff = 0
 		agentstate.State.SleepOnFailure = 0
 		agentstate.State.AlwaysUseNativeHashcat = false
+		agentstate.State.Platform = ""
+		agentstate.State.AgentVersion = ""
 		// Reset synchronized fields via setters
 		agentstate.State.SetReload(false)
 		agentstate.State.SetCurrentActivity("")
@@ -143,6 +145,8 @@ func ResetTestState() {
 	agentstate.State.MaxHeartbeatBackoff = 0
 	agentstate.State.SleepOnFailure = 0
 	agentstate.State.AlwaysUseNativeHashcat = false
+	agentstate.State.Platform = ""
+	agentstate.State.AgentVersion = ""
 	// Reset synchronized fields via setters
 	agentstate.State.SetReload(false)
 	agentstate.State.SetCurrentActivity("")

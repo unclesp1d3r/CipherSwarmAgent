@@ -1,4 +1,4 @@
-package lib
+package benchmark
 
 import (
 	"encoding/json"
@@ -12,10 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
-var sampleBenchmarkResults = []benchmarkResult{
+var sampleBenchmarkResults = []display.BenchmarkResult{
 	{
 		Device:     "1",
 		HashType:   "0",
@@ -35,7 +36,7 @@ var sampleBenchmarkResults = []benchmarkResult{
 func TestSaveBenchmarkCache(t *testing.T) {
 	tests := []struct {
 		name        string
-		results     []benchmarkResult
+		results     []display.BenchmarkResult
 		setupPath   bool
 		expectError bool
 	}{
@@ -53,7 +54,7 @@ func TestSaveBenchmarkCache(t *testing.T) {
 		},
 		{
 			name:        "saves empty slice",
-			results:     []benchmarkResult{},
+			results:     []display.BenchmarkResult{},
 			setupPath:   true,
 			expectError: false,
 		},
@@ -84,7 +85,7 @@ func TestSaveBenchmarkCache(t *testing.T) {
 			data, readErr := os.ReadFile(agentstate.State.BenchmarkCachePath)
 			require.NoError(t, readErr)
 
-			var loaded []benchmarkResult
+			var loaded []display.BenchmarkResult
 			require.NoError(t, json.Unmarshal(data, &loaded))
 			assert.Equal(t, tt.results, loaded)
 		})
@@ -115,7 +116,7 @@ func TestSaveBenchmarkCache_SubmittedField(t *testing.T) {
 
 	defer func() { agentstate.State.BenchmarkCachePath = "" }()
 
-	results := []benchmarkResult{
+	results := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "100.0", Submitted: true},
 		{Device: "2", HashType: "1", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "200.0"},
 	}
@@ -301,7 +302,7 @@ func TestSaveThenLoadBenchmarkCache(t *testing.T) {
 func TestCacheAndSubmitBenchmarks(t *testing.T) {
 	tests := []struct {
 		name                   string
-		results                []benchmarkResult
+		results                []display.BenchmarkResult
 		setupCachePath         func(t *testing.T) string
 		setupMock              func()
 		expectError            bool
@@ -368,7 +369,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 		},
 		{
 			name: "all already submitted skips send",
-			results: []benchmarkResult{
+			results: []display.BenchmarkResult{
 				{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 				{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0", Submitted: true},
 			},
@@ -382,7 +383,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 		},
 		{
 			name: "partially submitted sends only unsubmitted",
-			results: []benchmarkResult{
+			results: []display.BenchmarkResult{
 				{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 				{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
 			},
@@ -413,7 +414,8 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 
 			tt.setupMock()
 
-			err := cacheAndSubmitBenchmarks(tt.results)
+			mgr := NewManager(agentstate.State.APIClient.Agents())
+			err := mgr.cacheAndSubmitBenchmarks(tt.results)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -496,7 +498,8 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 
 			tt.setupMock()
 
-			result := TrySubmitCachedBenchmarks()
+			mgr := NewManager(agentstate.State.APIClient.Agents())
+			result := mgr.TrySubmitCachedBenchmarks()
 			assert.Equal(t, tt.expectSuccess, result)
 
 			if tt.expectSubmit {
@@ -524,7 +527,7 @@ func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	defer cleanupState()
 
-	submitted := []benchmarkResult{
+	submitted := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0", Submitted: true},
 	}
@@ -532,7 +535,8 @@ func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
 	require.NoError(t, err)
 
 	// No API mock — should not make any calls
-	result := TrySubmitCachedBenchmarks()
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	result := mgr.TrySubmitCachedBenchmarks()
 	assert.True(t, result)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
@@ -549,7 +553,7 @@ func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	defer cleanupState()
 
-	mixed := []benchmarkResult{
+	mixed := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
 	}
@@ -560,7 +564,8 @@ func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", pattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
-	result := TrySubmitCachedBenchmarks()
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	result := mgr.TrySubmitCachedBenchmarks()
 	assert.True(t, result)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
@@ -577,7 +582,7 @@ func TestTrySubmitCachedBenchmarks_MixedCacheServerFailure(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	defer cleanupState()
 
-	mixed := []benchmarkResult{
+	mixed := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
 	}
@@ -588,7 +593,8 @@ func TestTrySubmitCachedBenchmarks_MixedCacheServerFailure(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", pattern,
 		httpmock.NewStringResponder(http.StatusInternalServerError, "error"))
 
-	result := TrySubmitCachedBenchmarks()
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	result := mgr.TrySubmitCachedBenchmarks()
 	assert.False(t, result)
 	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
 

@@ -43,8 +43,8 @@ type AttacksClient interface {
 
 // AgentsClient defines the interface for agent-related API operations.
 type AgentsClient interface {
-	// SendHeartbeat sends a heartbeat to the server.
-	SendHeartbeat(ctx context.Context, id int64) (*SendHeartbeatResponse, error)
+	// SendHeartbeat sends a heartbeat to the server with the current activity state.
+	SendHeartbeat(ctx context.Context, id int64, activity string) (*SendHeartbeatResponse, error)
 
 	// UpdateAgent updates agent metadata.
 	UpdateAgent(

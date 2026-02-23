@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	stderrors "errors"
 	"net/http"
 	"os"
 	"path"
@@ -10,6 +11,9 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/downloader"
 )
 
 // setNativeHashcatPath sets the path for the native Hashcat binary if it is found in the system, otherwise logs and reports error.
@@ -19,7 +23,7 @@ func setNativeHashcatPath() error {
 	binPath, err := cracker.FindHashcatBinary()
 	if err != nil {
 		agentstate.Logger.Error("Error finding hashcat binary: ", err)
-		SendAgentError(err.Error(), nil, api.SeverityCritical)
+		cserrors.SendAgentError(err.Error(), nil, api.SeverityCritical)
 
 		return err
 	}
@@ -52,7 +56,7 @@ func UpdateCracker(ctx context.Context) {
 
 	response, err := agentstate.State.APIClient.Crackers().CheckForCrackerUpdate(
 		ctx,
-		&agentPlatform,
+		&agentstate.State.Platform,
 		&currentVersion,
 	)
 	if err != nil {
@@ -84,6 +88,97 @@ func UpdateCracker(ctx context.Context) {
 	} else {
 		agentstate.Logger.Error("Error checking for updated cracker", "CrackerUpdate", response.Status())
 	}
+}
+
+// handleCrackerUpdate manages the process of updating the cracker tool.
+// It follows these steps:
+// 0. Validates that download URL and exec name are present.
+// 1. Logs the new cracker update information.
+// 2. Creates a temporary directory for download and extraction.
+// 3. Downloads the cracker archive from the provided URL.
+// 4. Moves the downloaded archive to a predefined location.
+// 5. Extracts the archive to replace the old cracker directory.
+// 6. Validates the new cracker directory and executable.
+// 7. Updates the configuration with the new executable path.
+// Returns an error if any step in the process fails.
+func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
+	if update.GetDownloadURL() == nil || update.GetExecName() == nil {
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
+		return cserrors.LogAndSendError(
+			"Cracker update missing download URL or exec name",
+			stderrors.New("incomplete cracker update response"),
+			api.SeverityCritical,
+			nil,
+		)
+	}
+
+	display.NewCrackerAvailable(update)
+
+	tempDir, err := os.MkdirTemp("", "cipherswarm-*")
+	if err != nil {
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
+		return cserrors.LogAndSendError(
+			"Error creating temporary directory",
+			err,
+			api.SeverityCritical,
+			nil,
+		)
+	}
+	defer func(tempDir string) {
+		_ = downloader.CleanupTempDir(tempDir) //nolint:errcheck // Cleanup in defer, error not critical
+	}(tempDir)
+
+	tempArchivePath := path.Join(tempDir, "hashcat.7z")
+	if err := downloader.DownloadFile(ctx, *update.GetDownloadURL(), tempArchivePath, ""); err != nil {
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
+		return cserrors.LogAndSendError(
+			"Error downloading cracker",
+			err,
+			api.SeverityCritical,
+			nil,
+		)
+	}
+
+	newArchivePath, err := cracker.MoveArchiveFile(tempArchivePath)
+	if err != nil {
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
+		return cserrors.LogAndSendError("Error moving file", err, api.SeverityCritical, nil)
+	}
+
+	hashcatDirectory, err := cracker.ExtractHashcatArchive(ctx, newArchivePath)
+	if err != nil {
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
+		return cserrors.LogAndSendError("Error extracting file", err, api.SeverityCritical, nil)
+	}
+
+	if !validateHashcatDirectory(hashcatDirectory, *update.GetExecName()) {
+		//nolint:contextcheck // LogAndSendError uses context.Background() internally
+		return cserrors.LogAndSendError(
+			"Hashcat directory validation failed after extraction",
+			stderrors.New("hashcat binary validation failed"),
+			api.SeverityCritical,
+			nil,
+		)
+	}
+
+	if err := os.Remove(newArchivePath); err != nil {
+		//nolint:errcheck,contextcheck // LogAndSendError handles logging+sending internally
+		_ = cserrors.LogAndSendError(
+			"Error removing 7z file",
+			err,
+			api.SeverityWarning,
+			nil,
+		)
+	}
+
+	agentstate.State.HashcatPath = path.Join(agentstate.State.CrackersPath, "hashcat", *update.GetExecName())
+	viper.Set("hashcat_path", agentstate.State.HashcatPath)
+	if err := viper.WriteConfig(); err != nil {
+		agentstate.Logger.Warn("Failed to persist hashcat path to config; update will be lost on restart",
+			"error", err, "hashcat_path", agentstate.State.HashcatPath)
+	}
+
+	return nil
 }
 
 // validateHashcatDirectory checks if the given hashcat directory exists and contains the specified executable.

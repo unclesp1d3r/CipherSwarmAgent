@@ -1,4 +1,4 @@
-package lib
+package benchmark
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 )
 
 const (
@@ -17,7 +18,7 @@ const (
 // atomically to the cache file via a temporary file and rename. Returns an
 // error on any failure; callers decide whether to treat it as fatal since
 // benchmarks can be re-run on next startup.
-func saveBenchmarkCache(results []benchmarkResult) error {
+func saveBenchmarkCache(results []display.BenchmarkResult) error {
 	cachePath := agentstate.State.BenchmarkCachePath
 	if cachePath == "" {
 		agentstate.Logger.Warn("Benchmark cache path not configured, skipping cache save")
@@ -64,7 +65,7 @@ func saveBenchmarkCache(results []benchmarkResult) error {
 // does not exist, file contains corrupt JSON, or the result slice is empty.
 // Returns a non-nil error only for unexpected I/O failures (e.g., permission
 // denied).
-func loadBenchmarkCache() ([]benchmarkResult, error) {
+func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 	cachePath := agentstate.State.BenchmarkCachePath
 	if cachePath == "" {
 		return nil, nil
@@ -81,7 +82,7 @@ func loadBenchmarkCache() ([]benchmarkResult, error) {
 		return nil, fmt.Errorf("failed to read benchmark cache: %w", err)
 	}
 
-	var results []benchmarkResult
+	var results []display.BenchmarkResult
 	if err := json.Unmarshal(data, &results); err != nil {
 		agentstate.Logger.Warn("Benchmark cache file is corrupt, removing and will re-run benchmarks",
 			"error", err, "path", cachePath)
@@ -129,7 +130,7 @@ func clearBenchmarkCache() {
 // unsubmitted results, sends them, marks as submitted, and updates the cache.
 // Returns true if all results are now submitted (and clears the cache),
 // false otherwise (cache is preserved for the next attempt).
-func TrySubmitCachedBenchmarks() bool {
+func (m *Manager) TrySubmitCachedBenchmarks() bool {
 	if agentstate.State.ForceBenchmarkRun {
 		agentstate.Logger.Debug("Force benchmark flag set, skipping cache submission")
 		return false
@@ -154,7 +155,7 @@ func TrySubmitCachedBenchmarks() bool {
 	}
 
 	pending := unsubmittedResults(cached)
-	if err := sendBenchmarkResults(pending); err != nil {
+	if err := m.sendBenchmarkResults(pending); err != nil {
 		agentstate.Logger.Warn("Cached benchmark submission failed, will retry next interval",
 			"error", err)
 		return false

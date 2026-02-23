@@ -51,6 +51,8 @@ type agentState struct {
 	MaxHeartbeatBackoff                 int           // MaxHeartbeatBackoff is the max multiplier for heartbeat backoff.
 	SleepOnFailure                      time.Duration // SleepOnFailure is how long to wait after a task failure before retrying.
 	AlwaysUseNativeHashcat              bool          // AlwaysUseNativeHashcat forces using the system's native Hashcat binary.
+	Platform                            string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin").
+	AgentVersion                        string        // AgentVersion is the current version of the agent software.
 
 	// Synchronized fields — accessed across goroutines (heartbeat + agent loops).
 	// Use getter/setter methods; do not access directly.
