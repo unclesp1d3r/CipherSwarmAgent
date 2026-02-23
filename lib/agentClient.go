@@ -42,13 +42,13 @@ var (
 // It sends an authentication request to the API, processes the response, and updates the shared state.
 // On error, it logs the error and returns it. If the response is nil or indicates a failed authentication,
 // an error is logged and returned.
-func AuthenticateAgent() error {
+func AuthenticateAgent(ctx context.Context) error {
 	// Set agent version in shared state so cserrors.SendAgentError can include it in error reports.
 	agentstate.State.AgentVersion = AgentVersion
 
-	response, err := agentstate.State.APIClient.Auth().Authenticate(context.Background())
+	response, err := agentstate.State.APIClient.Auth().Authenticate(ctx)
 	if err != nil {
-		return handleAuthenticationError(err)
+		return handleAuthenticationError(ctx, err)
 	}
 
 	if response.JSON200 == nil || !response.JSON200.Authenticated {
@@ -65,10 +65,10 @@ func AuthenticateAgent() error {
 // GetAgentConfiguration retrieves the agent configuration from the CipherSwarm API and handles errors.
 // It updates the global Configuration variable with the fetched configuration.
 // If UseNativeHashcat is true in the configuration, it sets the native Hashcat path.
-func GetAgentConfiguration() error {
-	response, err := agentstate.State.APIClient.Auth().GetConfiguration(context.Background())
+func GetAgentConfiguration(ctx context.Context) error {
+	response, err := agentstate.State.APIClient.Auth().GetConfiguration(ctx)
 	if err != nil {
-		return handleConfigurationError(err)
+		return handleConfigurationError(ctx, err)
 	}
 
 	if response.JSON200 == nil {
@@ -80,7 +80,7 @@ func GetAgentConfiguration() error {
 	agentConfig := mapConfiguration(response.JSON200.ApiVersion, response.JSON200.Config)
 
 	if agentConfig.Config.UseNativeHashcat {
-		if err := setNativeHashcatPathFn(); err != nil {
+		if err := setNativeHashcatPathFn(ctx); err != nil {
 			return err
 		}
 	} else {
@@ -120,17 +120,17 @@ func unwrapOr[T any](ptr *T, defaultVal T) T {
 // UpdateAgentMetadata updates the agent's metadata and sends it to the CipherSwarm API.
 // It retrieves host information, device list, constructs the agent update request body,
 // and sends the updated metadata to the API. Logs relevant information and handles any API errors.
-func UpdateAgentMetadata() error {
-	info, err := host.InfoWithContext(context.Background())
+func UpdateAgentMetadata(ctx context.Context) error {
+	info, err := host.InfoWithContext(ctx)
 	if err != nil {
-		return cserrors.LogAndSendError("Error getting host info", err, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError(ctx, "Error getting host info", err, api.SeverityCritical, nil)
 	}
 
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
-	devices, err := getDevicesListFn(context.Background())
+	devices, err := getDevicesListFn(ctx)
 	if err != nil {
-		return cserrors.LogAndSendError("Error getting devices", err, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError(ctx, "Error getting devices", err, api.SeverityCritical, nil)
 	}
 
 	agentstate.State.Platform = info.OS
@@ -153,12 +153,12 @@ func UpdateAgentMetadata() error {
 		"has_token", agentstate.State.APIToken != "")
 
 	response, err := agentstate.State.APIClient.Agents().UpdateAgent(
-		context.Background(),
+		ctx,
 		agentstate.State.AgentID,
 		agentUpdate,
 	)
 	if err != nil {
-		handleAPIError("Error updating agent metadata", err)
+		handleAPIError(ctx, "Error updating agent metadata", err)
 
 		return err
 	}
@@ -192,7 +192,7 @@ func SendHeartBeat(ctx context.Context) (*api.SendHeartbeat200State, error) {
 	activity := string(agentstate.State.GetCurrentActivity())
 	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(ctx, agentstate.State.AgentID, activity)
 	if err != nil {
-		handleHeartbeatError(err)
+		handleHeartbeatError(ctx, err)
 
 		return nil, err
 	}
@@ -204,6 +204,12 @@ func SendHeartBeat(ctx context.Context) (*api.SendHeartbeat200State, error) {
 	}
 
 	if resp.StatusCode() == http.StatusOK {
+		if resp.JSON200 == nil {
+			agentstate.Logger.Warn("Heartbeat returned HTTP 200 but JSON body was nil or unparseable")
+
+			return nil, fmt.Errorf("%w: heartbeat returned HTTP 200 with nil JSON body", ErrBadResponse)
+		}
+
 		logHeartbeatSent()
 
 		return handleStateResponse(resp.JSON200), nil
@@ -254,9 +260,10 @@ func handleStateResponse(stateResponse *struct {
 }
 
 // SendAgentShutdown notifies the server of the agent shutdown and handles any errors during the API call.
-func SendAgentShutdown() {
-	_, err := agentstate.State.APIClient.Agents().SetAgentShutdown(context.Background(), agentstate.State.AgentID)
+// Callers control context: pass context.Background() for shutdown notifications that must complete.
+func SendAgentShutdown(ctx context.Context) {
+	_, err := agentstate.State.APIClient.Agents().SetAgentShutdown(ctx, agentstate.State.AgentID)
 	if err != nil {
-		handleAPIError("Error notifying server of agent shutdown", err)
+		handleAPIError(ctx, "Error notifying server of agent shutdown", err)
 	}
 }

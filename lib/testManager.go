@@ -16,9 +16,8 @@ import (
 // getDevices initializes a test Hashcat session and runs a test task, returning the names of available OpenCL devices.
 // An error is logged and returned if the session creation or test task execution fails.
 //
-//nolint:contextcheck // NewHashcatSession, LogAndSendError, and cserrors.SendAgentError will be updated to accept context in a future refactor
+//nolint:contextcheck // NewHashcatSession does not accept context
 func getDevices(ctx context.Context) ([]string, error) {
-	_ = ctx // Context will be used when underlying functions are updated
 	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackModeMask,
 		AdditionalArgs: arch.GetAdditionalHashcatArgs(),
@@ -29,12 +28,12 @@ func getDevices(ctx context.Context) ([]string, error) {
 
 	sess, err := hashcat.NewHashcatSession("test", jobParams)
 	if err != nil {
-		return nil, cserrors.LogAndSendError("Failed to create test session", err, api.SeverityMajor, nil)
+		return nil, cserrors.LogAndSendError(ctx, "Failed to create test session", err, api.SeverityMajor, nil)
 	}
 
-	testStatus, err := runTestTask(sess)
+	testStatus, err := runTestTask(ctx, sess)
 	if err != nil {
-		return nil, cserrors.LogAndSendError("Error running test task", err, api.SeverityFatal, nil)
+		return nil, cserrors.LogAndSendError(ctx, "Error running test task", err, api.SeverityFatal, nil)
 	}
 
 	return extractDeviceNames(testStatus.Devices), nil
@@ -51,11 +50,11 @@ func extractDeviceNames(deviceStatuses []hashcat.StatusDevice) []string {
 }
 
 // runTestTask runs a hashcat test session, handles various output channels, and returns the session status or an error.
-func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
+func runTestTask(ctx context.Context, sess *hashcat.Session) (*hashcat.Status, error) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start hashcat startup test session", "error", err)
-		cserrors.SendAgentError(err.Error(), nil, api.SeverityFatal)
+		cserrors.SendAgentError(ctx, err.Error(), nil, api.SeverityFatal)
 
 		return nil, err
 	}
@@ -72,10 +71,15 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 
 		for {
 			select {
+			case <-ctx.Done():
+				errorResult = ctx.Err()
+				sess.Cleanup()
+
+				return
 			case stdoutLine := <-sess.StdoutLines:
 				handleTestStdOutLine(stdoutLine)
 			case stdErrLine := <-sess.StderrMessages:
-				if err := handleTestStdErrLine(stdErrLine); err != nil {
+				if err := handleTestStdErrLine(ctx, stdErrLine); err != nil {
 					errorResult = err
 				}
 			case statusUpdate := <-sess.StatusUpdates:
@@ -85,7 +89,7 @@ func runTestTask(sess *hashcat.Session) (*hashcat.Status, error) {
 					errorResult = err
 				}
 			case err := <-sess.DoneChan:
-				if err := handleTestDoneChan(err); err != nil {
+				if err := handleTestDoneChan(ctx, err); err != nil {
 					errorResult = err
 				}
 
@@ -109,9 +113,9 @@ func handleTestStdOutLine(stdoutLine string) {
 }
 
 // handleTestStdErrLine sends the specified stderr line to the central server and returns an error if the line is not empty.
-func handleTestStdErrLine(stdErrLine string) error {
+func handleTestStdErrLine(ctx context.Context, stdErrLine string) error {
 	if strings.TrimSpace(stdErrLine) != "" {
-		cserrors.SendAgentError(stdErrLine, nil, api.SeverityMinor)
+		cserrors.SendAgentError(ctx, stdErrLine, nil, api.SeverityMinor)
 		return errors.New(stdErrLine)
 	}
 
@@ -128,9 +132,9 @@ func handleTestCrackedHash(crackedHash hashcat.Result) error {
 }
 
 // handleTestDoneChan handles errors from the test session's done channel, sends them to central server if not exit status 1.
-func handleTestDoneChan(err error) error {
+func handleTestDoneChan(ctx context.Context, err error) error {
 	if err != nil && err.Error() != "exit status 1" {
-		cserrors.SendAgentError(err.Error(), nil, api.SeverityCritical)
+		cserrors.SendAgentError(ctx, err.Error(), nil, api.SeverityCritical)
 		return err
 	}
 

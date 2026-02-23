@@ -23,8 +23,8 @@ var (
 func GetErrorHandler() *apierrors.Handler {
 	apiErrorHandlerOnce.Do(func() {
 		apiErrorHandler = &apierrors.Handler{
-			SendError: func(message string, severity api.Severity) {
-				SendAgentError(message, nil, severity)
+			SendError: func(ctx context.Context, message string, severity api.Severity) {
+				SendAgentError(ctx, message, nil, severity)
 			},
 		}
 	})
@@ -62,7 +62,15 @@ func WithClassification(category string, retryable bool) ErrorOption {
 // SendAgentError sends an error message to the centralized server, including metadata and severity level.
 // Optional ErrorOption arguments can enhance the error with classification metadata.
 // Safe to call before API client initialization — logs locally and returns if client is nil.
-func SendAgentError(stdErrLine string, task *api.Task, severity api.Severity, opts ...ErrorOption) {
+// Callers control context: pass ctx for cancellable operations, or context.Background() for
+// errors that must be delivered even during shutdown.
+func SendAgentError(
+	ctx context.Context,
+	stdErrLine string,
+	task *api.Task,
+	severity api.Severity,
+	opts ...ErrorOption,
+) {
 	if agentstate.State.APIClient == nil {
 		agentstate.ErrorLogger.Error("Cannot send error to server: API client not initialized",
 			"message", stdErrLine, "severity", severity)
@@ -105,33 +113,33 @@ func SendAgentError(stdErrLine string, task *api.Task, severity api.Severity, op
 	}
 
 	if _, err := agentstate.State.APIClient.Agents().SubmitErrorAgent(
-		context.Background(),
+		ctx,
 		agentstate.State.AgentID,
 		agentError,
 	); err != nil {
-		handleSendError(err)
+		handleSendError(ctx, err)
 	}
 }
 
 // handleSendError handles errors that occur during communication with the server.
 // It logs the error locally but does not attempt to send errors to the server again
 // to prevent infinite recursion if the error sending itself fails.
-func handleSendError(err error) {
+func handleSendError(ctx context.Context, err error) {
 	//nolint:errcheck,gosec // Error handler returns error for chaining; not needed here
-	GetErrorHandlerNoSend().LogOnly(err, "Error sending agent error to server")
+	GetErrorHandlerNoSend().LogOnly(ctx, err, "Error sending agent error to server")
 }
 
 // LogAndSendError logs an error message with severity and sends it to the CipherSwarm API.
 // When task is nil, the error is reported without a task context. API submission is
 // skipped only when the APIClient has not been initialized yet.
 // Returns the original error for further handling.
-//
-// Uses context.Background() because these errors must be delivered even during shutdown.
-func LogAndSendError(message string, err error, severity api.Severity, task *api.Task) error {
+// Callers control context: pass ctx for cancellable operations, or context.Background() for
+// errors that must be delivered even during shutdown.
+func LogAndSendError(ctx context.Context, message string, err error, severity api.Severity, task *api.Task) error {
 	agentstate.ErrorLogger.Error(message, "error", err)
 
 	if agentstate.State.APIClient != nil {
-		SendAgentError(message, task, severity)
+		SendAgentError(ctx, message, task, severity)
 	}
 
 	return err

@@ -72,7 +72,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
 - **Gotcha:** `revive` requires each exported constant in a `const` block to have its own doc comment starting with the constant name (e.g., `// DefaultFoo is...`). A group comment alone doesn't satisfy it.
 - **Gotcha:** `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation (e.g., `//nolint:contextcheck // callee lacks ctx param`). Bare `//nolint:linter` directives fail CI.
-- **Gotcha:** Adding `ctx context.Context` to a function causes `contextcheck` to flag all downstream calls that don't propagate it. Use above-line `//nolint:contextcheck // callee lacks ctx param` — these resolve as context propagation completes.
+- **Gotcha:** `contextcheck` flags calls that don't propagate context. Use `//nolint:contextcheck // reason` when the callee genuinely cannot accept a context parameter (e.g., `NewHashcatSession`).
 
 ### Naming Conventions
 
@@ -118,6 +118,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Prefer `os.Remove` + `os.IsNotExist(err)` check over `os.Stat` then `os.Remove` — avoids redundant syscall.
 - Cache `[]byte(str)` conversions when the same string is passed to both `json.Valid` and `json.Unmarshal`.
 - Use `chan struct{}` (not `chan int`) for signal-only channels — zero allocation.
+- Use `filepath.Join` (not `path.Join`) for filesystem paths — `path.Join` uses forward slashes only, breaking Windows.
 - Configuration defaults live in `lib/config/config.go` as exported constants — `cmd/root.go` references them (no duplication).
 
 ### Logging & Configuration
@@ -168,6 +169,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - MockClient sub-client accessors (`Tasks()`, `Agents()`, etc.) return default unconfigured mocks (not nil) to prevent nil pointer panics when code paths call sub-clients the test didn't explicitly mock.
 - When removing a field from global state (`agentstate.State`), grep all test helpers, cleanup functions, and reset functions for references.
 - **Gotcha:** `agentstate.State` contains `atomic.Bool` and `sync.RWMutex` — never copy the struct (`original := agentstate.State` triggers `go vet copylocks`). Use per-field save/restore in test helpers and getter/setter methods for synchronized fields.
+- **Gotcha:** `hashcat` package tests cannot import `testhelpers` (circular: testhelpers → hashcat). Use local test helpers in `hashcat` package tests instead.
+- Prefer `t.Cleanup(fn)` over `defer fn()` for test teardown — ensures cleanup runs even on `t.Fatal`.
 - Run `go test -race ./...` to detect data races.
 
 ## Git

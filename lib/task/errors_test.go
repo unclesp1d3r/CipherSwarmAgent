@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -76,7 +77,7 @@ func TestHandleStatusUpdateError(t *testing.T) {
 			defer sess.Cleanup()
 
 			// This function doesn't return an error
-			handleStatusUpdateError(tt.err, tt.task, sess)
+			handleStatusUpdateError(context.Background(), tt.err, tt.task, sess)
 		})
 	}
 }
@@ -113,7 +114,7 @@ func TestHandleTaskNotFound(t *testing.T) {
 			defer sess.Cleanup()
 
 			// This function doesn't return an error
-			handleTaskNotFound(tt.task, sess)
+			handleTaskNotFound(context.Background(), tt.task, sess)
 		})
 	}
 }
@@ -150,7 +151,7 @@ func TestHandleTaskGone(t *testing.T) {
 			defer sess.Cleanup()
 
 			// This function doesn't return an error
-			handleTaskGone(tt.task, sess)
+			handleTaskGone(context.Background(), tt.task, sess)
 		})
 	}
 }
@@ -178,7 +179,7 @@ func TestHandleAcceptTaskError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			withHTTPAndState(t, func() {
-				handleAcceptTaskError(tt.err)
+				handleAcceptTaskError(context.Background(), tt.err)
 				assertSubmitErrorCalledIfAPIError(t, tt.err)
 			})
 		})
@@ -236,7 +237,7 @@ func TestHandleTaskError(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(123)
 
 			// This function doesn't return an error
-			handleTaskError(tt.err, tt.message)
+			handleTaskError(context.Background(), tt.err, tt.message)
 
 			// Verify SubmitErrorAgent was called for API error types
 			var ae *api.APIError
@@ -272,7 +273,7 @@ func TestHandleSendCrackError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			withHTTPAndState(t, func() {
-				handleSendCrackError(tt.err)
+				handleSendCrackError(context.Background(), tt.err)
 				assertSubmitErrorCalledIfAPIError(t, tt.err)
 			})
 		})

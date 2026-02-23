@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -63,12 +64,12 @@ func TestHandleAuthenticationError(t *testing.T) {
 			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
 			defer cleanupState()
 
-			result := handleAuthenticationError(tt.err)
+			result := handleAuthenticationError(context.Background(), tt.err)
 
 			if tt.expectError {
-				assert.Error(t, result)
+				require.Error(t, result)
 			} else {
-				assert.NoError(t, result)
+				require.NoError(t, result)
 			}
 		})
 	}
@@ -114,7 +115,7 @@ func TestHandleConfigurationError(t *testing.T) {
 			initialCallCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 			testhelpers.MockSubmitErrorSuccess(123)
 
-			result := handleConfigurationError(tt.err)
+			result := handleConfigurationError(context.Background(), tt.err)
 
 			if tt.expectError {
 				require.Error(t, result)
@@ -196,7 +197,7 @@ func TestHandleAPIError(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(123)
 
 			// This function doesn't return an error
-			handleAPIError(tt.message, tt.err)
+			handleAPIError(context.Background(), tt.message, tt.err)
 
 			// Verify SubmitErrorAgent was called for API errors
 			if tt.err != nil {
@@ -234,7 +235,7 @@ func TestHandleHeartbeatError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			withHTTPAndState(t, func() {
 				// This function doesn't return an error
-				handleHeartbeatError(tt.err)
+				handleHeartbeatError(context.Background(), tt.err)
 				assertSubmitErrorCalledIfAPIError(t, tt.err)
 			})
 		})
@@ -281,7 +282,7 @@ func TestSendAgentError(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(123)
 
 			// This function doesn't return an error
-			cserrors.SendAgentError(tt.message, tt.task, tt.severity)
+			cserrors.SendAgentError(context.Background(), tt.message, tt.task, tt.severity)
 
 			// Verify SubmitErrorAgent was called
 			callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
