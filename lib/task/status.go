@@ -38,7 +38,7 @@ func (m *Manager) sendStatusUpdate(ctx context.Context, update hashcat.Status, t
 	// Send status update to the server
 	resp, err := m.tasksClient.SendStatus(ctx, task.Id, taskStatus)
 	if err != nil {
-		handleStatusUpdateError(err, task, sess)
+		handleStatusUpdateError(ctx, err, task, sess)
 		return
 	}
 
@@ -145,7 +145,7 @@ func (m *Manager) sendCrackedHash(ctx context.Context, timestamp time.Time, hash
 
 	response, err := m.tasksClient.SendCrack(ctx, task.Id, hashcatResult)
 	if err != nil {
-		handleSendCrackError(err)
+		handleSendCrackError(ctx, err)
 
 		return
 	}
@@ -159,8 +159,9 @@ func (m *Manager) sendCrackedHash(ctx context.Context, timestamp time.Time, hash
 			filePermissions,
 		)
 		if err != nil {
-			//nolint:errcheck // Error already being handled
+			//nolint:errcheck // LogAndSendError handles logging+sending internally
 			_ = cserrors.LogAndSendError(
+				ctx,
 				"Error opening cracked hash file",
 				err,
 				api.SeverityCritical,
@@ -178,8 +179,9 @@ func (m *Manager) sendCrackedHash(ctx context.Context, timestamp time.Time, hash
 
 		_, err = file.WriteString(fmt.Sprintf("%s:%s", hash, plaintext) + "\n")
 		if err != nil {
-			//nolint:errcheck // Error already being handled
+			//nolint:errcheck // LogAndSendError handles logging+sending internally
 			_ = cserrors.LogAndSendError(
+				ctx,
 				"Error writing cracked hash to file",
 				err,
 				api.SeverityCritical,

@@ -23,7 +23,7 @@ func setNativeHashcatPath() error {
 	binPath, err := cracker.FindHashcatBinary()
 	if err != nil {
 		agentstate.Logger.Error("Error finding hashcat binary: ", err)
-		cserrors.SendAgentError(err.Error(), nil, api.SeverityCritical)
+		cserrors.SendAgentError(context.Background(), err.Error(), nil, api.SeverityCritical)
 
 		return err
 	}
@@ -60,7 +60,7 @@ func UpdateCracker(ctx context.Context) {
 		&currentVersion,
 	)
 	if err != nil {
-		handleAPIError("Error connecting to the CipherSwarm API", err)
+		handleAPIError(ctx, "Error connecting to the CipherSwarm API", err)
 
 		return
 	}
@@ -103,8 +103,8 @@ func UpdateCracker(ctx context.Context) {
 // Returns an error if any step in the process fails.
 func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 	if update.GetDownloadURL() == nil || update.GetExecName() == nil {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
+			ctx,
 			"Cracker update missing download URL or exec name",
 			stderrors.New("incomplete cracker update response"),
 			api.SeverityCritical,
@@ -116,8 +116,8 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 
 	tempDir, err := os.MkdirTemp("", "cipherswarm-*")
 	if err != nil {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
+			ctx,
 			"Error creating temporary directory",
 			err,
 			api.SeverityCritical,
@@ -130,8 +130,8 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 
 	tempArchivePath := path.Join(tempDir, "hashcat.7z")
 	if err := downloader.DownloadFile(ctx, *update.GetDownloadURL(), tempArchivePath, ""); err != nil {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
+			ctx,
 			"Error downloading cracker",
 			err,
 			api.SeverityCritical,
@@ -141,19 +141,17 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 
 	newArchivePath, err := cracker.MoveArchiveFile(tempArchivePath)
 	if err != nil {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
-		return cserrors.LogAndSendError("Error moving file", err, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError(ctx, "Error moving file", err, api.SeverityCritical, nil)
 	}
 
 	hashcatDirectory, err := cracker.ExtractHashcatArchive(ctx, newArchivePath)
 	if err != nil {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
-		return cserrors.LogAndSendError("Error extracting file", err, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError(ctx, "Error extracting file", err, api.SeverityCritical, nil)
 	}
 
 	if !validateHashcatDirectory(hashcatDirectory, *update.GetExecName()) {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
+			ctx,
 			"Hashcat directory validation failed after extraction",
 			stderrors.New("hashcat binary validation failed"),
 			api.SeverityCritical,
@@ -162,8 +160,9 @@ func handleCrackerUpdate(ctx context.Context, update *api.CrackerUpdate) error {
 	}
 
 	if err := os.Remove(newArchivePath); err != nil {
-		//nolint:errcheck,contextcheck // LogAndSendError handles logging+sending internally
+		//nolint:errcheck // LogAndSendError handles logging+sending internally
 		_ = cserrors.LogAndSendError(
+			ctx,
 			"Error removing 7z file",
 			err,
 			api.SeverityWarning,

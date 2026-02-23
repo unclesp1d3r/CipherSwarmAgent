@@ -48,7 +48,7 @@ func AuthenticateAgent(ctx context.Context) error {
 
 	response, err := agentstate.State.APIClient.Auth().Authenticate(ctx)
 	if err != nil {
-		return handleAuthenticationError(err)
+		return handleAuthenticationError(ctx, err)
 	}
 
 	if response.JSON200 == nil || !response.JSON200.Authenticated {
@@ -68,7 +68,7 @@ func AuthenticateAgent(ctx context.Context) error {
 func GetAgentConfiguration(ctx context.Context) error {
 	response, err := agentstate.State.APIClient.Auth().GetConfiguration(ctx)
 	if err != nil {
-		return handleConfigurationError(err)
+		return handleConfigurationError(ctx, err)
 	}
 
 	if response.JSON200 == nil {
@@ -123,14 +123,14 @@ func unwrapOr[T any](ptr *T, defaultVal T) T {
 func UpdateAgentMetadata(ctx context.Context) error {
 	info, err := host.InfoWithContext(ctx)
 	if err != nil {
-		return cserrors.LogAndSendError("Error getting host info", err, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError(ctx, "Error getting host info", err, api.SeverityCritical, nil)
 	}
 
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
 	devices, err := getDevicesListFn(ctx)
 	if err != nil {
-		return cserrors.LogAndSendError("Error getting devices", err, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError(ctx, "Error getting devices", err, api.SeverityCritical, nil)
 	}
 
 	agentstate.State.Platform = info.OS
@@ -158,7 +158,7 @@ func UpdateAgentMetadata(ctx context.Context) error {
 		agentUpdate,
 	)
 	if err != nil {
-		handleAPIError("Error updating agent metadata", err)
+		handleAPIError(ctx, "Error updating agent metadata", err)
 
 		return err
 	}
@@ -192,7 +192,7 @@ func SendHeartBeat(ctx context.Context) (*api.SendHeartbeat200State, error) {
 	activity := string(agentstate.State.GetCurrentActivity())
 	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(ctx, agentstate.State.AgentID, activity)
 	if err != nil {
-		handleHeartbeatError(err)
+		handleHeartbeatError(ctx, err)
 
 		return nil, err
 	}
@@ -254,9 +254,10 @@ func handleStateResponse(stateResponse *struct {
 }
 
 // SendAgentShutdown notifies the server of the agent shutdown and handles any errors during the API call.
-func SendAgentShutdown() {
-	_, err := agentstate.State.APIClient.Agents().SetAgentShutdown(context.Background(), agentstate.State.AgentID)
+// Callers control context: pass context.Background() for shutdown notifications that must complete.
+func SendAgentShutdown(ctx context.Context) {
+	_, err := agentstate.State.APIClient.Agents().SetAgentShutdown(ctx, agentstate.State.AgentID)
 	if err != nil {
-		handleAPIError("Error notifying server of agent shutdown", err)
+		handleAPIError(ctx, "Error notifying server of agent shutdown", err)
 	}
 }

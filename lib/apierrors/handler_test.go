@@ -1,6 +1,7 @@
 package apierrors
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -39,7 +40,7 @@ func TestHandler_Handle_NilError(t *testing.T) {
 	h := &Handler{}
 	opts := DefaultOptions("test message")
 
-	result := h.Handle(nil, opts)
+	result := h.Handle(context.Background(), nil, opts)
 
 	assert.NoError(t, result)
 }
@@ -52,7 +53,7 @@ func TestHandler_Handle_APIError_ClientError(t *testing.T) {
 	var sentSeverity api.Severity
 
 	h := &Handler{
-		SendError: func(message string, severity api.Severity) {
+		SendError: func(_ context.Context, message string, severity api.Severity) {
 			sentMessage = message
 			sentSeverity = severity
 		},
@@ -69,7 +70,7 @@ func TestHandler_Handle_APIError_ClientError(t *testing.T) {
 		SendToServer: true,
 	}
 
-	result := h.Handle(apiErr, opts)
+	result := h.Handle(context.Background(), apiErr, opts)
 
 	require.Error(t, result)
 	assert.NotEmpty(t, sentMessage)
@@ -84,7 +85,7 @@ func TestHandler_Handle_APIError_ServerError(t *testing.T) {
 	var sentSeverity api.Severity
 
 	h := &Handler{
-		SendError: func(message string, severity api.Severity) {
+		SendError: func(_ context.Context, message string, severity api.Severity) {
 			sentMessage = message
 			sentSeverity = severity
 		},
@@ -101,7 +102,7 @@ func TestHandler_Handle_APIError_ServerError(t *testing.T) {
 		SendToServer: true,
 	}
 
-	result := h.Handle(apiErr, opts)
+	result := h.Handle(context.Background(), apiErr, opts)
 
 	require.Error(t, result)
 	assert.NotEmpty(t, sentMessage)
@@ -113,7 +114,7 @@ func TestHandler_Handle_APIError_AuthRelated(t *testing.T) {
 	defer cleanup()
 
 	h := &Handler{
-		SendError: func(_ string, _ api.Severity) {},
+		SendError: func(_ context.Context, _ string, _ api.Severity) {},
 	}
 
 	testCases := []struct {
@@ -137,7 +138,7 @@ func TestHandler_Handle_APIError_AuthRelated(t *testing.T) {
 				SendToServer: true,
 			}
 
-			result := h.Handle(apiErr, opts)
+			result := h.Handle(context.Background(), apiErr, opts)
 			require.Error(t, result)
 		})
 	}
@@ -149,7 +150,7 @@ func TestHandler_Handle_GenericError(t *testing.T) {
 
 	sendCalled := false
 	h := &Handler{
-		SendError: func(_ string, _ api.Severity) {
+		SendError: func(_ context.Context, _ string, _ api.Severity) {
 			sendCalled = true
 		},
 	}
@@ -162,7 +163,7 @@ func TestHandler_Handle_GenericError(t *testing.T) {
 		SendToServer: true,
 	}
 
-	result := h.Handle(genericErr, opts)
+	result := h.Handle(context.Background(), genericErr, opts)
 
 	require.Error(t, result)
 	// Generic errors should also trigger SendError for server visibility
@@ -175,7 +176,7 @@ func TestHandler_Handle_NoSendToServer(t *testing.T) {
 
 	sendCalled := false
 	h := &Handler{
-		SendError: func(_ string, _ api.Severity) {
+		SendError: func(_ context.Context, _ string, _ api.Severity) {
 			sendCalled = true
 		},
 	}
@@ -191,7 +192,7 @@ func TestHandler_Handle_NoSendToServer(t *testing.T) {
 		SendToServer: false,
 	}
 
-	err := h.Handle(apiErr, opts)
+	err := h.Handle(context.Background(), apiErr, opts)
 	require.Error(t, err)
 
 	assert.False(t, sendCalled, "SendError should not be called when SendToServer is false")
@@ -217,7 +218,7 @@ func TestHandler_Handle_NilSendError(t *testing.T) {
 	}
 
 	// Should not panic even with nil SendError
-	result := h.Handle(apiErr, opts)
+	result := h.Handle(context.Background(), apiErr, opts)
 	require.Error(t, result)
 }
 
@@ -227,13 +228,13 @@ func TestHandler_LogOnly(t *testing.T) {
 
 	sendCalled := false
 	h := &Handler{
-		SendError: func(_ string, _ api.Severity) {
+		SendError: func(_ context.Context, _ string, _ api.Severity) {
 			sendCalled = true
 		},
 	}
 
 	err := errors.New(testErrorMessage)
-	result := h.LogOnly(err, "Log only message")
+	result := h.LogOnly(context.Background(), err, "Log only message")
 
 	require.Error(t, result)
 	assert.False(t, sendCalled, "SendError should not be called for LogOnly")
@@ -246,7 +247,7 @@ func TestHandler_HandleWithSeverity(t *testing.T) {
 	var sentSeverity api.Severity
 
 	h := &Handler{
-		SendError: func(_ string, severity api.Severity) {
+		SendError: func(_ context.Context, _ string, severity api.Severity) {
 			sentSeverity = severity
 		},
 	}
@@ -256,7 +257,7 @@ func TestHandler_HandleWithSeverity(t *testing.T) {
 		Message:    testErrorMessage,
 	}
 
-	err := h.HandleWithSeverity(apiErr, "Test message", api.SeverityWarning)
+	err := h.HandleWithSeverity(context.Background(), apiErr, "Test message", api.SeverityWarning)
 	require.Error(t, err)
 
 	assert.Equal(t, api.SeverityWarning, sentSeverity)
@@ -374,7 +375,7 @@ func TestHandler_Handle_WithAuthContext(t *testing.T) {
 	defer cleanup()
 
 	h := &Handler{
-		SendError: func(_ string, _ api.Severity) {},
+		SendError: func(_ context.Context, _ string, _ api.Severity) {},
 	}
 
 	apiErr := &api.APIError{
@@ -390,6 +391,6 @@ func TestHandler_Handle_WithAuthContext(t *testing.T) {
 	}
 
 	// Should not panic and should log with auth context
-	result := h.Handle(apiErr, opts)
+	result := h.Handle(context.Background(), apiErr, opts)
 	require.Error(t, result)
 }

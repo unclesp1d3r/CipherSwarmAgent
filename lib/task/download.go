@@ -63,19 +63,17 @@ func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile)
 	}
 
 	if err := downloader.DownloadFile(ctx, resource.DownloadUrl, filePath, checksum); err != nil {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
-		return cserrors.LogAndSendError("Error downloading attack resource", err, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError(ctx, "Error downloading attack resource", err, api.SeverityCritical, nil)
 	}
 
 	fileInfo, statErr := os.Stat(filePath)
 	if statErr != nil {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
-		return cserrors.LogAndSendError("Error checking downloaded file", statErr, api.SeverityCritical, nil)
+		return cserrors.LogAndSendError(ctx, "Error checking downloaded file", statErr, api.SeverityCritical, nil)
 	}
 
 	if fileInfo.Size() == 0 {
-		//nolint:contextcheck // LogAndSendError uses context.Background() internally
 		return cserrors.LogAndSendError(
+			ctx,
 			"Downloaded file is empty: "+filePath,
 			fmt.Errorf("file %s has zero bytes", filePath),
 			api.SeverityCritical,

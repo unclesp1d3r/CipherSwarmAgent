@@ -22,7 +22,11 @@ const (
 
 // GetZaps fetches zap data for a given task, handles errors, and processes the response stream if available.
 // Logs an error if the task is nil, displays job progress, and retrieves zaps via the API client interface.
-func GetZaps(ctx context.Context, task *api.Task, sendCrackedHashFunc func(context.Context, time.Time, string, string, *api.Task)) {
+func GetZaps(
+	ctx context.Context,
+	task *api.Task,
+	sendCrackedHashFunc func(context.Context, time.Time, string, string, *api.Task),
+) {
 	if task == nil {
 		agentstate.Logger.Error("Task is nil")
 
@@ -65,7 +69,7 @@ func removeExistingZapFile(zapFilePath string) error {
 // createAndWriteZapFile creates a zap file at the specified path and writes data from the provided responseStream.
 // The task parameter is used for logging and error reporting in case of failures.
 // Returns an error if file creation, writing, or closing fails.
-func createAndWriteZapFile(zapFilePath string, responseStream io.Reader, task *api.Task) error {
+func createAndWriteZapFile(ctx context.Context, zapFilePath string, responseStream io.Reader, task *api.Task) error {
 	outFile, err := os.Create(
 		zapFilePath,
 	)
@@ -78,7 +82,7 @@ func createAndWriteZapFile(zapFilePath string, responseStream io.Reader, task *a
 	}
 
 	if cerr := outFile.Close(); cerr != nil {
-		return cserrors.LogAndSendError("Error closing zap file", cerr, api.SeverityCritical, task)
+		return cserrors.LogAndSendError(ctx, "Error closing zap file", cerr, api.SeverityCritical, task)
 	}
 
 	return nil
@@ -102,7 +106,9 @@ func handleResponseStream(
 	zapFilePath := path.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d.zap", task.Id))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
 		// Log but continue — os.Create in createAndWriteZapFile will truncate the file anyway.
-		_ = cserrors.LogAndSendError( //nolint:errcheck // log-and-continue
+		//nolint:errcheck // LogAndSendError handles logging+sending internally
+		_ = cserrors.LogAndSendError(
+			ctx,
 			"Error removing existing zap file",
 			err,
 			api.SeverityWarning,
@@ -110,12 +116,12 @@ func handleResponseStream(
 		)
 	}
 
-	if err := createAndWriteZapFile(zapFilePath, responseStream, task); err != nil {
-		return cserrors.LogAndSendError("Error creating and writing zap file", err, api.SeverityCritical, task)
+	if err := createAndWriteZapFile(ctx, zapFilePath, responseStream, task); err != nil {
+		return cserrors.LogAndSendError(ctx, "Error creating and writing zap file", err, api.SeverityCritical, task)
 	}
 
 	if err := processZapFile(ctx, zapFilePath, task, sendCrackedHashFunc); err != nil {
-		return cserrors.LogAndSendError("Error processing zap file", err, api.SeverityCritical, task)
+		return cserrors.LogAndSendError(ctx, "Error processing zap file", err, api.SeverityCritical, task)
 	}
 
 	return nil

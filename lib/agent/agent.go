@@ -57,10 +57,6 @@ func StartAgent() {
 
 	display.Startup()
 
-	// Set up signal handling for graceful shutdown
-	signChan := make(chan os.Signal, 1)
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
-
 	// Check for an existing lock file to prevent multiple instances
 	if cracker.CheckForExistingClient(agentstate.State.PidFile) {
 		agentstate.Logger.Fatal("Aborting agent start, lock file found", "path", agentstate.State.PidFile)
@@ -77,8 +73,12 @@ func StartAgent() {
 
 	defer cleanupLockFile(agentstate.State.PidFile)
 
-	// Create cancellable context for graceful shutdown propagation
-	ctx, cancel := context.WithCancel(context.Background())
+	// Create context that cancels on OS signal (SIGINT, SIGTERM)
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Wrap with a manual cancel so heartbeat StateError can trigger shutdown
+	ctx, cancel := context.WithCancel(signalCtx)
 	defer cancel()
 
 	// Authenticate with the CipherSwarm API
@@ -101,7 +101,7 @@ func StartAgent() {
 	agentstate.Logger.Info("Sent agent metadata to the CipherSwarm API")
 
 	// Start heartbeat loop early so UI can see agent is connected
-	go startHeartbeatLoop(ctx, signChan)
+	go startHeartbeatLoop(ctx, cancel)
 
 	// Initialize managers
 	benchmarkMgr = benchmark.NewManager(agentstate.State.APIClient.Agents())
@@ -127,12 +127,12 @@ func StartAgent() {
 	// Start agent loop (heartbeat loop already started above)
 	go startAgentLoop(ctx)
 
-	// Wait for termination signal
-	sig := <-signChan
-	cancel() // Cancel context to signal goroutines
-	agentstate.Logger.Debug("Received signal", "signal", sig)
-	cserrors.SendAgentError("Received signal to terminate. Shutting down", nil, api.SeverityInfo)
-	lib.SendAgentShutdown()
+	// Wait for context cancellation (OS signal or heartbeat StateError)
+	<-ctx.Done()
+	agentstate.Logger.Debug("Agent context cancelled, shutting down")
+	// Use context.Background() for shutdown messages — must complete even after cancellation
+	cserrors.SendAgentError(context.Background(), "Received signal to terminate. Shutting down", nil, api.SeverityInfo)
+	lib.SendAgentShutdown(context.Background())
 	display.ShuttingDown()
 }
 
@@ -184,12 +184,12 @@ func sleepWithContext(ctx context.Context, d time.Duration) bool {
 
 // startHeartbeatLoop runs the heartbeat loop with exponential backoff on failures.
 // On consecutive failures, it backs off exponentially up to a maximum multiplier.
-func startHeartbeatLoop(ctx context.Context, signChan chan os.Signal) {
+func startHeartbeatLoop(ctx context.Context, cancel context.CancelFunc) {
 	consecutiveFailures := 0
 	maxBackoffMultiplier := agentstate.State.MaxHeartbeatBackoff
 
 	for {
-		err := heartbeat(ctx, signChan)
+		err := heartbeat(ctx, cancel)
 		baseInterval := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
 
 		if err != nil {
@@ -233,8 +233,8 @@ func startAgentLoop(ctx context.Context) {
 						"Benchmark cache retry limit reached, will not retry until reload",
 						"attempts", benchmarkRetryFailures,
 					)
-					//nolint:contextcheck // callee lacks ctx param
 					cserrors.SendAgentError(
+						ctx,
 						fmt.Sprintf("Benchmark submission retry limit reached after %d attempts",
 							benchmarkRetryFailures),
 						nil,
@@ -267,16 +267,14 @@ func startAgentLoop(ctx context.Context) {
 }
 
 func handleReload(ctx context.Context) {
-	//nolint:contextcheck // callee lacks ctx param
-	cserrors.SendAgentError("Reloading config and performing new benchmark", nil, api.SeverityInfo)
+	cserrors.SendAgentError(ctx, "Reloading config and performing new benchmark", nil, api.SeverityInfo)
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 	agentstate.Logger.Info("Reloading agent")
 
 	if err := fetchAgentConfig(ctx); err != nil {
 		agentstate.Logger.Error("Failed to fetch agent configuration, skipping reload", "error", err)
-		//nolint:contextcheck // callee lacks ctx param
-		cserrors.SendAgentError("Failed to fetch agent configuration", nil, api.SeverityFatal)
+		cserrors.SendAgentError(ctx, "Failed to fetch agent configuration", nil, api.SeverityFatal)
 		agentstate.State.SetReload(false)
 
 		return
@@ -295,8 +293,8 @@ func handleReload(ctx context.Context) {
 	if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
 		agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
 			"error", err)
-		//nolint:contextcheck // callee lacks ctx param
 		cserrors.SendAgentError(
+			ctx,
 			"Benchmark update failed during reload: "+err.Error(),
 			nil,
 			api.SeverityMajor,
@@ -352,8 +350,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 			errMsg = err.Error()
 		}
 
-		//nolint:contextcheck // callee lacks ctx param
-		cserrors.SendAgentError(errMsg, t, api.SeverityFatal)
+		cserrors.SendAgentError(ctx, errMsg, t, api.SeverityFatal)
 		taskMgr.AbandonTask(ctx, t)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
@@ -379,8 +376,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 
 	if err := task.DownloadFiles(ctx, attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
-		//nolint:contextcheck // callee lacks ctx param
-		cserrors.SendAgentError(err.Error(), t, api.SeverityFatal)
+		cserrors.SendAgentError(ctx, err.Error(), t, api.SeverityFatal)
 		taskMgr.AbandonTask(ctx, t)
 		task.CleanupTaskFiles(attack.Id)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
@@ -405,7 +401,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 
 // heartbeat sends a heartbeat to the server and processes the response.
 // It returns an error if the heartbeat failed.
-func heartbeat(ctx context.Context, signChan chan os.Signal) error {
+func heartbeat(ctx context.Context, cancel context.CancelFunc) error {
 	if agentstate.State.ExtraDebugging {
 		agentstate.Logger.Debug("Sending heartbeat")
 	}
@@ -446,7 +442,7 @@ func heartbeat(ctx context.Context, signChan chan os.Signal) error {
 	case api.StateError:
 		agentstate.Logger.Info("Agent is in error state, stopping processing")
 
-		signChan <- syscall.SIGTERM
+		cancel()
 	}
 
 	return nil

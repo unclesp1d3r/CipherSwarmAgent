@@ -359,7 +359,7 @@ func TestHandleBenchmarkStdErrLine(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(789)
 
 			// Should not panic
-			handleBenchmarkStdErrLine(tt.line)
+			handleBenchmarkStdErrLine(context.Background(), tt.line)
 
 			if tt.expectAPICall {
 				callCount := testhelpers.GetSubmitErrorCallCount(789, "https://test.api")

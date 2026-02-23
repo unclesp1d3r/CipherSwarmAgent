@@ -198,7 +198,7 @@ func TestHandleStdErrLine(t *testing.T) {
 			initialCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
 
 			// Call handleStdErrLine
-			handleStdErrLine(tt.stdErrLine, task)
+			handleStdErrLine(context.Background(), tt.stdErrLine, task)
 
 			// Verify SendAgentError behavior
 			finalCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")

@@ -86,7 +86,7 @@ func TestCreateAndWriteZapFile(t *testing.T) {
 			zapFilePath := filepath.Join(tempDir, fmt.Sprintf("test_%d.zap", i))
 			reader := strings.NewReader(tt.content)
 
-			err := createAndWriteZapFile(zapFilePath, reader, tt.task)
+			err := createAndWriteZapFile(context.Background(), zapFilePath, reader, tt.task)
 
 			if tt.expectedError {
 				assert.Error(t, err)

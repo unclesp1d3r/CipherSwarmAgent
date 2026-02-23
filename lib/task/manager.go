@@ -50,7 +50,7 @@ var (
 func (m *Manager) GetNewTask(ctx context.Context) (*api.Task, error) {
 	response, err := m.tasksClient.GetNewTask(ctx)
 	if err != nil {
-		handleAPIError("Error getting new task", err)
+		handleAPIError(ctx, "Error getting new task", err)
 
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (m *Manager) GetNewTask(ctx context.Context) (*api.Task, error) {
 func (m *Manager) GetAttackParameters(ctx context.Context, attackID int64) (*api.Attack, error) {
 	response, err := m.attacksClient.GetAttack(ctx, attackID)
 	if err != nil {
-		handleAPIError("Error getting attack parameters", err)
+		handleAPIError(ctx, "Error getting attack parameters", err)
 
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (m *Manager) AcceptTask(ctx context.Context, task *api.Task) error {
 
 	_, err := m.tasksClient.SetTaskAccepted(ctx, task.Id)
 	if err != nil {
-		handleAcceptTaskError(err)
+		handleAcceptTaskError(ctx, err)
 
 		return err
 	}
@@ -128,7 +128,7 @@ func (m *Manager) markTaskExhausted(ctx context.Context, task *api.Task) {
 
 	_, err := m.tasksClient.SetTaskExhausted(ctx, task.Id)
 	if err != nil {
-		handleTaskError(err, "Error notifying server of task exhaustion")
+		handleTaskError(ctx, err, "Error notifying server of task exhaustion")
 	}
 }
 
@@ -143,7 +143,7 @@ func (m *Manager) AbandonTask(ctx context.Context, task *api.Task) {
 
 	_, err := m.tasksClient.SetTaskAbandoned(ctx, task.Id)
 	if err != nil {
-		handleTaskError(err, "Error notifying server of task abandonment")
+		handleTaskError(ctx, err, "Error notifying server of task abandonment")
 	}
 }
 
@@ -153,14 +153,15 @@ func (m *Manager) RunTask(ctx context.Context, task *api.Task, attack *api.Attac
 	display.RunTaskStarting(task)
 
 	if attack == nil {
-		return cserrors.LogAndSendError("Attack is nil", errors.New("attack is nil"), api.SeverityCritical, task)
+		return cserrors.LogAndSendError(ctx, "Attack is nil", errors.New("attack is nil"), api.SeverityCritical, task)
 	}
 
 	jobParams := m.createJobParams(task, attack)
 
+	//nolint:contextcheck // NewHashcatSession does not accept context
 	sess, err := hashcat.NewHashcatSession(strconv.FormatInt(attack.Id, 10), jobParams)
 	if err != nil {
-		return cserrors.LogAndSendError("Failed to create attack session", err, api.SeverityCritical, task)
+		return cserrors.LogAndSendError(ctx, "Failed to create attack session", err, api.SeverityCritical, task)
 	}
 
 	m.runAttackTask(ctx, sess, task)

@@ -277,10 +277,11 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
 	}
 
+	//nolint:contextcheck // NewHashcatSession does not accept context
 	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
 	if err != nil {
 		return nil, cserrors.LogAndSendError(
-			"Failed to create benchmark session", err, api.SeverityMajor, nil,
+			ctx, "Failed to create benchmark session", err, api.SeverityMajor, nil,
 		)
 	}
 
@@ -290,6 +291,7 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 	results, done := m.runBenchmarkTask(ctx, sess)
 	if done {
 		return nil, cserrors.LogAndSendError(
+			ctx,
 			"Benchmark session failed to produce results",
 			errors.New("benchmark task failed"),
 			api.SeverityMajor,
@@ -348,7 +350,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 					}
 				}
 			case stdErrLine := <-sess.StderrMessages:
-				handleBenchmarkStdErrLine(stdErrLine)
+				handleBenchmarkStdErrLine(ctx, stdErrLine)
 			case statusUpdate := <-sess.StatusUpdates:
 				agentstate.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
 			case crackedHash := <-sess.CrackedHashes:
@@ -359,7 +361,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 				if err != nil {
 					agentstate.Logger.Error("Benchmark session failed", "error", err)
-					cserrors.SendAgentError(err.Error(), nil, api.SeverityFatal)
+					cserrors.SendAgentError(ctx, err.Error(), nil, api.SeverityFatal)
 				}
 
 				// Submit any remaining unsubmitted results
