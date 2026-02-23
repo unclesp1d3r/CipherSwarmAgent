@@ -267,6 +267,7 @@ func startAgentLoop(ctx context.Context) {
 }
 
 func handleReload(ctx context.Context) {
+	//nolint:contextcheck // callee lacks ctx param
 	cserrors.SendAgentError("Reloading config and performing new benchmark", nil, api.SeverityInfo)
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
@@ -274,6 +275,7 @@ func handleReload(ctx context.Context) {
 
 	if err := fetchAgentConfig(ctx); err != nil {
 		agentstate.Logger.Error("Failed to fetch agent configuration, skipping reload", "error", err)
+		//nolint:contextcheck // callee lacks ctx param
 		cserrors.SendAgentError("Failed to fetch agent configuration", nil, api.SeverityFatal)
 		agentstate.State.SetReload(false)
 
@@ -293,6 +295,7 @@ func handleReload(ctx context.Context) {
 	if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
 		agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
 			"error", err)
+		//nolint:contextcheck // callee lacks ctx param
 		cserrors.SendAgentError(
 			"Benchmark update failed during reload: "+err.Error(),
 			nil,
@@ -349,6 +352,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 			errMsg = err.Error()
 		}
 
+		//nolint:contextcheck // callee lacks ctx param
 		cserrors.SendAgentError(errMsg, t, api.SeverityFatal)
 		taskMgr.AbandonTask(ctx, t)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
@@ -375,6 +379,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 
 	if err := task.DownloadFiles(ctx, attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
+		//nolint:contextcheck // callee lacks ctx param
 		cserrors.SendAgentError(err.Error(), t, api.SeverityFatal)
 		taskMgr.AbandonTask(ctx, t)
 		task.CleanupTaskFiles(attack.Id)
