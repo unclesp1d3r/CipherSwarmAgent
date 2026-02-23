@@ -37,11 +37,23 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 ### Project Structure
 
 - `cmd/`: Main application entry points using the Cobra framework.
-- `lib/`: Core agent logic, including the agent client, task/benchmark managers, and utilities.
+- `lib/`: Core agent logic, decomposed into focused sub-packages:
+  - `agent/`: Top-level agent lifecycle — startup, heartbeat loop, task polling, shutdown.
   - `api/`: API client layer — generated OpenAPI client (`client.gen.go`), hand-written wrapper (`client.go`), error types (`errors.go`), interfaces (`interfaces.go`), and mocks (`mock.go`). Regenerate with `just generate`.
-  - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
+  - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
   - `arch/`: OS-specific abstractions for handling different platforms (Linux, macOS, Windows).
-- `shared/`: Global state, logging, and shared data types.
+  - `benchmark/`: Benchmark execution, caching, and submission to the server.
+  - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
+  - `cracker/`: Hashcat binary discovery, archive extraction, and version detection.
+  - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
+  - `display/`: User-facing output (status messages, progress, benchmark results).
+  - `downloader/`: File download utilities with checksum verification.
+  - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
+  - `progress/`: Progress calculation utilities.
+  - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
+  - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
+  - `zap/`: Zap file monitoring for cracked hashes.
+- `agentstate/`: Global agent state, loggers, and synchronized fields.
 - `docs/`: Project documentation, including the OpenAPI specification.
 
 ### Formatting & Linting
@@ -118,7 +130,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 ### Tooling
 
-- **Code Generation:** `oapi-codegen` is declared as a Go tool in `go.mod` — invoke via `go tool oapi-codegen`, not bare binary. `just generate` runs it from `lib/api/config.yaml` against `docs/swagger.json`. After regenerating, run `go mod tidy && go mod vendor`.
+- **Code Generation:** `oapi-codegen` is managed via `mise.toml` (not `go.mod`). `just generate` runs it from `lib/api/config.yaml` against `docs/swagger.json`. After regenerating, run `go mod tidy && go mod vendor`.
 - **Gotcha:** oapi-codegen v2 config does NOT support `input-spec` — the spec path must be a positional CLI argument.
 - **Gotcha:** `docs/swagger.json` is downloaded from the CipherSwarm server — never modify it locally. Open issues on `unclesp1d3r/CipherSwarm` for spec problems.
 - **Gotcha:** `lib/api/client.gen.go` is auto-generated — never manually modify. Regenerate with `just generate`.
@@ -134,12 +146,12 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** `mdformat` pre-commit hook auto-fixes markdown files on first run, causing `just ci-check` to fail. Re-run after the auto-fix passes.
 - **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
 - **Vendor Sync:** After `go fix` or dependency changes, run `go mod tidy && go mod vendor` to sync the vendor directory.
+- **Gotcha:** `go get` fails in vendored projects (Go defaults to `-mod=vendor`). Use `GOFLAGS='-mod=mod' go get <pkg>` then `go mod tidy && go mod vendor`.
 - **Gotcha:** `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
 
 ### Dependencies
 
 - `hashicorp/go-getter` pulls ~78 transitive deps (AWS SDK, GCS, gRPC). See #122 for lightweight replacement plan.
-- `shirou/gopsutil/v3` is maintenance-only; v4 is actively developed. See #123 for upgrade plan.
 
 ### Testing
 
