@@ -1,4 +1,4 @@
-package lib
+package task
 
 import (
 	"errors"
@@ -106,9 +106,7 @@ func TestParseExitCode(t *testing.T) {
 }
 
 // TestParseExitCode_AllHashcatCodes tests parseExitCode with all documented hashcat exit codes.
-// This ensures the function correctly parses the full range of hashcat exit codes.
 func TestParseExitCode_AllHashcatCodes(t *testing.T) {
-	// Test all documented hashcat exit codes
 	hashcatExitCodes := []int{
 		0,  // Cracked
 		1,  // Exhausted
@@ -243,7 +241,6 @@ func TestClassifyStderr_KnownPatterns(t *testing.T) {
 
 	for _, tt := range errorPatterns {
 		t.Run(tt.name, func(t *testing.T) {
-			// Verify classification
 			info := hashcat.ClassifyStderr(tt.line)
 			assert.Equal(t, tt.expectedCategory, info.Category, "category mismatch for %q", tt.line)
 			assert.Equal(t, tt.expectedSeverity, info.Severity, "severity mismatch for %q", tt.line)
@@ -251,7 +248,7 @@ func TestClassifyStderr_KnownPatterns(t *testing.T) {
 	}
 }
 
-// TestHandleDoneChan tests the handleDoneChan function which handles completion
+// TestHandleDoneChan tests the handleDoneChan method which handles completion
 // of a hashcat task and classifies the exit code.
 func TestHandleDoneChan(t *testing.T) {
 	tests := []struct {
@@ -318,14 +315,9 @@ func TestHandleDoneChan(t *testing.T) {
 				t.Skipf("Skipping test: failed to create mock session: %v", err)
 			}
 
-			// Note: We cannot easily verify cleanup was called without modifying the Session
-			// structure. The test primarily ensures the function executes without panics
-			// and handles the different error cases correctly.
-			handleDoneChan(tt.err, task, sess)
+			mgr := newTestManager()
+			mgr.handleDoneChan(tt.err, task, sess)
 
-			// For exhausted case (exit code 1), we would ideally verify markTaskExhausted was called
-			// but this requires HTTP mocking for the task exhausted endpoint.
-			// The test currently verifies the function completes without error.
 			if tt.expectExhausted {
 				t.Log("exhausted path exercised for exit code 1")
 			}
@@ -336,8 +328,6 @@ func TestHandleDoneChan(t *testing.T) {
 // TestHandleDoneChan_ExitCodeHandling verifies that handleDoneChan
 // correctly uses hashcat.ClassifyExitCode and IsExhausted for exit code handling.
 func TestHandleDoneChan_ExitCodeHandling(t *testing.T) {
-	// Verify that the exit code classification functions work correctly
-	// These are used by handleDoneChan internally
 	tests := []struct {
 		exitCode    int
 		isExhausted bool

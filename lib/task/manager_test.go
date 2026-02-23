@@ -1,8 +1,7 @@
-package lib
+package task
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"regexp"
 	"testing"
@@ -10,23 +9,32 @@ import (
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
-// TestGetNewTask tests the GetNewTask function with various scenarios.
+// newTestManager creates a Manager using the current agentstate API client.
+func newTestManager() *Manager {
+	return NewManager(
+		agentstate.State.APIClient.Tasks(),
+		agentstate.State.APIClient.Attacks(),
+	)
+}
+
+// TestGetNewTask tests the Manager.GetNewTask method with various scenarios.
 func TestGetNewTask(t *testing.T) {
 	tests := []struct {
-		name          string
-		setupMock     func()
-		expectedTask  *api.Task
-		expectedError error
+		name         string
+		setupMock    func()
+		expectedTask *api.Task
+		wantErr      bool
+		wantErrIs    error // if non-nil, assert errors.Is(err, wantErrIs)
 	}{
 		{
 			name: "successful task retrieval",
 			setupMock: func() {
 				task := testhelpers.NewTestTask(123, 456)
-				// According to swagger.json, the response is the Task object directly, not wrapped
 				jsonResponse, err := json.Marshal(task)
 				if err != nil {
 					panic(err)
@@ -40,8 +48,7 @@ func TestGetNewTask(t *testing.T) {
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
 			},
-			expectedTask:  &api.Task{Id: 123, AttackId: 456},
-			expectedError: nil,
+			expectedTask: &api.Task{Id: 123, AttackId: 456},
 		},
 		{
 			name: "no task available - HTTP 204",
@@ -50,19 +57,17 @@ func TestGetNewTask(t *testing.T) {
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
 			},
-			expectedTask:  nil,
-			expectedError: ErrNoTaskAvailable,
+			wantErr:   true,
+			wantErrIs: ErrNoTaskAvailable,
 		},
 		{
 			name: "bad response - unexpected status",
 			setupMock: func() {
-				// Use 400 Bad Request to test client error handling without server error complications
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
 			},
-			expectedTask:  nil,
-			expectedError: ErrTaskBadResponse,
+			wantErr: true, // API client wraps 4xx as *api.APIError
 		},
 	}
 
@@ -77,13 +82,13 @@ func TestGetNewTask(t *testing.T) {
 
 			tt.setupMock()
 
-			task, err := GetNewTask()
+			mgr := newTestManager()
+			task, err := mgr.GetNewTask()
 
-			if tt.expectedError != nil {
+			if tt.wantErr {
 				require.Error(t, err)
-				// The API client wraps non-2xx responses as APIError; only assert type for specific sentinels we control.
-				if errors.Is(tt.expectedError, ErrNoTaskAvailable) {
-					require.ErrorIs(t, err, tt.expectedError)
+				if tt.wantErrIs != nil {
+					require.ErrorIs(t, err, tt.wantErrIs)
 				}
 			} else {
 				require.NoError(t, err)
@@ -97,21 +102,21 @@ func TestGetNewTask(t *testing.T) {
 	}
 }
 
-// TestGetAttackParameters tests the GetAttackParameters function.
+// TestGetAttackParameters tests the Manager.GetAttackParameters method.
 func TestGetAttackParameters(t *testing.T) {
 	tests := []struct {
 		name           string
 		attackID       int64
 		setupMock      func(attackID int64)
 		expectedAttack *api.Attack
-		expectedError  error
+		wantErr        bool
+		wantErrIs      error // if non-nil, assert errors.Is(err, wantErrIs)
 	}{
 		{
 			name:     "successful attack retrieval",
 			attackID: 456,
 			setupMock: func(attackID int64) {
 				attack := testhelpers.NewTestAttack(attackID, 0)
-				// According to swagger.json, the response is the Attack object directly, not wrapped
 				jsonResponse, err := json.Marshal(attack)
 				if err != nil {
 					panic(err)
@@ -126,7 +131,6 @@ func TestGetAttackParameters(t *testing.T) {
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
 			},
 			expectedAttack: &api.Attack{Id: 456},
-			expectedError:  nil,
 		},
 		{
 			name:     "attack not found - HTTP 404",
@@ -136,8 +140,7 @@ func TestGetAttackParameters(t *testing.T) {
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/attacks/\d+$`)
 				httpmock.RegisterRegexpResponder("GET", pattern, responder)
 			},
-			expectedAttack: nil,
-			expectedError:  ErrTaskBadResponse,
+			wantErr: true, // API client wraps 4xx as *api.APIError
 		},
 	}
 
@@ -152,13 +155,13 @@ func TestGetAttackParameters(t *testing.T) {
 
 			tt.setupMock(tt.attackID)
 
-			attack, err := GetAttackParameters(tt.attackID)
+			mgr := newTestManager()
+			attack, err := mgr.GetAttackParameters(tt.attackID)
 
-			if tt.expectedError != nil {
+			if tt.wantErr {
 				require.Error(t, err)
-				// For 4xx responses, errors are wrapped as APIError; avoid strict ErrorIs here.
-				if !errors.Is(tt.expectedError, ErrTaskBadResponse) {
-					require.ErrorIs(t, err, tt.expectedError)
+				if tt.wantErrIs != nil {
+					require.ErrorIs(t, err, tt.wantErrIs)
 				}
 			} else {
 				require.NoError(t, err)
@@ -169,7 +172,7 @@ func TestGetAttackParameters(t *testing.T) {
 	}
 }
 
-// TestAcceptTask tests the AcceptTask function.
+// TestAcceptTask tests the Manager.AcceptTask method.
 func TestAcceptTask(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -199,7 +202,6 @@ func TestAcceptTask(t *testing.T) {
 			name: "API error during acceptance",
 			task: testhelpers.NewTestTask(123, 456),
 			setupMock: func(_ int64) {
-				// Use 400 Bad Request to test client error handling without server error complications
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
 				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
 				httpmock.RegisterRegexpResponder("POST", pattern, responder)
@@ -226,7 +228,8 @@ func TestAcceptTask(t *testing.T) {
 				tt.setupMock(0)
 			}
 
-			err := AcceptTask(tt.task)
+			mgr := newTestManager()
+			err := mgr.AcceptTask(tt.task)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -237,7 +240,7 @@ func TestAcceptTask(t *testing.T) {
 	}
 }
 
-// TestAbandonTask tests the AbandonTask function.
+// TestAbandonTask tests the Manager.AbandonTask method.
 func TestAbandonTask(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -289,8 +292,9 @@ func TestAbandonTask(t *testing.T) {
 				tt.setupMock(0)
 			}
 
+			mgr := newTestManager()
 			// AbandonTask doesn't return an error, it just logs
-			AbandonTask(tt.task)
+			mgr.AbandonTask(tt.task)
 		})
 	}
 }

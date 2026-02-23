@@ -1,9 +1,5 @@
 package lib
 
-import (
-	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
-)
-
 // agentConfig holds the various configuration settings for an agent.
 type agentConfig struct {
 	UseNativeHashcat    bool   `json:"use_native_hashcat"        yaml:"use_native_hashcat"`        // UseNativeHashcat specifies whether to use the native Hashcat implementation.
@@ -16,31 +12,4 @@ type agentConfig struct {
 type agentConfiguration struct {
 	Config     agentConfig `json:"config"      yaml:"config"`
 	APIVersion int64       `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
-}
-
-// parseStringToDeviceType converts a string representing a device type to the corresponding api.DeviceStatusDeviceType enum.
-// If the input string does not match any known device type, it defaults to api.CPU.
-func parseStringToDeviceType(deviceType string) api.DeviceStatusDeviceType {
-	switch deviceType {
-	case "CPU":
-		return api.CPU
-	case "GPU":
-		return api.GPU
-	// case "fpga":
-	// 	return api.FPGA
-	// case "asic":
-	// 	return api.ASIC
-	default:
-		return api.CPU
-	}
-}
-
-// benchmarkResult represents the outcome of a benchmark session.
-type benchmarkResult struct {
-	Device     string `json:"device,omitempty"`     // Device is the name of the device used for the benchmark.
-	HashType   string `json:"hash_type,omitempty"`  // HashType is the type of hash used for the benchmark.
-	RuntimeMs  string `json:"runtime,omitempty"`    // RuntimeMs is the runtime of the benchmark in milliseconds.
-	HashTimeMs string `json:"hash_time,omitempty"`  // HashTimeMs is the time taken to hash in milliseconds.
-	SpeedHs    string `json:"hash_speed,omitempty"` // SpeedHs is the hash speed in hashes per second.
-	Submitted  bool   `json:"submitted,omitempty"`  // Submitted indicates whether this result has been accepted by the server.
 }

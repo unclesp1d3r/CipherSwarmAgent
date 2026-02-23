@@ -1,4 +1,7 @@
-package lib
+// Package task provides task management and execution logic for the CipherSwarm agent.
+// It handles the full task lifecycle: retrieval, acceptance, execution, status reporting,
+// and error handling.
+package task
 
 import (
 	"context"
@@ -12,8 +15,25 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
+
+// Manager orchestrates task lifecycle operations using injected API clients.
+type Manager struct {
+	tasksClient    api.TasksClient
+	attacksClient  api.AttacksClient
+	BackendDevices string
+	OpenCLDevices  string
+}
+
+// NewManager creates a new task Manager with the given API clients.
+func NewManager(tc api.TasksClient, ac api.AttacksClient) *Manager {
+	return &Manager{
+		tasksClient:   tc,
+		attacksClient: ac,
+	}
+}
 
 var (
 	// ErrTaskBadResponse is returned when the server returns a bad response.
@@ -25,11 +45,10 @@ var (
 )
 
 // GetNewTask retrieves a new task from the server.
-// It sends a request using the API client interface, handles any errors, and returns the task if available.
 // If the server responds with no content, it means no new task is available, and the function returns nil without error.
 // For any other unexpected response status, an error is returned.
-func GetNewTask() (*api.Task, error) {
-	response, err := agentstate.State.APIClient.Tasks().GetNewTask(context.Background())
+func (m *Manager) GetNewTask() (*api.Task, error) {
+	response, err := m.tasksClient.GetNewTask(context.Background())
 	if err != nil {
 		handleAPIError("Error getting new task", err)
 
@@ -55,8 +74,8 @@ func GetNewTask() (*api.Task, error) {
 
 // GetAttackParameters retrieves the attack parameters for a given attackID via the API client interface.
 // Returns an Attack object if the API call is successful and the response status is OK.
-func GetAttackParameters(attackID int64) (*api.Attack, error) {
-	response, err := agentstate.State.APIClient.Attacks().GetAttack(context.Background(), attackID)
+func (m *Manager) GetAttackParameters(attackID int64) (*api.Attack, error) {
+	response, err := m.attacksClient.GetAttack(context.Background(), attackID)
 	if err != nil {
 		handleAPIError("Error getting attack parameters", err)
 
@@ -77,11 +96,81 @@ func GetAttackParameters(attackID int64) (*api.Attack, error) {
 	return nil, fmt.Errorf("%w: %s", ErrTaskBadResponse, response.Status())
 }
 
+// AcceptTask attempts to accept the given task identified by its ID.
+// It logs an error and returns if the task is nil.
+func (m *Manager) AcceptTask(task *api.Task) error {
+	if task == nil {
+		agentstate.Logger.Error("Task is nil")
+
+		return ErrTaskIsNil
+	}
+
+	_, err := m.tasksClient.SetTaskAccepted(context.Background(), task.Id)
+	if err != nil {
+		handleAcceptTaskError(err)
+
+		return err
+	}
+
+	agentstate.Logger.Debug("Task accepted")
+
+	return nil
+}
+
+// markTaskExhausted marks the given task as exhausted by notifying the server.
+// Logs an error if the task is nil or if notifying the server fails.
+func (m *Manager) markTaskExhausted(task *api.Task) {
+	if task == nil {
+		agentstate.Logger.Error("Task is nil")
+
+		return
+	}
+
+	_, err := m.tasksClient.SetTaskExhausted(context.Background(), task.Id)
+	if err != nil {
+		handleTaskError(err, "Error notifying server of task exhaustion")
+	}
+}
+
+// AbandonTask sets the given task to an abandoned state and logs any errors that occur.
+// If the task is nil, it logs an error and returns immediately.
+func (m *Manager) AbandonTask(task *api.Task) {
+	if task == nil {
+		agentstate.Logger.Error("Task is nil")
+
+		return
+	}
+
+	_, err := m.tasksClient.SetTaskAbandoned(context.Background(), task.Id)
+	if err != nil {
+		handleTaskError(err, "Error notifying server of task abandonment")
+	}
+}
+
+// RunTask performs a hashcat attack based on the provided task and attack objects.
+// It initializes the task, creates job parameters, starts the hashcat session, and handles task completion or errors.
+func (m *Manager) RunTask(task *api.Task, attack *api.Attack) error {
+	display.RunTaskStarting(task)
+
+	if attack == nil {
+		return cserrors.LogAndSendError("Attack is nil", errors.New("attack is nil"), api.SeverityCritical, task)
+	}
+
+	jobParams := m.createJobParams(task, attack)
+
+	sess, err := hashcat.NewHashcatSession(strconv.FormatInt(attack.Id, 10), jobParams)
+	if err != nil {
+		return cserrors.LogAndSendError("Failed to create attack session", err, api.SeverityCritical, task)
+	}
+
+	m.runAttackTask(sess, task)
+	display.RunTaskCompleted()
+
+	return nil
+}
+
 // createJobParams creates hashcat parameters from the given Task and Attack objects.
-// The function initializes a hashcat.Params struct by extracting and converting fields
-// from the Task and Attack objects. It includes path settings for various resources
-// like hash files, word lists, rule lists, and restore files.
-func createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
+func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
 	return hashcat.Params{
 		AttackMode: int64(attack.AttackModeHashcat),
 		HashType:   int64(attack.HashMode),
@@ -107,8 +196,8 @@ func createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
 		SlowCandidates:   attack.SlowCandidateGenerators,
 		Skip:             unwrapOr(task.Skip, 0),
 		Limit:            unwrapOr(task.Limit, 0),
-		BackendDevices:   Configuration.Config.BackendDevices,
-		OpenCLDevices:    Configuration.Config.OpenCLDevices,
+		BackendDevices:   m.BackendDevices,
+		OpenCLDevices:    m.OpenCLDevices,
 		RestoreFilePath:  path.Join(agentstate.State.RestoreFilePath, strconv.FormatInt(attack.Id, 10)+".restore"),
 	}
 }
@@ -121,82 +210,11 @@ func resourceNameOrBlank(resource *api.AttackResourceFile) string {
 	return resource.FileName
 }
 
-// AcceptTask attempts to accept the given task identified by its ID.
-// It logs an error and returns if the task is nil.
-// If the task is successfully accepted, it logs a debug message indicating success.
-// In case of an error during task acceptance, it handles the error and returns it.
-func AcceptTask(task *api.Task) error {
-	if task == nil {
-		agentstate.Logger.Error("Task is nil")
-
-		return ErrTaskIsNil
+// unwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
+func unwrapOr[T any](ptr *T, defaultVal T) T {
+	if ptr != nil {
+		return *ptr
 	}
 
-	_, err := agentstate.State.APIClient.Tasks().SetTaskAccepted(context.Background(), task.Id)
-	if err != nil {
-		handleAcceptTaskError(err)
-
-		return err
-	}
-
-	agentstate.Logger.Debug("Task accepted")
-
-	return nil
-}
-
-// markTaskExhausted marks the given task as exhausted by notifying the server.
-// Logs an error if the task is nil or if notifying the server fails.
-func markTaskExhausted(task *api.Task) {
-	if task == nil {
-		agentstate.Logger.Error("Task is nil")
-
-		return
-	}
-
-	_, err := agentstate.State.APIClient.Tasks().SetTaskExhausted(context.Background(), task.Id)
-	if err != nil {
-		handleTaskError(err, "Error notifying server of task exhaustion")
-	}
-}
-
-// AbandonTask sets the given task to an abandoned state using the API client interface and logs any errors that occur.
-// If the task is nil, it logs an error and returns immediately.
-func AbandonTask(task *api.Task) {
-	if task == nil {
-		agentstate.Logger.Error("Task is nil")
-
-		return
-	}
-
-	_, err := agentstate.State.APIClient.Tasks().SetTaskAbandoned(context.Background(), task.Id)
-	if err != nil {
-		handleTaskError(err, "Error notifying server of task abandonment")
-	}
-}
-
-// RunTask performs a hashcat attack based on the provided task and attack objects.
-// It initializes the task, creates job parameters, starts the hashcat session, and handles task completion or errors.
-// Parameters:
-//   - task: Pointer to the Task object to be run.
-//   - attack: Pointer to the Attack object describing the specifics of the attack.
-//
-// Returns an error if the task could not be run or if the attack session could not be started.
-func RunTask(task *api.Task, attack *api.Attack) error {
-	displayRunTaskStarting(task)
-
-	if attack == nil {
-		return cserrors.LogAndSendError("Attack is nil", errors.New("attack is nil"), api.SeverityCritical, task)
-	}
-
-	jobParams := createJobParams(task, attack)
-
-	sess, err := hashcat.NewHashcatSession(strconv.FormatInt(attack.Id, 10), jobParams)
-	if err != nil {
-		return cserrors.LogAndSendError("Failed to create attack session", err, api.SeverityCritical, task)
-	}
-
-	runAttackTask(sess, task)
-	displayRunTaskCompleted()
-
-	return nil
+	return defaultVal
 }
