@@ -10,12 +10,29 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
+// setupSessionTestState sets up minimal agentstate paths for session tests
+// and returns a cleanup function. Uses t.TempDir() for automatic cleanup.
+func setupSessionTestState(t *testing.T) {
+	t.Helper()
+	tempDir := t.TempDir()
+
+	savedZapsPath := agentstate.State.ZapsPath
+	savedRetain := agentstate.State.RetainZapsOnCompletion
+
+	agentstate.State.ZapsPath = filepath.Join(tempDir, "zaps")
+	agentstate.State.RetainZapsOnCompletion = true // Avoid removing zaps dir during tests
+
+	t.Cleanup(func() {
+		agentstate.State.ZapsPath = savedZapsPath
+		agentstate.State.RetainZapsOnCompletion = savedRetain
+	})
+}
+
 // TestCleanup_RemovesRestoreFile verifies that Session.Cleanup removes the restore file.
 func TestCleanup_RemovesRestoreFile(t *testing.T) {
-	tempDir := t.TempDir()
-	agentstate.State.ZapsPath = filepath.Join(tempDir, "zaps")
+	setupSessionTestState(t)
 
-	restoreFile := filepath.Join(tempDir, "test.restore")
+	restoreFile := filepath.Join(t.TempDir(), "test.restore")
 	require.NoError(t, os.WriteFile(restoreFile, []byte("restore-data"), 0o600))
 
 	sess := &Session{
@@ -31,11 +48,10 @@ func TestCleanup_RemovesRestoreFile(t *testing.T) {
 // TestCleanup_SkipsMissingRestoreFile verifies that Cleanup does not error
 // when the restore file does not exist.
 func TestCleanup_SkipsMissingRestoreFile(t *testing.T) {
-	tempDir := t.TempDir()
-	agentstate.State.ZapsPath = filepath.Join(tempDir, "zaps")
+	setupSessionTestState(t)
 
 	sess := &Session{
-		RestoreFilePath: filepath.Join(tempDir, "nonexistent.restore"),
+		RestoreFilePath: filepath.Join(t.TempDir(), "nonexistent.restore"),
 	}
 
 	// Should not panic
@@ -45,8 +61,7 @@ func TestCleanup_SkipsMissingRestoreFile(t *testing.T) {
 // TestCleanup_SkipsEmptyRestoreFilePath verifies that Cleanup handles
 // an empty RestoreFilePath gracefully.
 func TestCleanup_SkipsEmptyRestoreFilePath(t *testing.T) {
-	tempDir := t.TempDir()
-	agentstate.State.ZapsPath = filepath.Join(tempDir, "zaps")
+	setupSessionTestState(t)
 
 	sess := &Session{
 		RestoreFilePath: "",

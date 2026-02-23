@@ -15,7 +15,7 @@ import (
 // removes the hash file for the given attack ID.
 func TestCleanupTaskFiles_RemovesHashFile(t *testing.T) {
 	cleanupState := testhelpers.SetupMinimalTestState(1)
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	var attackID int64 = 42
 	hashFile := filepath.Join(agentstate.State.HashlistPath, "42.hsh")
@@ -32,7 +32,7 @@ func TestCleanupTaskFiles_RemovesHashFile(t *testing.T) {
 // removes the restore file for the given attack ID.
 func TestCleanupTaskFiles_RemovesRestoreFile(t *testing.T) {
 	cleanupState := testhelpers.SetupMinimalTestState(1)
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	var attackID int64 = 42
 	restoreFile := filepath.Join(agentstate.State.RestoreFilePath, "42.restore")
@@ -59,7 +59,7 @@ func TestCleanupTaskFiles_HandlesNonexistentFiles(t *testing.T) {
 // files are removed in a single call.
 func TestCleanupTaskFiles_RemovesBothFiles(t *testing.T) {
 	cleanupState := testhelpers.SetupMinimalTestState(1)
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	var attackID int64 = 99
 	hashFile := filepath.Join(agentstate.State.HashlistPath, "99.hsh")

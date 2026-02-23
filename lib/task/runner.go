@@ -49,6 +49,7 @@ func (m *Manager) runAttackTask(sess *hashcat.Session, task *api.Task) {
 						task,
 						api.SeverityFatal,
 					)
+					sess.Cleanup()
 
 					return
 				}
