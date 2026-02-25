@@ -162,12 +162,6 @@ func AgentMetadataUpdated(result *api.UpdateAgentResponse) {
 	agentstate.Logger.Debug("Agent metadata", "metadata", result)
 }
 
-// NewCrackerAvailable logs details about the newly available cracker, including the latest version and download URL.
-func NewCrackerAvailable(result *api.CrackerUpdate) {
-	agentstate.Logger.Info("New cracker available", "latest_version", result.GetLatestVersion())
-	agentstate.Logger.Info("Download URL", "url", result.GetDownloadURL())
-}
-
 // BenchmarkStarting logs a message indicating that benchmark processes are starting.
 func BenchmarkStarting() {
 	agentstate.Logger.Info("Performing benchmarks")
