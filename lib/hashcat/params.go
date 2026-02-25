@@ -237,6 +237,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			return nil, fmt.Errorf("%w: %w", ErrWordlistNotOpened, err)
 		}
 
+		//nolint:gosec // G703 - validated by safePath
 		if _, err := os.Stat(wordList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrWordlistNotOpened, wordList)
 		}
@@ -250,6 +251,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			return nil, fmt.Errorf("%w: %w", ErrRuleListNotOpened, err)
 		}
 
+		//nolint:gosec // G703 - validated by safePath
 		if _, err := os.Stat(ruleList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrRuleListNotOpened, ruleList)
 		}
@@ -263,6 +265,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			return nil, fmt.Errorf("%w: %w", ErrMaskListNotOpened, err)
 		}
 
+		//nolint:gosec // G703 - validated by safePath
 		if _, err := os.Stat(maskList); os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrMaskListNotOpened, maskList)
 		}

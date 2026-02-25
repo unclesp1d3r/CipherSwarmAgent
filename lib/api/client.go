@@ -11,11 +11,11 @@ import (
 
 // Compile-time interface compliance checks.
 var (
-	_ APIClient      = (*AgentClient)(nil)
-	_ TasksClient    = (*agentTasksClient)(nil)
-	_ AttacksClient  = (*agentAttacksClient)(nil)
-	_ AgentsClient   = (*agentAgentsClient)(nil)
-	_ AuthClient     = (*agentAuthClient)(nil)
+	_ APIClient     = (*AgentClient)(nil)
+	_ TasksClient   = (*agentTasksClient)(nil)
+	_ AttacksClient = (*agentAttacksClient)(nil)
+	_ AgentsClient  = (*agentAgentsClient)(nil)
+	_ AuthClient    = (*agentAuthClient)(nil)
 )
 
 // AgentClient wraps the generated ClientWithResponses and implements the APIClient interface.

@@ -7,20 +7,20 @@ import (
 
 // Compile-time interface compliance checks for mocks.
 var (
-	_ APIClient      = (*MockClient)(nil)
-	_ TasksClient    = (*MockTasksClient)(nil)
-	_ AttacksClient  = (*MockAttacksClient)(nil)
-	_ AgentsClient   = (*MockAgentsClient)(nil)
-	_ AuthClient     = (*MockAuthClient)(nil)
+	_ APIClient     = (*MockClient)(nil)
+	_ TasksClient   = (*MockTasksClient)(nil)
+	_ AttacksClient = (*MockAttacksClient)(nil)
+	_ AgentsClient  = (*MockAgentsClient)(nil)
+	_ AuthClient    = (*MockAuthClient)(nil)
 )
 
 // MockClient is a test double for the APIClient interface.
 // Each subsystem client can be configured independently.
 type MockClient struct {
-	TasksImpl    TasksClient
-	AttacksImpl  AttacksClient
-	AgentsImpl   AgentsClient
-	AuthImpl     AuthClient
+	TasksImpl   TasksClient
+	AttacksImpl AttacksClient
+	AgentsImpl  AgentsClient
+	AuthImpl    AuthClient
 }
 
 // Tasks returns the configured TasksClient, or an unconfigured mock that returns descriptive errors.
@@ -268,4 +268,3 @@ func (m *MockAuthClient) GetConfiguration(ctx context.Context) (*GetConfiguratio
 
 	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
-
