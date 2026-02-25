@@ -92,7 +92,7 @@ func (e *ErrorObject) MarshalJSON() ([]byte, error) {
 // APIError represents an HTTP error returned by the CipherSwarm API.
 // It serves as the unified internal error type for 4xx and 5xx API responses.
 // For the API error object model (JSON "error" field), see ErrorObject.
-type APIError struct { //nolint:revive // stutter with api.APIError is intentional for clarity
+type APIError struct { //nolint:revive // stutter is intentional — avoids conflict with generated Client type
 	StatusCode int
 	Message    string
 	Body       string
@@ -114,7 +114,7 @@ func (e *APIError) Error() string {
 // It maps to the 422 response schema for the SetTaskAbandoned endpoint.
 type SetTaskAbandonedError struct {
 	Details []string `json:"details"`
-	Error_  *string  `json:"error"` //nolint:revive // underscore avoids conflict with Error() method
+	Error_  *string  `json:"error"` //nolint:revive // underscore avoids collision with Error() method
 }
 
 var _ error = (*SetTaskAbandonedError)(nil) //nolint:errcheck // compile-time interface assertion

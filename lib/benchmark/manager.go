@@ -333,6 +333,16 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 		for {
 			select {
+			case <-ctx.Done():
+				agentstate.Logger.Warn("Context cancelled during benchmark, killing session")
+
+				if err := sess.Kill(); err != nil {
+					agentstate.Logger.Error("Failed to kill benchmark session on cancellation", "error", err)
+				}
+
+				sess.Cleanup()
+
+				return
 			case stdOutLine := <-sess.StdoutLines:
 				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults)
 
@@ -380,6 +390,8 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 				if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
 					agentstate.Logger.Warn("Failed to save final benchmark cache", "error", saveErr)
 				}
+
+				sess.Cleanup()
 
 				return
 			}

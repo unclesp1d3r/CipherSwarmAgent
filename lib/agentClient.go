@@ -98,18 +98,18 @@ func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration) age
 	agentConfig := agentConfiguration{
 		APIVersion: int64(apiVersion),
 		Config: agentConfig{
-			UseNativeHashcat:    unwrapOr(config.UseNativeHashcat, false),
-			AgentUpdateInterval: int64(unwrapOr(config.AgentUpdateInterval, defaultAgentUpdateInterval)),
-			BackendDevices:      unwrapOr(config.BackendDevice, ""),
-			OpenCLDevices:       unwrapOr(config.OpenclDevices, ""),
+			UseNativeHashcat:    UnwrapOr(config.UseNativeHashcat, false),
+			AgentUpdateInterval: int64(UnwrapOr(config.AgentUpdateInterval, defaultAgentUpdateInterval)),
+			BackendDevices:      UnwrapOr(config.BackendDevice, ""),
+			OpenCLDevices:       UnwrapOr(config.OpenclDevices, ""),
 		},
 	}
 
 	return agentConfig
 }
 
-// unwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
-func unwrapOr[T any](ptr *T, defaultVal T) T {
+// UnwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
+func UnwrapOr[T any](ptr *T, defaultVal T) T {
 	if ptr != nil {
 		return *ptr
 	}

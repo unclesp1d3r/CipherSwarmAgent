@@ -108,13 +108,13 @@ func (m *Manager) handleSendStatusResponse(ctx context.Context, resp *api.SendSt
 		}
 	case http.StatusAccepted:
 		agentstate.Logger.Debug("Status update sent, but stale")
-		zap.GetZaps(ctx, task, m.sendCrackedHash)
+		zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash)
 	default:
 		if resp.StatusCode() >= http.StatusOK && resp.StatusCode() < http.StatusMultipleChoices {
 			agentstate.Logger.Warn("Unexpected success status code for status update",
 				"status_code", resp.StatusCode(), "task_id", task.Id)
 			// Defensively fetch zaps for any other 2xx success code to avoid losing cracked hashes
-			zap.GetZaps(ctx, task, m.sendCrackedHash)
+			zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash)
 		} else {
 			agentstate.Logger.Error("Failed to send status update",
 				"status_code", resp.StatusCode(), "task_id", task.Id)
@@ -141,7 +141,7 @@ func (m *Manager) sendCrackedHash(ctx context.Context, timestamp time.Time, hash
 		PlainText: plaintext,
 	}
 
-	agentstate.Logger.Info("Cracked hash", "hash", hash)
+	agentstate.Logger.Debug("Cracked hash", "hash", hash)
 
 	response, err := m.tasksClient.SendCrack(ctx, task.Id, hashcatResult)
 	if err != nil {

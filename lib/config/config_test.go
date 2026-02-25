@@ -2,7 +2,7 @@ package config
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -154,24 +154,15 @@ func TestSetDefaultConfigValues(t *testing.T) {
 	})
 
 	t.Run("path defaults", func(t *testing.T) {
-		expectedDataPath := path.Join(cwd, "data")
+		expectedDataPath := filepath.Join(cwd, "data")
 
 		t.Run("data_path defaults to cwd/data", func(t *testing.T) {
 			actual := viper.GetString("data_path")
 			assert.Equal(t, expectedDataPath, actual)
 		})
 
-		t.Run("files_path defaults to data_path/files", func(t *testing.T) {
-			expected := path.Join(expectedDataPath, "files")
-			actual := viper.GetString("files_path")
-			assert.Equal(t, expected, actual)
-		})
-
-		t.Run("zap_path defaults to data_path/zaps", func(t *testing.T) {
-			expected := path.Join(expectedDataPath, "zaps")
-			actual := viper.GetString("zap_path")
-			assert.Equal(t, expected, actual)
-		})
+		// files_path and zap_path are derived in SetupSharedState, not in SetDefaultConfigValues.
+		// See TestSetupSharedState_DerivedPathsFromDataRoot for coverage.
 	})
 }
 
@@ -237,4 +228,56 @@ func TestSetupSharedState_ValidationAcceptsValidValues(t *testing.T) {
 	assert.Equal(t, 10, agentstate.State.DownloadMaxRetries)
 	assert.Equal(t, 1*time.Hour, agentstate.State.TaskTimeout)
 	assert.Equal(t, 10, agentstate.State.MaxHeartbeatBackoff)
+}
+
+func TestSetupSharedState_DerivedPathsFromDataRoot(t *testing.T) {
+	t.Run("default data_path derives files_path and zap_path", func(t *testing.T) {
+		viper.Reset()
+		SetDefaultConfigValues()
+		SetupSharedState()
+
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+
+		expectedDataPath := filepath.Join(cwd, "data")
+		assert.Equal(t, filepath.Join(expectedDataPath, "files"), agentstate.State.FilePath)
+		assert.Equal(t, filepath.Join(expectedDataPath, "zaps"), agentstate.State.ZapsPath)
+	})
+
+	t.Run("custom data_path is honoured for derived paths", func(t *testing.T) {
+		viper.Reset()
+		SetDefaultConfigValues()
+		customDataPath := filepath.Join("custom", "data")
+		viper.Set("data_path", customDataPath)
+		SetupSharedState()
+
+		assert.Equal(t, filepath.Join(customDataPath, "files"), agentstate.State.FilePath)
+		assert.Equal(t, filepath.Join(customDataPath, "zaps"), agentstate.State.ZapsPath)
+	})
+
+	t.Run("explicit files_path overrides derivation", func(t *testing.T) {
+		viper.Reset()
+		SetDefaultConfigValues()
+		customDataPath := filepath.Join("custom", "data")
+		explicitFilesPath := filepath.Join("explicit", "files")
+		viper.Set("data_path", customDataPath)
+		viper.Set("files_path", explicitFilesPath)
+		SetupSharedState()
+
+		assert.Equal(t, explicitFilesPath, agentstate.State.FilePath)
+		assert.Equal(t, filepath.Join(customDataPath, "zaps"), agentstate.State.ZapsPath)
+	})
+
+	t.Run("explicit zap_path overrides derivation", func(t *testing.T) {
+		viper.Reset()
+		SetDefaultConfigValues()
+		customDataPath := filepath.Join("custom", "data")
+		explicitZapsPath := filepath.Join("explicit", "zaps")
+		viper.Set("data_path", customDataPath)
+		viper.Set("zap_path", explicitZapsPath)
+		SetupSharedState()
+
+		assert.Equal(t, filepath.Join(customDataPath, "files"), agentstate.State.FilePath)
+		assert.Equal(t, explicitZapsPath, agentstate.State.ZapsPath)
+	})
 }

@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
@@ -179,15 +180,15 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 			agentstate.State.HashlistPath,
 			strconv.FormatInt(attack.Id, 10)+".hsh",
 		),
-		Mask:             unwrapOr(attack.Mask, ""),
+		Mask:             lib.UnwrapOr(attack.Mask, ""),
 		MaskIncrement:    attack.IncrementMode,
 		MaskIncrementMin: int64(attack.IncrementMinimum),
 		MaskIncrementMax: int64(attack.IncrementMaximum),
 		MaskCustomCharsets: []string{
-			unwrapOr(attack.CustomCharset1, ""),
-			unwrapOr(attack.CustomCharset2, ""),
-			unwrapOr(attack.CustomCharset3, ""),
-			unwrapOr(attack.CustomCharset4, ""),
+			lib.UnwrapOr(attack.CustomCharset1, ""),
+			lib.UnwrapOr(attack.CustomCharset2, ""),
+			lib.UnwrapOr(attack.CustomCharset3, ""),
+			lib.UnwrapOr(attack.CustomCharset4, ""),
 		},
 		WordListFilename: resourceNameOrBlank(attack.WordList),
 		RuleListFilename: resourceNameOrBlank(attack.RuleList),
@@ -195,8 +196,8 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 		AdditionalArgs:   arch.GetAdditionalHashcatArgs(),
 		OptimizedKernels: attack.Optimized,
 		SlowCandidates:   attack.SlowCandidateGenerators,
-		Skip:             unwrapOr(task.Skip, 0),
-		Limit:            unwrapOr(task.Limit, 0),
+		Skip:             lib.UnwrapOr(task.Skip, 0),
+		Limit:            lib.UnwrapOr(task.Limit, 0),
 		BackendDevices:   m.BackendDevices,
 		OpenCLDevices:    m.OpenCLDevices,
 		RestoreFilePath:  filepath.Join(agentstate.State.RestoreFilePath, strconv.FormatInt(attack.Id, 10)+".restore"),
@@ -209,13 +210,4 @@ func resourceNameOrBlank(resource *api.AttackResourceFile) string {
 	}
 
 	return resource.FileName
-}
-
-// unwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
-func unwrapOr[T any](ptr *T, defaultVal T) T {
-	if ptr != nil {
-		return *ptr
-	}
-
-	return defaultVal
 }

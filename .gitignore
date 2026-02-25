@@ -140,6 +140,8 @@ cipherswarmagent.yaml
 .venv/
 .DS_Store
 site/
+*.cyclonedx.json
+*.cyclonedx.xml
 **/node_modules/
 cipherswarmagent
 cipherswarm-agent

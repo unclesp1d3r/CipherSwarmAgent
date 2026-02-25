@@ -88,7 +88,7 @@ type CrackersClient interface {
 
 // APIClient is the aggregate interface combining all API subsystems.
 // This can be implemented by the AgentClient wrapper or by mocks in tests.
-type APIClient interface { //nolint:revive // stutter with api.APIClient is intentional for clarity
+type APIClient interface { //nolint:revive // stutter is intentional — avoids conflict with generated Client type
 	Tasks() TasksClient
 	Attacks() AttacksClient
 	Agents() AgentsClient

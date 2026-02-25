@@ -88,10 +88,9 @@ _update-precommit: _update-python
     @{{ mise_exec }} pre-commit autoupdate
 
 
-# Install security and SBOM tools (cyclonedx-gomod, gosec)
+# Install security and SBOM tools (cyclonedx-gomod)
 [group('setup')]
 install-security-tools:
-    @{{ mise_exec }} go install github.com/securego/gosec/v2/cmd/gosec@latest
     @{{ mise_exec }} go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
     # cosign is now handled by mise
 
@@ -292,7 +291,7 @@ alias d := docs
 # Serve documentation locally
 [group('docs')]
 docs:
-    @{{ mise_exec }} uv run mkdocs serve
+    @{{ mise_exec }} mkdocs serve
 
 # Alias for docs
 [group('docs')]
@@ -301,12 +300,12 @@ site: docs
 # Build documentation
 [group('docs')]
 docs-build:
-    @{{ mise_exec }} uv run mkdocs build
+    @{{ mise_exec }} mkdocs build
 
 # Build documentation with verbose output
 [group('docs')]
 docs-test:
-    @{{ mise_exec }} uv run mkdocs build --verbose
+    @{{ mise_exec }} mkdocs build --verbose
 
 # Generate model reference documentation
 [group('docs')]
@@ -346,23 +345,17 @@ _require-git-cliff:
 # Security
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Run gosec security scanner
-[group('security')]
-scan:
-    @echo "Running security scan..."
-    @{{ mise_exec }} gosec ./...
-
 # Generate SBOM with cyclonedx-gomod
 [group('security')]
 sbom: build-release
     @echo "Generating SBOM..."
-    @{{ mise_exec }} cyclonedx-gomod bin -output sbom-binary.cyclonedx.json ./{{ binary_name }}{{ if os_family() == "windows" { ".exe" } else { "" } }}
-    @{{ mise_exec }} cyclonedx-gomod app -output sbom-modules.cyclonedx.json -json .
+    @{{ mise_exec }} cyclonedx-gomod bin -json -output sbom-binary.cyclonedx.json ./{{ binary_name }}{{ if os_family() == "windows" { ".exe" } else { "" } }}
+    @{{ mise_exec }} cyclonedx-gomod app -json -output sbom-modules.cyclonedx.json .
     @echo "✅ SBOM generated: sbom-binary.cyclonedx.json, sbom-modules.cyclonedx.json"
 
-# Run all security checks (SBOM + security scan)
+# Run all security checks (SBOM generation)
 [group('security')]
-security-all: sbom scan
+security-all: sbom
     @echo "✅ All security checks complete"
 
 # ─────────────────────────────────────────────────────────────────────────────
