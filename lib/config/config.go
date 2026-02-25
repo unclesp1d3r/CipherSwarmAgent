@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -68,10 +69,16 @@ func InitConfig(cfgFile string) {
 	if err := viper.ReadInConfig(); err == nil {
 		agentstate.Logger.Info("Using config file", "config_file", viper.ConfigFileUsed())
 	} else {
-		agentstate.Logger.Warn("No config file found, attempting to write a new one")
+		var notFoundErr viper.ConfigFileNotFoundError
+		if errors.As(err, &notFoundErr) {
+			agentstate.Logger.Warn("No config file found, attempting to write a new one")
 
-		if err := viper.SafeWriteConfig(); err != nil && err.Error() != "config file already exists" {
-			agentstate.Logger.Error("Error writing config file", "error", err)
+			var alreadyExistsErr viper.ConfigFileAlreadyExistsError
+			if writeErr := viper.SafeWriteConfig(); writeErr != nil && !errors.As(writeErr, &alreadyExistsErr) {
+				agentstate.Logger.Error("Error writing config file", "error", writeErr)
+			}
+		} else {
+			agentstate.Logger.Error("Error reading config file", "error", err)
 		}
 	}
 }
