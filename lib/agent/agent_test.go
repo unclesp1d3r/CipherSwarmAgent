@@ -170,6 +170,11 @@ func TestAgentActivityTransitions(t *testing.T) {
 		assert.Equal(t, agentstate.CurrentActivityCracking, agentstate.State.GetCurrentActivity())
 	})
 
+	t.Run("Downloading", func(t *testing.T) {
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityDownloading)
+		assert.Equal(t, agentstate.CurrentActivityDownloading, agentstate.State.GetCurrentActivity())
+	})
+
 	t.Run("Stopping", func(t *testing.T) {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStopping)
 		assert.Equal(t, agentstate.CurrentActivityStopping, agentstate.State.GetCurrentActivity())

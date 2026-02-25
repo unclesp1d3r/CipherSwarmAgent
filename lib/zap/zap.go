@@ -21,9 +21,10 @@ const (
 )
 
 // GetZaps fetches zap data for a given task, handles errors, and processes the response stream if available.
-// Logs an error if the task is nil, displays job progress, and retrieves zaps via the API client interface.
+// Logs an error if the task is nil, displays job progress, and retrieves zaps via the injected TasksClient.
 func GetZaps(
 	ctx context.Context,
+	tasksClient api.TasksClient,
 	task *api.Task,
 	sendCrackedHashFunc func(context.Context, time.Time, string, string, *api.Task),
 ) {
@@ -33,7 +34,7 @@ func GetZaps(
 		return
 	}
 
-	res, err := agentstate.State.APIClient.Tasks().GetTaskZaps(ctx, task.Id)
+	res, err := tasksClient.GetTaskZaps(ctx, task.Id)
 	if err != nil {
 		agentstate.Logger.Error("Error fetching zaps for task", "task_id", task.Id, "error", err)
 
@@ -70,9 +71,7 @@ func removeExistingZapFile(zapFilePath string) error {
 // The task parameter is used for logging and error reporting in case of failures.
 // Returns an error if file creation, writing, or closing fails.
 func createAndWriteZapFile(ctx context.Context, zapFilePath string, responseStream io.Reader, task *api.Task) error {
-	outFile, err := os.Create(
-		zapFilePath,
-	)
+	outFile, err := os.OpenFile(zapFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("error creating zap file: %w", err)
 	}
