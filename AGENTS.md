@@ -102,7 +102,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 ### Tooling
 
 - **Code Generation:** `oapi-codegen` via `mise.toml`. `just generate` runs it against `docs/swagger.json`. After regenerating, run `go mod tidy`.
-- **API Client Architecture:** `AgentClient` wraps `ClientWithResponses`, implements `APIClient` interface. Error types live in `errors.go`. Use `errors.As` to extract `*api.APIError`.
+- **API Client Architecture:** `AgentClient` wraps `ClientWithResponses` (single field), implements `APIClient` interface. All sub-clients must use the generated client — never hand-roll raw HTTP endpoints. Error types live in `errors.go`. Use `errors.As` to extract `*api.APIError`.
 - **CI:** `just ci-full` for comprehensive checks (pre-commit, lint, test, SBOM, release, docs). `just ci-check` for the fast subset.
 - **Dev tools:** `mise` manages all toolchains via `mise.toml`.
 - **Dependencies:** No vendor directory — never run `go mod vendor`. Use `just update-deps`.

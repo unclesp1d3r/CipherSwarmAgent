@@ -58,11 +58,10 @@ func TestMockClient_InterfaceCompliance(t *testing.T) {
 	// This test verifies that MockClient satisfies the APIClient interface
 	// and that all subsystem mocks satisfy their respective interfaces.
 	var client APIClient = &MockClient{
-		TasksImpl:    &MockTasksClient{},
-		AttacksImpl:  &MockAttacksClient{},
-		AgentsImpl:   &MockAgentsClient{},
-		AuthImpl:     &MockAuthClient{},
-		CrackersImpl: &MockCrackersClient{},
+		TasksImpl:   &MockTasksClient{},
+		AttacksImpl: &MockAttacksClient{},
+		AgentsImpl:  &MockAgentsClient{},
+		AuthImpl:    &MockAuthClient{},
 	}
 
 	// Verify all subsystems are accessible
@@ -70,7 +69,6 @@ func TestMockClient_InterfaceCompliance(t *testing.T) {
 	assert.NotNil(t, client.Attacks())
 	assert.NotNil(t, client.Agents())
 	assert.NotNil(t, client.Auth())
-	assert.NotNil(t, client.Crackers())
 }
 
 func TestMockTasksClient_DefaultBehavior(t *testing.T) {

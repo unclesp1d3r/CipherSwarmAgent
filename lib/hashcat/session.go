@@ -25,9 +25,10 @@ import (
 )
 
 const (
-	channelBufferSize = 5     // Buffer size for output channels
-	filePermissions   = 0o600 // Restrictive permissions for sensitive files
-	logParseMinParts  = 3     // Minimum expected parts when parsing output log lines
+	channelBufferSize = 5           // Buffer size for output channels
+	filePermissions   = 0o600       // Restrictive permissions for sensitive files
+	logParseMinParts  = 3           // Minimum expected parts when parsing output log lines
+	drainTimeout      = time.Second // Wait time for channel consumers to drain before signaling DoneChan
 )
 
 // Session represents a hashcat execution session with comprehensive process management.
@@ -268,7 +269,7 @@ func (sess *Session) handleStdout() {
 
 	// Allow brief time for channel consumers to drain remaining stdout/stderr
 	// messages before signaling completion via DoneChan.
-	time.Sleep(time.Second)
+	time.Sleep(drainTimeout)
 
 	sess.DoneChan <- done
 }

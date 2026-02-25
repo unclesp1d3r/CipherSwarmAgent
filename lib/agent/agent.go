@@ -258,10 +258,6 @@ func startAgentLoop(ctx context.Context) {
 			benchmarkRetryFailures = 0 // Reset retry counter after reload
 		}
 
-		if !lib.Configuration.Config.UseNativeHashcat {
-			handleCrackerUpdate(ctx)
-		}
-
 		if !agentstate.State.GetJobCheckingStopped() {
 			handleNewTask(ctx)
 		}
@@ -311,14 +307,6 @@ func handleReload(ctx context.Context) {
 	}
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 	agentstate.State.SetReload(false)
-}
-
-func handleCrackerUpdate(ctx context.Context) {
-	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityUpdating)
-
-	lib.UpdateCracker(ctx)
-
-	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 }
 
 func handleNewTask(ctx context.Context) {
