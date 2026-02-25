@@ -98,16 +98,18 @@ func SetupSharedState() {
 		dataRoot,
 		"crackers",
 	) // Set the crackers path in the shared state
-	agentstate.State.FilePath = viper.GetString(
-		"files_path",
-	) // Set the file path in the shared state
+	agentstate.State.FilePath = viper.GetString("files_path")
+	if agentstate.State.FilePath == "" {
+		agentstate.State.FilePath = filepath.Join(dataRoot, "files")
+	}
 	agentstate.State.HashlistPath = filepath.Join(
 		dataRoot,
 		"hashlists",
 	) // Set the hashlist path in the shared state
-	agentstate.State.ZapsPath = viper.GetString(
-		"zap_path",
-	) // Set the zaps path in the shared state
+	agentstate.State.ZapsPath = viper.GetString("zap_path")
+	if agentstate.State.ZapsPath == "" {
+		agentstate.State.ZapsPath = filepath.Join(dataRoot, "zaps")
+	}
 	agentstate.State.PreprocessorsPath = filepath.Join(
 		dataRoot,
 		"preprocessors",
@@ -197,12 +199,12 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("hashcat_path", "")
 	viper.SetDefault("sleep_on_failure", DefaultSleepOnFailure)
 	viper.SetDefault("always_trust_files", false)
-	viper.SetDefault("files_path", filepath.Join(viper.GetString("data_path"), "files"))
+	// files_path and zap_path are derived from data_path in SetupSharedState
+	// when not explicitly set (avoids eagerly reading data_path before config is loaded).
 	viper.SetDefault("extra_debugging", false)
 	viper.SetDefault("status_timer", DefaultStatusTimer)
 	viper.SetDefault("heartbeat_interval", DefaultHeartbeatInterval)
 	viper.SetDefault("write_zaps_to_file", false)
-	viper.SetDefault("zap_path", filepath.Join(viper.GetString("data_path"), "zaps"))
 	viper.SetDefault("retain_zaps_on_completion", false)
 	viper.SetDefault("enable_additional_hash_types", true)
 	viper.SetDefault("use_legacy_device_technique", false)
