@@ -67,6 +67,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** When removing global gosec exclusions, run `mise x -- golangci-lint run ./...` to find ALL violation sites before adding per-site `//nolint:gosec` comments.
 - **gosec nolint style:** Use per-site `//nolint:gosec // G7XX - <reason>` with specific rule ID rather than global exclusions in `.golangci.yml`.
 - **Gotcha:** `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint comments short (e.g., `// G704 - trusted URL`) so total line stays under 120 chars.
+- **Gotcha:** `//nolint:revive` on `APIError`, `Error_`, and `APIClient` can be stripped by `golines` or other formatters. Verify they survive after running formatters.
 - **Gotcha:** When `golines` splits a multi-line expression (e.g., `if err := os.Remove(\n\tpath\n); err != nil`), even short inline `//nolint:` comments get displaced. Place nolint as a standalone comment on the line above instead: `//nolint:gosec // G703 - reason` followed by the flagged statement.
 - **Gotcha:** A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep doc comments contiguous with their declaration.
 - **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
@@ -129,10 +130,11 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Treat `viper.WriteConfig()` failures as non-fatal warnings (log + continue) — the in-memory config is correct and a read-only filesystem should not block agent operation.
 - **Config access pattern:** Read config values from `agentstate.State` (wired in `SetupSharedState()`), not `viper.GetString()`/`viper.GetBool()` directly. Use `viper.Set()` only when persisting runtime changes via `viper.WriteConfig()`.
 - Numeric/duration config fields are validated in `SetupSharedState()` — invalid values are clamped to defaults with a warning log. Add validation when introducing new numeric config fields.
+- **Gotcha:** `SetDefaultConfigValues` runs before config files/env vars are loaded. Never derive defaults from other viper keys (e.g., `viper.GetString("data_path")`) — they only return the registered default, not user overrides. Derive in `SetupSharedState` instead.
 
 ### Tooling
 
-- **Code Generation:** `oapi-codegen` is managed via `mise.toml` (not `go.mod`). `just generate` runs it from `lib/api/config.yaml` against `docs/swagger.json`. After regenerating, run `go mod tidy && go mod vendor`.
+- **Code Generation:** `oapi-codegen` is managed via `mise.toml` (not `go.mod`). `just generate` runs it from `lib/api/config.yaml` against `docs/swagger.json`. After regenerating, run `go mod tidy`.
 - **Gotcha:** oapi-codegen v2 config does NOT support `input-spec` — the spec path must be a positional CLI argument.
 - **Gotcha:** `docs/swagger.json` is downloaded from the CipherSwarm server — never modify it locally. Open issues on `unclesp1d3r/CipherSwarm` for spec problems.
 - **Gotcha:** `lib/api/client.gen.go` is auto-generated — never manually modify. Regenerate with `just generate`.
@@ -147,8 +149,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **CI Validation:** Run `just ci-check` to validate all checks pass before committing.
 - **Gotcha:** `mdformat` pre-commit hook auto-fixes markdown files on first run, causing `just ci-check` to fail. Re-run after the auto-fix passes.
 - **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
-- **Vendor Sync:** After `go fix` or dependency changes, run `go mod tidy && go mod vendor` to sync the vendor directory.
-- **Gotcha:** `go get` fails in vendored projects (Go defaults to `-mod=vendor`). Use `GOFLAGS='-mod=mod' go get <pkg>` then `go mod tidy && go mod vendor`.
+- **No vendor directory:** This project does not use `vendor/`. Never run `go mod vendor`. Use `just update-deps` to update all dependencies.
 - **Gotcha:** `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
 
 ### Releasing
