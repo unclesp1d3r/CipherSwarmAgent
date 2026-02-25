@@ -30,6 +30,10 @@ The agent operates as a long-lived CLI client that interacts with the CipherSwar
 - **API Specification:** All API interactions must strictly adhere to the v1 Agent API contract defined by the CipherSwarm server.
 - **Reliability:** The agent must implement exponential backoff for failed API requests.
 
+## Code Quality Policy
+
+- **Zero tolerance for tech debt.** Never dismiss warnings, lint failures, or CI errors as "pre-existing" or "not from our changes." If CI fails, investigate and fix it — regardless of when the issue was introduced. Every session should leave the codebase better than it found it.
+
 ## Go
 
 The project follows standard, idiomatic Go practices (version 1.26+).
@@ -146,10 +150,12 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Gotcha:** When an API method returns HTTP 200, always guard `resp.JSON200 == nil` before using it — oapi-codegen silently sets JSON200 to nil if JSON unmarshaling fails.
 - **Gotcha:** Do not name directories `gen/` — the user's global gitignore excludes them.
 - **Dev Tool Management:** Use `mise` to install and manage development toolchains (e.g., Go, Bun) via `mise.toml`.
-- **CI Validation:** Run `just ci-check` to validate all checks pass before committing.
+- **CI Validation:** Run `just ci-full` for comprehensive checks (pre-commit, lint, test, SBOM, release validation, docs build). Use `just ci-check` for the fast subset (pre-commit, lint, test only).
 - **Gotcha:** `mdformat` pre-commit hook auto-fixes markdown files on first run, causing `just ci-check` to fail. Re-run after the auto-fix passes.
 - **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
 - **No vendor directory:** This project does not use `vendor/`. Never run `go mod vendor`. Use `just update-deps` to update all dependencies.
+- **Security scanning:** gosec runs via golangci-lint integration only (no standalone `gosec` binary). All `//nolint:gosec` annotations are for golangci-lint; `#nosec` annotations are not used.
+- **Docs build:** mkdocs is installed via mise (`pipx:mkdocs` with `mkdocs-material` bundled). Use `mise x -- mkdocs build` or `just docs-build`.
 - **Gotcha:** `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
 
 ### Releasing
