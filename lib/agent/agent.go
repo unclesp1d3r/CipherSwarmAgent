@@ -360,6 +360,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 		}
 
 		cserrors.SendAgentError(ctx, errMsg, t, api.SeverityFatal)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
@@ -376,6 +377,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 	err = taskMgr.AcceptTask(ctx, t)
 	if err != nil {
 		agentstate.Logger.Error("Failed to accept task", "task_id", t.Id)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
 		task.CleanupTaskFiles(attack.Id)
@@ -390,7 +392,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 	if err := task.DownloadFiles(ctx, attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		cserrors.SendAgentError(ctx, err.Error(), t, api.SeverityFatal)
-		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
 		task.CleanupTaskFiles(attack.Id)
@@ -406,6 +408,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 		// Note: RunTask returns nil from runAttackTask (which handles its own
 		// cleanup via sess.Cleanup()). This fallback only triggers for
 		// NewHashcatSession failures.
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		task.CleanupTaskFiles(attack.Id)
 
 		return err
