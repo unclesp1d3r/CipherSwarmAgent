@@ -80,12 +80,6 @@ type AuthClient interface {
 	GetConfiguration(ctx context.Context) (*GetConfigurationResponse, error)
 }
 
-// CrackersClient defines the interface for cracker-related API operations.
-type CrackersClient interface {
-	// CheckForCrackerUpdate checks if a new cracker version is available.
-	CheckForCrackerUpdate(ctx context.Context, os, version *string) (*CheckForCrackerUpdateResponse, error)
-}
-
 // APIClient is the aggregate interface combining all API subsystems.
 // This can be implemented by the AgentClient wrapper or by mocks in tests.
 type APIClient interface { //nolint:revive // stutter is intentional — avoids conflict with generated Client type
@@ -93,5 +87,4 @@ type APIClient interface { //nolint:revive // stutter is intentional — avoids 
 	Attacks() AttacksClient
 	Agents() AgentsClient
 	Auth() AuthClient
-	Crackers() CrackersClient
 }

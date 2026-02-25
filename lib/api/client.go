@@ -3,12 +3,10 @@ package api
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
-	"net/url"
 )
 
 // Compile-time interface compliance checks.
@@ -18,15 +16,11 @@ var (
 	_ AttacksClient  = (*agentAttacksClient)(nil)
 	_ AgentsClient   = (*agentAgentsClient)(nil)
 	_ AuthClient     = (*agentAuthClient)(nil)
-	_ CrackersClient = (*agentCrackersClient)(nil)
 )
 
 // AgentClient wraps the generated ClientWithResponses and implements the APIClient interface.
 type AgentClient struct {
-	client     *ClientWithResponses
-	baseURL    string
-	httpClient *http.Client
-	token      string
+	client *ClientWithResponses
 }
 
 // NewAgentClient creates a new AgentClient from a server URL and bearer token.
@@ -43,10 +37,7 @@ func NewAgentClient(serverURL, token string) (*AgentClient, error) {
 	}
 
 	return &AgentClient{
-		client:     c,
-		baseURL:    serverURL,
-		httpClient: httpClient,
-		token:      token,
+		client: c,
 	}, nil
 }
 
@@ -61,11 +52,6 @@ func (a *AgentClient) Agents() AgentsClient { return &agentAgentsClient{client: 
 
 // Auth returns a sub-client for authentication-related API operations.
 func (a *AgentClient) Auth() AuthClient { return &agentAuthClient{client: a.client} }
-
-// Crackers returns a sub-client for cracker-related API operations.
-func (a *AgentClient) Crackers() CrackersClient {
-	return &agentCrackersClient{client: a.client, baseURL: a.baseURL, httpClient: a.httpClient, token: a.token}
-}
 
 // ---------------------------------------------------------------------------
 // Tasks sub-client
@@ -350,79 +336,6 @@ func (a *agentAuthClient) GetConfiguration(ctx context.Context) (*GetConfigurati
 	}
 
 	return resp, nil
-}
-
-// ---------------------------------------------------------------------------
-// Crackers sub-client (raw HTTP — endpoint absent from generated client)
-// ---------------------------------------------------------------------------
-
-type agentCrackersClient struct {
-	client     *ClientWithResponses
-	baseURL    string
-	httpClient *http.Client
-	token      string
-}
-
-//nolint:nonamedreturns // Named returns required for deferred resp.Body.Close() error capture
-func (c *agentCrackersClient) CheckForCrackerUpdate(
-	ctx context.Context,
-	operatingSystem, version *string,
-) (result *CheckForCrackerUpdateResponse, err error) {
-	reqURL, err := url.Parse(c.baseURL + "/api/v1/client/crackers/check_for_cracker_update")
-	if err != nil {
-		return nil, fmt.Errorf("parsing cracker update URL: %w", err)
-	}
-
-	q := reqURL.Query()
-	if operatingSystem != nil {
-		q.Set("operating_system", *operatingSystem)
-	}
-	if version != nil {
-		q.Set("version", *version)
-	}
-	reqURL.RawQuery = q.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), http.NoBody)
-	if err != nil {
-		return nil, fmt.Errorf("creating cracker update request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-
-	resp, err := c.httpClient.Do(req) //nolint:gosec // G107 - trusted URL
-	if err != nil {
-		return nil, fmt.Errorf("executing cracker update request: %w", err)
-	}
-
-	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("closing cracker update response body: %w", cerr)
-		}
-	}()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading cracker update response: %w", err)
-	}
-
-	result = &CheckForCrackerUpdateResponse{
-		StatusCode:   resp.StatusCode,
-		HTTPResponse: resp,
-	}
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		return result, newAPIError(resp.StatusCode, resp.Status, bodyBytes)
-	}
-
-	if resp.StatusCode == http.StatusOK && len(bodyBytes) > 0 {
-		var update CrackerUpdate
-		if jsonErr := json.Unmarshal(bodyBytes, &update); jsonErr != nil {
-			return nil, fmt.Errorf("decoding cracker update response: %w", jsonErr)
-		}
-		result.CrackerUpdate = &update
-	}
-
-	return result, nil
 }
 
 // ---------------------------------------------------------------------------

@@ -290,11 +290,3 @@ func TestSendAgentError(t *testing.T) {
 		})
 	}
 }
-
-// TestHandleCrackerUpdate tests the handleCrackerUpdate function
-// Note: This function has many external dependencies and may need integration test approach.
-func TestHandleCrackerUpdate(t *testing.T) {
-	// This test is a placeholder - actual implementation would require extensive mocking
-	// of downloader, cracker, and viper operations
-	t.Skip("Skipping handleCrackerUpdate test - requires extensive mocking of external dependencies")
-}

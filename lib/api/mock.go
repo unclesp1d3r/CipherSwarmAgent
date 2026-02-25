@@ -12,7 +12,6 @@ var (
 	_ AttacksClient  = (*MockAttacksClient)(nil)
 	_ AgentsClient   = (*MockAgentsClient)(nil)
 	_ AuthClient     = (*MockAuthClient)(nil)
-	_ CrackersClient = (*MockCrackersClient)(nil)
 )
 
 // MockClient is a test double for the APIClient interface.
@@ -22,7 +21,6 @@ type MockClient struct {
 	AttacksImpl  AttacksClient
 	AgentsImpl   AgentsClient
 	AuthImpl     AuthClient
-	CrackersImpl CrackersClient
 }
 
 // Tasks returns the configured TasksClient, or an unconfigured mock that returns descriptive errors.
@@ -59,15 +57,6 @@ func (m *MockClient) Auth() AuthClient {
 	}
 
 	return &MockAuthClient{}
-}
-
-// Crackers returns the configured CrackersClient, or an unconfigured mock that returns descriptive errors.
-func (m *MockClient) Crackers() CrackersClient {
-	if m.CrackersImpl != nil {
-		return m.CrackersImpl
-	}
-
-	return &MockCrackersClient{}
 }
 
 // MockTasksClient is a configurable mock for TasksClient.
@@ -280,19 +269,3 @@ func (m *MockAuthClient) GetConfiguration(ctx context.Context) (*GetConfiguratio
 	return nil, fmt.Errorf("mock method not configured: %T", m)
 }
 
-// MockCrackersClient is a configurable mock for CrackersClient.
-type MockCrackersClient struct {
-	CheckForCrackerUpdateFunc func(ctx context.Context, os, version *string) (*CheckForCrackerUpdateResponse, error)
-}
-
-// CheckForCrackerUpdate calls the configured function or returns an error if not configured.
-func (m *MockCrackersClient) CheckForCrackerUpdate(
-	ctx context.Context,
-	os, version *string,
-) (*CheckForCrackerUpdateResponse, error) {
-	if m.CheckForCrackerUpdateFunc != nil {
-		return m.CheckForCrackerUpdateFunc(ctx, os, version)
-	}
-
-	return nil, fmt.Errorf("mock method not configured: %T", m)
-}
