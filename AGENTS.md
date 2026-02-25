@@ -1,38 +1,32 @@
 # AGENTS
 
-This document outlines the formats, standards, and architecture for the CipherSwarmAgent project, tailored for the Gemini AI model.
+Standards and architecture for the CipherSwarmAgent project.
+
+@GOTCHAS.md
+
+## Code Quality Policy
+
+- **Zero tolerance for tech debt.** Never dismiss warnings, lint failures, or CI errors as "pre-existing" or "not from our changes." If CI fails, investigate and fix it — regardless of when the issue was introduced. Every session should leave the codebase better than it found it.
 
 ## Architecture
 
 ### Core Concepts
 
-- **Purpose:** A distributed agent for CipherSwarm, designed to manage and execute hash-cracking tasks at scale across Linux, macOS, and Windows.
-- **Entrypoint:** The application starts via `main.go`, which initializes the Cobra CLI application defined in `cmd/root.go`.
-- **Configuration:** Configuration is handled through environment variables, CLI flags (via Cobra/Viper), and a YAML config file that is auto-generated on the first run. Key settings include the API token, server URL, data paths, and GPU thresholds.
+- **Purpose:** A distributed agent for CipherSwarm, managing hash-cracking tasks at scale across Linux, macOS, and Windows.
+- **Entrypoint:** `main.go` initializes the Cobra CLI application defined in `cmd/root.go`.
+- **Configuration:** Environment variables, CLI flags (Cobra/Viper), and an auto-generated YAML config file.
 
 ### Task Lifecycle & API Contract
 
-The agent operates as a long-lived CLI client that interacts with the CipherSwarm server API. It is responsible for:
+The agent is a long-lived CLI client interacting with the CipherSwarm server API:
 
-1. **Registration & Heartbeat:** Registering itself with the server and sending regular heartbeats to signal it's online.
-2. **Polling for Tasks:** Periodically requesting new tasks from the `/api/v1/client/tasks/new` endpoint.
-3. **Task Execution:**
-   - Accepting a task (`POST /tasks/{id}/accept_task`).
-   - Downloading resources like hash lists (`GET /attacks/{id}/hash_list`).
-   - Launching and monitoring a hashcat process.
-   - Submitting status updates (`POST /tasks/{id}/submit_status`).
-   - Submitting cracked passwords (`POST /tasks/{id}/submit_crack`).
-4. **Completion & Error Handling:**
-   - Reporting task exhaustion (`POST /tasks/{id}/exhausted`).
-   - Submitting structured errors on failure (`POST /agents/{id}/submit_error`).
-   - Gracefully notifying the server on shutdown (`POST /agents/{id}/shutdown`).
+1. **Registration & Heartbeat:** Register with server, send regular heartbeats.
+2. **Polling for Tasks:** Request new tasks from `/api/v1/client/tasks/new`.
+3. **Task Execution:** Accept task, download resources, launch hashcat, submit status/cracks.
+4. **Completion & Error Handling:** Report exhaustion, submit structured errors, notify on shutdown.
 
-- **API Specification:** All API interactions must strictly adhere to the v1 Agent API contract defined by the CipherSwarm server.
-- **Reliability:** The agent must implement exponential backoff for failed API requests.
-
-## Code Quality Policy
-
-- **Zero tolerance for tech debt.** Never dismiss warnings, lint failures, or CI errors as "pre-existing" or "not from our changes." If CI fails, investigate and fix it — regardless of when the issue was introduced. Every session should leave the codebase better than it found it.
+- All API interactions must adhere to the v1 Agent API contract.
+- Implement exponential backoff for failed API requests.
 
 ## Go
 
@@ -42,181 +36,118 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - `cmd/`: Main application entry points using the Cobra framework.
 - `lib/`: Core agent logic, decomposed into focused sub-packages:
-  - `agent/`: Top-level agent lifecycle — startup, heartbeat loop, task polling, shutdown.
-  - `api/`: API client layer — generated OpenAPI client (`client.gen.go`), hand-written wrapper (`client.go`), error types (`errors.go`), interfaces (`interfaces.go`), and mocks (`mock.go`). Regenerate with `just generate`.
-  - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
-  - `arch/`: OS-specific abstractions for handling different platforms (Linux, macOS, Windows).
-  - `benchmark/`: Benchmark execution, caching, and submission to the server.
-  - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
-  - `cracker/`: Hashcat binary discovery, archive extraction, and version detection.
-  - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
-  - `display/`: User-facing output (status messages, progress, benchmark results).
-  - `downloader/`: File download utilities with checksum verification.
-  - `hashcat/`: Logic for managing Hashcat sessions, parameters, and output parsing.
-  - `progress/`: Progress calculation utilities.
-  - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
-  - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
-  - `zap/`: Zap file monitoring for cracked hashes.
+    - `agent/`: Agent lifecycle — startup, heartbeat loop, task polling, shutdown.
+    - `api/`: API client layer — generated client (`client.gen.go`), wrapper (`client.go`), errors (`errors.go`), interfaces (`interfaces.go`), mocks (`mock.go`).
+    - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
+    - `arch/`: OS-specific abstractions (Linux, macOS, Windows).
+    - `benchmark/`: Benchmark execution, caching, and submission.
+    - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
+    - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
+    - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
+    - `display/`: User-facing output (status, progress, benchmark results).
+    - `downloader/`: File download with checksum verification.
+    - `hashcat/`: Hashcat session management, parameters, and output parsing.
+    - `progress/`: Progress calculation utilities.
+    - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
+    - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
+    - `zap/`: Zap file monitoring for cracked hashes.
 - `agentstate/`: Global agent state, loggers, and synchronized fields.
 - `docs/`: Project documentation, including the OpenAPI specification.
 
 ### Formatting & Linting
 
-- **Formatting:** All Go code must be formatted using `gofmt`.
-- **Linting:** We use `golangci-lint` for static analysis. Run checks with `just ci-check`.
-- **Note:** Use `mise x -- golangci-lint run ./...` to ensure correct linter version (v2).
-- **Gotcha:** `//go:fix inline` directives conflict with `gocheckcompilerdirectives` linter — avoid adding them.
-- **Gotcha:** `just ci-check` includes a `go fix -diff` dry-run whose output is informational only, not a failure. Do not apply its suggested `//go:fix inline` directives (see above).
-- **Gotcha:** `contextcheck` linter flags functions not propagating context — use `//nolint:contextcheck` when callee doesn't accept context yet.
-- **Gotcha:** When removing global gosec exclusions, run `mise x -- golangci-lint run ./...` to find ALL violation sites before adding per-site `//nolint:gosec` comments.
-- **gosec nolint style:** Use per-site `//nolint:gosec // G7XX - <reason>` with specific rule ID rather than global exclusions in `.golangci.yml`.
-- **Gotcha:** `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint comments short (e.g., `// G704 - trusted URL`) so total line stays under 120 chars.
-- **Gotcha:** `//nolint:revive` on `APIError`, `Error_`, and `APIClient` can be stripped by `golines` or other formatters. Verify they survive after running formatters.
-- **Gotcha:** When `golines` splits a multi-line expression (e.g., `if err := os.Remove(\n\tpath\n); err != nil`), even short inline `//nolint:` comments get displaced. Place nolint as a standalone comment on the line above instead: `//nolint:gosec // G703 - reason` followed by the flagged statement.
-- **Gotcha:** A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep doc comments contiguous with their declaration.
-- **Gotcha:** `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
-- **Gotcha:** `revive` requires each exported constant in a `const` block to have its own doc comment starting with the constant name (e.g., `// DefaultFoo is...`). A group comment alone doesn't satisfy it.
-- **Gotcha:** `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation (e.g., `//nolint:contextcheck // callee lacks ctx param`). Bare `//nolint:linter` directives fail CI.
-- **Gotcha:** `contextcheck` flags calls that don't propagate context. Use `//nolint:contextcheck // reason` when the callee genuinely cannot accept a context parameter (e.g., `NewHashcatSession`).
+- **Formatting:** `gofmt`. **Linting:** `golangci-lint` v2 (`mise x -- golangci-lint run ./...`).
+- **gosec nolint style:** Use per-site `//nolint:gosec // G7XX - <reason>` with specific rule ID. gosec runs via golangci-lint only (no standalone binary); `#nosec` annotations are not used.
+- See GOTCHAS.md for linting edge cases (`golines`, `contextcheck`, `revive`, `gocritic`).
 
 ### Naming Conventions
 
-- **Packages**: `snake_case`
-- **Files**: `snake_case` (e.g., `agent_client.go`).
-- **CLI Flags**: `kebab-case` (e.g., `--force-benchmark`, `--always-trust-files`). Use `Bool`/`String`/`Int`/`Duration` for flags without shorthand — only use `BoolP`/`StringP` variants when providing a short flag letter.
-- **Interfaces**: `PascalCase`, often with an `-er` suffix (e.g., `Reader`, `Writer`).
-- **Structs**: `PascalCase`.
-- **Functions/Methods**: `camelCase` for unexported, `PascalCase` for exported.
-- **Variables**: `camelCase`.
+- **Packages/Files**: `snake_case`. **Interfaces/Structs**: `PascalCase`. **Functions/Methods**: `camelCase`/`PascalCase`. **Variables**: `camelCase`.
+- **CLI Flags**: `kebab-case`. Use `Bool`/`String`/`Int`/`Duration` for flags without shorthand — only use `BoolP`/`StringP` variants when providing a short flag letter.
 
 ### Error Handling
 
-- Errors must always be checked and never ignored.
-- Use `fmt.Errorf` with the `%w` verb to wrap errors for context.
-- Use stdlib `errors` and `fmt.Errorf` only — do not use `github.com/pkg/errors` (removed from project).
-- Use `defer` for resource cleanup (e.g., closing files, terminating processes).
-- `panic` should not be used for normal control flow.
-- Never silently correct invalid inputs (e.g., negative values) - always log a warning.
-- Guard against negative values in bit shift operations to prevent panic.
-- When checking `err != nil || obj == nil` for API responses, handle `obj == nil && err == nil` as a separate error case to prevent nil pointer dereferences.
-- In deferred cleanup functions (e.g., lock file removal), use `os.IsNotExist` to skip already-removed files and include file paths in error messages.
-- **Gotcha:** Generated types with an `Error` field (e.g., `ErrorObject`) can't implement Go's `error` interface (`Error()` method) — use a wrapper type like `api.APIError` instead.
-- **Gotcha:** `cserrors.LogAndSendError` returns the `err` parameter directly — always pass a non-nil error in error paths, or callers will see success.
-- `cserrors.LogAndSendError` sends errors to the server even without a task (nil task → nil TaskId). Only skipped when APIClient is not yet initialized.
-- For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding with `_ = file.Close()`.
-- **Error reporting options:** Use `SendAgentError(msg, task, severity, opts ...ErrorOption)` for all error reporting. Add classification metadata via `WithClassification(category, retryable)`. Do NOT create separate error-sending functions — extend via `ErrorOption` functional options instead.
-- `cserrors.LogAndSendError` delegates to `SendAgentError`, which includes platform/version metadata. API submission is skipped only when `APIClient` has not been initialized yet.
+- Always check errors. Use `fmt.Errorf` with `%w` to wrap. Use stdlib `errors` only — not `github.com/pkg/errors`.
+- Use `defer` for resource cleanup. `panic` is not for normal control flow.
+- Never silently correct invalid inputs — always log a warning. Guard against negative values in bit shifts.
+- Handle `obj == nil && err == nil` as a separate error case for API responses to prevent nil pointer dereferences.
+- In deferred cleanup, use `os.IsNotExist` to skip already-removed files. Include file paths in error messages.
+- For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding.
+- **Error reporting:** Use `SendAgentError(msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. `cserrors.LogAndSendError` delegates to `SendAgentError` (includes platform/version metadata). Always pass a non-nil error — it returns `err` directly. API submission is skipped only when `APIClient` is uninitialized.
 
 ### Concurrency
 
-- Use goroutines and channels for asynchronous operations like monitoring hashcat.
-- Protect shared state with mutexes where necessary, but prefer channel-based communication.
+- Use goroutines and channels for async operations. Prefer channel-based communication over mutexes.
 - Use `context.Context` for cancellation and deadlines in all long-running or networked operations.
-- **Synchronized state access:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` (for `Reload`, `JobCheckingStopped`, `BenchmarksSubmitted`) or `sync.RWMutex` (for `CurrentActivity`). Always use getter/setter methods (`GetReload()`, `SetReload()`, etc.) — never access these fields directly.
-- **Context propagation:** `StartAgent()` creates a cancellable context (`context.WithCancel`) that is threaded through all goroutine functions. Use `ctx` for operations that should stop on shutdown; use `context.Background()` for error reports and shutdown notifications that must complete.
-- **Must-complete operations:** When using `context.Background()` intentionally in a function that has `ctx` (e.g., `AbandonTask` to prevent server-side task starvation), add `//nolint:contextcheck // must-complete: reason`.
-- **Context-aware sleep:** Use `sleepWithContext(ctx, duration)` (defined in `lib/agent/agent.go`) instead of `time.Sleep` in goroutine loops — enables graceful shutdown on context cancellation.
-- Run tests with the `-race` flag in CI to detect data races.
+- **Synchronized state:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` or `sync.RWMutex`. Always use getter/setter methods — never access directly.
+- **Context propagation:** `StartAgent()` creates a cancellable context threaded through all goroutines. Use `ctx` for stoppable operations; `context.Background()` for must-complete operations (e.g., `AbandonTask`), with `//nolint:contextcheck // must-complete: reason`.
+- **Context-aware sleep:** Use `sleepWithContext(ctx, duration)` (in `lib/agent/agent.go`) instead of `time.Sleep`.
+- Run tests with `-race` flag to detect data races.
 
 ### Performance
 
-- Always compile `regexp.MustCompile` at package level, never inside functions.
-- Prefer `os.Remove` + `os.IsNotExist(err)` check over `os.Stat` then `os.Remove` — avoids redundant syscall.
-- Cache `[]byte(str)` conversions when the same string is passed to both `json.Valid` and `json.Unmarshal`.
-- Use `chan struct{}` (not `chan int`) for signal-only channels — zero allocation.
-- Use `filepath.Join` (not `path.Join`) for filesystem paths — `path.Join` uses forward slashes only, breaking Windows.
-- Configuration defaults live in `lib/config/config.go` as exported constants — `cmd/root.go` references them (no duplication).
+- `regexp.MustCompile` at package level, never inside functions.
+- `os.Remove` + `os.IsNotExist(err)` over `os.Stat` then `os.Remove`.
+- Cache `[]byte(str)` when passing to both `json.Valid` and `json.Unmarshal`.
+- `chan struct{}` for signal-only channels. `filepath.Join` (not `path.Join`) for filesystem paths.
+- Configuration defaults live in `lib/config/config.go` as exported constants.
 
 ### Logging & Configuration
 
-- **Logging:** Use a structured logger (e.g., `charmbracelet/log`). Never log secrets or sensitive data.
-- **Configuration:** Use `spf13/viper` to manage configuration from files, environment variables, and CLI flags.
-- Treat `viper.WriteConfig()` failures as non-fatal warnings (log + continue) — the in-memory config is correct and a read-only filesystem should not block agent operation.
-- **Config access pattern:** Read config values from `agentstate.State` (wired in `SetupSharedState()`), not `viper.GetString()`/`viper.GetBool()` directly. Use `viper.Set()` only when persisting runtime changes via `viper.WriteConfig()`.
-- Numeric/duration config fields are validated in `SetupSharedState()` — invalid values are clamped to defaults with a warning log. Add validation when introducing new numeric config fields.
-- **Gotcha:** `SetDefaultConfigValues` runs before config files/env vars are loaded. Never derive defaults from other viper keys (e.g., `viper.GetString("data_path")`) — they only return the registered default, not user overrides. Derive in `SetupSharedState` instead.
+- Use structured logger (`charmbracelet/log`). Never log secrets.
+- Use `spf13/viper` for config. Treat `viper.WriteConfig()` failures as non-fatal warnings.
+- **Config access:** Read from `agentstate.State` (wired in `SetupSharedState()`), not `viper.Get*()` directly.
+- Validate numeric/duration config fields in `SetupSharedState()` — clamp invalid values to defaults with a warning.
 
 ### Tooling
 
-- **Code Generation:** `oapi-codegen` is managed via `mise.toml` (not `go.mod`). `just generate` runs it from `lib/api/config.yaml` against `docs/swagger.json`. After regenerating, run `go mod tidy`.
-- **Gotcha:** oapi-codegen v2 config does NOT support `input-spec` — the spec path must be a positional CLI argument.
-- **Gotcha:** `docs/swagger.json` is downloaded from the CipherSwarm server — never modify it locally. Open issues on `unclesp1d3r/CipherSwarm` for spec problems.
-- **Gotcha:** `lib/api/client.gen.go` is auto-generated — never manually modify. Regenerate with `just generate`.
-- **Gotcha:** oapi-codegen generates a `Client` struct in `lib/api/client.gen.go` — the hand-written aggregate interface is named `APIClient` (with `//nolint:revive` for stutter) to avoid the conflict.
-- **Gotcha:** `APIError` in `errors.go` also has `//nolint:revive` for stutter. `SetTaskAbandonedError.Error_` has `//nolint:revive` because the underscore avoids a name collision with the `Error()` method.
-- **Gotcha:** Use `exclude-schemas` in `lib/api/config.yaml` when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface in `errors.go`).
-- **API Client Architecture:** `AgentClient` in `client.go` wraps the generated `ClientWithResponses`, implements `APIClient` interface. Error types (`APIError`, `SetTaskAbandonedError`, `Severity`) live in `errors.go`. Use `errors.As` to extract `*api.APIError` from returned errors.
-- **Gotcha:** oapi-codegen's generated `Parse*Response` methods read and close `HTTPResponse.Body` during parsing. Helper functions must use the parsed `Body` byte slice (`resp.Body`), not `resp.HTTPResponse.Body` (already drained and closed).
-- **Gotcha:** When an API method returns HTTP 200, always guard `resp.JSON200 == nil` before using it — oapi-codegen silently sets JSON200 to nil if JSON unmarshaling fails.
-- **Gotcha:** Do not name directories `gen/` — the user's global gitignore excludes them.
-- **Dev Tool Management:** Use `mise` to install and manage development toolchains (e.g., Go, Bun) via `mise.toml`.
-- **CI Validation:** Run `just ci-full` for comprehensive checks (pre-commit, lint, test, SBOM, release validation, docs build). Use `just ci-check` for the fast subset (pre-commit, lint, test only).
-- **Gotcha:** `mdformat` pre-commit hook auto-fixes markdown files on first run, causing `just ci-check` to fail. Re-run after the auto-fix passes.
-- **Go Modernize:** Use `go fix ./...` (Go 1.26+ built-in) instead of the deprecated `golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize` tool. Dry-run: `go fix -diff ./...`.
-- **No vendor directory:** This project does not use `vendor/`. Never run `go mod vendor`. Use `just update-deps` to update all dependencies.
-- **Security scanning:** gosec runs via golangci-lint integration only (no standalone `gosec` binary). All `//nolint:gosec` annotations are for golangci-lint; `#nosec` annotations are not used.
-- **Docs build:** mkdocs is installed via mise (`pipx:mkdocs` with `mkdocs-material` bundled). Use `mise x -- mkdocs build` or `just docs-build`.
-- **Gotcha:** `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
+- **Code Generation:** `oapi-codegen` via `mise.toml`. `just generate` runs it against `docs/swagger.json`. After regenerating, run `go mod tidy`.
+- **API Client Architecture:** `AgentClient` wraps `ClientWithResponses`, implements `APIClient` interface. Error types live in `errors.go`. Use `errors.As` to extract `*api.APIError`.
+- **CI:** `just ci-full` for comprehensive checks (pre-commit, lint, test, SBOM, release, docs). `just ci-check` for the fast subset.
+- **Dev tools:** `mise` manages all toolchains via `mise.toml`.
+- **Dependencies:** No vendor directory — never run `go mod vendor`. Use `just update-deps`.
+- **Docs:** mkdocs installed via mise (`pipx:mkdocs` with `mkdocs-material` bundled). Use `just docs-build`.
+- See GOTCHAS.md for code generation edge cases and tooling pitfalls.
 
 ### Releasing
 
 - **Process:** Merge to `main`, tag (`git tag vX.Y.Z`), push tag, run `just release` locally.
-- **Prereqs:** `GITHUB_TOKEN` env var with `write:packages` scope; `docker login ghcr.io` for container images.
-- **Skip docker:** `mise x -- goreleaser release --clean --skip docker` to ship binaries without container images.
-- **Gotcha:** `go generate ./...` was removed from `.goreleaser.yaml` hooks — `oapi-codegen` is a mise tool, not a Go tool. Generated code is already committed.
-- **Gotcha:** Goreleaser's `milestones.close` looks for `vX.Y.Z` format — if you close the milestone manually with a different name (e.g., `v0.6`), the auto-close will warn but not fail.
+- **Prereqs:** `GITHUB_TOKEN` with `write:packages` scope; `docker login ghcr.io` for containers.
+- **Skip docker:** `mise x -- goreleaser release --clean --skip docker`.
 
 ### Dependencies
 
-- `hashicorp/go-getter` pulls ~78 transitive deps (AWS SDK, GCS, gRPC). See #122 for lightweight replacement plan.
+- `hashicorp/go-getter` pulls ~78 transitive deps (AWS SDK, GCS, gRPC). See #122 for replacement plan.
 
 ### Testing
 
-- Write table-driven tests for core logic and place them in `_test.go` files within the same package.
-- Use mocks for network and OS-level interactions to ensure testability.
-- When a function combines external-process invocation (e.g., hashcat) with business logic, extract the business logic into a separate unexported function so it can be tested independently.
-- Use `lib/testhelpers/` package for shared test fixtures, HTTP mocking (`SetupHTTPMock`), and state setup (`SetupTestState`).
-- Use `any` instead of `interface{}` (enforced by modernize linter).
-- Aim for high test coverage on core logic.
-- Test naming convention: `TestFunctionName_Scenario` with underscore separation.
-- Use `require.Error/NoError` instead of `assert.Error/NoError` for error assertions (testifylint rule).
-- Use `atomic.Int32` for thread-safe counters in mock implementations.
-- Use `lib/testhelpers/error_helpers.go` for constructing test errors (`NewAPIError`, `NewValidationAPIError`, `NewSetTaskAbandonedError`).
-- MockClient sub-client accessors (`Tasks()`, `Agents()`, etc.) return default unconfigured mocks (not nil) to prevent nil pointer panics when code paths call sub-clients the test didn't explicitly mock.
-- When removing a field from global state (`agentstate.State`), grep all test helpers, cleanup functions, and reset functions for references.
-- **Gotcha:** `agentstate.State` contains `atomic.Bool` and `sync.RWMutex` — never copy the struct (`original := agentstate.State` triggers `go vet copylocks`). Use per-field save/restore in test helpers and getter/setter methods for synchronized fields.
-- **Gotcha:** `hashcat` package tests cannot import `testhelpers` (circular: testhelpers → hashcat). Use local test helpers in `hashcat` package tests instead.
-- Prefer `t.Cleanup(fn)` over `defer fn()` for test teardown — ensures cleanup runs even on `t.Fatal`.
+- Table-driven tests in `_test.go` files within the same package. Naming: `TestFunctionName_Scenario`.
+- Mock network/OS interactions. Extract business logic from external-process invocations for independent testing.
+- Use `lib/testhelpers/` for fixtures (`SetupHTTPMock`, `SetupTestState`), `error_helpers.go` for test errors.
+- Use `any` (not `interface{}`), `require.Error/NoError` (not `assert`), `t.Cleanup` (not `defer`), `atomic.Int32` for mock counters.
+- MockClient sub-client accessors return default mocks (not nil) to prevent nil pointer panics.
+- When removing `agentstate.State` fields, grep all test helpers and reset functions.
 - Run `go test -race ./...` to detect data races.
 
 ## Git
 
 ### Branching Model
 
-- **Feature Branches:** All new work (features, fixes, refactors) must be done on a separate branch.
-- **Main Branch:** Never commit directly to `main`. All changes must go through a pull request with at least one code review.
+- Feature branches for all work. Never commit directly to `main` — all changes go through pull requests.
 
 ### Commit Messages
 
-Commit messages must follow the **Conventional Commits** specification.
-
-- **Format:** `<type>(<scope>): <description>`
-- **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`.
-- **Scope:** A noun describing the affected part of the codebase (e.g., `(cli)`, `(api)`, `(hashcat)`).
-- **CI Enforcement:** The `.gitlint` file and CI checks enforce this standard.
+Conventional Commits: `<type>(<scope>): <description>`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Enforced by `.gitlint` and CI.
 
 ### Changelog
 
-The `CHANGELOG.md` is automatically generated from commit messages using `git-chglog`.
+`CHANGELOG.md` is auto-generated from commit messages using `git-chglog`.
 
 ## CI/CD & Docker
 
 - **GitHub Actions:** Workflows in `.github/workflows/` automate linting, testing, building, and releases.
-- **Docker:**
-  - `Dockerfile`: Used for building the main application container.
-  - `Dockerfile.releaser`: Used within the GoReleaser pipeline for creating releases.
+- **Docker:** `Dockerfile` for the main container; `Dockerfile.releaser` for GoReleaser pipeline.
 
 ## Documentation
 
-- **MkDocs:** Project documentation is written in Markdown in the `docs/` directory and built into a static site using `mkdocs`.
-- **API Docs:** The API is documented using an OpenAPI v3 spec maintained in the CipherSwarm server repository.
+- **MkDocs:** Markdown in `docs/`, built with `mkdocs` (Material theme). API docs use OpenAPI v3 spec from the CipherSwarm server repo.
