@@ -51,8 +51,8 @@ type agentState struct {
 	MaxHeartbeatBackoff                 int           // MaxHeartbeatBackoff is the max multiplier for heartbeat backoff.
 	SleepOnFailure                      time.Duration // SleepOnFailure is how long to wait after a task failure before retrying.
 	AlwaysUseNativeHashcat              bool          // AlwaysUseNativeHashcat forces using the system's native Hashcat binary.
-	Platform                            string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin").
-	AgentVersion                        string        // AgentVersion is the current version of the agent software.
+	Platform                            string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin"). Set once before goroutines start; safe to read from any goroutine.
+	AgentVersion                        string        // AgentVersion is the current version of the agent software. Set once in AuthenticateAgent before goroutines start; safe to read from any goroutine.
 
 	// Synchronized fields — accessed across goroutines (heartbeat + agent loops).
 	// Use getter/setter methods; do not access directly.
@@ -78,6 +78,8 @@ const (
 	CurrentActivityWaiting Activity = "waiting"
 	// CurrentActivityCracking indicates the agent is cracking hashes.
 	CurrentActivityCracking Activity = "cracking"
+	// CurrentActivityDownloading indicates the agent is downloading attack files.
+	CurrentActivityDownloading Activity = "downloading"
 	// CurrentActivityStopping indicates the agent is stopping.
 	CurrentActivityStopping Activity = "stopping"
 )

@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -211,7 +211,7 @@ func DownloadHashList(ctx context.Context, attack *api.Attack) error {
 		return errors.New("attack is nil")
 	}
 
-	hashlistPath := path.Join(agentstate.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.Id))
+	hashlistPath := filepath.Join(agentstate.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.Id))
 	agentstate.Logger.Debug("Downloading hash list", "url", attack.HashListUrl, "path", hashlistPath)
 
 	if err := removeExistingFile(hashlistPath); err != nil {

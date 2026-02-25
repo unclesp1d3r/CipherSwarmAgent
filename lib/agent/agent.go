@@ -27,6 +27,11 @@ const (
 	maxBenchmarkRetries = 10 // Stop retrying cached benchmark submission after this many failures
 )
 
+// Package-level managers — written once in StartAgent, then accessed exclusively
+// from the agent-loop goroutine (startAgentLoop + handleReload). The single-goroutine
+// invariant means no mutex is required, but these must NOT be accessed from the
+// heartbeat goroutine or any other concurrent goroutine.
+//
 //nolint:gochecknoglobals // Package-level managers, initialized in StartAgent
 var (
 	benchmarkMgr *benchmark.Manager
@@ -174,8 +179,11 @@ func calculateHeartbeatBackoff(
 // sleepWithContext blocks for the given duration or until the context is cancelled.
 // Returns true if the context was cancelled (caller should return).
 func sleepWithContext(ctx context.Context, d time.Duration) bool {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
 	select {
-	case <-time.After(d):
+	case <-timer.C:
 		return false
 	case <-ctx.Done():
 		return true
@@ -352,6 +360,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 		}
 
 		cserrors.SendAgentError(ctx, errMsg, t, api.SeverityFatal)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
@@ -368,6 +377,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 	err = taskMgr.AcceptTask(ctx, t)
 	if err != nil {
 		agentstate.Logger.Error("Failed to accept task", "task_id", t.Id)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
 		task.CleanupTaskFiles(attack.Id)
@@ -377,9 +387,12 @@ func processTask(ctx context.Context, t *api.Task) error {
 
 	display.RunTaskAccepted(t)
 
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityDownloading)
+
 	if err := task.DownloadFiles(ctx, attack); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		cserrors.SendAgentError(ctx, err.Error(), t, api.SeverityFatal)
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
 		task.CleanupTaskFiles(attack.Id)
@@ -388,11 +401,14 @@ func processTask(ctx context.Context, t *api.Task) error {
 		return err
 	}
 
+	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
+
 	err = taskMgr.RunTask(ctx, t, attack)
 	if err != nil {
 		// Note: RunTask returns nil from runAttackTask (which handles its own
 		// cleanup via sess.Cleanup()). This fallback only triggers for
 		// NewHashcatSession failures.
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		task.CleanupTaskFiles(attack.Id)
 
 		return err

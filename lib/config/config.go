@@ -3,7 +3,7 @@ package config
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	gap "github.com/muesli/go-app-paths"
@@ -86,45 +86,47 @@ func SetupSharedState() {
 		"data_path",
 	) // Get the data path from the configuration
 	agentstate.State.DataPath = dataRoot // Set the data path in the shared state
-	agentstate.State.PidFile = path.Join(
+	agentstate.State.PidFile = filepath.Join(
 		dataRoot,
 		"lock.pid",
 	) // Set the default PID file path
-	agentstate.State.HashcatPidFile = path.Join(
+	agentstate.State.HashcatPidFile = filepath.Join(
 		dataRoot,
 		"hashcat.pid",
 	) // Set the default hashcat PID file path
-	agentstate.State.CrackersPath = path.Join(
+	agentstate.State.CrackersPath = filepath.Join(
 		dataRoot,
 		"crackers",
 	) // Set the crackers path in the shared state
-	agentstate.State.FilePath = viper.GetString(
-		"files_path",
-	) // Set the file path in the shared state
-	agentstate.State.HashlistPath = path.Join(
+	agentstate.State.FilePath = viper.GetString("files_path")
+	if agentstate.State.FilePath == "" {
+		agentstate.State.FilePath = filepath.Join(dataRoot, "files")
+	}
+	agentstate.State.HashlistPath = filepath.Join(
 		dataRoot,
 		"hashlists",
 	) // Set the hashlist path in the shared state
-	agentstate.State.ZapsPath = viper.GetString(
-		"zap_path",
-	) // Set the zaps path in the shared state
-	agentstate.State.PreprocessorsPath = path.Join(
+	agentstate.State.ZapsPath = viper.GetString("zap_path")
+	if agentstate.State.ZapsPath == "" {
+		agentstate.State.ZapsPath = filepath.Join(dataRoot, "zaps")
+	}
+	agentstate.State.PreprocessorsPath = filepath.Join(
 		dataRoot,
 		"preprocessors",
 	) // Set the preprocessors path in the shared state
-	agentstate.State.ToolsPath = path.Join(
+	agentstate.State.ToolsPath = filepath.Join(
 		dataRoot,
 		"tools",
 	) // Set the tools path in the shared state
-	agentstate.State.OutPath = path.Join(
+	agentstate.State.OutPath = filepath.Join(
 		dataRoot,
 		"output",
 	) // Set the output path in the shared state
-	agentstate.State.RestoreFilePath = path.Join(
+	agentstate.State.RestoreFilePath = filepath.Join(
 		dataRoot,
 		"restore",
 	) // Set the restore file path in the shared state
-	agentstate.State.BenchmarkCachePath = path.Join(
+	agentstate.State.BenchmarkCachePath = filepath.Join(
 		dataRoot,
 		"benchmark_cache.json",
 	) // Set the benchmark cache file path in the shared state
@@ -191,18 +193,18 @@ func SetDefaultConfigValues() {
 	cwd, err := os.Getwd()
 	cobra.CheckErr(err)
 
-	viper.SetDefault("data_path", path.Join(cwd, "data"))
+	viper.SetDefault("data_path", filepath.Join(cwd, "data"))
 	viper.SetDefault("gpu_temp_threshold", DefaultGPUTempThreshold)
 	viper.SetDefault("always_use_native_hashcat", false)
 	viper.SetDefault("hashcat_path", "")
 	viper.SetDefault("sleep_on_failure", DefaultSleepOnFailure)
 	viper.SetDefault("always_trust_files", false)
-	viper.SetDefault("files_path", path.Join(viper.GetString("data_path"), "files"))
+	// files_path and zap_path are derived from data_path in SetupSharedState
+	// when not explicitly set (avoids eagerly reading data_path before config is loaded).
 	viper.SetDefault("extra_debugging", false)
 	viper.SetDefault("status_timer", DefaultStatusTimer)
 	viper.SetDefault("heartbeat_interval", DefaultHeartbeatInterval)
 	viper.SetDefault("write_zaps_to_file", false)
-	viper.SetDefault("zap_path", path.Join(viper.GetString("data_path"), "zaps"))
 	viper.SetDefault("retain_zaps_on_completion", false)
 	viper.SetDefault("enable_additional_hash_types", true)
 	viper.SetDefault("use_legacy_device_technique", false)

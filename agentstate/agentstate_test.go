@@ -77,6 +77,7 @@ func TestActivityConstants(t *testing.T) {
 	assert.Equal(t, CurrentActivityUpdating, Activity("updating"))
 	assert.Equal(t, CurrentActivityWaiting, Activity("waiting"))
 	assert.Equal(t, CurrentActivityCracking, Activity("cracking"))
+	assert.Equal(t, CurrentActivityDownloading, Activity("downloading"))
 	assert.Equal(t, CurrentActivityStopping, Activity("stopping"))
 }
 

@@ -225,7 +225,7 @@ func handleNonExhaustedError(
 			agentstate.Logger.Error("Failed to remove restore file", "error", removeErr)
 		}
 
-		sess.RestoreFilePath = ""
+		sess.RestoreFilePath = "" // channel-processing goroutine only; no concurrent access
 
 		// Report the restore-file failure before returning so the server is aware
 		// of the retryable failure (the task can be retried now that the corrupt
