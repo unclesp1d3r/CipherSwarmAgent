@@ -349,9 +349,9 @@ _require-git-cliff:
 [group('security')]
 sbom: build-release
     @echo "Generating SBOM..."
-    @{{ mise_exec }} cyclonedx-gomod bin -output sbom-binary.cyclonedx.xml ./{{ binary_name }}{{ if os_family() == "windows" { ".exe" } else { "" } }}
-    @{{ mise_exec }} cyclonedx-gomod app -output sbom-modules.cyclonedx.xml .
-    @echo "✅ SBOM generated: sbom-binary.cyclonedx.xml, sbom-modules.cyclonedx.xml"
+    @{{ mise_exec }} cyclonedx-gomod bin -json -output sbom-binary.cyclonedx.json ./{{ binary_name }}{{ if os_family() == "windows" { ".exe" } else { "" } }}
+    @{{ mise_exec }} cyclonedx-gomod app -json -output sbom-modules.cyclonedx.json .
+    @echo "✅ SBOM generated: sbom-binary.cyclonedx.json, sbom-modules.cyclonedx.json"
 
 # Run all security checks (SBOM generation)
 [group('security')]
