@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	zapLineParts = 2 // Expected number of parts when splitting zap line by colon
+	zapLineParts = 2     // Expected number of parts when splitting zap line by colon
+	zapFileMode  = 0o600 // Restrictive permissions for cracked hash data
 )
 
 // GetZaps fetches zap data for a given task, handles errors, and processes the response stream if available.
@@ -71,9 +72,16 @@ func removeExistingZapFile(zapFilePath string) error {
 // The task parameter is used for logging and error reporting in case of failures.
 // Returns an error if file creation, writing, or closing fails.
 func createAndWriteZapFile(ctx context.Context, zapFilePath string, responseStream io.Reader, task *api.Task) error {
-	outFile, err := os.OpenFile(zapFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	outFile, err := os.OpenFile(zapFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zapFileMode)
 	if err != nil {
 		return fmt.Errorf("error creating zap file: %w", err)
+	}
+
+	// Best-effort chmod to enforce 0600 on pre-existing files.
+	// Non-fatal: network shares (NFS, SMB) may not support chmod.
+	if err := outFile.Chmod(zapFileMode); err != nil {
+		agentstate.Logger.Warn("Could not set zap file permissions (network share?)",
+			"path", zapFilePath, "error", err)
 	}
 
 	defer func() {

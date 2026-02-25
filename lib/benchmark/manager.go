@@ -391,6 +391,8 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 					agentstate.Logger.Warn("Failed to save final benchmark cache", "error", saveErr)
 				}
 
+				sess.Cleanup()
+
 				return
 			}
 		}

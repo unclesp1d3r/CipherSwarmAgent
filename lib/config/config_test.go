@@ -247,32 +247,37 @@ func TestSetupSharedState_DerivedPathsFromDataRoot(t *testing.T) {
 	t.Run("custom data_path is honoured for derived paths", func(t *testing.T) {
 		viper.Reset()
 		SetDefaultConfigValues()
-		viper.Set("data_path", "/custom/data")
+		customDataPath := filepath.Join("custom", "data")
+		viper.Set("data_path", customDataPath)
 		SetupSharedState()
 
-		assert.Equal(t, "/custom/data/files", agentstate.State.FilePath)
-		assert.Equal(t, "/custom/data/zaps", agentstate.State.ZapsPath)
+		assert.Equal(t, filepath.Join(customDataPath, "files"), agentstate.State.FilePath)
+		assert.Equal(t, filepath.Join(customDataPath, "zaps"), agentstate.State.ZapsPath)
 	})
 
 	t.Run("explicit files_path overrides derivation", func(t *testing.T) {
 		viper.Reset()
 		SetDefaultConfigValues()
-		viper.Set("data_path", "/custom/data")
-		viper.Set("files_path", "/explicit/files")
+		customDataPath := filepath.Join("custom", "data")
+		explicitFilesPath := filepath.Join("explicit", "files")
+		viper.Set("data_path", customDataPath)
+		viper.Set("files_path", explicitFilesPath)
 		SetupSharedState()
 
-		assert.Equal(t, "/explicit/files", agentstate.State.FilePath)
-		assert.Equal(t, "/custom/data/zaps", agentstate.State.ZapsPath)
+		assert.Equal(t, explicitFilesPath, agentstate.State.FilePath)
+		assert.Equal(t, filepath.Join(customDataPath, "zaps"), agentstate.State.ZapsPath)
 	})
 
 	t.Run("explicit zap_path overrides derivation", func(t *testing.T) {
 		viper.Reset()
 		SetDefaultConfigValues()
-		viper.Set("data_path", "/custom/data")
-		viper.Set("zap_path", "/explicit/zaps")
+		customDataPath := filepath.Join("custom", "data")
+		explicitZapsPath := filepath.Join("explicit", "zaps")
+		viper.Set("data_path", customDataPath)
+		viper.Set("zap_path", explicitZapsPath)
 		SetupSharedState()
 
-		assert.Equal(t, "/custom/data/files", agentstate.State.FilePath)
-		assert.Equal(t, "/explicit/zaps", agentstate.State.ZapsPath)
+		assert.Equal(t, filepath.Join(customDataPath, "files"), agentstate.State.FilePath)
+		assert.Equal(t, explicitZapsPath, agentstate.State.ZapsPath)
 	})
 }
