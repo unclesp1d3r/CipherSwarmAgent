@@ -7,7 +7,7 @@ The Enhanced Task Monitoring and Recovery System extends the existing CipherSwar
 The system is architected as a modular enhancement to the existing agent, introducing new packages under `lib/` for monitoring, state persistence, and recovery while preserving all current functionality. The design follows Go idioms and integrates seamlessly with the existing architecture:
 
 - `lib/monitoring/` - System and task metrics collection
-- `lib/persistence/` - Task state and history management  
+- `lib/persistence/` - Task state and history management
 - `lib/recovery/` - Automatic failure recovery logic
 - Enhanced `lib/task/` - Integration with new monitoring and recovery capabilities
 
@@ -604,14 +604,14 @@ recovery:
 
 persistence:
   enabled: true
-  state_directory: "states"
+  state_directory: states
   history_retention_days: 30
   history_max_size_mb: 100
   cleanup_on_completion: true
 
 analytics:
   enabled: true
-  export_formats: ["json", "csv"]
+  export_formats: [json, csv]
   performance_tracking: true
 ```
 
@@ -669,8 +669,10 @@ Persisted to `{state_directory}/{agent_id}/task_{task_id}.json`:
   "attack_id": 67890,
   "status": "running",
   "hashcat_params": [
-    "-a", "0",
-    "-m", "1000",
+    "-a",
+    "0",
+    "-m",
+    "1000",
     "/path/to/hashes.txt",
     "/path/to/wordlist.txt"
   ],
@@ -1133,162 +1135,162 @@ Before defining the correctness properties, I need to analyze the acceptance cri
 **Requirement 1: Comprehensive Task Monitoring**
 
 1.1. WHEN a task is accepted by the agent THEN the system SHALL create a detailed task execution log
-  Thoughts: This is about creating a log entry when a specific event occurs. We can test that for any task acceptance, a log entry is created with the required fields.
-  Testable: yes - property
+Thoughts: This is about creating a log entry when a specific event occurs. We can test that for any task acceptance, a log entry is created with the required fields.
+Testable: yes - property
 
 1.2. WHEN a task is executing THEN the system SHALL collect and report performance metrics at configurable intervals
-  Thoughts: This is about continuous metric collection during execution. We can test that metrics are collected at the configured interval for any running task.
-  Testable: yes - property
+Thoughts: This is about continuous metric collection during execution. We can test that metrics are collected at the configured interval for any running task.
+Testable: yes - property
 
 1.3. WHEN system resources exceed defined thresholds THEN the system SHALL automatically throttle or pause task execution
-  Thoughts: This is about the system's response to threshold violations. We can generate random resource states and verify that when thresholds are exceeded, the appropriate action is taken.
-  Testable: yes - property
+Thoughts: This is about the system's response to threshold violations. We can generate random resource states and verify that when thresholds are exceeded, the appropriate action is taken.
+Testable: yes - property
 
 1.4. WHEN a task completes successfully THEN the system SHALL generate a comprehensive completion report
-  Thoughts: This is about generating a report for any completed task. We can test that for any task completion, a report with required fields is generated.
-  Testable: yes - property
+Thoughts: This is about generating a report for any completed task. We can test that for any task completion, a report with required fields is generated.
+Testable: yes - property
 
 1.5. WHEN monitoring data is collected THEN the system SHALL maintain compatibility with existing API endpoint format
-  Thoughts: This is about data format compatibility. We can test that for any monitoring data, the serialized format matches the expected API schema.
-  Testable: yes - property
+Thoughts: This is about data format compatibility. We can test that for any monitoring data, the serialized format matches the expected API schema.
+Testable: yes - property
 
 1.6. WHEN the agent sends heartbeats THEN the system SHALL include current task status and system health metrics
-  Thoughts: This is about heartbeat payload content. We can test that for any heartbeat, the payload contains the required fields.
-  Testable: yes - property
+Thoughts: This is about heartbeat payload content. We can test that for any heartbeat, the payload contains the required fields.
+Testable: yes - property
 
 **Requirement 2: Automatic Task Recovery**
 
 2.1. WHEN a network connection is lost during task execution THEN the system SHALL pause the current hashcat process and attempt reconnection using exponential backoff
-  Thoughts: This is about the system's response to network failures. We can test that for any network failure, the process is paused and backoff is applied.
-  Testable: yes - property
+Thoughts: This is about the system's response to network failures. We can test that for any network failure, the process is paused and backoff is applied.
+Testable: yes - property
 
 2.2. WHEN network connectivity is restored THEN the system SHALL validate the task is still active and resume
-  Thoughts: This is about resumption after network recovery. We can test that for any network restoration, validation and resumption occur.
-  Testable: yes - property
+Thoughts: This is about resumption after network recovery. We can test that for any network restoration, validation and resumption occur.
+Testable: yes - property
 
 2.3. WHEN a hashcat process crashes unexpectedly THEN the system SHALL capture the exit code and stderr, then automatically restart
-  Thoughts: This is about crash handling. We can test that for any process crash, exit code/stderr are captured and restart occurs.
-  Testable: yes - property
+Thoughts: This is about crash handling. We can test that for any process crash, exit code/stderr are captured and restart occurs.
+Testable: yes - property
 
 2.4. IF a task fails more than 3 consecutive times THEN the system SHALL mark the task as failed and report the failure
-  Thoughts: This is about failure threshold handling. We can test that for any task with >3 failures, it's marked as failed and reported.
-  Testable: yes - property
+Thoughts: This is about failure threshold handling. We can test that for any task with >3 failures, it's marked as failed and reported.
+Testable: yes - property
 
 2.5. WHEN GPU temperature exceeds the configured threshold THEN the system SHALL pause task execution and resume when temperature drops
-  Thoughts: This is about temperature-based throttling. We can test that for any temperature threshold violation, pause and resume occur correctly.
-  Testable: yes - property
+Thoughts: This is about temperature-based throttling. We can test that for any temperature threshold violation, pause and resume occur correctly.
+Testable: yes - property
 
 2.6. WHEN the agent process is terminated unexpectedly THEN the system SHALL be able to resume incomplete tasks on restart
-  Thoughts: This is about persistence and recovery across restarts. We can test that for any incomplete task state, it can be loaded and resumed.
-  Testable: yes - property
+Thoughts: This is about persistence and recovery across restarts. We can test that for any incomplete task state, it can be loaded and resumed.
+Testable: yes - property
 
 2.7. WHEN resuming a task THEN the system SHALL verify task parameters haven't changed on the server
-  Thoughts: This is about validation during resumption. We can test that for any task resumption, server validation occurs.
-  Testable: yes - property
+Thoughts: This is about validation during resumption. We can test that for any task resumption, server validation occurs.
+Testable: yes - property
 
 **Requirement 3: Task State Persistence**
 
 3.1. WHEN a task begins execution THEN the system SHALL persist task state to local storage in JSON format
-  Thoughts: This is about initial state persistence. We can test that for any task start, a valid JSON state file is created.
-  Testable: yes - property
+Thoughts: This is about initial state persistence. We can test that for any task start, a valid JSON state file is created.
+Testable: yes - property
 
 3.2. WHEN task progress updates occur THEN the system SHALL atomically update the persisted state
-  Thoughts: This is about atomic updates. We can test that for any progress update, the state file is updated atomically (no partial writes).
-  Testable: yes - property
+Thoughts: This is about atomic updates. We can test that for any progress update, the state file is updated atomically (no partial writes).
+Testable: yes - property
 
 3.3. WHEN the agent starts up THEN the system SHALL scan for incomplete task state files and automatically attempt to resume them
-  Thoughts: This is about startup recovery. We can test that for any set of incomplete state files, they are all discovered and processed.
-  Testable: yes - property
+Thoughts: This is about startup recovery. We can test that for any set of incomplete state files, they are all discovered and processed.
+Testable: yes - property
 
 3.4. WHEN resuming an incomplete task THEN the system SHALL validate the task is still active on the server
-  Thoughts: This is about validation during resume. We can test that for any incomplete task, server validation is performed.
-  Testable: yes - property
+Thoughts: This is about validation during resume. We can test that for any incomplete task, server validation is performed.
+Testable: yes - property
 
 3.5. WHEN a task is completed, cancelled, or marked as exhausted THEN the system SHALL clean up the persisted state files
-  Thoughts: This is about cleanup. We can test that for any terminal task state, the state files are removed.
-  Testable: yes - property
+Thoughts: This is about cleanup. We can test that for any terminal task state, the state files are removed.
+Testable: yes - property
 
 3.6. WHEN state persistence fails THEN the system SHALL log the error but continue task execution
-  Thoughts: This is about graceful degradation. We can test that for any persistence failure, execution continues and an error is logged.
-  Testable: yes - property
+Thoughts: This is about graceful degradation. We can test that for any persistence failure, execution continues and an error is logged.
+Testable: yes - property
 
 3.7. WHEN multiple agents run on the same system THEN the system SHALL use agent-specific state directories
-  Thoughts: This is about isolation. We can test that for any agent ID, a unique state directory is used.
-  Testable: yes - property
+Thoughts: This is about isolation. We can test that for any agent ID, a unique state directory is used.
+Testable: yes - property
 
 **Requirement 4: Configurable Monitoring Thresholds**
 
 4.1. WHEN the agent starts THEN the system SHALL load monitoring configuration with sensible defaults
-  Thoughts: This is about configuration loading. We can test that for any missing config values, defaults are applied.
-  Testable: yes - property
+Thoughts: This is about configuration loading. We can test that for any missing config values, defaults are applied.
+Testable: yes - property
 
 4.2. WHEN monitoring thresholds are exceeded THEN the system SHALL log appropriate messages
-  Thoughts: This is about logging behavior. We can test that for any threshold violation, a log entry is created.
-  Testable: yes - property
+Thoughts: This is about logging behavior. We can test that for any threshold violation, a log entry is created.
+Testable: yes - property
 
 4.3. IF custom monitoring rules are defined in configuration THEN the system SHALL evaluate and apply those rules
-  Thoughts: This is about custom rule evaluation. We can test that for any custom rule, it's correctly evaluated.
-  Testable: yes - property
+Thoughts: This is about custom rule evaluation. We can test that for any custom rule, it's correctly evaluated.
+Testable: yes - property
 
 4.4. WHEN configuration supports it THEN the system SHALL allow per-device thresholds for multi-GPU systems
-  Thoughts: This is about per-device configuration. We can test that for any device-specific threshold, it's applied to the correct device.
-  Testable: yes - property
+Thoughts: This is about per-device configuration. We can test that for any device-specific threshold, it's applied to the correct device.
+Testable: yes - property
 
 4.5. WHEN the system detects configuration file changes THEN the system SHALL reload monitoring parameters
-  Thoughts: This is about dynamic configuration reload. This is a feature requirement but testing file watching is complex and may be better as an integration test.
-  Testable: no
+Thoughts: This is about dynamic configuration reload. This is a feature requirement but testing file watching is complex and may be better as an integration test.
+Testable: no
 
 4.6. WHEN environment variables or CLI flags override config file values THEN the system SHALL prioritize the override values
-  Thoughts: This is about configuration precedence. We can test that for any override, it takes precedence over file values.
-  Testable: yes - property
+Thoughts: This is about configuration precedence. We can test that for any override, it takes precedence over file values.
+Testable: yes - property
 
 **Requirement 5: Task Execution History and Analytics**
 
 5.1. WHEN tasks complete THEN the system SHALL store execution history
-  Thoughts: This is about history storage. We can test that for any completed task, a history entry is created with required fields.
-  Testable: yes - property
+Thoughts: This is about history storage. We can test that for any completed task, a history entry is created with required fields.
+Testable: yes - property
 
 5.2. WHEN requested via CLI command THEN the system SHALL provide task execution statistics
-  Thoughts: This is about CLI output. This is more of an integration test of the CLI command.
-  Testable: no
+Thoughts: This is about CLI output. This is more of an integration test of the CLI command.
+Testable: no
 
 5.3. WHEN storage limits are reached THEN the system SHALL automatically rotate old execution logs
-  Thoughts: This is about log rotation. We can test that when storage exceeds the limit, old logs are removed.
-  Testable: yes - property
+Thoughts: This is about log rotation. We can test that when storage exceeds the limit, old logs are removed.
+Testable: yes - property
 
 5.4. WHEN exporting data THEN the system SHALL provide task history in structured formats
-  Thoughts: This is about export functionality. We can test that for any history data, it can be exported in the specified formats.
-  Testable: yes - property
+Thoughts: This is about export functionality. We can test that for any history data, it can be exported in the specified formats.
+Testable: yes - property
 
 5.5. WHEN benchmark data is collected THEN the system SHALL store historical benchmark results
-  Thoughts: This is about benchmark history. We can test that for any benchmark result, it's stored in history.
-  Testable: yes - property
+Thoughts: This is about benchmark history. We can test that for any benchmark result, it's stored in history.
+Testable: yes - property
 
 **Requirement 6: API Compatibility**
 
 6.1. WHEN implementing monitoring features THEN the system SHALL maintain strict compatibility with all existing v1 Agent API endpoints
-  Thoughts: This is about API compatibility. We can test that all API calls use the correct endpoints and formats.
-  Testable: yes - property
+Thoughts: This is about API compatibility. We can test that all API calls use the correct endpoints and formats.
+Testable: yes - property
 
 6.2. WHEN sending status updates THEN the system SHALL use the exact JSON schema format expected by the current server
-  Thoughts: This is about schema compliance. We can test that for any status update, the JSON matches the expected schema.
-  Testable: yes - property
+Thoughts: This is about schema compliance. We can test that for any status update, the JSON matches the expected schema.
+Testable: yes - property
 
 6.3. WHEN handling authentication THEN the system SHALL support the existing Bearer token authentication mechanism
-  Thoughts: This is about auth mechanism. We can test that authentication uses Bearer tokens correctly.
-  Testable: yes - property
+Thoughts: This is about auth mechanism. We can test that authentication uses Bearer tokens correctly.
+Testable: yes - property
 
 6.4. WHEN reporting errors THEN the system SHALL use the structured error format defined in the current API specification
-  Thoughts: This is about error format. We can test that for any error report, the format matches the API spec.
-  Testable: yes - property
+Thoughts: This is about error format. We can test that for any error report, the format matches the API spec.
+Testable: yes - property
 
 6.5. WHEN implementing new features THEN the system SHALL not break existing server-side expectations
-  Thoughts: This is a general compatibility goal, not a specific testable behavior.
-  Testable: no
+Thoughts: This is a general compatibility goal, not a specific testable behavior.
+Testable: no
 
 6.6. WHEN the agent shuts down THEN the system SHALL properly notify the server using the existing endpoint
-  Thoughts: This is about shutdown notification. We can test that shutdown calls the correct endpoint.
-  Testable: yes - property
+Thoughts: This is about shutdown notification. We can test that shutdown calls the correct endpoint.
+Testable: yes - property
 
 ### Property Reflection
 
@@ -1585,7 +1587,7 @@ func (c *Collector) collectGPUMetrics() ([]GPUMetrics, error) {
 - Configurable monitoring intervals (default 3 seconds)
 - Metrics collection runs in separate goroutine
 - Non-blocking alert channel (buffered, size 100)
-- Minimal overhead on task execution (<1% CPU)
+- Minimal overhead on task execution (\<1% CPU)
 
 **2. State Persistence**
 
@@ -1784,16 +1786,17 @@ type MockMonitoringManager struct {
 Add to existing CI workflows:
 
 ```yaml
-- name: Run property-based tests
-  run: go test -v -tags=property ./lib/monitoring/... ./lib/persistence/... ./lib/recovery/...
+  - name: Run property-based tests
+    run: go test -v -tags=property ./lib/monitoring/... ./lib/persistence/... 
+      ./lib/recovery/...
 
-- name: Run integration tests
-  run: go test -v -tags=integration ./lib/task/...
+  - name: Run integration tests
+    run: go test -v -tags=integration ./lib/task/...
 
-- name: Check test coverage
-  run: |
-    go test -cover -coverprofile=coverage.out ./...
-    go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{if ($1 < 80) exit 1}'
+  - name: Check test coverage
+    run: |
+      go test -cover -coverprofile=coverage.out ./...
+      go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{if ($1 < 80) exit 1}'
 ```
 
 ### Migration Path
