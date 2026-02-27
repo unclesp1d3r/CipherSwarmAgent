@@ -43,7 +43,7 @@ Project-specific Go conventions. For general rules, see AGENTS.md.
 - Handle `obj == nil && err == nil` as a separate error case for API responses (prevents nil pointer dereferences).
 - In deferred cleanup, use `os.IsNotExist` to skip already-removed files. Include file paths in error messages.
 - For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding.
-- **Error reporting**: Use `cserrors.SendAgentError(msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. Always pass a non-nil error.
+- **Error reporting**: Use `cserrors.SendAgentError(ctx, msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. Always pass a non-nil error.
 
 ## 4. Concurrency & State
 

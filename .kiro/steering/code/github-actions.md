@@ -16,10 +16,11 @@ CI/CD workflows for the CipherSwarmAgent project.
 - **Coverage**: Generates `coverage.out` and uploads to Codecov. Uses `fail_ci_if_error: false` to avoid failing PRs on transient upload issues.
 - **Triggers**: Push to `main`, all pull requests.
 
-### `git-chglog.yml` — Changelog Generation
+### `git-chglog.yml` — Changelog Generation (CI)
 
 - Uses `nuuday/github-changelog-action` with config from `.chglog/`.
 - **Triggers**: Push to `main`, PRs against `main`.
+- **Note**: Local changelog generation uses `git-cliff` (`just changelog`), not `git-chglog`.
 
 ## Toolchain Setup
 
