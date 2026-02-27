@@ -37,7 +37,7 @@ inclusion: always
 
 - Tag releases with semantic versioning: `git tag vX.Y.Z`.
 - Push tag, then run `just release` locally.
-- Requires `GITHUB_TOKEN` with `write:packages` scope; `docker login ghcr.io` for containers.
+- Requires a PAT with `write:packages` scope exported as `GITHUB_TOKEN`; `docker login ghcr.io` for containers.
 
 ## Changelog
 
