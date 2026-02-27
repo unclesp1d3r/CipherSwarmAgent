@@ -117,6 +117,8 @@ func StartAgent() {
 	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 
+	// BenchmarksNeeded is set by the server during configuration. When false, the
+	// server already has valid benchmarks for this agent and a re-run is unnecessary.
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	if lib.Configuration.BenchmarksNeeded {
 		if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
@@ -314,7 +316,7 @@ func handleReload(ctx context.Context) {
 		}
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 	} else {
-		agentstate.Logger.Info("Server reports valid benchmarks on file, skipping benchmark re-run")
+		agentstate.Logger.Warn("Server reports valid benchmarks on file during reload, skipping benchmark re-run")
 		agentstate.State.SetBenchmarksSubmitted(true)
 	}
 	agentstate.State.SetReload(false)
