@@ -2,6 +2,7 @@ package hashcat
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -268,5 +269,71 @@ func TestHandleTailerOutput_ExitsOnContextCancellation(t *testing.T) {
 		// Success: handleTailerOutput exited and cleaned up tailer
 	case <-time.After(testTimeout):
 		t.Fatal("handleTailerOutput did not exit after context cancellation")
+	}
+}
+
+// TestHandleTailerOutput_FullChannelExitsOnCancellation verifies that
+// handleTailerOutput exits when the CrackedHashes channel is full and the
+// context is cancelled, rather than blocking on the channel send forever.
+// This tests the inner ctx.Done() case (line 246 in session.go).
+func TestHandleTailerOutput_FullChannelExitsOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	tmpFile := filepath.Join(t.TempDir(), "test.out")
+	require.NoError(t, os.WriteFile(tmpFile, []byte{}, 0o600))
+
+	tailer, err := tail.TailFile(tmpFile, tail.Config{
+		Follow: true,
+		Logger: tail.DiscardingLogger,
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		cancel()
+		tailer.Cleanup()
+	})
+
+	sess := &Session{
+		ctx:           ctx,
+		cancel:        cancel,
+		CrackedHashes: make(chan Result, channelBufferSize),
+	}
+
+	// Fill CrackedHashes to capacity so the next send blocks
+	for i := range channelBufferSize {
+		sess.CrackedHashes <- Result{
+			Hash:      fmt.Sprintf("prefill-%d", i),
+			Plaintext: "x",
+		}
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sess.handleTailerOutput(tailer)
+	}()
+
+	// Write a valid tailer line: timestamp:hash:hex_plaintext
+	// The format is "timestamp:hash_parts:hex_encoded_plaintext"
+	plainHex := hex.EncodeToString([]byte("password123"))
+	tailerLine := fmt.Sprintf("1700000000:somehash:%s\n", plainHex)
+
+	f, err := os.OpenFile(tmpFile, os.O_APPEND|os.O_WRONLY, 0o600)
+	require.NoError(t, err)
+	_, err = f.WriteString(tailerLine)
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	// Give goroutine time to read the line and block on full channel
+	time.Sleep(50 * time.Millisecond)
+
+	// Cancel context — goroutine should unblock via inner ctx.Done() and exit
+	cancel()
+
+	select {
+	case <-done:
+		// Success: handleTailerOutput exited without blocking
+	case <-time.After(testTimeout):
+		t.Fatal("handleTailerOutput blocked on full CrackedHashes channel after context cancellation")
 	}
 }

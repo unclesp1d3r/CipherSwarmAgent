@@ -193,6 +193,8 @@ func (sess *Session) startTailer() (*tail.Tail, error) {
 // handleTailerOutput processes lines from the hashcat output file.
 // It parses each line to extract timestamp, hash, and plaintext, then sends
 // the result through the CrackedHashes channel. Invalid lines are logged and skipped.
+// On context cancellation, exits and logs any pending hash as dropped at Warn level.
+// The tailer is stopped and cleaned up on exit via defer.
 func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 	defer func() {
 		if stopErr := tailer.Stop(); stopErr != nil {
@@ -258,7 +260,9 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 // handleStdout processes stdout from the hashcat process.
 // It sends all lines to the StdoutLines channel, parses JSON status updates
 // (unless SkipStatusUpdates is true), and handles special messages like restore mode.
-// This method blocks until the process completes and sends the exit status to DoneChan.
+// On context cancellation, exits early and logs any dropped line at Warn level.
+// After the process completes, sends the exit status to DoneChan (or logs and
+// drops it if the context is already cancelled).
 func (sess *Session) handleStdout() {
 	scanner := bufio.NewScanner(sess.pStdout)
 scanLoop:
@@ -268,7 +272,8 @@ scanLoop:
 		select {
 		case sess.StdoutLines <- line:
 		case <-sess.ctx.Done():
-			agentstate.Logger.Debug("Stdout line dropped due to context cancellation")
+			agentstate.Logger.Warn("Stdout line dropped due to context cancellation",
+				"line", line)
 
 			break scanLoop
 		}
@@ -290,7 +295,7 @@ scanLoop:
 				select {
 				case sess.StatusUpdates <- status:
 				case <-sess.ctx.Done():
-					agentstate.Logger.Debug("Status update dropped due to context cancellation")
+					agentstate.Logger.Warn("Status update dropped due to context cancellation")
 
 					break scanLoop
 				}
@@ -336,6 +341,9 @@ func (sess *Session) handleStderr() {
 		select {
 		case sess.StderrMessages <- line:
 		case <-sess.ctx.Done():
+			agentstate.Logger.Warn("Stderr line dropped due to context cancellation",
+				"text", line)
+
 			return // return directly: stderr goroutine does not own DoneChan
 		}
 	}
