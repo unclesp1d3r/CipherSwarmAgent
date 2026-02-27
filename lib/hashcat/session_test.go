@@ -16,6 +16,25 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
+// TestHelperProcess is a helper process used by tests to avoid
+// depending on OS-specific binaries like "sleep" and "true".
+// It is not a real test and exits immediately when invoked directly.
+func TestHelperProcess(_ *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+
+	switch os.Getenv("GO_HELPER_MODE") {
+	case "sleep":
+		// Block indefinitely until killed
+		select {}
+	case "exit0":
+		os.Exit(0)
+	default:
+		os.Exit(0)
+	}
+}
+
 // setupSessionTestState sets up minimal agentstate paths for session tests.
 // Uses t.TempDir() for automatic cleanup and t.Cleanup() to restore state.
 func setupSessionTestState(t *testing.T) {
@@ -88,9 +107,13 @@ func TestHandleStdout_ExitsOnContextCancellation(t *testing.T) {
 
 	pr, pw := io.Pipe()
 
-	// Use CommandContext so the process is killed when context is cancelled,
-	// allowing proc.Wait() inside handleStdout to return immediately.
-	cmd := exec.CommandContext(ctx, "sleep", "60")
+	// Use a helper process that blocks until killed, so CommandContext
+	// can terminate it when the context is cancelled.
+	//nolint:gosec // G204 - test helper process pattern
+	cmd := exec.CommandContext(ctx, os.Args[0],
+		"-test.run=TestHelperProcess", "--")
+	cmd.Env = append(os.Environ(),
+		"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_MODE=sleep")
 	require.NoError(t, cmd.Start())
 
 	t.Cleanup(func() {
@@ -150,9 +173,12 @@ func TestHandleStdout_DoneChanNoBlockOnCancellation(t *testing.T) {
 	pr, pw := io.Pipe()
 	_ = pw.Close() // Close pipe so scanner.Scan() returns false immediately
 
-	// Use context.Background() because the test context is already cancelled.
-	// "true" exits immediately, so proc.Wait() returns right away.
-	cmd := exec.CommandContext(context.Background(), "true")
+	// Use a helper process that exits immediately, so proc.Wait() returns right away.
+	//nolint:gosec // G204 - test helper process pattern
+	cmd := exec.CommandContext(context.Background(), os.Args[0],
+		"-test.run=TestHelperProcess", "--")
+	cmd.Env = append(os.Environ(),
+		"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_MODE=exit0")
 	require.NoError(t, cmd.Start())
 
 	sess := &Session{
