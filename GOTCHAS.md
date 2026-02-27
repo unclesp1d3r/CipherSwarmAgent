@@ -43,6 +43,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 - `agentstate.State` contains `atomic.Bool` and `sync.RWMutex` — never copy the struct. Use per-field save/restore in test helpers and getter/setter methods for synchronized fields.
 - `hashcat` package tests cannot import `testhelpers` (circular: testhelpers -> hashcat). Use local test helpers.
+- Package-level `var` test fixtures get mutated by production code across subtests. Use factory functions (e.g., `newSampleData()`) that return fresh copies to prevent cross-test contamination.
 
 ## Tooling
 
