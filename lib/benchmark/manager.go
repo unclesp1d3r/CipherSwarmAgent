@@ -194,7 +194,10 @@ func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 			}
 
 			if saveErr := saveBenchmarkCache(cached); saveErr != nil {
-				agentstate.Logger.Warn("Failed to update benchmark cache after submission", "error", saveErr)
+				agentstate.Logger.Warn(
+					"Failed to persist benchmark cache after submission; benchmarks may re-submit on next restart",
+					"error", saveErr,
+				)
 			}
 
 			agentstate.State.SetBenchmarksSubmitted(true)
@@ -214,8 +217,10 @@ func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 }
 
 // cacheAndSubmitBenchmarks saves benchmark results to the disk cache and then
-// submits any unsubmitted results to the server. On successful submission of
-// all results, marks them as submitted, persists the cache, and sets
+// submits any unsubmitted results to the server. If all results are already
+// marked as submitted (e.g., from incremental batch submission), returns
+// immediately without cache persistence. On successful submission of all
+// results, marks them as submitted, persists the cache, and sets
 // BenchmarksSubmitted to true. If both the cache save and submission fail, it
 // returns the submission error so the caller can fail fast. When the cache was
 // saved but submission fails, it returns nil to allow retry via
@@ -264,7 +269,10 @@ func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults
 	}
 
 	if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
-		agentstate.Logger.Warn("Failed to update benchmark cache after submission", "error", saveErr)
+		agentstate.Logger.Warn(
+			"Failed to persist benchmark cache after submission; benchmarks may re-submit on next restart",
+			"error", saveErr,
+		)
 	}
 
 	agentstate.State.SetBenchmarksSubmitted(true)
