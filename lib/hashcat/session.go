@@ -34,10 +34,9 @@ const (
 // Session represents a hashcat execution session with comprehensive process management.
 // It manages the hashcat process lifecycle, handles I/O streams, and provides channels
 // for real-time communication of results, status updates, and error messages.
-// The ctx field is the session lifecycle context observed by I/O goroutines for
-// cancellation. The session stores a context.CancelFunc to enable graceful shutdown
-// and cancellation of session operations, allowing controlled termination of goroutines
-// and resource cleanup during lifecycle management.
+// The session stores a context.CancelFunc to enable graceful shutdown and cancellation
+// of session operations, allowing controlled termination of goroutines and resource
+// cleanup during lifecycle management.
 type Session struct {
 	proc               *exec.Cmd       // Hashcat process command
 	hashFile           string          // Path to hash input file
@@ -106,7 +105,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}
 
 	return &Session{
-		proc: exec.CommandContext( //nolint:gosec // G702 - binary path from internal config, not user input
+		proc: exec.CommandContext( //nolint:gosec // G204 - binary path from internal config, not user input
 			ctx,
 			binaryPath,
 			args...),
@@ -195,6 +194,13 @@ func (sess *Session) startTailer() (*tail.Tail, error) {
 // It parses each line to extract timestamp, hash, and plaintext, then sends
 // the result through the CrackedHashes channel. Invalid lines are logged and skipped.
 func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
+	defer func() {
+		if stopErr := tailer.Stop(); stopErr != nil {
+			agentstate.Logger.Debug("Tailer stop during cleanup", "error", stopErr)
+		}
+		tailer.Cleanup()
+	}()
+
 	for {
 		select {
 		case tailLine, ok := <-tailer.Lines:
@@ -238,17 +244,12 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 				Plaintext: plain,
 			}:
 			case <-sess.ctx.Done():
-				//nolint:gosec,errcheck // G104 - best-effort cleanup
-				tailer.Stop()
-				tailer.Cleanup()
+				agentstate.Logger.Warn("Cracked hash dropped due to context cancellation",
+					"hash", hash)
 
 				return
 			}
 		case <-sess.ctx.Done():
-			//nolint:gosec,errcheck // G104 - best-effort cleanup
-			tailer.Stop()
-			tailer.Cleanup()
-
 			return
 		}
 	}
@@ -267,6 +268,8 @@ scanLoop:
 		select {
 		case sess.StdoutLines <- line:
 		case <-sess.ctx.Done():
+			agentstate.Logger.Debug("Stdout line dropped due to context cancellation")
+
 			break scanLoop
 		}
 
@@ -287,6 +290,8 @@ scanLoop:
 				select {
 				case sess.StatusUpdates <- status:
 				case <-sess.ctx.Done():
+					agentstate.Logger.Debug("Status update dropped due to context cancellation")
+
 					break scanLoop
 				}
 			} else {
@@ -313,6 +318,10 @@ scanLoop:
 	select {
 	case sess.DoneChan <- done:
 	case <-sess.ctx.Done():
+		if done != nil {
+			agentstate.Logger.Warn("Process exit status dropped due to context cancellation",
+				"error", done)
+		}
 	}
 }
 
@@ -327,7 +336,7 @@ func (sess *Session) handleStderr() {
 		select {
 		case sess.StderrMessages <- line:
 		case <-sess.ctx.Done():
-			return
+			return // return directly: stderr goroutine does not own DoneChan
 		}
 	}
 }
