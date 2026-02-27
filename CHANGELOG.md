@@ -1,743 +1,612 @@
+# Changelog
 
-<a name="v0.5.8"></a>
+All notable changes to this project will be documented in this file.
 
-## [v0.5.8](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.7...v0.5.8)
+## [0.6.1] - 2026-02-27
 
-> 2026-01-19
+### Features
 
-### Maintenance Changes 🧹
+- Introduce new agent and configuration management
 
-* Upgrade agent SDK from v0.8.5 to v0.9.0
+- Upgrade agent sdk to v0.9.0 ([#107](https://github.com/EvilBit-Labs/opnDossier/pull/107))
 
+- Add fault tolerance improvements for resilience
 
+- Implement intelligent hashcat error parsing and classification
 
-<a name="v0.5.7"></a>
+- Add prompts for Continuous Integration Check and Simplicity Review
 
-## [v0.5.7](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.6...v0.5.7)
+- Add mise.lock file with tool configurations
 
-> 2024-12-18
+- **dev**: Add oapi-codegen to mise.toml as dev tool
 
-### Maintenance Changes 🧹
+- Persistent benchmark caching with retry mechanism ([#117](https://github.com/EvilBit-Labs/opnDossier/pull/117))
 
-* update dependencies in go.mod to latest versions
+- Submit benchmarks incrementally with per-item tracking ([#131](https://github.com/EvilBit-Labs/opnDossier/pull/131))
 
+- Add missing CLI flags and architecture remediation ([#133](https://github.com/EvilBit-Labs/opnDossier/pull/133))
 
 
-<a name="v0.5.6"></a>
+### Bug Fixes
 
-## [v0.5.6](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.5...v0.5.6)
+- Fix hashlist download error handling ([#56](https://github.com/EvilBit-Labs/opnDossier/pull/56))
 
-> 2024-10-03
+- **hashcat**: Fix CI linting issues - move constructor and use CommandContext
 
-### Bug Fixes 🐛
+- Resolve all golangci-lint issues across codebase
 
-* enhance hashcat binary location logic
+- Correct nolint placement for gosec exception in Extract7z
 
-  Replaced direct exec.LookPath calls with a more robust findHashcatBinary function. This function searches multiple predefined paths and the user's $PATH, improving binary location reliability and simplifying version retrieval logic.
+- Resolve all golangci-lint issues across codebase
 
+- **deps**: Update module github.com/shirou/gopsutil/v3 to v4
 
-### Code Refactoring 🛠
+- Use structured logging in UpdateAgentMetadata error handling
 
-* divide up large library files into single responsibility files ([#53](https://github.com/unclesp1d3r/CipherSwarm/issues/53))
+- Resolve variable shadowing of state package in heartbeat functions
 
-  This commit moves the previous functions in agentClient and clientUtils into purpose-specific files. The overall codebase is now more maintainable and easier to navigate.
+- Prevent silent failure on zero maxRetries and improve error logging
 
-* improve findHashcatBinary function documentation
+- Address PR review comments for error parsing implementation
 
-  Updated the documentation for the findHashcatBinary function to clarify its behavior and error handling. Replaced redundant variable names for consistency and removed obsolete fetchHashcatVersion function.
+- Report restore-file failures before early return
 
+- Address PR review findings for error handling
 
-### Documentation Changes 📚
+- Address PR review findings for error handling
 
-* simplify and condense function comments
+- Improve observability for silent corrections and fix test docs
 
-  Revised comments to be more succinct and direct.
+- Improve error handling, context propagation, and code modernization
 
-Reduced verbosity and removed redundant details to improve readability. Condensed function descriptions to highlight main actions and outcomes while preserving essential context.
+- Address PR review findings for error handling, comments, and security
 
+- Restore mise.toml after accidental overwrite ([#116](https://github.com/EvilBit-Labs/opnDossier/pull/116))
 
-### Features 🚀
+- **ci**: Require lgtm label in Mergify queue conditions ([#128](https://github.com/EvilBit-Labs/opnDossier/pull/128))
 
-* update changelog configuration
+- **task**: Clean up job output files after completion or cancellation ([#135](https://github.com/EvilBit-Labs/opnDossier/pull/135))
 
-  Updated the repository URL and added filtering and sorting options. Expanded commit groups settings to include new types and reordered titles with emoji icons. Improved header pattern, added issue prefixes, and refined merge and revert patterns for better clarity.
+- **release**: Remove go generate from goreleaser hooks
 
-* Add command line flags for Viper configuration options ([#49](https://github.com/unclesp1d3r/CipherSwarm/issues/49))
+- Resolve code review issues from go-review audit ([#143](https://github.com/EvilBit-Labs/opnDossier/pull/143))
 
-  * feat: Add command line flags for Viper configuration options
+- Remove stale cracker update calls causing 404s ([#145](https://github.com/EvilBit-Labs/opnDossier/pull/145))
 
 
-Add command line flags for Viper configuration options in `cmd/root.go`.
+### Refactor
 
-* Add command line flags for `API_TOKEN`, `API_URL`, `DATA_PATH`, `GPU_TEMP_THRESHOLD`, `ALWAYS_USE_NATIVE_HASHCAT`, `SLEEP_ON_FAILURE`, `FILES_PATH`, `EXTRA_DEBUGGING`, `STATUS_TIMER`, `WRITE_ZAPS_TO_FILE`, `ZAP_PATH`, and `RETAIN_ZAPS_ON_COMPLETION`.
-* Bind each flag to its corresponding Viper configuration in the `init` function.
-* Add proper descriptions for each command line flag in the viper settings.
+- **hashcat**: Improve documentation and comments in session.go and types.go
 
----
+- **hashcat**: Improve documentation and comments in params.go and cracker.go
 
+- **hashcat**: Simplify restore file check logic in session creation
 
-* Add command line flags and update README
+- **hashcat**: Improve documentation and comments in session.go and types.go
 
-* Add command line flags for various configuration options in `cmd/root.go`
-* Bind each flag to its corresponding Viper configuration in the `init` function
-* Update `setDefaultConfigValues` function to set default values for new configuration options
-* Add single letter flag aliases for each command line flag
-* Update `README.md` to include new command line flags and mention `--help` and `--version` flags
+- **hashcat**: Simplify restore file check logic in session creation
 
-* chore: simplify init function documentation
+- Rename shared package to state to fix revive lint error
 
-Update the init function comment for clarity and brevity. The revised comment concisely explains the initialization process and the binding of flags to the configuration.
+- Consolidate error handling and improve test coverage ([#105](https://github.com/EvilBit-Labs/opnDossier/pull/105))
 
+- Update Go modernization commands and benchmark output handling
 
----------
+- Extract domain packages from lib/ god package ([#134](https://github.com/EvilBit-Labs/opnDossier/pull/134))
 
+- Complete context.Context propagation through error handling ([#115](https://github.com/EvilBit-Labs/opnDossier/pull/115)) ([#136](https://github.com/EvilBit-Labs/opnDossier/pull/136))
 
-### Maintenance Changes 🧹
 
-* update changelog with v0.5.6 release details
+### Documentation
 
-* update Go and dependencies in go.mod
+- Update mkdocs configuration and enhance documentation structure
 
-  Updated Go version and multiple dependencies to their latest versions. This includes upgrades for various Google Cloud libraries, OpenTelemetry components, and others to improve security and performance.
+- Update cursorrules.md to reference new API contract location
 
-* update dependency versions and fix agent update request
+- Add GEMINI.md for Gemini System Prompt documentation
 
-  Updated multiple dependencies in `go.mod` to their latest versions. Corrected field name from `Name` to `HostName` in agent update request.
+- Add learnings to AGENTS.md for AI assistants
 
-* add vcs configuration file
+- Add learnings to AGENTS.md for AI assistants
 
-  Introduce VCS configuration file to ensure consistent commit message format and enable Git integration. This includes setting up inspection profiles and directory mappings for version control.
+- **agents**: Add releasing section and must-complete pattern
 
 
-### Reverts
+### Styling
 
-* Add utility methods for file operations and task management
+- Align struct field comments in Session
 
+- Replace interface{} with any in config tests
 
-<a name="v0.5.5"></a>
+- Fix testifylint and gocritic warnings
 
-## [v0.5.5](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.4...v0.5.5)
 
-> 2024-09-18
+### Testing
 
-### Bug Fixes 🐛
+- Add initial unit test for clientUtils
 
-* replace createTempFile with createOutFile
+- Improve base64ToHex unit tests ([#57](https://github.com/EvilBit-Labs/opnDossier/pull/57))
 
-  Replaced createTempFile with createOutFile in the NewHashcatSession function. This makes the output file more deterministic and fixes an issue where restored tasks weren't sending their cracked hashes.
+- Add comprehensive tests for downloadWithRetry function
 
+- Add configuration defaults verification tests
 
-### Documentation Changes 📚
+- Add proper error assertions in TestSendHeartBeat
 
-* simplify and clarify function comments
+- Add task runner tests for parseExitCode and handler functions
 
-  Simplify and refine the documentation comments for functions to enhance readability and conciseness. Updated comments describe the core actions performed by each function while removing excessive details and steps.
+- Add heartbeat backoff calculation tests
 
-* Update Docker run command in README.md
 
+### Miscellaneous Tasks
 
-### Maintenance Changes 🧹
+- Add architecture and coding guidelines documentation
 
-* Updated CHANGELOG.md
+- Add initial documentation and configuration files
 
+- Add configuration and testing documentation
 
+- Add Go SDK development rules and implementation plan
 
-<a name="v0.5.4"></a>
+- Streamline justfile by removing usage comments
 
-## [v0.5.4](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.3...v0.5.4)
+- Update project configuration and linting setup
 
-> 2024-09-12
+- Update dependencies and enhance justfile for dependency management
 
-### Code Refactoring 🛠
+- Update project files for consistency and clarity
 
-* Heavily cleanup and optimization.
+- Update project configuration and enhance logging
 
-* Refactored the agentClient
+- Added requirements management rules.
 
+- Update dependencies and improve context handling
 
-### Features 🚀
+- Specify tool versions in mise.toml
 
-* Added initial Windows client support
+- Update justfile and mise.toml for mkdocs setup
 
-  This is very experimental and has not been adequately tested. Since we haven’t tested it, use caution in this version. I firmly recommend not using the legacy device detection mode.
+- Add VSCode settings for Go tool configuration
 
+- Update VSCode settings for ruff and add CLAUDE.md reference
 
-### Maintenance Changes 🧹
+- Update configuration files and dependencies for improved tooling support
 
-* Updated changelog
+- Add .claude.local.md to .gitignore for local configuration exclusion
 
-* Bundle dependencies
+- Bump golangci-lint to 2.10.1 and fix review findings
 
-* Bumped dependencies
 
+## [0.5.7] - 2024-12-19
 
+### Miscellaneous Tasks
 
-<a name="v0.5.3"></a>
+- Update dependencies in go.mod to latest versions
 
-## [v0.5.3](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.2...v0.5.3)
+- Updated change log
 
-> 2024-08-29
+- Remove obsolete entries from go.sum
 
-### Bug Fixes 🐛
 
-* Finished enabling support for opencl-devices
+## [0.5.6] - 2024-10-04
 
+### Features
 
-### Code Refactoring 🛠
+- Add command line flags for Viper configuration options ([#49](https://github.com/EvilBit-Labs/opnDossier/pull/49))
 
-* Code changes to try and make golangci-lint happy
+- Update changelog configuration
 
-* Minor cleanup of hashcat session code
 
-* Minor code cleanup
+### Bug Fixes
 
+- Enhance hashcat binary location logic
 
-### Features 🚀
 
-* Devices are now identified using hashcat rather than a brittle shell script
+### Refactor
 
-  The system now runs a tiny attack job upon the agent’s startup, which verifies that the hashcat is working correctly and then identifies the devices detected by the hashcat. This is much more accurate than the legacy technique since it conforms to what hashcat will actually use.
+- Improve findHashcatBinary function documentation
 
-* Added automatic hashcat capability
+- Divide up large library files into single responsibility files ([#53](https://github.com/EvilBit-Labs/opnDossier/pull/53))
 
-  The hashcat session will be stored in the data directory, and if one is detected, it will automatically attempt to resume it when starting the attack. When the attack is complete, the restore file will be removed.
 
+### Documentation
 
-### Maintenance Changes 🧹
+- Simplify and condense function comments
 
-* Updated changelog
 
-* Update changelog
+### Miscellaneous Tasks
 
-* Updated CHANGELOG
+- Add vcs configuration file
 
+- Update dependency versions and fix agent update request
 
+- Update Go and dependencies in go.mod
 
-<a name="v0.5.2"></a>
+- Update changelog with v0.5.6 release details
 
-## [v0.5.2](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.1...v0.5.2)
 
-> 2024-08-27
+## [0.5.5] - 2024-09-19
 
-### Bug Fixes 🐛
+### Bug Fixes
 
-* Fixed an issue causing SegFaults on weird HTTP errors
+- Replace createTempFile with createOutFile
 
-* Fixed an issue causing SegFaults on weird HTTP errors
 
+### Documentation
 
-### Maintenance Changes 🧹
+- Update Docker run command in README.md
 
-* Updated ChangeLog
+- Simplify and clarify function comments
 
 
+### Miscellaneous Tasks
 
-<a name="v0.5.1"></a>
+- Updated CHANGELOG.md
 
-## [v0.5.1](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.5.0...v0.5.1)
 
-> 2024-08-26
+## [0.5.4] - 2024-09-13
 
-### Bug Fixes 🐛
+### Features
 
-* Added significant error checking to client to prevent nil crashes
+- Added initial Windows client support
 
 
-### Maintenance Changes 🧹
+### Refactor
 
-* Updated CHANGELOG
+- Refactored the agentClient
 
+- Heavily cleanup and optimization.
 
 
-<a name="v0.5.0"></a>
+### Miscellaneous Tasks
 
-## [v0.5.0](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.4.2...v0.5.0)
+- Bumped dependencies
 
-> 2024-08-26
+- Bundle dependencies
 
-### Features 🚀
+- Updated changelog
 
-* Added support for mask list files from v0.5.0 of API
 
+## [0.5.3] - 2024-08-30
 
-### Maintenance Changes 🧹
+### Features
 
-* Update changelog
+- Added automatic hashcat capability
 
+- Devices are now identified using hashcat rather than a brittle shell script
 
 
-<a name="v0.4.2"></a>
+### Bug Fixes
 
-## [v0.4.2](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.4.1...v0.4.2)
+- Finished enabling support for opencl-devices
 
-> 2024-08-06
 
-### Bug Fixes 🐛
+### Refactor
 
-* Upgraded to support version v0.7.2 of API
+- Minor code cleanup
 
-  The API was refactored, introducing breaking changes in the SDK, so we needed to rename some packages and objects.
+- Minor cleanup of hashcat session code
 
+- Code changes to try and make golangci-lint happy
 
-### Code Refactoring 🛠
 
-* Minor cleanup to meet formatting standards
+### Miscellaneous Tasks
 
+- Updated CHANGELOG
 
-### Documentation Changes 📚
+- Update changelog
 
-* Minor grammar changes to the README
+- Updated changelog
 
 
-### Maintenance Changes 🧹
+## [0.5.2] - 2024-08-27
 
-* Updated changelog
+### Bug Fixes
 
+- Fixed an issue causing SegFaults on weird HTTP errors
 
+- Fixed an issue causing SegFaults on weird HTTP errors
 
-<a name="v0.4.1"></a>
 
-## [v0.4.1](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.4.0...v0.4.1)
+### Miscellaneous Tasks
 
-> 2024-07-31
+- Updated ChangeLog
 
-### Bug Fixes 🐛
 
-* Automatic benchmark now performs all hash types
+## [0.5.1] - 2024-08-27
 
-  Since the benchmarking function determines what hash types this agent supports, we needed to change the feature to benchmark all hash types, not just the common ones. The agent’s initial startup is significantly slower now but supports more functionality. This can be turned off by setting `enable_additional_hash_types: false` in the agent config.
+### Bug Fixes
 
+- Added significant error checking to client to prevent nil crashes
 
-### Maintenance Changes 🧹
 
-* Updated changelog
+### Miscellaneous Tasks
 
+- Updated CHANGELOG
 
 
-<a name="v0.4.0"></a>
+## [0.5.0] - 2024-08-26
 
-## [v0.4.0](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.3.1...v0.4.0)
+### Features
 
-> 2024-07-29
+- Added support for mask list files from v0.5.0 of API
 
-### Features 🚀
 
-* Added support for bidirectional status on status updates
+### Miscellaneous Tasks
 
-  This enables running tasks to be notified of hashes cracked in another task and pause tasks currently running.
+- Update changelog
 
-We also added support for using a shared directory as a zap synchronization point. If configured, cracked hashes will be written to a directory, and the client will monitor that directory for new zaps.
 
+## [0.4.2] - 2024-08-07
 
-### Maintenance Changes 🧹
+### Bug Fixes
 
-* Updated changelog
+- Upgraded to support version v0.7.2 of API
 
 
+### Refactor
 
-<a name="v0.3.1"></a>
+- Minor cleanup to meet formatting standards
 
-## [v0.3.1](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.3...v0.3.1)
 
-> 2024-07-23
+### Documentation
 
-### Bug Fixes 🐛
+- Minor grammar changes to the README
 
-* Tasks are accepted before the downloads start
 
+### Miscellaneous Tasks
 
-### Maintenance Changes 🧹
+- Updated changelog
 
-* Updated changelog
 
-* Bumped chglog
+## [0.4.1] - 2024-08-01
 
+### Bug Fixes
 
+- Automatic benchmark now performs all hash types
 
-<a name="v0.3"></a>
 
-## [v0.3](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.8...v0.3)
+### Miscellaneous Tasks
 
-> 2024-07-12
+- Updated changelog
 
-### Bug Fixes 🐛
 
-* Fixed issue with always_use_native_hashcat on server messing up the client
+## [0.4.0] - 2024-07-30
 
-  When the server setting was set for the agent, the agent was not finding hashcat, but also not allowing it to be set via config or environment variable.
+### Features
 
-* Removed exessive output in standard debugging
+- Added support for bidirectional status on status updates
 
-* Files directory can be set separate of the data dir
 
-* Replaced tail library with one still maintained
+### Miscellaneous Tasks
 
+- Updated changelog
 
-### Features 🚀
 
-* Add support for zaps
+## [0.3.1] - 2024-07-24
 
+### Bug Fixes
 
-### Maintenance Changes 🧹
+- Tasks are accepted before the downloads start
 
-* Updated changelog and bumped version number
 
-* Bumped dependencies
+### Miscellaneous Tasks
 
+- Bumped chglog
 
+- Updated changelog
 
-<a name="v0.2.8"></a>
 
-## [v0.2.8](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.7...v0.2.8)
+## [0.3] - 2024-07-13
 
-> 2024-07-10
+### Features
 
-### Bug Fixes 🐛
+- Add support for zaps
 
-* Added more checking for null tasks or attacks
 
+### Bug Fixes
 
-### Maintenance Changes 🧹
+- Replaced tail library with one still maintained
 
-* Updated changelog
+- Files directory can be set separate of the data dir
 
-* Bumped module versions
+- Removed excessive output in standard debugging
 
+- Fixed issue with always_use_native_hashcat on server messing up the client
 
 
-<a name="v0.2.7"></a>
+### Miscellaneous Tasks
 
-## [v0.2.7](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.6...v0.2.7)
+- Bumped dependencies
 
-> 2024-07-01
+- Updated changelog and bumped version number
 
-### Code Refactoring 🛠
 
-* Moved utility code out of agentClient.go
+## [0.2.8] - 2024-07-10
 
+### Bug Fixes
 
-### Maintenance Changes 🧹
+- Added more checking for null tasks or attacks
 
-* Updated Changelog
 
+### Miscellaneous Tasks
 
+- Bumped module versions
 
-<a name="v0.2.6"></a>
+- Updated changelog
 
-## [v0.2.6](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.5...v0.2.6)
 
-> 2024-06-21
+## [0.2.7] - 2024-07-01
 
-### Bug Fixes 🐛
+### Refactor
 
-* Correctly handle when a running task is deleted
+- Moved utility code out of agentClient.go
 
 
-### Maintenance Changes 🧹
+### Miscellaneous Tasks
 
-* Update changelog
+- Updated Changelog
 
 
+## [0.2.6] - 2024-06-21
 
-<a name="v0.2.5"></a>
+### Bug Fixes
 
-## [v0.2.5](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.4...v0.2.5)
+- Correctly handle when a running task is deleted
 
-> 2024-06-17
 
-### Bug Fixes 🐛
+### Miscellaneous Tasks
 
-* Fix incorrect status and benchmark output
+- Update changelog
 
 
-### Maintenance Changes 🧹
+## [0.2.5] - 2024-06-18
 
-* Update changelog
+### Bug Fixes
 
+- Fix incorrect status and benchmark output
 
 
-<a name="v0.2.4"></a>
+### Miscellaneous Tasks
 
-## [v0.2.4](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.3...v0.2.4)
+- Update changelog
 
-> 2024-06-16
 
-### Bug Fixes 🐛
+## [0.2.4] - 2024-06-17
 
-* Updated to support v0.4.1 of CipherSwarm SDK
+### Features
 
-* Docker now finds hashcat correctly
+- Added error metadata
 
+- Add bidirectional status
 
-### Features 🚀
+- Agent now tells server its offline when shutting down
 
-* Added the ability to override checking checksums
+- Added the ability to override checking checksums
 
-  This is useful when you set the data directory to be a network share
 
+### Bug Fixes
 
-### Maintenance Changes 🧹
+- Download files are now compare checksums correctly
 
-* Bumped version tag
+- Handle failure of getting agent config
 
-* updated changelog
+- Docker now finds hashcat correctly
 
+- Updated to support v0.4.1 of CipherSwarm SDK
 
 
-<a name="v0.2.3"></a>
+### Miscellaneous Tasks
 
-## [v0.2.3](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.2...v0.2.3)
+- Remove boring stuff from changelog
 
-> 2024-06-16
+- Updated changelog
 
-### Bug Fixes 🐛
+- Updated goreleaser config format
 
-* Updated to support v0.4.1 of CipherSwarm SDK
+- Updated changelog
 
-* Docker now finds hashcat correctly
+- Updated changelog
 
+- Bumped version tag
 
-### Features 🚀
 
-* Added the ability to override checking checksums
+## [0.1.11] - 2024-06-02
 
-  This is useful when you set the data directory to be a network share
+### Features
 
+- Add parallel file downloads
 
-### Maintenance Changes 🧹
+- Add support for the agent error API
 
-* updated changelog
 
+### Bug Fixes
 
+- Fixed failure on dangling lock
 
-<a name="v0.2.2"></a>
 
-## [v0.2.2](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.1...v0.2.2)
+### Miscellaneous Tasks
 
-> 2024-06-14
+- Updated changelog
 
-### Maintenance Changes 🧹
+- Updated changelog
 
-* Updated changelog
 
-* Updated goreleaser config format
+## [0.1.10] - 2024-05-29
 
+### Features
 
+- Add parallel file downloads
 
-<a name="v0.2.1"></a>
 
-## [v0.2.1](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.2.0...v0.2.1)
+### Miscellaneous Tasks
 
-> 2024-06-14
+- Update changelog
 
-### Bug Fixes 🐛
+- Updated changelog
 
-* Handle failure of getting agent config
 
+## [0.1.9] - 2024-05-22
 
-### Maintenance Changes 🧹
+### Refactor
 
-* updated changelog
+- Move to v0.2.0 of the SDK
 
 
+### Documentation
 
-<a name="v0.2.0"></a>
+- Updated change logs
 
-## [v0.2.0](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.11...v0.2.0)
+- Update change log
 
-> 2024-06-14
 
-### Bug Fixes 🐛
+### Miscellaneous Tasks
 
-* Download files are now compare checksums correctly
+- Bumped versions on dependencies
 
+- Updated Changelog
 
-### Features 🚀
 
-* Agent now tells server its offline when shutting down
+## [0.1.7] - 2024-05-16
 
-  This marks the agent offline and frees up the tasks to be handled by another agent.
+### Refactor
 
-* Add bidirectional status
+- Update to latest Agent SDK v0.1.9
 
-  Benchmarks are now determined by the server on the heartbeat.
 
-* Added error metadata
+### Documentation
 
+- Add note about Conventional Commits
 
-### Maintenance Changes 🧹
+- Updated changelog
 
-* updated changelog
 
-* Remove boring stuff from changelog
+### Styling
 
+- Add gitlint to enforce conventional commits
 
 
-<a name="v0.1.11"></a>
+### Miscellaneous Tasks
 
-## [v0.1.11](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.10...v0.1.11)
+- Add changelog action
 
-> 2024-06-01
+- Fix git-chglog missing config_dir
 
-### Bug Fixes 🐛
+- Add SBOM to goreleaser config
 
-* Fixed failure on dangling lock
 
-  Fixed the bug where the agent died if there was a dangling lock.pid
+### Revert
 
+- Remove non-working git-chglog action
 
-### Features 🚀
 
-* Add support for the agent error API
+## [0.1.6] - 2024-05-14
 
-  The agent will now send any errors to the server for collection.
+### Features
 
-* Add parallel file downloads
+- Added improved changelog support
 
-  Replaced  the word and rule file downloads to use go-getter in parallel using go routines
 
+## [0.1.0] - 2024-04-30
 
-### Maintenance Changes 🧹
-
-* Updated changelog
-
-* Updated changelog
-
-
-
-<a name="v0.1.10"></a>
-
-## [v0.1.10](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.9...v0.1.10)
-
-> 2024-05-28
-
-### Features 🚀
-
-* Add parallel file downloads
-
-  Replaced  the word and rule file downloads to use go-getter in parallel using go routines
-
-
-### Maintenance Changes 🧹
-
-* Updated changelog
-
-* Update changelog
-
-
-
-<a name="v0.1.9"></a>
-
-## [v0.1.9](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.8...v0.1.9)
-
-> 2024-05-21
-
-### Code Refactoring 🛠
-
-* Move to v0.2.0 of the SDK
-
-
-### Documentation Changes 📚
-
-* Update change log
-
-* Updated change logs
-
-
-### Maintenance Changes 🧹
-
-* Updated Changelog
-
-* Bumped versions on dependencies
-
-
-
-<a name="v0.1.8"></a>
-
-## [v0.1.8](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.7...v0.1.8)
-
-> 2024-05-15
-
-
-<a name="v0.1.7"></a>
-
-## [v0.1.7](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.6...v0.1.7)
-
-> 2024-05-15
-
-### Code Refactoring 🛠
-
-* Update to latest Agent SDK v0.1.9
-
-
-### Documentation Changes 📚
-
-* Updated changelog
-
-* Add note about Conventional Commits
-
-
-### Maintenance Changes 🧹
-
-* Add changelog action
-
-
-### Style Changes 🎨
-
-* Add gitlint to enforce conventional commits
-
-
-
-<a name="v0.1.6"></a>
-
-## [v0.1.6](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.5...v0.1.6)
-
-> 2024-05-13
-
-### Features 🚀
-
-* Added improved changelog support
-
-
-
-<a name="v0.1.5"></a>
-
-## [v0.1.5](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.4...v0.1.5)
-
-> 2024-05-09
-
-
-<a name="v0.1.4"></a>
-
-## [v0.1.4](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.3...v0.1.4)
-
-> 2024-05-07
-
-
-<a name="v0.1.3"></a>
-
-## [v0.1.3](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.2...v0.1.3)
-
-> 2024-05-06
-
-
-<a name="v0.1.2"></a>
-
-## [v0.1.2](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.1...v0.1.2)
-
-> 2024-05-06
-
-
-<a name="v0.1.1"></a>
-
-## [v0.1.1](https://github.com/unclesp1d3r/CipherSwarm/compare/v0.1.0...v0.1.1)
-
-> 2024-05-01
-
-
-<a name="v0.1.0"></a>
-
-## v0.1.0
-
-> 2024-04-30
-
+<!-- generated by git-cliff -->
