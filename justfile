@@ -110,10 +110,18 @@ run *args:
 dev *args:
     @{{ mise_exec }} go run main.go {{ args }}
 
+# Download latest spec from CipherSwarm and regenerate the API client
+[group('dev')]
+generate: gen-api-download gen-api
+
+# Download the latest swagger.json from the CipherSwarm server repo
+[group('dev')]
+gen-api-download:
+    @curl -fSL -o docs/swagger.json https://raw.githubusercontent.com/unclesp1d3r/CipherSwarm/refs/heads/main/swagger/v1/swagger.json
+
 # Regenerate lib/api/client.gen.go from docs/swagger.json
 [group('dev')]
-generate:
-    @curl -fSL -o docs/swagger.json https://raw.githubusercontent.com/unclesp1d3r/CipherSwarm/refs/heads/main/swagger/v1/swagger.json
+gen-api:
     @{{ mise_exec }} go generate ./lib/api/...
     @echo "✅ API client regenerated at lib/api/client.gen.go"
 

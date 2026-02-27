@@ -1,3 +1,3 @@
 package api
 
-//go:generate go tool oapi-codegen -config config.yaml ../../docs/swagger.json
+//go:generate oapi-codegen -config config.yaml ../../docs/swagger.json
