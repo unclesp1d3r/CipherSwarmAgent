@@ -65,10 +65,10 @@ func main() {
 
 - **Purpose**: Cobra CLI command definition and configuration
 - **Key Functions**:
-    - Command-line flag parsing and Viper binding
-    - Configuration initialization (`initConfig`)
-    - Agent lifecycle startup (`startAgent`)
-    - Signal handling for graceful shutdown
+  - Command-line flag parsing and Viper binding
+  - Configuration initialization (`initConfig`)
+  - Agent lifecycle startup (`startAgent`)
+  - Signal handling for graceful shutdown
 
 ### 3. Agent State (`agentstate/`)
 
@@ -76,11 +76,11 @@ func main() {
 
 - **Purpose**: Global application state and configuration
 - **Key Types**:
-    - `State`: Runtime state with synchronized fields (`atomic.Bool`, `sync.RWMutex`)
-    - `CurrentActivity`: Current agent activity enum
+  - `State`: Runtime state with synchronized fields (`atomic.Bool`, `sync.RWMutex`)
+  - `CurrentActivity`: Current agent activity enum
 - **Globals**:
-    - `State`: Shared agent state (access via getter/setter methods only)
-    - `Logger`: Application logger (`charmbracelet/log`)
+  - `State`: Shared agent state (access via getter/setter methods only)
+  - `Logger`: Application logger (`charmbracelet/log`)
 
 ### 4. Core Library (`lib/`)
 
@@ -90,30 +90,30 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Server communication and configuration mapping
 - **Key Functions**:
-    - `AuthenticateAgent()`: Server authentication
-    - `GetAgentConfiguration()`: Fetch and map server configuration
-    - `UpdateAgentMetadata()`: Send agent info to server
-    - `SendHeartBeat()`: Periodic health check
-    - `mapConfiguration()`: Map API response to internal config
+  - `AuthenticateAgent()`: Server authentication
+  - `GetAgentConfiguration()`: Fetch and map server configuration
+  - `UpdateAgentMetadata()`: Send agent info to server
+  - `SendHeartBeat()`: Periodic health check
+  - `mapConfiguration()`: Map API response to internal config
 
 #### `lib/dataTypes.go`
 
 - **Purpose**: Core data structures and type definitions
 - **Key Types**:
-    - `agentConfiguration`: Internal configuration structure
-    - Type conversion utilities
+  - `agentConfiguration`: Internal configuration structure
+  - Type conversion utilities
 
 #### `lib/errorUtils.go`
 
 - **Purpose**: Error handling helpers for API responses
 - **Key Functions**:
-    - Error type handlers for specific API operations (heartbeat, status, task, etc.)
+  - Error type handlers for specific API operations (heartbeat, status, task, etc.)
 
 #### `lib/crackerUtils.go`
 
 - **Purpose**: Hashcat binary path management
 - **Key Functions**:
-    - `setNativeHashcatPath()`: Configure native binary usage
+  - `setNativeHashcatPath()`: Configure native binary usage
 
 ### 5. Agent Lifecycle (`lib/agent/`)
 
@@ -121,8 +121,8 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Agent main loop and lifecycle management
 - **Key Functions**:
-    - `StartAgent()`: Main agent loop (heartbeat, task polling, benchmark gating)
-    - `sleepWithContext()`: Context-aware sleep utility
+  - `StartAgent()`: Main agent loop (heartbeat, task polling, benchmark gating)
+  - `sleepWithContext()`: Context-aware sleep utility
 
 ### 6. API Client Layer (`lib/api/`)
 
@@ -135,8 +135,8 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Hand-written API client wrapper
 - **Key Types**:
-    - `AgentClient`: Wraps `ClientWithResponses`, implements `APIClient` interface
-    - Sub-clients: `Tasks()`, `Attacks()`, `Agents()`, `Auth()`
+  - `AgentClient`: Wraps `ClientWithResponses`, implements `APIClient` interface
+  - Sub-clients: `Tasks()`, `Attacks()`, `Agents()`, `Auth()`
 
 #### `lib/api/interfaces.go`
 
@@ -162,17 +162,17 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Benchmark execution and incremental submission
 - **Key Types**:
-    - `Manager`: Orchestrates benchmark sessions with constructor injection
+  - `Manager`: Orchestrates benchmark sessions with constructor injection
 - **Key Functions**:
-    - `UpdateBenchmarks()`: Run full benchmark session
-    - `cacheAndSubmitBenchmarks()`: Combined cache + submit with early-return
+  - `UpdateBenchmarks()`: Run full benchmark session
+  - `cacheAndSubmitBenchmarks()`: Combined cache + submit with early-return
 
 #### `lib/benchmark/cache.go`
 
 - **Purpose**: Persistent benchmark cache at `{data_path}/benchmark_cache.json`
 - **Key Functions**:
-    - `saveBenchmarkCache()`, `loadBenchmarkCache()`: Cache persistence
-    - `TrySubmitCachedBenchmarks()`: Submit cached results on startup
+  - `saveBenchmarkCache()`, `loadBenchmarkCache()`: Cache persistence
+  - `TrySubmitCachedBenchmarks()`: Submit cached results on startup
 
 #### `lib/benchmark/parse.go`
 
@@ -184,8 +184,8 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Configuration defaults as exported constants
 - **Key Functions**:
-    - `SetDefaultConfigValues()`: Register viper defaults
-    - `SetupSharedState()`: Wire config into `agentstate.State`
+  - `SetDefaultConfigValues()`: Register viper defaults
+  - `SetupSharedState()`: Wire config into `agentstate.State`
 
 ### 10. Hashcat Integration (`lib/hashcat/`)
 
@@ -193,21 +193,21 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Hashcat process lifecycle management
 - **Key Types**:
-    - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines
+  - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines
 - **Key Functions**:
-    - `NewHashcatSession()`: Create configured session
-    - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines
-    - `Kill()`: Terminate process gracefully
-    - `Cleanup()`: Resource cleanup (temp files, charset files)
+  - `NewHashcatSession()`: Create configured session
+  - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines
+  - `Kill()`: Terminate process gracefully
+  - `Cleanup()`: Resource cleanup (temp files, charset files)
 
 #### `lib/hashcat/params.go`
 
 - **Purpose**: Hashcat parameter configuration and validation
 - **Key Types**:
-    - `Params`: Attack configuration structure
+  - `Params`: Attack configuration structure
 - **Key Functions**:
-    - `Validate()`: Parameter validation per attack mode
-    - `toCmdArgs()`: Command-line argument generation
+  - `Validate()`: Parameter validation per attack mode
+  - `toCmdArgs()`: Command-line argument generation
 
 #### `lib/hashcat/types.go`
 
@@ -227,13 +227,13 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Task acceptance and lifecycle
 - **Key Functions**:
-    - `AcceptTask()`, `AbandonTask()`, `MarkTaskExhausted()`
+  - `AcceptTask()`, `AbandonTask()`, `MarkTaskExhausted()`
 
 #### `lib/task/runner.go`
 
 - **Purpose**: Task execution with hashcat
 - **Key Functions**:
-    - `RunTask()`: Main task runner
+  - `RunTask()`: Main task runner
 
 #### `lib/task/status.go`
 
@@ -257,8 +257,8 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Error reporting to server
 - **Key Functions**:
-    - `SendAgentError()`: Report errors with severity and metadata
-    - `LogAndSendError()`: Combined logging and server reporting
+  - `SendAgentError()`: Report errors with severity and metadata
+  - `LogAndSendError()`: Combined logging and server reporting
 
 ### 13. OS Abstractions (`lib/arch/`)
 

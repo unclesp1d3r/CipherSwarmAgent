@@ -128,6 +128,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `any` (not `interface{}`), `require.Error/NoError` (not `assert`), `t.Cleanup` (not `defer`), `atomic.Int32` for mock counters.
 - MockClient sub-client accessors return default mocks (not nil) to prevent nil pointer panics.
 - When removing `agentstate.State` fields, grep all test helpers and reset functions.
+- For cross-platform subprocess tests, use the Go test helper process pattern (`TestHelperProcess` + `os.Args[0]` + env vars) instead of OS-specific binaries like `sleep` or `true`.
 - Run `go test -race ./...` to detect data races.
 
 ## Git
