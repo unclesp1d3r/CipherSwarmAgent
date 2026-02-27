@@ -165,6 +165,7 @@ sequenceDiagram
 **Purpose**: Provides real-time system and task monitoring with configurable thresholds.
 
 **Package Structure**:
+
 ```
 lib/monitoring/
 ├── manager.go       # Main monitoring manager
@@ -259,6 +260,7 @@ const (
 ```
 
 **Responsibilities**:
+
 - Collect system metrics (CPU, memory, GPU temperature, disk space)
 - Monitor hashcat process performance and progress
 - Evaluate configurable thresholds and generate alerts
@@ -271,6 +273,7 @@ const (
 **Purpose**: Manages task state persistence, recovery data, and execution history.
 
 **Package Structure**:
+
 ```
 lib/persistence/
 ├── manager.go       # Main persistence manager
@@ -375,6 +378,7 @@ type HistoryFilters struct {
 ```
 
 **Responsibilities**:
+
 - Persist task state to local storage (JSON format)
 - Manage atomic updates to prevent corruption
 - Handle task state cleanup on completion
@@ -387,6 +391,7 @@ type HistoryFilters struct {
 **Purpose**: Handles automatic recovery from various failure scenarios.
 
 **Package Structure**:
+
 ```
 lib/recovery/
 ├── manager.go       # Main recovery manager
@@ -467,14 +472,13 @@ func (b *BackoffCalculator) Reset()
 ```
 
 **Responsibilities**:
+
 - Implement exponential backoff for network failures
 - Handle hashcat process crashes and restarts
 - Manage resource-based throttling (temperature, memory)
 - Coordinate with persistence manager for state recovery
 - Report unrecoverable failures via `cserrors.LogAndSendError`
 - Integrate with existing `lib/hashcat/session.go` for process management
-
-### 4. Task Manager Enhancement (lib/task/)
 
 ### 4. Task Manager Enhancement (lib/task/)
 
@@ -532,6 +536,7 @@ type RecoveryInfo struct {
 ```
 
 **Integration Points**:
+
 - Wraps existing `RunTask` with monitoring and persistence
 - Integrates with `lib/hashcat/session.go` for process management
 - Uses existing `api.TasksClient` interface for server communication
@@ -645,6 +650,7 @@ type State struct {
 ```
 
 **Responsibilities**:
+
 - Provide configuration defaults in `lib/config/config.go`
 - Load configuration via Viper in `cmd/root.go`
 - Store configuration in `agentstate.State` for global access
@@ -798,11 +804,13 @@ The enhanced system integrates with the existing `cserrors` package and extends 
 #### 1. Network Failures
 
 **Detection**:
+
 - API call failures with network-related errors
 - Timeout errors from HTTP client
 - Connection refused or DNS resolution failures
 
 **Recovery Strategy**:
+
 ```go
 // Implemented in lib/recovery/handlers.go
 func (m *Manager) HandleNetworkFailure(ctx context.Context, taskID int64) error {
@@ -864,6 +872,7 @@ func (m *Manager) HandleNetworkFailure(ctx context.Context, taskID int64) error 
 ```
 
 **Error Reporting**:
+
 - Use `cserrors.LogAndSendError` with `api.SeverityWarning` for transient failures
 - Use `api.SeverityCritical` when max retries exceeded
 - Include recovery attempt count in error metadata
@@ -871,11 +880,13 @@ func (m *Manager) HandleNetworkFailure(ctx context.Context, taskID int64) error 
 #### 2. Process Crashes
 
 **Detection**:
+
 - Hashcat process exits with non-zero exit code
 - Unexpected process termination
 - Parse exit code using `lib/hashcat/exitcode.go`
 
 **Recovery Strategy**:
+
 ```go
 // Implemented in lib/recovery/handlers.go
 func (m *Manager) HandleProcessCrash(ctx context.Context, taskID int64, exitCode int, stderr string) error {
@@ -933,6 +944,7 @@ func (m *Manager) HandleProcessCrash(ctx context.Context, taskID int64, exitCode
 ```
 
 **Error Reporting**:
+
 - Capture and include exit code and stderr in error reports
 - Use `cserrors.WithClassification` to mark as non-retryable after max attempts
 - Include failure count in error metadata
@@ -940,12 +952,14 @@ func (m *Manager) HandleProcessCrash(ctx context.Context, taskID int64, exitCode
 #### 3. Resource Threshold Violations
 
 **Detection**:
+
 - Monitoring alerts from `lib/monitoring/alerts.go`
 - GPU temperature exceeds threshold
 - Memory usage exceeds threshold
 - Disk space below threshold
 
 **Recovery Strategy**:
+
 ```go
 // Implemented in lib/recovery/handlers.go
 func (m *Manager) HandleResourceThreshold(ctx context.Context, taskID int64, alert monitoring.Alert) error {
@@ -1024,6 +1038,7 @@ func (m *Manager) handleGPUTemperature(ctx context.Context, taskID int64, alert 
 ```
 
 **Error Reporting**:
+
 - Log warnings for threshold violations
 - Use `api.SeverityWarning` for temporary pauses
 - Use `api.SeverityCritical` only if unable to recover
@@ -1031,11 +1046,13 @@ func (m *Manager) handleGPUTemperature(ctx context.Context, taskID int64, alert 
 #### 4. State Persistence Failures
 
 **Detection**:
+
 - File system errors during state save/load
 - JSON marshaling/unmarshaling errors
 - Permission errors
 
 **Recovery Strategy**:
+
 ```go
 // Implemented in lib/persistence/state.go
 func (m *Manager) SaveTaskState(state *TaskState) error {
@@ -1071,6 +1088,7 @@ func (m *Manager) SaveTaskState(state *TaskState) error {
 ```
 
 **Error Handling**:
+
 - Log errors but continue task execution (graceful degradation)
 - Use atomic file operations (write to temp, then rename)
 - Clean up temporary files on failure
@@ -1282,6 +1300,7 @@ After reviewing all properties, I'll identify any redundancy:
 - Properties 4.2 and 1.3 both involve threshold violations but test different aspects (logging vs. action) - keep separate
 
 Consolidated properties:
+
 - Combine 2.2, 2.7, and 3.4 into a single "Task resumption validation" property
 - Combine 1.5 and 6.2 into a single "Status update format compatibility" property
 
@@ -1495,6 +1514,7 @@ func NewManager(
 ```
 
 This allows:
+
 - Easy mocking in tests
 - Optional features (pass nil to disable)
 - Clear component boundaries
@@ -1716,6 +1736,7 @@ agentstate.Logger.Error("Failed to save task state",
 **3. Sensitive Data**
 
 Never log:
+
 - API tokens or authentication credentials
 - Hash values or cracked passwords
 - Full file paths that might contain usernames
@@ -1778,6 +1799,7 @@ Add to existing CI workflows:
 ### Migration Path
 
 **Phase 1: Core Infrastructure** (Week 1-2)
+
 - Implement `lib/monitoring/` package
 - Implement `lib/persistence/` package
 - Implement `lib/recovery/` package
@@ -1785,29 +1807,32 @@ Add to existing CI workflows:
 - Unit tests for all new packages
 
 **Phase 2: Integration** (Week 3)
+
 - Extend `lib/task/Manager` with monitoring integration
 - Update `agentstate.State` with new fields
 - Implement configuration loading in `cmd/root.go`
 - Integration tests
 
 **Phase 3: Recovery Logic** (Week 4)
+
 - Implement network failure recovery
 - Implement process crash recovery
 - Implement resource threshold handling
 - Property-based tests for recovery scenarios
 
 **Phase 4: History and Analytics** (Week 5)
+
 - Implement history storage (SQLite)
 - Implement history queries and export
 - Add CLI commands for history viewing
 - Performance testing
 
 **Phase 5: Polish and Documentation** (Week 6)
+
 - Cross-platform testing
 - Performance optimization
 - Documentation updates
 - Example configurations
-
 
 ## Testing Strategy
 
@@ -2007,6 +2032,7 @@ func TestRecoveryManager_HandleNetworkFailure(t *testing.T) {
 ### Property-Based Testing
 
 **Configuration**:
+
 - Use `github.com/leanovate/gopter` for property-based testing in Go
 - Minimum 100 iterations per property test
 - Each test tagged with feature name and property number
@@ -2171,6 +2197,7 @@ func TestMonitoring_GPUMetrics_Windows(t *testing.T) {
 ```
 
 **CI Matrix**:
+
 - Test on Linux (Ubuntu latest), macOS (latest), Windows (latest)
 - Test with Go 1.26+
 - Run with `-race` flag to detect data races
