@@ -61,10 +61,15 @@ func saveBenchmarkCache(results []display.BenchmarkResult) error {
 	return nil
 }
 
+// errCacheCorrupt indicates the benchmark cache file contained invalid JSON
+// and was removed. Callers should treat this as "no cache" and re-run.
+var errCacheCorrupt = errors.New("benchmark cache file is corrupt")
+
 // loadBenchmarkCache reads and unmarshals the cached benchmark results.
-// Returns (nil, nil) when no usable cache exists: cache path is empty, file
-// does not exist, file contains corrupt JSON, or the result slice is empty.
-// Returns a non-nil error only for unexpected I/O failures (e.g., permission
+// Returns (nil, nil) when no cache exists: cache path is empty, file does
+// not exist, or the result slice is empty. Returns (nil, errCacheCorrupt)
+// when the file exists but contains invalid JSON (the file is removed).
+// Returns a non-nil error for unexpected I/O failures (e.g., permission
 // denied).
 func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 	cachePath := agentstate.State.BenchmarkCachePath
@@ -76,27 +81,30 @@ func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			agentstate.Logger.Debug("No benchmark cache file found", "path", cachePath)
+
 			return nil, nil
 		}
+
 		agentstate.Logger.Warn("Failed to read benchmark cache file",
 			"error", err, "path", cachePath)
+
 		return nil, fmt.Errorf("failed to read benchmark cache: %w", err)
 	}
 
 	var results []display.BenchmarkResult
 	if err := json.Unmarshal(data, &results); err != nil {
-		agentstate.Logger.Warn("Benchmark cache file is corrupt, removing and will re-run benchmarks",
-			"error", err, "path", cachePath)
 		if removeErr := os.Remove(cachePath); removeErr != nil && !os.IsNotExist(removeErr) {
 			agentstate.Logger.Warn("Failed to remove corrupt benchmark cache file",
 				"error", removeErr, "path", cachePath)
 		}
-		return nil, nil
+
+		return nil, fmt.Errorf("%w: %s", errCacheCorrupt, err.Error())
 	}
 
 	if len(results) == 0 {
 		agentstate.Logger.Debug("Benchmark cache file is empty, will re-run benchmarks",
 			"path", cachePath)
+
 		return nil, nil
 	}
 

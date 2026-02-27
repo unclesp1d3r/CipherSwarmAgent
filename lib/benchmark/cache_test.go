@@ -168,7 +168,7 @@ func TestLoadBenchmarkCache(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name: "returns nil for corrupt JSON",
+			name: "returns error for corrupt JSON",
 			setupCache: func(t *testing.T, dir string) string {
 				t.Helper()
 				p := filepath.Join(dir, "benchmark_cache.json")
@@ -176,7 +176,7 @@ func TestLoadBenchmarkCache(t *testing.T) {
 				return p
 			},
 			expectResults: false,
-			expectError:   false,
+			expectError:   true,
 		},
 		{
 			name: "returns nil for empty array",
