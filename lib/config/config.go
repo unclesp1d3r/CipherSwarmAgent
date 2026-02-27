@@ -157,7 +157,7 @@ func SetupSharedState() {
 	agentstate.State.UseLegacyDeviceIdentificationMethod = viper.GetBool(
 		"use_legacy_device_technique",
 	) // Set the use legacy device identification method flag in the shared state
-	agentstate.State.ForceBenchmarkRun = viper.GetBool("force_benchmark_run")
+	agentstate.State.SetForceBenchmarkRun(viper.GetBool("force_benchmark_run"))
 	agentstate.State.InsecureDownloads = viper.GetBool("insecure_downloads")
 	agentstate.State.AlwaysUseNativeHashcat = viper.GetBool("always_use_native_hashcat")
 

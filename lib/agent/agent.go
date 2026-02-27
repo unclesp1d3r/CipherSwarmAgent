@@ -302,8 +302,8 @@ func handleReload(ctx context.Context) {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 		// Server-initiated reload must re-run benchmarks (not use stale cache).
 		// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
-		agentstate.State.ForceBenchmarkRun = true
-		defer func() { agentstate.State.ForceBenchmarkRun = false }()
+		agentstate.State.SetForceBenchmarkRun(true)
+		defer func() { agentstate.State.SetForceBenchmarkRun(false) }()
 		if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
 			agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
 				"error", err)

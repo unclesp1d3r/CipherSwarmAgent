@@ -90,7 +90,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.EnableAdditionalHashTypes = false
 		agentstate.State.UseLegacyDeviceIdentificationMethod = false
 		agentstate.State.APIClient = nil
-		agentstate.State.ForceBenchmarkRun = false
+		agentstate.State.SetForceBenchmarkRun(false)
 		agentstate.State.InsecureDownloads = false
 		agentstate.State.DownloadMaxRetries = 0
 		agentstate.State.DownloadRetryDelay = 0
@@ -137,7 +137,7 @@ func ResetTestState() {
 	agentstate.State.EnableAdditionalHashTypes = false
 	agentstate.State.UseLegacyDeviceIdentificationMethod = false
 	agentstate.State.APIClient = nil
-	agentstate.State.ForceBenchmarkRun = false
+	agentstate.State.SetForceBenchmarkRun(false)
 	agentstate.State.InsecureDownloads = false
 	agentstate.State.DownloadMaxRetries = 0
 	agentstate.State.DownloadRetryDelay = 0

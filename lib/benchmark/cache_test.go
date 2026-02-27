@@ -447,8 +447,8 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 			defer cleanupState()
 
 			if tt.forceBenchmark {
-				agentstate.State.ForceBenchmarkRun = true
-				defer func() { agentstate.State.ForceBenchmarkRun = false }()
+				agentstate.State.SetForceBenchmarkRun(true)
+				defer func() { agentstate.State.SetForceBenchmarkRun(false) }()
 			}
 
 			if tt.setupCache {

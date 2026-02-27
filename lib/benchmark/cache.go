@@ -55,14 +55,16 @@ func saveBenchmarkCache(results []display.BenchmarkResult) error {
 		agentstate.Logger.Info("Benchmark results cached to disk",
 			"path", cachePath, "size_bytes", info.Size())
 	} else {
-		agentstate.Logger.Info("Benchmark results cached to disk", "path", cachePath)
+		agentstate.Logger.Debug("Benchmark cache saved but stat failed",
+			"error", statErr, "path", cachePath)
 	}
 
 	return nil
 }
 
-// errCacheCorrupt indicates the benchmark cache file contained invalid JSON
-// and was removed. Callers should treat this as "no cache" and re-run.
+// errCacheCorrupt indicates the benchmark cache file contained invalid JSON.
+// Removal is attempted but may fail (logged as a warning). Callers should
+// treat this as "no cache" and re-run.
 var errCacheCorrupt = errors.New("benchmark cache file is corrupt")
 
 // loadBenchmarkCache reads and unmarshals the cached benchmark results.
@@ -93,6 +95,9 @@ func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 
 	var results []display.BenchmarkResult
 	if err := json.Unmarshal(data, &results); err != nil {
+		agentstate.Logger.Warn("Benchmark cache file is corrupt, removing and will re-run benchmarks",
+			"error", err, "path", cachePath)
+
 		if removeErr := os.Remove(cachePath); removeErr != nil && !os.IsNotExist(removeErr) {
 			agentstate.Logger.Warn("Failed to remove corrupt benchmark cache file",
 				"error", removeErr, "path", cachePath)
@@ -123,7 +128,7 @@ func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 // true if all results are now submitted, false otherwise (cache is preserved
 // for the next attempt).
 func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
-	if agentstate.State.ForceBenchmarkRun {
+	if agentstate.State.GetForceBenchmarkRun() {
 		agentstate.Logger.Debug("Force benchmark flag set, skipping cache submission")
 		return false
 	}
