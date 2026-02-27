@@ -165,14 +165,14 @@ The main business logic of the agent, organized by functional area:
     - `Manager`: Orchestrates benchmark sessions with constructor injection
 - **Key Functions**:
     - `UpdateBenchmarks()`: Run full benchmark session
-    - `TrySubmitCachedBenchmarks()`: Submit cached results on startup
+    - `cacheAndSubmitBenchmarks()`: Combined cache + submit with early-return
 
 #### `lib/benchmark/cache.go`
 
 - **Purpose**: Persistent benchmark cache at `{data_path}/benchmark_cache.json`
 - **Key Functions**:
     - `saveBenchmarkCache()`, `loadBenchmarkCache()`: Cache persistence
-    - `cacheAndSubmitBenchmarks()`: Combined cache + submit with early-return
+    - `TrySubmitCachedBenchmarks()`: Submit cached results on startup
 
 #### `lib/benchmark/parse.go`
 
