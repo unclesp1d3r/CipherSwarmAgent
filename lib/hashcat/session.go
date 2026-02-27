@@ -34,15 +34,17 @@ const (
 // Session represents a hashcat execution session with comprehensive process management.
 // It manages the hashcat process lifecycle, handles I/O streams, and provides channels
 // for real-time communication of results, status updates, and error messages.
-// The session stores a context.CancelFunc to enable graceful shutdown and cancellation
-// of session operations, allowing controlled termination of goroutines and resource cleanup
-// during lifecycle management.
+// The ctx field is the session lifecycle context observed by I/O goroutines for
+// cancellation. The session stores a context.CancelFunc to enable graceful shutdown
+// and cancellation of session operations, allowing controlled termination of goroutines
+// and resource cleanup during lifecycle management.
 type Session struct {
-	proc               *exec.Cmd  // Hashcat process command
-	hashFile           string     // Path to hash input file
-	outFile            *os.File   // Output file for cracked hashes
-	charsetFiles       []*os.File // Custom charset files for mask attacks
-	shardedCharsetFile *os.File   // Sharded charset file for distributed attacks
+	proc               *exec.Cmd       // Hashcat process command
+	hashFile           string          // Path to hash input file
+	outFile            *os.File        // Output file for cracked hashes
+	charsetFiles       []*os.File      // Custom charset files for mask attacks
+	shardedCharsetFile *os.File        // Sharded charset file for distributed attacks
+	ctx                context.Context //nolint:containedctx // session lifecycle context for I/O goroutines
 	cancel             context.CancelFunc
 	cancelMu           sync.Mutex    // Protects cancel field from concurrent access
 	CrackedHashes      chan Result   // Channel for successfully cracked hashes
@@ -108,6 +110,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 			ctx,
 			binaryPath,
 			args...),
+		ctx:                ctx,
 		cancel:             cancel,
 		hashFile:           params.HashFile,
 		outFile:            outFile,
@@ -192,40 +195,61 @@ func (sess *Session) startTailer() (*tail.Tail, error) {
 // It parses each line to extract timestamp, hash, and plaintext, then sends
 // the result through the CrackedHashes channel. Invalid lines are logged and skipped.
 func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
-	for tailLine := range tailer.Lines {
-		line := tailLine.Text
+	for {
+		select {
+		case tailLine, ok := <-tailer.Lines:
+			if !ok {
+				return
+			}
 
-		values := strings.Split(line, ":")
-		if len(values) < logParseMinParts {
-			agentstate.Logger.Error("unexpected line contents", "line", line)
+			line := tailLine.Text
 
-			continue
-		}
+			values := strings.Split(line, ":")
+			if len(values) < logParseMinParts {
+				agentstate.Logger.Error("unexpected line contents", "line", line)
 
-		timestamp, plainHex := values[0], values[len(values)-1]
+				continue
+			}
 
-		bs, err := hex.DecodeString(plainHex)
-		if err != nil {
-			agentstate.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
+			timestamp, plainHex := values[0], values[len(values)-1]
 
-			continue
-		}
+			bs, err := hex.DecodeString(plainHex)
+			if err != nil {
+				agentstate.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
 
-		plain := string(bs)
-		hashParts := values[1 : len(values)-1]
-		hash := strings.Join(hashParts, ":")
+				continue
+			}
 
-		timestampI, err := strconv.ParseInt(timestamp, 10, 64)
-		if err != nil {
-			agentstate.Logger.Error("couldn't parse hashcat timestamp", "timestamp", timestamp, "error", err)
+			plain := string(bs)
+			hashParts := values[1 : len(values)-1]
+			hash := strings.Join(hashParts, ":")
 
-			continue
-		}
+			timestampI, err := strconv.ParseInt(timestamp, 10, 64)
+			if err != nil {
+				agentstate.Logger.Error("couldn't parse hashcat timestamp", "timestamp", timestamp, "error", err)
 
-		sess.CrackedHashes <- Result{
-			Timestamp: time.Unix(timestampI, 0),
-			Hash:      hash,
-			Plaintext: plain,
+				continue
+			}
+
+			select {
+			case sess.CrackedHashes <- Result{
+				Timestamp: time.Unix(timestampI, 0),
+				Hash:      hash,
+				Plaintext: plain,
+			}:
+			case <-sess.ctx.Done():
+				//nolint:gosec,errcheck // G104 - best-effort cleanup
+				tailer.Stop()
+				tailer.Cleanup()
+
+				return
+			}
+		case <-sess.ctx.Done():
+			//nolint:gosec,errcheck // G104 - best-effort cleanup
+			tailer.Stop()
+			tailer.Cleanup()
+
+			return
 		}
 	}
 }
@@ -236,9 +260,15 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 // This method blocks until the process completes and sends the exit status to DoneChan.
 func (sess *Session) handleStdout() {
 	scanner := bufio.NewScanner(sess.pStdout)
+scanLoop:
 	for scanner.Scan() {
 		line := scanner.Text()
-		sess.StdoutLines <- line
+
+		select {
+		case sess.StdoutLines <- line:
+		case <-sess.ctx.Done():
+			break scanLoop
+		}
 
 		if line == "" {
 			continue
@@ -254,7 +284,11 @@ func (sess *Session) handleStdout() {
 					continue
 				}
 
-				sess.StatusUpdates <- status
+				select {
+				case sess.StatusUpdates <- status:
+				case <-sess.ctx.Done():
+					break scanLoop
+				}
 			} else {
 				if strings.Contains(line, "starting in restore mode") {
 					agentstate.Logger.Info("Hashcat is starting in restore mode")
@@ -269,9 +303,17 @@ func (sess *Session) handleStdout() {
 
 	// Allow brief time for channel consumers to drain remaining stdout/stderr
 	// messages before signaling completion via DoneChan.
-	time.Sleep(drainTimeout)
+	drainTimer := time.NewTimer(drainTimeout)
+	select {
+	case <-drainTimer.C:
+	case <-sess.ctx.Done():
+		drainTimer.Stop()
+	}
 
-	sess.DoneChan <- done
+	select {
+	case sess.DoneChan <- done:
+	case <-sess.ctx.Done():
+	}
 }
 
 // handleStderr processes stderr output from the hashcat process.
@@ -279,9 +321,14 @@ func (sess *Session) handleStdout() {
 func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
-		agentstate.Logger.Error("read stderr", "text", scanner.Text())
+		line := scanner.Text()
+		agentstate.Logger.Error("read stderr", "text", line)
 
-		sess.StderrMessages <- scanner.Text()
+		select {
+		case sess.StderrMessages <- line:
+		case <-sess.ctx.Done():
+			return
+		}
 	}
 }
 

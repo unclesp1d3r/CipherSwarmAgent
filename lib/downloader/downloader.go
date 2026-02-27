@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"net/url"
@@ -70,14 +71,14 @@ func FileExistsAndValid(filePath, checksum string) bool {
 		return true
 	}
 
-	fileChecksum, err := fileMD5(filePath)
+	digest, err := fileChecksum(filePath, md5.New()) //nolint:gosec // G401 - MD5 for integrity
 	if err != nil {
 		agentstate.Logger.Error("Error calculating file checksum", "path", filePath, "error", err)
 
 		return false
 	}
 
-	if fileChecksum == checksum {
+	if digest == checksum {
 		return true
 	}
 
@@ -88,7 +89,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 		"url_checksum",
 		checksum,
 		"file_checksum",
-		fileChecksum,
+		digest,
 	)
 
 	if err := os.Remove(filePath); err != nil {
@@ -144,8 +145,29 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 		return err
 	}
 
-	if strings.TrimSpace(checksum) != "" && !FileExistsAndValid(filePath, checksum) {
-		return errors.New("downloaded file checksum does not match")
+	if strings.TrimSpace(checksum) != "" {
+		digest, err := fileChecksum(filePath, md5.New()) //nolint:gosec // G401 - MD5 for integrity
+		if err != nil {
+			return fmt.Errorf("error calculating downloaded file checksum: %w", err)
+		}
+
+		if digest != checksum {
+			agentstate.Logger.Warn(
+				"Checksums do not match",
+				"path",
+				filePath,
+				"url_checksum",
+				checksum,
+				"file_checksum",
+				digest,
+			)
+
+			if err := os.Remove(filePath); err != nil {
+				agentstate.Logger.Error("Error removing file with mismatched checksum", "path", filePath, "error", err)
+			}
+
+			return errors.New("downloaded file checksum does not match")
+		}
 	}
 
 	return nil
@@ -195,6 +217,7 @@ func appendChecksumToURL(rawURL, checksum string) (string, error) {
 	}
 
 	q := u.Query()
+	// TODO(#118): migrate to SHA-256 once CipherSwarm server API supports it
 	q.Set("checksum", "md5:"+checksum)
 	u.RawQuery = q.Encode()
 
@@ -304,8 +327,9 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 	return nil
 }
 
-// fileMD5 computes the MD5 hex digest of the file at the given path.
-func fileMD5(filePath string) (string, error) {
+// TODO(#118): migrate to SHA-256 once CipherSwarm server API supports it
+// fileChecksum computes the hex digest of the file at the given path using the provided hash.
+func fileChecksum(filePath string, h hash.Hash) (string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return "", err
@@ -318,7 +342,6 @@ func fileMD5(filePath string) (string, error) {
 		}
 	}()
 
-	h := md5.New() //nolint:gosec // G401 - MD5 used for file integrity check, not security
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
