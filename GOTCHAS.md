@@ -9,6 +9,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `contextcheck` flags functions not propagating context — use `//nolint:contextcheck // reason` when the callee genuinely cannot accept a context parameter.
 - `revive` requires each exported constant to have its own `// ConstName is...` doc comment. A group comment alone doesn't satisfy it.
 - `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
+- `//nolint:errcheck` does NOT suppress `gosec` G104 (unhandled error return) — list both (e.g., `//nolint:gosec,errcheck // G104 - reason`).
+- `containedctx` flags `context.Context` stored in structs — use `//nolint:containedctx // reason` when the context is intentionally part of the struct lifecycle.
 - `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation. Bare `//nolint:linter` directives fail CI.
 - A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep them contiguous.
 
