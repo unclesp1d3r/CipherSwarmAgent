@@ -77,7 +77,11 @@ func GetAgentConfiguration(ctx context.Context) error {
 		return ErrConfigurationFailed
 	}
 
-	agentConfig := mapConfiguration(response.JSON200.ApiVersion, response.JSON200.Config)
+	agentConfig := mapConfiguration(
+		response.JSON200.ApiVersion,
+		response.JSON200.Config,
+		response.JSON200.BenchmarksNeeded,
+	)
 
 	if agentConfig.Config.UseNativeHashcat {
 		if err := setNativeHashcatPathFn(ctx); err != nil {
@@ -94,9 +98,10 @@ func GetAgentConfiguration(ctx context.Context) error {
 }
 
 // mapConfiguration converts the API configuration response into an agentConfiguration for use within the agent.
-func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration) agentConfiguration {
+func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration, benchmarksNeeded bool) agentConfiguration {
 	agentConfig := agentConfiguration{
-		APIVersion: int64(apiVersion),
+		APIVersion:       int64(apiVersion),
+		BenchmarksNeeded: benchmarksNeeded,
 		Config: agentConfig{
 			UseNativeHashcat:    UnwrapOr(config.UseNativeHashcat, false),
 			AgentUpdateInterval: int64(UnwrapOr(config.AgentUpdateInterval, defaultAgentUpdateInterval)),

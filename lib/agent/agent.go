@@ -118,8 +118,13 @@ func StartAgent() {
 	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
-	if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
-		agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
+	if lib.Configuration.BenchmarksNeeded {
+		if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
+			agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
+		}
+	} else {
+		agentstate.Logger.Info("Server reports valid benchmarks on file, skipping benchmark run")
+		agentstate.State.SetBenchmarksSubmitted(true)
 	}
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
@@ -285,27 +290,33 @@ func handleReload(ctx context.Context) {
 		return
 	}
 
-	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	// Update manager configs after reload
 	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
-	// Server-initiated reload must re-run benchmarks (not use stale cache).
-	// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
-	agentstate.State.ForceBenchmarkRun = true
-	defer func() { agentstate.State.ForceBenchmarkRun = false }()
-	if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
-		agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
-			"error", err)
-		cserrors.SendAgentError(
-			ctx,
-			"Benchmark update failed during reload: "+err.Error(),
-			nil,
-			api.SeverityMajor,
-		)
+
+	if lib.Configuration.BenchmarksNeeded {
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
+		// Server-initiated reload must re-run benchmarks (not use stale cache).
+		// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
+		agentstate.State.ForceBenchmarkRun = true
+		defer func() { agentstate.State.ForceBenchmarkRun = false }()
+		if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
+			agentstate.Logger.Error("Benchmark update failed during reload, task processing paused",
+				"error", err)
+			cserrors.SendAgentError(
+				ctx,
+				"Benchmark update failed during reload: "+err.Error(),
+				nil,
+				api.SeverityMajor,
+			)
+		}
+		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
+	} else {
+		agentstate.Logger.Info("Server reports valid benchmarks on file, skipping benchmark re-run")
+		agentstate.State.SetBenchmarksSubmitted(true)
 	}
-	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 	agentstate.State.SetReload(false)
 }
 

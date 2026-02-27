@@ -128,9 +128,9 @@ func clearBenchmarkCache() {
 // TrySubmitCachedBenchmarks attempts to submit previously cached benchmark
 // results to the server. Returns false immediately if the force-benchmark
 // flag is set (stale results should not be submitted). Filters to only
-// unsubmitted results, sends them, marks as submitted, and updates the cache.
-// Returns true if all results are now submitted (and clears the cache),
-// false otherwise (cache is preserved for the next attempt).
+// unsubmitted results, sends them, marks as submitted, and persists the
+// updated cache. Returns true if all results are now submitted, false
+// otherwise (cache is preserved for the next attempt).
 func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
 	if agentstate.State.ForceBenchmarkRun {
 		agentstate.Logger.Debug("Force benchmark flag set, skipping cache submission")
@@ -148,9 +148,8 @@ func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
 	}
 
 	if allSubmitted(cached) {
-		clearBenchmarkCache()
 		agentstate.State.SetBenchmarksSubmitted(true)
-		agentstate.Logger.Info("All cached benchmarks already submitted, clearing cache")
+		agentstate.Logger.Info("All cached benchmarks already submitted")
 
 		return true
 	}
@@ -162,12 +161,15 @@ func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
 		return false
 	}
 
-	// Mark all as submitted
+	// Mark all as submitted and persist updated cache
 	for i := range cached {
 		cached[i].Submitted = true
 	}
 
-	clearBenchmarkCache()
+	if saveErr := saveBenchmarkCache(cached); saveErr != nil {
+		agentstate.Logger.Warn("Failed to update benchmark cache after submission", "error", saveErr)
+	}
+
 	agentstate.State.SetBenchmarksSubmitted(true)
 	agentstate.Logger.Info("Cached benchmarks successfully submitted to server")
 
