@@ -73,7 +73,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Handle `obj == nil && err == nil` as a separate error case for API responses to prevent nil pointer dereferences.
 - In deferred cleanup, use `os.IsNotExist` to skip already-removed files. Include file paths in error messages.
 - For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding.
-- **Error reporting:** Use `SendAgentError(msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. `cserrors.LogAndSendError` delegates to `SendAgentError` (includes platform/version metadata). Always pass a non-nil error — it returns `err` directly. API submission is skipped only when `APIClient` is uninitialized.
+- **Error reporting:** Use `SendAgentError(ctx, msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. `cserrors.LogAndSendError` delegates to `SendAgentError` (includes platform/version metadata). Always pass a non-nil error — it returns `err` directly. API submission is skipped only when `APIClient` is uninitialized.
 
 ### Concurrency
 
@@ -142,7 +142,7 @@ Conventional Commits: `<type>(<scope>): <description>`. Types: `feat`, `fix`, `d
 
 ### Changelog
 
-`CHANGELOG.md` is auto-generated from commit messages using `git-chglog`.
+`CHANGELOG.md` is auto-generated from commit messages using `git-cliff` (`just changelog`).
 
 ## CI/CD & Docker
 
