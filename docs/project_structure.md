@@ -4,7 +4,7 @@ This document explains the organization and architecture of the CipherSwarm Agen
 
 ## Overview
 
-The CipherSwarm Agent is built with Go 1.22+ and follows a modular architecture for maintainability and testability. The project structure separates concerns into logical modules and provides clear interfaces between components.
+The CipherSwarm Agent is built with Go 1.26+ and follows a modular architecture for maintainability and testability. The project structure separates concerns into logical modules and provides clear interfaces between components.
 
 ## Directory Layout
 
@@ -12,21 +12,33 @@ The CipherSwarm Agent is built with Go 1.22+ and follows a modular architecture 
 CipherSwarmAgent/
 ├── cmd/                    # CLI entrypoint and command registration
 ├── lib/                    # Core agent logic and utilities
+│   ├── agent/             # Agent lifecycle (startup, heartbeat, shutdown)
+│   ├── api/               # API client layer (generated + hand-written)
+│   ├── apierrors/         # Generic API error handler
 │   ├── arch/              # OS-specific abstractions
-│   ├── hashcat/           # Hashcat integration
-│   └── utils/             # Reusable utilities
-├── shared/                 # Global state and shared types
+│   ├── benchmark/         # Benchmark execution, caching, and submission
+│   ├── config/            # Configuration defaults as exported constants
+│   ├── cracker/           # Hashcat binary discovery and extraction
+│   ├── cserrors/          # Centralized error reporting
+│   ├── display/           # User-facing output (status, progress)
+│   ├── downloader/        # File download with checksum verification
+│   ├── hashcat/           # Hashcat session management and parsing
+│   ├── progress/          # Progress calculation utilities
+│   ├── task/              # Task lifecycle management
+│   ├── testdata/          # Test fixtures and data files
+│   ├── testhelpers/       # Shared test helpers and mocks
+│   └── zap/               # Zap file monitoring for cracked hashes
+├── agentstate/             # Global agent state, loggers, synchronized fields
 ├── docs/                   # Documentation (this directory)
 ├── .github/               # GitHub workflows and templates
 ├── .chglog/               # Changelog configuration
-├── .cursor/               # Cursor editor configuration
-├── .devcontainer/         # VS Code dev container
 ├── Dockerfile             # Container build for agent
 ├── Dockerfile.releaser    # Container for releases
 ├── go.mod                 # Go module definition
 ├── go.sum                 # Go module checksums
 ├── justfile               # Command runner configuration
 ├── main.go                # Application entrypoint
+├── mise.toml              # Dev toolchain management
 ├── mkdocs.yml             # Documentation configuration
 └── README.md              # Project overview
 ```
@@ -53,208 +65,242 @@ func main() {
 
 - **Purpose**: Cobra CLI command definition and configuration
 - **Key Functions**:
-  - Command-line flag parsing
-  - Configuration binding (Viper)
-  - Agent lifecycle management
-  - Signal handling for graceful shutdown
+    - Command-line flag parsing and Viper binding
+    - Configuration initialization (`initConfig`)
+    - Agent lifecycle startup (`startAgent`)
+    - Signal handling for graceful shutdown
 
-**Key Components**:
+### 3. Agent State (`agentstate/`)
 
-- `rootCmd`: Main Cobra command definition
-- `initConfig()`: Configuration initialization
-- `startAgent()`: Main agent execution loop
-- Flag definitions for all configuration options
+#### `agentstate/agentstate.go`
 
-### 3. Core Library (`lib/`)
+- **Purpose**: Global application state and configuration
+- **Key Types**:
+    - `State`: Runtime state with synchronized fields (`atomic.Bool`, `sync.RWMutex`)
+    - `CurrentActivity`: Current agent activity enum
+- **Globals**:
+    - `State`: Shared agent state (access via getter/setter methods only)
+    - `Logger`: Application logger (`charmbracelet/log`)
+
+### 4. Core Library (`lib/`)
 
 The main business logic of the agent, organized by functional area:
 
 #### `lib/agentClient.go`
 
-- **Purpose**: Primary agent logic and server communication
+- **Purpose**: Server communication and configuration mapping
 - **Key Functions**:
-  - `AuthenticateAgent()`: Server authentication
-  - `GetAgentConfiguration()`: Fetch server configuration
-  - `UpdateAgentMetadata()`: Send agent info to server
-  - `SendHeartBeat()`: Periodic health check
-  - `DownloadFiles()`: Attack resource downloads
-
-#### `lib/taskManager.go`
-
-- **Purpose**: Task lifecycle management
-- **Key Functions**:
-  - `GetNewTask()`: Poll for available tasks
-  - `AcceptTask()`: Accept and prepare task
-  - `RunTask()`: Execute task with Hashcat
-  - `markTaskExhausted()`: Mark task complete
-
-#### `lib/benchmarkManager.go`
-
-- **Purpose**: Device benchmarking and capability detection
-- **Key Functions**:
-  - `UpdateBenchmarks()`: Run performance benchmarks
-  - `sendBenchmarkResults()`: Submit results to server
-  - `runBenchmarkTask()`: Execute benchmark session
-
-#### `lib/errorUtils.go`
-
-- **Purpose**: Centralized error handling and reporting
-- **Key Functions**:
-  - `SendAgentError()`: Report errors to server
-  - `handleAPIError()`: API error processing
-  - `logAndSendError()`: Combined logging and reporting
-
-#### `lib/fileUtils.go`
-
-- **Purpose**: File operations and download management
-- **Key Functions**:
-  - `downloadFile()`: Secure file downloads with checksums
-  - `fileExistsAndValid()`: File validation
-  - `writeCrackedHashToFile()`: Result file management
-
-#### `lib/clientUtils.go`
-
-- **Purpose**: System utilities and helper functions
-- **Key Functions**:
-  - `findHashcatBinary()`: Locate Hashcat executable
-  - `CreateLockFile()`: Process management
-  - `CreateDataDirs()`: Directory structure setup
-
-#### `lib/crackerUtils.go`
-
-- **Purpose**: Hashcat binary management
-- **Key Functions**:
-  - `UpdateCracker()`: Download/update Hashcat binaries
-  - `setNativeHashcatPath()`: Configure native binary usage
-
-#### `lib/runners.go`
-
-- **Purpose**: Task execution and monitoring
-- **Key Functions**:
-  - `runAttackTask()`: Main task runner
-  - `handleStdOutLine()`: Process Hashcat output
-  - `handleCrackedHash()`: Process found hashes
-
-#### `lib/outputs.go`
-
-- **Purpose**: User interface and logging output
-- **Key Functions**:
-  - `DisplayStartup()`: Startup messages
-  - `DisplayNewTask()`: Task information display
-  - Various status and progress displays
+    - `AuthenticateAgent()`: Server authentication
+    - `GetAgentConfiguration()`: Fetch and map server configuration
+    - `UpdateAgentMetadata()`: Send agent info to server
+    - `SendHeartBeat()`: Periodic health check
+    - `mapConfiguration()`: Map API response to internal config
 
 #### `lib/dataTypes.go`
 
 - **Purpose**: Core data structures and type definitions
 - **Key Types**:
-  - `agentConfig`: Configuration structure
-  - `benchmarkResult`: Performance data
-  - Type conversion utilities
+    - `agentConfiguration`: Internal configuration structure
+    - Type conversion utilities
 
-### 4. Hashcat Integration (`lib/hashcat/`)
+#### `lib/errorUtils.go`
 
-Specialized module for Hashcat process management:
+- **Purpose**: Error handling helpers for API responses
+- **Key Functions**:
+    - Error type handlers for specific API operations (heartbeat, status, task, etc.)
+
+#### `lib/crackerUtils.go`
+
+- **Purpose**: Hashcat binary path management
+- **Key Functions**:
+    - `setNativeHashcatPath()`: Configure native binary usage
+
+### 5. Agent Lifecycle (`lib/agent/`)
+
+#### `lib/agent/agent.go`
+
+- **Purpose**: Agent main loop and lifecycle management
+- **Key Functions**:
+    - `StartAgent()`: Main agent loop (heartbeat, task polling, benchmark gating)
+    - `sleepWithContext()`: Context-aware sleep utility
+
+### 6. API Client Layer (`lib/api/`)
+
+#### `lib/api/client.gen.go`
+
+- **Purpose**: Auto-generated API client from OpenAPI spec (oapi-codegen)
+- **Note**: Never modify manually — regenerate with `just generate`
+
+#### `lib/api/client.go`
+
+- **Purpose**: Hand-written API client wrapper
+- **Key Types**:
+    - `AgentClient`: Wraps `ClientWithResponses`, implements `APIClient` interface
+    - Sub-clients: `Tasks()`, `Attacks()`, `Agents()`, `Auth()`
+
+#### `lib/api/interfaces.go`
+
+- **Purpose**: `APIClient` aggregate interface for all sub-client operations
+
+#### `lib/api/errors.go`
+
+- **Purpose**: API error types (`APIError` wrapper for generated `ErrorObject`)
+
+#### `lib/api/mock.go`
+
+- **Purpose**: Mock implementations for testing
+
+### 7. API Error Handler (`lib/apierrors/`)
+
+#### `lib/apierrors/handler.go`
+
+- **Purpose**: Generic API error handler (`Handler`) for log-or-send error handling
+
+### 8. Benchmark System (`lib/benchmark/`)
+
+#### `lib/benchmark/manager.go`
+
+- **Purpose**: Benchmark execution and incremental submission
+- **Key Types**:
+    - `Manager`: Orchestrates benchmark sessions with constructor injection
+- **Key Functions**:
+    - `UpdateBenchmarks()`: Run full benchmark session
+    - `TrySubmitCachedBenchmarks()`: Submit cached results on startup
+
+#### `lib/benchmark/cache.go`
+
+- **Purpose**: Persistent benchmark cache at `{data_path}/benchmark_cache.json`
+- **Key Functions**:
+    - `saveBenchmarkCache()`, `loadBenchmarkCache()`: Cache persistence
+    - `cacheAndSubmitBenchmarks()`: Combined cache + submit with early-return
+
+#### `lib/benchmark/parse.go`
+
+- **Purpose**: Benchmark output parsing from hashcat stdout
+
+### 9. Configuration (`lib/config/`)
+
+#### `lib/config/config.go`
+
+- **Purpose**: Configuration defaults as exported constants
+- **Key Functions**:
+    - `SetDefaultConfigValues()`: Register viper defaults
+    - `SetupSharedState()`: Wire config into `agentstate.State`
+
+### 10. Hashcat Integration (`lib/hashcat/`)
 
 #### `lib/hashcat/session.go`
 
 - **Purpose**: Hashcat process lifecycle management
 - **Key Types**:
-  - `Session`: Represents a running Hashcat instance
+    - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines
 - **Key Functions**:
-  - `NewHashcatSession()`: Create configured session
-  - `Start()`: Launch Hashcat process
-  - `Kill()`: Terminate process gracefully
-  - `Cleanup()`: Resource cleanup
+    - `NewHashcatSession()`: Create configured session
+    - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines
+    - `Kill()`: Terminate process gracefully
+    - `Cleanup()`: Resource cleanup (temp files, charset files)
 
 #### `lib/hashcat/params.go`
 
-- **Purpose**: Hashcat parameter configuration
+- **Purpose**: Hashcat parameter configuration and validation
 - **Key Types**:
-  - `Params`: Attack configuration structure
+    - `Params`: Attack configuration structure
 - **Key Functions**:
-  - `Validate()`: Parameter validation
-  - `toCmdArgs()`: Command-line argument generation
-  - Attack mode-specific parameter handling
+    - `Validate()`: Parameter validation per attack mode
+    - `toCmdArgs()`: Command-line argument generation
 
 #### `lib/hashcat/types.go`
 
-- **Purpose**: Hashcat data structure definitions
-- **Key Types**:
-  - `Status`: Real-time status information
-  - `Result`: Cracked hash results
-  - `StatusDevice`: GPU/CPU device status
+- **Purpose**: Hashcat data structures (Status, Result, StatusDevice)
 
-### 5. OS Abstractions (`lib/arch/`)
+#### `lib/hashcat/exitcode.go`
+
+- **Purpose**: Hashcat exit code interpretation
+
+#### `lib/hashcat/errorparser.go`
+
+- **Purpose**: Hashcat stderr error message parsing
+
+### 11. Task Management (`lib/task/`)
+
+#### `lib/task/manager.go`
+
+- **Purpose**: Task acceptance and lifecycle
+- **Key Functions**:
+    - `AcceptTask()`, `AbandonTask()`, `MarkTaskExhausted()`
+
+#### `lib/task/runner.go`
+
+- **Purpose**: Task execution with hashcat
+- **Key Functions**:
+    - `RunTask()`: Main task runner
+
+#### `lib/task/status.go`
+
+- **Purpose**: Status update submission during task execution
+
+#### `lib/task/download.go`
+
+- **Purpose**: Task resource downloads (hash lists, wordlists, rules)
+
+#### `lib/task/cleanup.go`
+
+- **Purpose**: Post-task cleanup
+
+#### `lib/task/errors.go`
+
+- **Purpose**: Task-specific error handling
+
+### 12. Centralized Error Reporting (`lib/cserrors/`)
+
+#### `lib/cserrors/errors.go`
+
+- **Purpose**: Error reporting to server
+- **Key Functions**:
+    - `SendAgentError()`: Report errors with severity and metadata
+    - `LogAndSendError()`: Combined logging and server reporting
+
+### 13. OS Abstractions (`lib/arch/`)
 
 Platform-specific functionality for cross-platform support:
 
-#### `lib/arch/linux.go`
+- **`linux.go`**: Linux device detection
+- **`darwin.go`**: macOS (Intel + Apple Silicon) support
+- **`windows.go`**: Windows device detection
 
-- Linux-specific implementations
-- Device detection via system tools
-- Native package manager integration
+**Common Functions**: `GetDevices()`, `GetHashcatVersion()`, `Extract7z()`, `GetDefaultHashcatBinaryName()`
 
-#### `lib/arch/darwin.go`
+### 14. Supporting Packages
 
-- macOS-specific implementations
-- Apple Silicon and Intel support
-- Homebrew integration support
+#### `lib/cracker/` — Hashcat binary discovery and archive extraction
 
-#### `lib/arch/windows.go`
+#### `lib/display/` — User-facing output formatting
 
-- Windows-specific implementations
-- PowerShell-based device detection
-- Windows package manager support
+#### `lib/downloader/` — File download with checksum verification and retries
 
-**Common Interface**:
+#### `lib/progress/` — Progress calculation utilities
 
-- `GetDevices()`: Device enumeration
-- `GetHashcatVersion()`: Version detection
-- `Extract7z()`: Archive extraction
-- `GetDefaultHashcatBinaryName()`: Platform binary names
+#### `lib/zap/` — Zap file monitoring for cracked hashes (shared cracking)
 
-### 6. Utilities (`lib/utils/`)
-
-#### `lib/utils/progress_tracking.go`
-
-- **Purpose**: Download progress monitoring
-- **Key Types**:
-  - `progressBar`: Progress display management
-- **Features**:
-  - Real-time download progress
-  - Multiple concurrent progress bars
-  - Terminal-friendly display
-
-### 7. Shared State (`shared/`)
-
-#### `shared/shared.go`
-
-- **Purpose**: Global application state and configuration
-- **Key Types**:
-  - `agentState`: Runtime state management
-  - `activity`: Current agent activity enum
-- **Global Variables**:
-  - `State`: Shared agent state
-  - `Logger`: Application logger
-  - `ErrorLogger`: Error-specific logger
+#### `lib/testhelpers/` — Shared test fixtures, HTTP mocking, and state setup
 
 ## Architecture Patterns
 
 ### 1. Modular Design
 
-Each major functional area is separated into its own module:
+Each major functional area is separated into its own sub-package under `lib/`:
 
 - **Separation of Concerns**: Clear boundaries between functionality
-- **Testability**: Modules can be tested independently
-- **Maintainability**: Changes are localized to relevant modules
+- **Testability**: Modules can be tested independently with constructor injection
+- **Maintainability**: Changes are localized to relevant packages
 
 ### 2. Interface-Based Design
 
-Key interfaces abstract platform-specific functionality:
+Key interfaces abstract dependencies for testing:
 
+- **`APIClient`**: Aggregate interface for all API operations (`lib/api/interfaces.go`)
 - **OS Abstractions**: Platform-specific code isolated in `arch/`
-- **Hashcat Integration**: Clean interface to external process
-- **Network Operations**: Abstracted API communication
+- **Mock Support**: `lib/api/mock.go` and `lib/testhelpers/` for test isolation
 
 ### 3. Configuration Management
 
@@ -262,24 +308,24 @@ Multi-layered configuration system:
 
 - **Command-line flags** (highest priority)
 - **Environment variables**
-- **Configuration files**
-- **Default values** (lowest priority)
+- **Configuration files** (`cipherswarmagent.yaml`)
+- **Default values** (lowest priority, from `lib/config/config.go`)
 
 ### 4. Error Handling
 
 Centralized error management:
 
-- **Structured Errors**: Custom error types with context
-- **Error Reporting**: Automatic server notification
-- **Graceful Degradation**: Non-fatal error recovery
+- **Structured Errors**: `api.APIError` wraps generated error types
+- **Error Reporting**: `cserrors.SendAgentError()` reports to server with metadata
+- **Graceful Degradation**: Non-fatal error recovery with exponential backoff
 
 ### 5. State Management
 
-Global state management with clear ownership:
+Global state with synchronized access:
 
-- **Shared State**: Global configuration and runtime state
-- **Local State**: Module-specific state management
-- **Immutable Configuration**: Runtime configuration is read-only
+- **`agentstate.State`**: Runtime state with `atomic.Bool` and `sync.RWMutex` fields
+- **Getter/Setter Methods**: Never access synchronized fields directly
+- **Immutable Configuration**: `lib.Configuration` is set once at startup and on reload
 
 ## Data Flow
 
@@ -322,24 +368,20 @@ graph TD
 
 ### Unit Tests
 
-- **File Pattern**: `*_test.go`
-- **Coverage**: Core logic and utilities
-- **Mocking**: External dependencies mocked
-- **Examples**:
-  - `lib/agentClient_test.go`
-  - `lib/clientUtils_test.go`
+- **File Pattern**: `*_test.go` within the same package
+- **Naming**: `TestFunctionName_Scenario`
+- **Style**: Table-driven tests for core logic
+- **Mocking**: `lib/api/mock.go` for API, `lib/testhelpers/` for shared fixtures
+- **Note**: `hashcat` package cannot import `testhelpers` (circular dependency) — use local helpers
 
-### Integration Tests
+### Test Helpers (`lib/testhelpers/`)
 
-- **Purpose**: Test component interactions
-- **Scope**: API communication, file operations
-- **Environment**: Controlled test environment
-
-### Benchmark Tests
-
-- **Purpose**: Performance testing
-- **Scope**: Critical path operations
-- **Metrics**: CPU, memory, and network usage
+- `fixtures.go`: Common test data setup
+- `http_mock.go`: HTTP server mocking (`SetupHTTPMock`)
+- `state_helper.go`: Agent state setup (`SetupTestState`, `SetupMinimalTestState`)
+- `error_helpers.go`: Test error utilities
+- `mock_session.go`: Hashcat session mocking
+- `assertions.go`: Custom test assertions
 
 ## Build and Release
 
@@ -349,47 +391,22 @@ graph TD
 # Local development
 go build -o cipherswarm-agent
 
-# With build info
-go build -ldflags "-X main.version=dev -X main.commit=$(git rev-parse HEAD)"
+# Using just
+just install
 ```
 
 ### Release Build
 
-- **GoReleaser**: Automated release builds
-- **Cross-compilation**: Multiple OS/architecture support
-- **Packaging**: Binaries, packages (deb/rpm), and Docker images
-- **Distribution**: GitHub releases and container registries
+- **GoReleaser**: Automated release builds via `.goreleaser.yaml`
+- **Cross-compilation**: Linux, macOS, Windows (amd64, arm64)
+- **Packaging**: Binaries, .deb, .rpm, .pkg.tar.xz, and Docker images
+- **Distribution**: GitHub releases and `ghcr.io` container registry
 
 ### Docker Build
 
 - **Multi-stage**: Separate build and runtime stages
-- **Base Images**: Hashcat-enabled base images
-- **Variants**: Standard and POCL (CPU-only) versions
-
-## Development Guidelines
-
-### Code Organization
-
-1. **Single Responsibility**: Each function has one clear purpose
-2. **Clear Naming**: Functions and variables have descriptive names
-3. **Error Handling**: All errors are handled appropriately
-4. **Documentation**: Public APIs have Go doc comments
-
-### Adding New Features
-
-1. **Design**: Consider where new functionality belongs
-2. **Interfaces**: Define clean interfaces for new components
-3. **Testing**: Add unit tests for new functionality
-4. **Documentation**: Update relevant documentation
-
-### Platform Support
-
-When adding platform-specific code:
-
-1. **Abstraction**: Use the `arch/` package pattern
-2. **Interface**: Define common interfaces
-3. **Fallbacks**: Provide sensible defaults
-4. **Testing**: Test on all supported platforms
+- **Variants**: Standard (GPU) and POCL (CPU-only)
+- **Tags**: `latest`, `pocl`, version-specific
 
 ## Dependencies
 
@@ -397,55 +414,20 @@ When adding platform-specific code:
 
 - **Cobra**: CLI framework and command parsing
 - **Viper**: Configuration management
-- **Loguru**: Structured logging
-- **CipherSwarm SDK**: API client library
+- **charmbracelet/log**: Structured logging
+- **oapi-codegen**: OpenAPI client generation
 
 ### Build Dependencies
 
 - **GoReleaser**: Release automation
 - **Just**: Command runner
-- **MkDocs**: Documentation generation
+- **mise**: Dev toolchain management
+- **MkDocs**: Documentation generation (Material theme)
 
 ### Optional Dependencies
 
 - **Hashcat**: Hash cracking engine (bundled in Docker)
 - **7zip**: Archive extraction
-
-## Security Considerations
-
-### Secure Coding Practices
-
-1. **Input Validation**: All external input is validated
-2. **Safe File Operations**: Path traversal protection
-3. **Secure Communications**: TLS for all API calls
-4. **Credential Handling**: No credentials in logs or memory dumps
-
-### Threat Model
-
-- **Network Attacks**: TLS and authentication protect API communication
-- **File System Attacks**: Restricted file operations and validation
-- **Process Attacks**: Secure process management and cleanup
-
-## Contributing
-
-### Getting Started
-
-1. **Fork**: Fork the repository on GitHub
-2. **Clone**: Clone your fork locally
-3. **Setup**: Run `just install` to set up development environment
-4. **Branch**: Create a feature branch
-5. **Develop**: Make your changes following the guidelines
-6. **Test**: Run `just ci-check` to verify changes
-7. **Submit**: Create a pull request
-
-### Code Review Process
-
-1. **Automated Checks**: CI runs tests and linting
-2. **Manual Review**: Maintainers review code and design
-3. **Feedback**: Address review comments
-4. **Merge**: Approved changes are merged
-
-For more detailed contributing information, see [Contributing](contributing.md).
 
 ## Next Steps
 
