@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
 	"sync/atomic"
 	"testing"
@@ -398,7 +397,7 @@ func TestUpdateBenchmarks_CachedSubmissionSuccess(t *testing.T) {
 	defer cleanupState()
 
 	// Pre-populate cache
-	err := saveBenchmarkCache(sampleBenchmarkResults)
+	err := saveBenchmarkCache(newSampleBenchmarkResults())
 	require.NoError(t, err)
 
 	// Mock successful benchmark submission
@@ -421,7 +420,7 @@ func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 	defer cleanupState()
 
 	// Pre-populate cache
-	err := saveBenchmarkCache(sampleBenchmarkResults)
+	err := saveBenchmarkCache(newSampleBenchmarkResults())
 	require.NoError(t, err)
 
 	// Mock failed benchmark submission
@@ -462,9 +461,11 @@ func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
-	// Cache should be cleared
-	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
-	assert.True(t, os.IsNotExist(statErr), "cache should be cleared")
+	// Cache should be preserved with all results marked as submitted
+	cached, loadErr := loadBenchmarkCache()
+	require.NoError(t, loadErr, "cache should be preserved")
+	require.NotNil(t, cached)
+	assert.True(t, allSubmitted(cached), "all cached results should be marked as submitted")
 }
 
 // TestUpdateBenchmarks_CachedPartiallySubmitted verifies that UpdateBenchmarks

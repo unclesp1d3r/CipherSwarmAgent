@@ -43,7 +43,6 @@ type agentState struct {
 	HashcatPath                         string        // HashcatPath is the path to the Hashcat binary (empty for auto-detection).
 	UseLegacyDeviceIdentificationMethod bool          // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
 	APIClient                           api.APIClient // APIClient is the interface-based client for API operations (enables dependency injection).
-	ForceBenchmarkRun                   bool          // ForceBenchmarkRun forces a fresh benchmark run instead of using cached results. Agent-loop-only; no cross-goroutine access.
 	InsecureDownloads                   bool          // InsecureDownloads skips TLS certificate verification for downloads.
 	DownloadMaxRetries                  int           // DownloadMaxRetries is the max number of download retry attempts.
 	DownloadRetryDelay                  time.Duration // DownloadRetryDelay is the base delay between download retries.
@@ -54,11 +53,11 @@ type agentState struct {
 	Platform                            string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin"). Set once before goroutines start; safe to read from any goroutine.
 	AgentVersion                        string        // AgentVersion is the current version of the agent software. Set once in AuthenticateAgent before goroutines start; safe to read from any goroutine.
 
-	// Synchronized fields — accessed across goroutines (heartbeat + agent loops).
-	// Use getter/setter methods; do not access directly.
+	// Synchronized fields — use getter/setter methods; do not access directly.
 	reload              atomic.Bool
 	jobCheckingStopped  atomic.Bool
 	benchmarksSubmitted atomic.Bool
+	forceBenchmarkRun   atomic.Bool
 	currentActivityMu   sync.RWMutex
 	currentActivity     Activity
 }
@@ -112,6 +111,16 @@ func (s *agentState) GetBenchmarksSubmitted() bool {
 // SetBenchmarksSubmitted sets whether the agent has successfully submitted its benchmark data.
 func (s *agentState) SetBenchmarksSubmitted(v bool) {
 	s.benchmarksSubmitted.Store(v)
+}
+
+// GetForceBenchmarkRun returns whether a fresh benchmark run is forced.
+func (s *agentState) GetForceBenchmarkRun() bool {
+	return s.forceBenchmarkRun.Load()
+}
+
+// SetForceBenchmarkRun sets whether a fresh benchmark run should be forced.
+func (s *agentState) SetForceBenchmarkRun(v bool) {
+	s.forceBenchmarkRun.Store(v)
 }
 
 // GetCurrentActivity returns the current activity of the agent (thread-safe).

@@ -280,6 +280,13 @@ These settings control retry behavior, timeouts, and circuit breakers for improv
 - **Default**: `false`
 - **Description**: Skip checksum verification for downloaded files (not recommended)
 
+#### `force_benchmark_run` / `FORCE_BENCHMARK_RUN`
+
+- **Flag**: `--force-benchmark`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Force re-run of benchmarks, bypassing the local cache. Useful when hardware has changed or cached results are suspected to be stale.
+
 ## Configuration Examples
 
 ### Basic Home Lab Setup

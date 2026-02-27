@@ -17,21 +17,26 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
-var sampleBenchmarkResults = []display.BenchmarkResult{
-	{
-		Device:     "1",
-		HashType:   "0",
-		RuntimeMs:  "100",
-		HashTimeMs: "50",
-		SpeedHs:    "12345.67",
-	},
-	{
-		Device:     "2",
-		HashType:   "100",
-		RuntimeMs:  "200",
-		HashTimeMs: "100",
-		SpeedHs:    "54321.09",
-	},
+// newSampleBenchmarkResults returns a fresh slice of benchmark results for each
+// test invocation. This prevents mutation (e.g., Submitted flag changes) from
+// leaking across subtests.
+func newSampleBenchmarkResults() []display.BenchmarkResult {
+	return []display.BenchmarkResult{
+		{
+			Device:     "1",
+			HashType:   "0",
+			RuntimeMs:  "100",
+			HashTimeMs: "50",
+			SpeedHs:    "12345.67",
+		},
+		{
+			Device:     "2",
+			HashType:   "100",
+			RuntimeMs:  "200",
+			HashTimeMs: "100",
+			SpeedHs:    "54321.09",
+		},
+	}
 }
 
 func TestSaveBenchmarkCache(t *testing.T) {
@@ -43,13 +48,13 @@ func TestSaveBenchmarkCache(t *testing.T) {
 	}{
 		{
 			name:        "saves valid results",
-			results:     sampleBenchmarkResults,
+			results:     newSampleBenchmarkResults(),
 			setupPath:   true,
 			expectError: false,
 		},
 		{
 			name:        "empty cache path returns error",
-			results:     sampleBenchmarkResults,
+			results:     newSampleBenchmarkResults(),
 			setupPath:   false,
 			expectError: true,
 		},
@@ -100,7 +105,7 @@ func TestSaveBenchmarkCache_AtomicWrite(t *testing.T) {
 
 	defer func() { agentstate.State.BenchmarkCachePath = "" }()
 
-	err := saveBenchmarkCache(sampleBenchmarkResults)
+	err := saveBenchmarkCache(newSampleBenchmarkResults())
 	require.NoError(t, err)
 
 	// Verify no temp file is left behind
@@ -145,7 +150,7 @@ func TestLoadBenchmarkCache(t *testing.T) {
 			setupCache: func(t *testing.T, dir string) string {
 				t.Helper()
 				p := filepath.Join(dir, "benchmark_cache.json")
-				data, err := json.Marshal(sampleBenchmarkResults)
+				data, err := json.Marshal(newSampleBenchmarkResults())
 				require.NoError(t, err)
 				require.NoError(t, os.WriteFile(p, data, 0o600))
 				return p
@@ -163,7 +168,7 @@ func TestLoadBenchmarkCache(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name: "returns nil for corrupt JSON",
+			name: "returns error for corrupt JSON",
 			setupCache: func(t *testing.T, dir string) string {
 				t.Helper()
 				p := filepath.Join(dir, "benchmark_cache.json")
@@ -171,7 +176,7 @@ func TestLoadBenchmarkCache(t *testing.T) {
 				return p
 			},
 			expectResults: false,
-			expectError:   false,
+			expectError:   true,
 		},
 		{
 			name: "returns nil for empty array",
@@ -239,65 +244,19 @@ func TestLoadBenchmarkCache_BackwardCompatible(t *testing.T) {
 	assert.False(t, loaded[0].Submitted, "old cache entries should default to unsubmitted")
 }
 
-func TestClearBenchmarkCache(t *testing.T) {
-	tests := []struct {
-		name       string
-		setupCache func(t *testing.T, dir string) string
-	}{
-		{
-			name: "removes existing cache file",
-			setupCache: func(t *testing.T, dir string) string {
-				t.Helper()
-				p := filepath.Join(dir, "benchmark_cache.json")
-				require.NoError(t, os.WriteFile(p, []byte("[]"), 0o600))
-				return p
-			},
-		},
-		{
-			name: "no-op for nonexistent file",
-			setupCache: func(_ *testing.T, dir string) string {
-				return filepath.Join(dir, "nonexistent.json")
-			},
-		},
-		{
-			name: "no-op for empty path",
-			setupCache: func(_ *testing.T, _ string) string {
-				return ""
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			agentstate.State.BenchmarkCachePath = tt.setupCache(t, tmpDir)
-
-			defer func() { agentstate.State.BenchmarkCachePath = "" }()
-
-			// Should not panic
-			clearBenchmarkCache()
-
-			if agentstate.State.BenchmarkCachePath != "" {
-				_, err := os.Stat(agentstate.State.BenchmarkCachePath)
-				assert.True(t, os.IsNotExist(err), "cache file should be removed")
-			}
-		})
-	}
-}
-
 func TestSaveThenLoadBenchmarkCache(t *testing.T) {
 	tmpDir := t.TempDir()
 	agentstate.State.BenchmarkCachePath = filepath.Join(tmpDir, "benchmark_cache.json")
 
 	defer func() { agentstate.State.BenchmarkCachePath = "" }()
 
-	err := saveBenchmarkCache(sampleBenchmarkResults)
+	err := saveBenchmarkCache(newSampleBenchmarkResults())
 	require.NoError(t, err)
 
 	loaded, loadErr := loadBenchmarkCache()
 	require.NoError(t, loadErr)
 	require.NotNil(t, loaded)
-	assert.Equal(t, sampleBenchmarkResults, loaded)
+	assert.Equal(t, newSampleBenchmarkResults(), loaded)
 }
 
 func TestCacheAndSubmitBenchmarks(t *testing.T) {
@@ -311,7 +270,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 	}{
 		{
 			name:    "cache saved and submission succeeds",
-			results: sampleBenchmarkResults,
+			results: newSampleBenchmarkResults(),
 			setupCachePath: func(t *testing.T) string {
 				t.Helper()
 				return filepath.Join(t.TempDir(), "benchmark_cache.json")
@@ -326,7 +285,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 		},
 		{
 			name:    "cache saved but submission fails returns nil for retry",
-			results: sampleBenchmarkResults,
+			results: newSampleBenchmarkResults(),
 			setupCachePath: func(t *testing.T) string {
 				t.Helper()
 				return filepath.Join(t.TempDir(), "benchmark_cache.json")
@@ -341,7 +300,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 		},
 		{
 			name:    "cache write failure and submission failure returns error",
-			results: sampleBenchmarkResults,
+			results: newSampleBenchmarkResults(),
 			setupCachePath: func(_ *testing.T) string {
 				// Empty path causes saveBenchmarkCache to fail
 				return ""
@@ -356,7 +315,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 		},
 		{
 			name:    "cache write failure but submission succeeds",
-			results: sampleBenchmarkResults,
+			results: newSampleBenchmarkResults(),
 			setupCachePath: func(_ *testing.T) string {
 				return ""
 			},
@@ -488,12 +447,12 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 			defer cleanupState()
 
 			if tt.forceBenchmark {
-				agentstate.State.ForceBenchmarkRun = true
-				defer func() { agentstate.State.ForceBenchmarkRun = false }()
+				agentstate.State.SetForceBenchmarkRun(true)
+				defer func() { agentstate.State.SetForceBenchmarkRun(false) }()
 			}
 
 			if tt.setupCache {
-				err := saveBenchmarkCache(sampleBenchmarkResults)
+				err := saveBenchmarkCache(newSampleBenchmarkResults())
 				require.NoError(t, err)
 			}
 
@@ -505,9 +464,11 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 
 			if tt.expectSubmit {
 				assert.True(t, agentstate.State.GetBenchmarksSubmitted())
-				// Cache should be cleared after successful submission
-				_, err := os.Stat(agentstate.State.BenchmarkCachePath)
-				assert.True(t, os.IsNotExist(err), "cache should be cleared after successful submission")
+				// Cache should be preserved with all results marked as submitted
+				cached, err := loadBenchmarkCache()
+				require.NoError(t, err, "cache should be preserved after successful submission")
+				require.NotNil(t, cached)
+				assert.True(t, allSubmitted(cached), "all cached results should be marked as submitted")
 			}
 
 			if !tt.expectSuccess && tt.setupCache && !tt.forceBenchmark {
@@ -541,8 +502,10 @@ func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
 	assert.True(t, result)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
-	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
-	assert.True(t, os.IsNotExist(statErr), "cache should be cleared")
+	cached, loadErr := loadBenchmarkCache()
+	require.NoError(t, loadErr, "cache should be preserved")
+	require.NotNil(t, cached)
+	assert.True(t, allSubmitted(cached), "all cached results should be marked as submitted")
 }
 
 // TestTrySubmitCachedBenchmarks_PartiallySubmitted verifies that only
@@ -570,8 +533,10 @@ func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
 	assert.True(t, result)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 
-	_, statErr := os.Stat(agentstate.State.BenchmarkCachePath)
-	assert.True(t, os.IsNotExist(statErr), "cache should be cleared after all submitted")
+	cached, loadErr := loadBenchmarkCache()
+	require.NoError(t, loadErr, "cache should be preserved after submission")
+	require.NotNil(t, cached)
+	assert.True(t, allSubmitted(cached), "all cached results should be marked as submitted")
 }
 
 // TestTrySubmitCachedBenchmarks_MixedCacheServerFailure verifies that when

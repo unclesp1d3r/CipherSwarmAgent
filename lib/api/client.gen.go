@@ -1857,6 +1857,9 @@ type GetConfigurationResponse struct {
 		// ApiVersion The minimum accepted version of the API
 		ApiVersion int `json:"api_version"`
 
+		// BenchmarksNeeded Whether the agent needs to run benchmarks. False when the server already has valid benchmarks for this agent.
+		BenchmarksNeeded bool `json:"benchmarks_needed"`
+
 		// Config Advanced hashcat and agent configuration options
 		Config AdvancedAgentConfiguration `json:"config"`
 	}
@@ -2581,6 +2584,9 @@ func ParseGetConfigurationResponse(rsp *http.Response) (*GetConfigurationRespons
 		var dest struct {
 			// ApiVersion The minimum accepted version of the API
 			ApiVersion int `json:"api_version"`
+
+			// BenchmarksNeeded Whether the agent needs to run benchmarks. False when the server already has valid benchmarks for this agent.
+			BenchmarksNeeded bool `json:"benchmarks_needed"`
 
 			// Config Advanced hashcat and agent configuration options
 			Config AdvancedAgentConfiguration `json:"config"`

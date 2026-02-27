@@ -3,7 +3,7 @@
 ![GitHub](https://img.shields.io/github/license/unclesp1d3r/CipherSwarmAgent)
 ![GitHub issues](https://img.shields.io/github/issues/unclesp1d3r/CipherSwarmAgent)
 ![GitHub last commit](https://img.shields.io/github/last-commit/unclesp1d3r/CipherSwarmAgent)
-![Maintenance](https://img.shields.io/maintenance/yes/2024)
+![Maintenance](https://img.shields.io/maintenance/yes/2026)
 [![Maintainability](https://api.codeclimate.com/v1/badges/9c76ebe483ef3b1eff8d/maintainability)](https://codeclimate.com/github/unclesp1d3r/CipherSwarmAgent/maintainability)
 [![wakatime](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent.svg)](https://wakatime.com/badge/github/unclesp1d3r/CipherSwarmAgent)
 [![Go Report Card](https://goreportcard.com/badge/github.com/unclesp1d3r/cipherswarmagent)](https://goreportcard.com/report/github.com/unclesp1d3r/cipherswarmagent)
@@ -27,7 +27,7 @@ The CipherSwarm Go Agent is a high-performance component of the CipherSwarm ecos
 
 ### Prerequisites
 
-- Go 1.22 or higher
+- Go 1.26 or higher
 - Git (for cloning the repository)
 - Docker (optional for running the agent in a container)
 - A [CipherSwarm](https://github.com/unclesp1d3r/CipherSwarm) server to connect to
@@ -70,11 +70,11 @@ docker run -e API_TOKEN=your_api_token \
 The CipherSwarm Agent follows a modular architecture:
 
 - **CLI Interface** (`cmd/`): Command-line entrypoint using Cobra
-- **Core Logic** (`lib/`): Main agent functionality and utilities
+- **Core Logic** (`lib/`): Main agent functionality, decomposed into focused sub-packages
 - **Hashcat Integration** (`lib/hashcat/`): Session management and result parsing
 - **OS Abstractions** (`lib/arch/`): Platform-specific device detection and binary handling
-- **Utilities** (`lib/utils/`): Reusable components like progress tracking
-- **Shared State** (`shared/`): Global configuration and logging
+- **Progress Utilities** (`lib/progress/`): Progress calculation and tracking
+- **Agent State** (`agentstate/`): Global state, loggers, and synchronized fields
 
 ## Getting Help
 

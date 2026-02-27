@@ -35,14 +35,15 @@ const (
 // It manages the hashcat process lifecycle, handles I/O streams, and provides channels
 // for real-time communication of results, status updates, and error messages.
 // The session stores a context.CancelFunc to enable graceful shutdown and cancellation
-// of session operations, allowing controlled termination of goroutines and resource cleanup
-// during lifecycle management.
+// of session operations, allowing controlled termination of goroutines and resource
+// cleanup during lifecycle management.
 type Session struct {
-	proc               *exec.Cmd  // Hashcat process command
-	hashFile           string     // Path to hash input file
-	outFile            *os.File   // Output file for cracked hashes
-	charsetFiles       []*os.File // Custom charset files for mask attacks
-	shardedCharsetFile *os.File   // Sharded charset file for distributed attacks
+	proc               *exec.Cmd       // Hashcat process command
+	hashFile           string          // Path to hash input file
+	outFile            *os.File        // Output file for cracked hashes
+	charsetFiles       []*os.File      // Custom charset files for mask attacks
+	shardedCharsetFile *os.File        // Sharded charset file for distributed attacks
+	ctx                context.Context //nolint:containedctx // session lifecycle context for I/O goroutines
 	cancel             context.CancelFunc
 	cancelMu           sync.Mutex    // Protects cancel field from concurrent access
 	CrackedHashes      chan Result   // Channel for successfully cracked hashes
@@ -104,10 +105,11 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}
 
 	return &Session{
-		proc: exec.CommandContext( //nolint:gosec // G702 - binary path from internal config, not user input
+		proc: exec.CommandContext( //nolint:gosec // G204 - binary path from internal config, not user input
 			ctx,
 			binaryPath,
 			args...),
+		ctx:                ctx,
 		cancel:             cancel,
 		hashFile:           params.HashFile,
 		outFile:            outFile,
@@ -191,41 +193,66 @@ func (sess *Session) startTailer() (*tail.Tail, error) {
 // handleTailerOutput processes lines from the hashcat output file.
 // It parses each line to extract timestamp, hash, and plaintext, then sends
 // the result through the CrackedHashes channel. Invalid lines are logged and skipped.
+// On context cancellation, exits and logs any pending hash as dropped at Warn level.
+// The tailer is stopped and cleaned up on exit via defer.
 func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
-	for tailLine := range tailer.Lines {
-		line := tailLine.Text
-
-		values := strings.Split(line, ":")
-		if len(values) < logParseMinParts {
-			agentstate.Logger.Error("unexpected line contents", "line", line)
-
-			continue
+	defer func() {
+		if stopErr := tailer.Stop(); stopErr != nil {
+			agentstate.Logger.Debug("Tailer stop during cleanup", "error", stopErr)
 		}
+		tailer.Cleanup()
+	}()
 
-		timestamp, plainHex := values[0], values[len(values)-1]
+	for {
+		select {
+		case tailLine, ok := <-tailer.Lines:
+			if !ok {
+				return
+			}
 
-		bs, err := hex.DecodeString(plainHex)
-		if err != nil {
-			agentstate.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
+			line := tailLine.Text
 
-			continue
-		}
+			values := strings.Split(line, ":")
+			if len(values) < logParseMinParts {
+				agentstate.Logger.Error("unexpected line contents", "line", line)
 
-		plain := string(bs)
-		hashParts := values[1 : len(values)-1]
-		hash := strings.Join(hashParts, ":")
+				continue
+			}
 
-		timestampI, err := strconv.ParseInt(timestamp, 10, 64)
-		if err != nil {
-			agentstate.Logger.Error("couldn't parse hashcat timestamp", "timestamp", timestamp, "error", err)
+			timestamp, plainHex := values[0], values[len(values)-1]
 
-			continue
-		}
+			bs, err := hex.DecodeString(plainHex)
+			if err != nil {
+				agentstate.Logger.Error("couldn't decode hex string", "hex", plainHex, "error", err)
 
-		sess.CrackedHashes <- Result{
-			Timestamp: time.Unix(timestampI, 0),
-			Hash:      hash,
-			Plaintext: plain,
+				continue
+			}
+
+			plain := string(bs)
+			hashParts := values[1 : len(values)-1]
+			hash := strings.Join(hashParts, ":")
+
+			timestampI, err := strconv.ParseInt(timestamp, 10, 64)
+			if err != nil {
+				agentstate.Logger.Error("couldn't parse hashcat timestamp", "timestamp", timestamp, "error", err)
+
+				continue
+			}
+
+			select {
+			case sess.CrackedHashes <- Result{
+				Timestamp: time.Unix(timestampI, 0),
+				Hash:      hash,
+				Plaintext: plain,
+			}:
+			case <-sess.ctx.Done():
+				agentstate.Logger.Warn("Cracked hash dropped due to context cancellation",
+					"hash", hash)
+
+				return
+			}
+		case <-sess.ctx.Done():
+			return
 		}
 	}
 }
@@ -233,12 +260,23 @@ func (sess *Session) handleTailerOutput(tailer *tail.Tail) {
 // handleStdout processes stdout from the hashcat process.
 // It sends all lines to the StdoutLines channel, parses JSON status updates
 // (unless SkipStatusUpdates is true), and handles special messages like restore mode.
-// This method blocks until the process completes and sends the exit status to DoneChan.
+// On context cancellation, exits early and logs any dropped line at Warn level.
+// After the process completes, sends the exit status to DoneChan (or logs and
+// drops it if the context is already cancelled).
 func (sess *Session) handleStdout() {
 	scanner := bufio.NewScanner(sess.pStdout)
+scanLoop:
 	for scanner.Scan() {
 		line := scanner.Text()
-		sess.StdoutLines <- line
+
+		select {
+		case sess.StdoutLines <- line:
+		case <-sess.ctx.Done():
+			agentstate.Logger.Warn("Stdout line dropped due to context cancellation",
+				"line", line)
+
+			break scanLoop
+		}
 
 		if line == "" {
 			continue
@@ -254,7 +292,13 @@ func (sess *Session) handleStdout() {
 					continue
 				}
 
-				sess.StatusUpdates <- status
+				select {
+				case sess.StatusUpdates <- status:
+				case <-sess.ctx.Done():
+					agentstate.Logger.Warn("Status update dropped due to context cancellation")
+
+					break scanLoop
+				}
 			} else {
 				if strings.Contains(line, "starting in restore mode") {
 					agentstate.Logger.Info("Hashcat is starting in restore mode")
@@ -269,9 +313,21 @@ func (sess *Session) handleStdout() {
 
 	// Allow brief time for channel consumers to drain remaining stdout/stderr
 	// messages before signaling completion via DoneChan.
-	time.Sleep(drainTimeout)
+	drainTimer := time.NewTimer(drainTimeout)
+	select {
+	case <-drainTimer.C:
+	case <-sess.ctx.Done():
+		drainTimer.Stop()
+	}
 
-	sess.DoneChan <- done
+	select {
+	case sess.DoneChan <- done:
+	case <-sess.ctx.Done():
+		if done != nil {
+			agentstate.Logger.Warn("Process exit status dropped due to context cancellation",
+				"error", done)
+		}
+	}
 }
 
 // handleStderr processes stderr output from the hashcat process.
@@ -279,9 +335,17 @@ func (sess *Session) handleStdout() {
 func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
-		agentstate.Logger.Error("read stderr", "text", scanner.Text())
+		line := scanner.Text()
+		agentstate.Logger.Error("read stderr", "text", line)
 
-		sess.StderrMessages <- scanner.Text()
+		select {
+		case sess.StderrMessages <- line:
+		case <-sess.ctx.Done():
+			agentstate.Logger.Warn("Stderr line dropped due to context cancellation",
+				"text", line)
+
+			return // return directly: stderr goroutine does not own DoneChan
+		}
 	}
 }
 

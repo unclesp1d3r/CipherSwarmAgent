@@ -73,7 +73,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Handle `obj == nil && err == nil` as a separate error case for API responses to prevent nil pointer dereferences.
 - In deferred cleanup, use `os.IsNotExist` to skip already-removed files. Include file paths in error messages.
 - For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding.
-- **Error reporting:** Use `SendAgentError(msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. `cserrors.LogAndSendError` delegates to `SendAgentError` (includes platform/version metadata). Always pass a non-nil error — it returns `err` directly. API submission is skipped only when `APIClient` is uninitialized.
+- **Error reporting:** Use `SendAgentError(ctx, msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. `cserrors.LogAndSendError` delegates to `SendAgentError` (includes platform/version metadata). Always pass a non-nil error — it returns `err` directly. API submission is skipped only when `APIClient` is uninitialized.
 
 ### Concurrency
 
@@ -81,6 +81,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `context.Context` for cancellation and deadlines in all long-running or networked operations.
 - **Synchronized state:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` or `sync.RWMutex`. Always use getter/setter methods — never access directly.
 - **Context propagation:** `StartAgent()` creates a cancellable context threaded through all goroutines. Use `ctx` for stoppable operations; `context.Background()` for must-complete operations (e.g., `AbandonTask`), with `//nolint:contextcheck // must-complete: reason`.
+- **Data-loss logging:** When a channel send is skipped due to `ctx.Done()`, always log the dropped value at Warn level (e.g., dropped cracked hashes, process exit status). Silent data loss during shutdown hides bugs.
 - **Context-aware sleep:** Use `sleepWithContext(ctx, duration)` (in `lib/agent/agent.go`) instead of `time.Sleep`.
 - Run tests with `-race` flag to detect data races.
 
@@ -127,6 +128,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `any` (not `interface{}`), `require.Error/NoError` (not `assert`), `t.Cleanup` (not `defer`), `atomic.Int32` for mock counters.
 - MockClient sub-client accessors return default mocks (not nil) to prevent nil pointer panics.
 - When removing `agentstate.State` fields, grep all test helpers and reset functions.
+- For cross-platform subprocess tests, use the Go test helper process pattern (`TestHelperProcess` + `os.Args[0]` + env vars) instead of OS-specific binaries like `sleep` or `true`.
 - Run `go test -race ./...` to detect data races.
 
 ## Git
@@ -141,7 +143,7 @@ Conventional Commits: `<type>(<scope>): <description>`. Types: `feat`, `fix`, `d
 
 ### Changelog
 
-`CHANGELOG.md` is auto-generated from commit messages using `git-chglog`.
+`CHANGELOG.md` is auto-generated from commit messages using `git-cliff` (`just changelog`).
 
 ## CI/CD & Docker
 

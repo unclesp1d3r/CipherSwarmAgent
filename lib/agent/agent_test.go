@@ -28,7 +28,7 @@ func saveAndRestoreState(t *testing.T) func() {
 	origAPIToken := agentstate.State.APIToken
 	origAPIClient := agentstate.State.APIClient
 	origHashcatPath := agentstate.State.HashcatPath
-	origForceBenchmarkRun := agentstate.State.ForceBenchmarkRun
+	origForceBenchmarkRun := agentstate.State.GetForceBenchmarkRun()
 	origInsecureDownloads := agentstate.State.InsecureDownloads
 	origDownloadMaxRetries := agentstate.State.DownloadMaxRetries
 	origDownloadRetryDelay := agentstate.State.DownloadRetryDelay
@@ -51,7 +51,7 @@ func saveAndRestoreState(t *testing.T) func() {
 		agentstate.State.APIToken = origAPIToken
 		agentstate.State.APIClient = origAPIClient
 		agentstate.State.HashcatPath = origHashcatPath
-		agentstate.State.ForceBenchmarkRun = origForceBenchmarkRun
+		agentstate.State.SetForceBenchmarkRun(origForceBenchmarkRun)
 		agentstate.State.InsecureDownloads = origInsecureDownloads
 		agentstate.State.DownloadMaxRetries = origDownloadMaxRetries
 		agentstate.State.DownloadRetryDelay = origDownloadRetryDelay

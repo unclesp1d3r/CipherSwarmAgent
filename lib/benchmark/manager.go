@@ -160,18 +160,22 @@ func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 	agentstate.State.SetBenchmarksSubmitted(false)
 
 	// Try submitting from cache first (unless force re-run is requested)
-	if !agentstate.State.ForceBenchmarkRun {
+	if !agentstate.State.GetForceBenchmarkRun() {
 		cached, loadErr := loadBenchmarkCache()
 		if loadErr != nil {
-			agentstate.Logger.Warn("Failed to load benchmark cache, will re-run benchmarks",
-				"error", loadErr)
+			if errors.Is(loadErr, errCacheCorrupt) {
+				agentstate.Logger.Warn("Benchmark cache was corrupt, will re-run benchmarks",
+					"error", loadErr)
+			} else {
+				agentstate.Logger.Error("Failed to read benchmark cache due to I/O error, will re-run benchmarks",
+					"error", loadErr)
+			}
 		}
 
 		if cached != nil {
 			if allSubmitted(cached) {
-				clearBenchmarkCache()
 				agentstate.State.SetBenchmarksSubmitted(true)
-				agentstate.Logger.Info("All cached benchmarks already submitted")
+				agentstate.Logger.Info("All cached benchmarks already submitted, skipping re-run")
 
 				return nil
 			}
@@ -189,12 +193,18 @@ func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 				return nil
 			}
 
-			// Mark all as submitted and update cache before clearing
+			// Mark all as submitted and persist updated cache
 			for i := range cached {
 				cached[i].Submitted = true
 			}
 
-			clearBenchmarkCache()
+			if saveErr := saveBenchmarkCache(cached); saveErr != nil {
+				agentstate.Logger.Warn(
+					"Failed to persist benchmark cache after submission; benchmarks may re-submit on next restart",
+					"error", saveErr,
+				)
+			}
+
 			agentstate.State.SetBenchmarksSubmitted(true)
 			agentstate.Logger.Info("Cached benchmarks successfully submitted to server")
 
@@ -212,15 +222,22 @@ func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 }
 
 // cacheAndSubmitBenchmarks saves benchmark results to the disk cache and then
-// submits any unsubmitted results to the server. On successful submission of
-// all results, clears the cache file and sets BenchmarksSubmitted to true. If
-// both the cache save and submission fail, it returns the submission error so
-// the caller can fail fast. When the cache was saved but submission fails, it
-// returns nil to allow retry via TrySubmitCachedBenchmarks.
+// submits any unsubmitted results to the server. If all results are already
+// marked as submitted (e.g., from incremental batch submission), persists
+// the cache for restart resilience and returns. On successful submission of
+// all results, marks them as submitted, persists the cache, and sets
+// BenchmarksSubmitted to true. If both the cache save and submission fail, it
+// returns the submission error so the caller can fail fast. When the cache was
+// saved but submission fails, it returns nil to allow retry via
+// TrySubmitCachedBenchmarks.
 func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults []display.BenchmarkResult) error {
 	if allSubmitted(benchmarkResults) {
 		agentstate.Logger.Info("All benchmarks already submitted incrementally, skipping bulk submission")
-		clearBenchmarkCache()
+
+		if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
+			agentstate.Logger.Warn("Failed to persist already-submitted benchmark cache", "error", saveErr)
+		}
+
 		agentstate.State.SetBenchmarksSubmitted(true)
 
 		return nil
@@ -256,7 +273,18 @@ func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults
 		return fmt.Errorf("benchmark submission failed with no cache for retry: %w", err)
 	}
 
-	clearBenchmarkCache()
+	// Mark all as submitted and persist cache so restarts skip re-running
+	for i := range benchmarkResults {
+		benchmarkResults[i].Submitted = true
+	}
+
+	if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
+		agentstate.Logger.Warn(
+			"Failed to persist benchmark cache after submission; benchmarks may re-submit on next restart",
+			"error", saveErr,
+		)
+	}
+
 	agentstate.State.SetBenchmarksSubmitted(true)
 	agentstate.Logger.Info("Benchmarks successfully submitted to server")
 
@@ -317,6 +345,73 @@ func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) (
 	return m.processBenchmarkOutput(ctx, sess), false
 }
 
+// submitBatchIfReady sends an incremental batch of benchmark results to the
+// server when the number of unsubmitted results reaches benchmarkBatchSize.
+// On success, it marks the batch as submitted and persists the cache. Returns
+// the updated submittedUpTo index.
+func (m *Manager) submitBatchIfReady(
+	ctx context.Context,
+	results []display.BenchmarkResult,
+	submittedUpTo int,
+) int {
+	if len(results)-submittedUpTo < benchmarkBatchSize {
+		return submittedUpTo
+	}
+
+	batch := results[submittedUpTo:]
+	if sendErr := m.sendBenchmarkResults(ctx, batch); sendErr != nil {
+		agentstate.Logger.Warn("Failed to submit incremental benchmark batch", "error", sendErr)
+
+		return submittedUpTo
+	}
+
+	markSubmitted(results, submittedUpTo, len(results))
+	newUpTo := len(results)
+
+	if saveErr := saveBenchmarkCache(results); saveErr != nil {
+		agentstate.Logger.Warn("Failed to save benchmark cache after batch", "error", saveErr)
+	}
+
+	return newUpTo
+}
+
+// finalizeBenchmarkSession handles the DoneChan signal: drains remaining
+// stdout, reports errors, submits any unsubmitted results, and persists
+// the final cache state.
+func (m *Manager) finalizeBenchmarkSession(
+	ctx context.Context,
+	sess *hashcat.Session,
+	results *[]display.BenchmarkResult,
+	submittedUpTo int,
+	procErr error,
+) {
+	drainStdout(sess, results)
+
+	if procErr != nil {
+		agentstate.Logger.Error("Benchmark session failed", "error", procErr)
+		cserrors.SendAgentError(ctx, procErr.Error(), nil, api.SeverityFatal)
+	}
+
+	// Submit any remaining unsubmitted results
+	if len(*results) > submittedUpTo {
+		batch := (*results)[submittedUpTo:]
+		if sendErr := m.sendBenchmarkResults(ctx, batch); sendErr != nil {
+			agentstate.Logger.Warn("Failed to submit final benchmark batch", "error", sendErr)
+		} else {
+			markSubmitted(*results, submittedUpTo, len(*results))
+		}
+	}
+
+	agentstate.State.SetBenchmarksSubmitted(allSubmitted(*results))
+
+	// Always persist cache with Submitted flags for retry
+	if saveErr := saveBenchmarkCache(*results); saveErr != nil {
+		agentstate.Logger.Warn("Failed to save final benchmark cache", "error", saveErr)
+	}
+
+	sess.Cleanup()
+}
+
 // processBenchmarkOutput reads from the session's channels, collects benchmark
 // results, and submits them incrementally in batches. It marks each result as
 // Submitted after successful server acknowledgment and persists the cache after
@@ -345,53 +440,15 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 				return
 			case stdOutLine := <-sess.StdoutLines:
 				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults)
-
-				if len(benchmarkResults)-submittedUpTo >= benchmarkBatchSize {
-					batch := benchmarkResults[submittedUpTo:]
-					if sendErr := m.sendBenchmarkResults(ctx, batch); sendErr != nil {
-						agentstate.Logger.Warn("Failed to submit incremental benchmark batch", "error", sendErr)
-					} else {
-						markSubmitted(benchmarkResults, submittedUpTo, len(benchmarkResults))
-						submittedUpTo = len(benchmarkResults)
-
-						if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
-							agentstate.Logger.Warn("Failed to save benchmark cache after batch", "error", saveErr)
-						}
-					}
-				}
+				submittedUpTo = m.submitBatchIfReady(ctx, benchmarkResults, submittedUpTo)
 			case stdErrLine := <-sess.StderrMessages:
 				handleBenchmarkStdErrLine(ctx, stdErrLine)
 			case statusUpdate := <-sess.StatusUpdates:
-				agentstate.Logger.Debug("Benchmark status update", "status", statusUpdate) // This should never happen
+				agentstate.Logger.Debug("Benchmark status update", "status", statusUpdate)
 			case crackedHash := <-sess.CrackedHashes:
-				agentstate.Logger.Debug("Benchmark cracked hash", "hash", crackedHash) // This should never happen
+				agentstate.Logger.Debug("Benchmark cracked hash", "hash", crackedHash)
 			case err := <-sess.DoneChan:
-				// Drain any remaining buffered stdout lines before final submission
-				drainStdout(sess, &benchmarkResults)
-
-				if err != nil {
-					agentstate.Logger.Error("Benchmark session failed", "error", err)
-					cserrors.SendAgentError(ctx, err.Error(), nil, api.SeverityFatal)
-				}
-
-				// Submit any remaining unsubmitted results
-				if len(benchmarkResults) > submittedUpTo {
-					batch := benchmarkResults[submittedUpTo:]
-					if sendErr := m.sendBenchmarkResults(ctx, batch); sendErr != nil {
-						agentstate.Logger.Warn("Failed to submit final benchmark batch", "error", sendErr)
-					} else {
-						markSubmitted(benchmarkResults, submittedUpTo, len(benchmarkResults))
-					}
-				}
-
-				agentstate.State.SetBenchmarksSubmitted(allSubmitted(benchmarkResults))
-
-				// Always persist cache with Submitted flags for retry
-				if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
-					agentstate.Logger.Warn("Failed to save final benchmark cache", "error", saveErr)
-				}
-
-				sess.Cleanup()
+				m.finalizeBenchmarkSession(ctx, sess, &benchmarkResults, submittedUpTo, err)
 
 				return
 			}

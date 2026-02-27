@@ -1,70 +1,48 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: lib/sdk/**/*.go
+fileMatchPattern: lib/api/**/*.go
 ---
 
-# Go SDK Development Rules
+# API Client Development Rules
 
-## 1. Project Structure & Layout
+Rules for the API client layer in `lib/api/`. The client is generated from `docs/swagger.json` using oapi-codegen.
 
-- Follow Go module conventions ([go.dev](mdc:https:/go.dev/doc/modules/layout)):
-  - Place commands in `cmd/`, core packages in `pkg/` or root, and internal-only code in `internal/`.
-  - Use clear, idiomatic package names; avoid stutter (e.g., `sdk.Client`, not `sdk.SDKClient`).
-  - Keep public APIs minimal; prefer unexported helpers.
+## 1. Code Generation
 
-## 2. Idiomatic Go & API Design
+- **Generated file**: `lib/api/client.gen.go` — never modify manually. Regenerate with `just generate`.
+- **Config**: `lib/api/config.yaml` defines oapi-codegen settings.
+- oapi-codegen v2 config does NOT support `input-spec` — the spec path is a positional CLI argument.
+- After regenerating, always run `go mod tidy`.
+- Use `exclude-schemas` in config when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface).
 
-- Use Go idioms: interfaces for abstractions, structs for data, and functional options for configuration ([speakeasy.com](mdc:https:/www.speakeasy.com/docs/languages/golang/methodology-go)).
-- Prefer context-aware methods (`ctx context.Context` as first arg for network calls).
-- Return concrete types, not interfaces, from constructors.
-- Avoid global state; use dependency injection for testability.
-- Design for composability and extensibility.
+## 2. Client Architecture
 
-## 3. Error Handling
+- `AgentClient` wraps `ClientWithResponses` (single field), implements the `APIClient` aggregate interface.
+- Sub-clients: `Tasks()`, `Attacks()`, `Agents()`, `Auth()`.
+- All sub-clients must use the generated client — never hand-roll raw HTTP endpoints.
+- `APIClient` interface is defined in `lib/api/interfaces.go`.
 
-- Always return errors as the last return value; never panic for normal errors.
-- Use Go's `errors` package for wrapping and annotating errors.
-- Provide clear, actionable error messages; document error types.
-- For SDKs, define sentinel errors for common failure modes.
+## 3. Naming & Nolint
 
-## 4. Testing & Reliability
+- oapi-codegen generates a `Client` struct — the hand-written aggregate interface is named `APIClient` (with `//nolint:revive` for stutter).
+- `APIError` and `SetTaskAbandonedError.Error_` also have `//nolint:revive`.
+- These nolint directives can be stripped by `golines` — verify they survive after running formatters.
 
-- Cover all public APIs with table-driven unit tests.
-- Use Go's `testing` package; avoid external test frameworks unless necessary.
-- Provide integration tests for API calls (mocking remote endpoints where possible).
-- Ensure all code passes `go vet`, `golint`, and `go test ./...`.
+## 4. Error Handling
 
-## 5. Documentation & Developer Experience
+- Error types live in `lib/api/errors.go`. Use `errors.As` to extract `*api.APIError`.
+- Generated types with an `Error` field (e.g., `ErrorObject`) can't implement Go's `error` interface — use the `APIError` wrapper.
+- oapi-codegen's `Parse*Response` methods read and close `HTTPResponse.Body` during parsing. Use the parsed `Body` byte slice (`resp.Body`), not `resp.HTTPResponse.Body` (already drained and closed).
+- When an API method returns HTTP 200, always guard `resp.JSON200 == nil` — oapi-codegen silently sets it to nil if JSON unmarshaling fails.
 
-- Document all exported types, functions, and methods with GoDoc comments.
-- Provide usage examples in GoDoc and a `README.md`.
-- Favor discoverability: intuitive method names, clear parameter docs, and minimal setup.
-- Include a quickstart and troubleshooting section in docs ([auth0.com](mdc:https:/auth0.com/blog/guiding-principles-for-building-sdks)).
-- Version the SDK using semantic versioning; document breaking changes.
+## 5. Testing
 
-## 6. Performance & Security
+- Mock implementations live in `lib/api/mock.go`.
+- MockClient sub-client accessors return default mocks (not nil) to prevent nil pointer panics.
+- Use `lib/testhelpers/` for HTTP mocking (`SetupHTTPMock`) and state setup.
 
-- Avoid unnecessary allocations; benchmark critical paths.
-- Never log or expose sensitive data (e.g., tokens, secrets).
-- Use secure defaults for all network and crypto operations.
+## 6. Spec Management
 
-## 7. Packaging & Distribution
-
-- Tag releases with semantic versions.
-- Keep dependencies minimal and up-to-date.
-- Provide a `go.mod` and `go.sum` for reproducible builds.
-
-## 8. Community & Contribution
-
-- Use Conventional Commits for all changes.
-- Provide a `CONTRIBUTING.md` and issue templates.
-- Respond to issues and PRs promptly; document support policy.
-
----
-
-### References
-
-- [Go Module Layout](mdc:https:/go.dev/doc/modules/layout)
-- [Speakeasy Go SDK Methodology](mdc:https:/www.speakeasy.com/docs/languages/golang/methodology-go)
-- [SDK Best Practices](mdc:https:/www.speakeasy.com/blog/sdk-best-practices)
-- [Auth0 SDK Principles](mdc:https:/auth0.com/blog/guiding-principles-for-building-sdks)
+- `docs/swagger.json` is downloaded from the CipherSwarm server — never modify it locally.
+- Open issues on `unclesp1d3r/CipherSwarm` for spec problems.
+- Download latest: `just gen-api-download` (fetches from `unclesp1d3r/CipherSwarm/main/swagger/v1/swagger.json`).

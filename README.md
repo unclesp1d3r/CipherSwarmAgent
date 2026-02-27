@@ -32,7 +32,7 @@ Follow these instructions to set up and run the CipherSwarm Agent in your enviro
 
 ### Prerequisites
 
-- Go 1.22 or higher
+- Go 1.26 or higher
 - Git (for cloning the repository)
 - Docker (optional for running the agent in a container)
 - A [CipherSwarm](https://github.com/unclesp1d3r/CipherSwarm) server to connect to (e.g., a local or remote instance)

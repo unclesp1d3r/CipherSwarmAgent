@@ -10,6 +10,7 @@ type agentConfig struct {
 
 // agentConfiguration holds the configuration settings and API version for the agent client.
 type agentConfiguration struct {
-	Config     agentConfig `json:"config"      yaml:"config"`
-	APIVersion int64       `json:"api_version" yaml:"api_version"` // ApiVersion represents the version of the API used by the agent client.
+	Config           agentConfig `json:"config"            yaml:"config"`
+	APIVersion       int64       `json:"api_version"       yaml:"api_version"`       // ApiVersion represents the version of the API used by the agent client.
+	BenchmarksNeeded bool        `json:"benchmarks_needed" yaml:"benchmarks_needed"` // BenchmarksNeeded indicates whether the server requires new benchmarks from this agent.
 }

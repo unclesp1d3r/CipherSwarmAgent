@@ -9,8 +9,11 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `contextcheck` flags functions not propagating context — use `//nolint:contextcheck // reason` when the callee genuinely cannot accept a context parameter.
 - `revive` requires each exported constant to have its own `// ConstName is...` doc comment. A group comment alone doesn't satisfy it.
 - `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
+- `//nolint:errcheck` does NOT suppress `gosec` G104 (unhandled error return) — list both (e.g., `//nolint:gosec,errcheck // G104 - reason`).
+- `containedctx` flags `context.Context` stored in structs — use `//nolint:containedctx // reason` when the context is intentionally part of the struct lifecycle.
 - `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation. Bare `//nolint:linter` directives fail CI.
 - A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep them contiguous.
+- `.golangci.yml` has `fix: true` — `nolintlint` auto-strips `//nolint:` directives that don't suppress an active warning. Don't add nolint for rules that aren't actually firing; verify with a clean cache first (`golangci-lint cache clean`).
 
 ## golines & nolint Comments
 
@@ -22,6 +25,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 - oapi-codegen v2 config does NOT support `input-spec` — the spec path must be a positional CLI argument.
 - `docs/swagger.json` is downloaded from the CipherSwarm server — never modify it locally. Open issues on `unclesp1d3r/CipherSwarm` for spec problems.
+- During coordinated client+server development, local `swagger.json` changes are acceptable. CodeRabbit may flag these as policy violations when the upstream server PR hasn't merged yet — these are false positives.
 - `lib/api/client.gen.go` is auto-generated — never manually modify. Regenerate with `just generate`.
 - oapi-codegen generates a `Client` struct — the hand-written aggregate interface is named `APIClient` (with `//nolint:revive` for stutter) to avoid the conflict. `APIError` and `SetTaskAbandonedError.Error_` also have `//nolint:revive`.
 - Use `exclude-schemas` in `lib/api/config.yaml` when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface).
@@ -41,6 +45,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 - `agentstate.State` contains `atomic.Bool` and `sync.RWMutex` — never copy the struct. Use per-field save/restore in test helpers and getter/setter methods for synchronized fields.
 - `hashcat` package tests cannot import `testhelpers` (circular: testhelpers -> hashcat). Use local test helpers.
+- Package-level `var` test fixtures get mutated by production code across subtests. Use factory functions (e.g., `newSampleData()`) that return fresh copies to prevent cross-test contamination.
+- `nxadm/tail` `Cleanup()` returns void — do not attempt to capture a return value. `Stop()` returns an error; `Cleanup()` does not.
 
 ## Tooling
 

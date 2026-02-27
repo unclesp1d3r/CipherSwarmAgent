@@ -455,14 +455,16 @@ func TestHandleStateResponse(t *testing.T) {
 // TestMapConfiguration tests the mapConfiguration function with various pointer combinations.
 func TestMapConfiguration(t *testing.T) {
 	tests := []struct {
-		name       string
-		apiVersion int
-		config     api.AdvancedAgentConfiguration
-		expected   agentConfiguration
+		name             string
+		apiVersion       int
+		config           api.AdvancedAgentConfiguration
+		benchmarksNeeded bool
+		expected         agentConfiguration
 	}{
 		{
-			name:       "all nil pointers",
-			apiVersion: 1,
+			name:             "all nil pointers",
+			apiVersion:       1,
+			benchmarksNeeded: false,
 			config: api.AdvancedAgentConfiguration{
 				UseNativeHashcat:    nil,
 				AgentUpdateInterval: nil,
@@ -470,7 +472,8 @@ func TestMapConfiguration(t *testing.T) {
 				OpenclDevices:       nil,
 			},
 			expected: agentConfiguration{
-				APIVersion: 1,
+				APIVersion:       1,
+				BenchmarksNeeded: false,
 				Config: agentConfig{
 					UseNativeHashcat:    false,
 					AgentUpdateInterval: defaultAgentUpdateInterval,
@@ -480,8 +483,9 @@ func TestMapConfiguration(t *testing.T) {
 			},
 		},
 		{
-			name:       "all non-nil pointers",
-			apiVersion: 1,
+			name:             "all non-nil pointers",
+			apiVersion:       1,
+			benchmarksNeeded: true,
 			config: api.AdvancedAgentConfiguration{
 				UseNativeHashcat:    ptrBool(true),
 				AgentUpdateInterval: ptrInt(600),
@@ -489,7 +493,8 @@ func TestMapConfiguration(t *testing.T) {
 				OpenclDevices:       ptrString("1,2"),
 			},
 			expected: agentConfiguration{
-				APIVersion: 1,
+				APIVersion:       1,
+				BenchmarksNeeded: true,
 				Config: agentConfig{
 					UseNativeHashcat:    true,
 					AgentUpdateInterval: 600,
@@ -499,8 +504,9 @@ func TestMapConfiguration(t *testing.T) {
 			},
 		},
 		{
-			name:       "mixed nil and non-nil pointers",
-			apiVersion: 1,
+			name:             "mixed nil and non-nil pointers",
+			apiVersion:       1,
+			benchmarksNeeded: false,
 			config: api.AdvancedAgentConfiguration{
 				UseNativeHashcat:    ptrBool(true),
 				AgentUpdateInterval: nil,
@@ -508,7 +514,8 @@ func TestMapConfiguration(t *testing.T) {
 				OpenclDevices:       ptrString("1"),
 			},
 			expected: agentConfiguration{
-				APIVersion: 1,
+				APIVersion:       1,
+				BenchmarksNeeded: false,
 				Config: agentConfig{
 					UseNativeHashcat:    true,
 					AgentUpdateInterval: defaultAgentUpdateInterval,
@@ -521,8 +528,9 @@ func TestMapConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mapConfiguration(tt.apiVersion, tt.config)
+			result := mapConfiguration(tt.apiVersion, tt.config, tt.benchmarksNeeded)
 			assert.Equal(t, tt.expected.APIVersion, result.APIVersion)
+			assert.Equal(t, tt.expected.BenchmarksNeeded, result.BenchmarksNeeded)
 			assert.Equal(t, tt.expected.Config.UseNativeHashcat, result.Config.UseNativeHashcat)
 			assert.Equal(t, tt.expected.Config.AgentUpdateInterval, result.Config.AgentUpdateInterval)
 			assert.Equal(t, tt.expected.Config.BackendDevices, result.Config.BackendDevices)
