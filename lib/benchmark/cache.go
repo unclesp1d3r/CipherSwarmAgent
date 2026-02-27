@@ -106,31 +106,14 @@ func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 	return results, nil
 }
 
-// clearBenchmarkCache removes the cache file. Silently ignores "not exist"
-// errors (idempotent), and logs a warning for other removal failures without
-// propagating the error.
-func clearBenchmarkCache() {
-	cachePath := agentstate.State.BenchmarkCachePath
-	if cachePath == "" {
-		return
-	}
-
-	if err := os.Remove(cachePath); err != nil {
-		if !os.IsNotExist(err) {
-			agentstate.Logger.Warn("Failed to remove benchmark cache file",
-				"error", err, "path", cachePath)
-		}
-	} else {
-		agentstate.Logger.Debug("Benchmark cache file cleared", "path", cachePath)
-	}
-}
-
 // TrySubmitCachedBenchmarks attempts to submit previously cached benchmark
 // results to the server. Returns false immediately if the force-benchmark
-// flag is set (stale results should not be submitted). Filters to only
-// unsubmitted results, sends them, marks as submitted, and persists the
-// updated cache. Returns true if all results are now submitted, false
-// otherwise (cache is preserved for the next attempt).
+// flag is set (stale results should not be submitted). If all cached results
+// are already marked as submitted, returns true immediately without
+// re-persisting the cache. Otherwise, filters to only unsubmitted results,
+// sends them, marks as submitted, and persists the updated cache. Returns
+// true if all results are now submitted, false otherwise (cache is preserved
+// for the next attempt).
 func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
 	if agentstate.State.ForceBenchmarkRun {
 		agentstate.Logger.Debug("Force benchmark flag set, skipping cache submission")
@@ -167,7 +150,10 @@ func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
 	}
 
 	if saveErr := saveBenchmarkCache(cached); saveErr != nil {
-		agentstate.Logger.Warn("Failed to update benchmark cache after submission", "error", saveErr)
+		agentstate.Logger.Warn(
+			"Failed to persist benchmark cache after submission; benchmarks may re-submit on next restart",
+			"error", saveErr,
+		)
 	}
 
 	agentstate.State.SetBenchmarksSubmitted(true)

@@ -244,52 +244,6 @@ func TestLoadBenchmarkCache_BackwardCompatible(t *testing.T) {
 	assert.False(t, loaded[0].Submitted, "old cache entries should default to unsubmitted")
 }
 
-func TestClearBenchmarkCache(t *testing.T) {
-	tests := []struct {
-		name       string
-		setupCache func(t *testing.T, dir string) string
-	}{
-		{
-			name: "removes existing cache file",
-			setupCache: func(t *testing.T, dir string) string {
-				t.Helper()
-				p := filepath.Join(dir, "benchmark_cache.json")
-				require.NoError(t, os.WriteFile(p, []byte("[]"), 0o600))
-				return p
-			},
-		},
-		{
-			name: "no-op for nonexistent file",
-			setupCache: func(_ *testing.T, dir string) string {
-				return filepath.Join(dir, "nonexistent.json")
-			},
-		},
-		{
-			name: "no-op for empty path",
-			setupCache: func(_ *testing.T, _ string) string {
-				return ""
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			agentstate.State.BenchmarkCachePath = tt.setupCache(t, tmpDir)
-
-			defer func() { agentstate.State.BenchmarkCachePath = "" }()
-
-			// Should not panic
-			clearBenchmarkCache()
-
-			if agentstate.State.BenchmarkCachePath != "" {
-				_, err := os.Stat(agentstate.State.BenchmarkCachePath)
-				assert.True(t, os.IsNotExist(err), "cache file should be removed")
-			}
-		})
-	}
-}
-
 func TestSaveThenLoadBenchmarkCache(t *testing.T) {
 	tmpDir := t.TempDir()
 	agentstate.State.BenchmarkCachePath = filepath.Join(tmpDir, "benchmark_cache.json")
