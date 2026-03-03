@@ -16,7 +16,7 @@ require (
 )
 
 require (
-	github.com/oapi-codegen/runtime v1.1.2
+	github.com/oapi-codegen/runtime v1.2.0
 	github.com/shirou/gopsutil/v4 v4.26.1
 )
 
