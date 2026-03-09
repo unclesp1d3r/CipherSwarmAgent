@@ -3,7 +3,7 @@ module github.com/unclesp1d3r/cipherswarmagent
 go 1.26.0
 
 require (
-	github.com/charmbracelet/log v0.4.2
+	github.com/charmbracelet/log v1.0.0
 	github.com/cheggaaa/pb/v3 v3.1.7
 	github.com/dustin/go-humanize v1.0.1
 	github.com/hashicorp/go-getter v1.8.4
