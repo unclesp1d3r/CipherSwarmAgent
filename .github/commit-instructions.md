@@ -1,4 +1,4 @@
-# Commit Message Style for mmap-guard
+# Commit Message Style for project
 
 Use Conventional Commits: `<type>(<scope>): <description>`
 
