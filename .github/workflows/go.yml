@@ -29,6 +29,19 @@ jobs:
 
       - name: Test
         run: go test -v ./...
+  race:
+    name: Race detector
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Test with race detector
+        timeout-minutes: 15
+        run: go test -race -v ./...
   golangci:
     name: lint
     runs-on: ubuntu-latest
@@ -54,9 +67,8 @@ jobs:
           cache: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run coverage
-        continue-on-error: true
         timeout-minutes: 10
-        run: go test -coverprofile=coverage.out -covermode=set ./...
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage to Codecov
         if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codecov/codecov-action@v5
