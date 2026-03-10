@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"sync/atomic"
 	"testing"
 
@@ -1026,7 +1027,7 @@ func TestSubmitBatchIfReady_ExactBoundary(t *testing.T) {
 	results := make([]display.BenchmarkResult, benchmarkBatchSize)
 	for i := range results {
 		results[i] = display.BenchmarkResult{
-			Device: "1", HashType: fmt.Sprintf("%d", i),
+			Device: "1", HashType: strconv.Itoa(i),
 			RuntimeMs: "100", SpeedHs: "1000.0",
 		}
 	}
