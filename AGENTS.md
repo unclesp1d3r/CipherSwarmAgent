@@ -39,7 +39,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
   - `agent/`: Agent lifecycle — startup, heartbeat loop, task polling, shutdown.
   - `api/`: API client layer — generated client (`client.gen.go`), wrapper (`client.go`), errors (`errors.go`), interfaces (`interfaces.go`), mocks (`mock.go`).
   - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
-  - `arch/`: OS-specific abstractions (Linux, macOS, Windows).
+  - `arch/`: OS-specific abstractions (Linux, macOS, Windows). Platform identity comes from `host.InfoStat.OS` (in `UpdateAgentMetadata`), not from `arch` — don't add `GetPlatform()` functions here.
   - `benchmark/`: Benchmark execution, caching, and submission.
   - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
   - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
@@ -84,6 +84,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Context propagation:** `StartAgent()` creates a cancellable context threaded through all goroutines. Use `ctx` for stoppable operations; `context.Background()` for must-complete operations (e.g., `AbandonTask`), with `//nolint:contextcheck // must-complete: reason`.
 - **Data-loss logging:** When a channel send is skipped due to `ctx.Done()`, always log the dropped value at Warn level (e.g., dropped cracked hashes, process exit status). Silent data loss during shutdown hides bugs.
 - **Context-aware sleep:** Use `sleepWithContext(ctx, duration)` (in `lib/agent/agent.go`) instead of `time.Sleep`.
+- **Context-aware retry:** Retry loops with backoff must use `time.NewTimer` + `Stop()` in a `select` with `ctx.Done()` (not `time.After` or `time.Sleep`). `time.After` leaks timers on cancellation. See `downloadWithRetry` in `lib/downloader/downloader.go`.
 - Run tests with `-race` flag to detect data races.
 
 ### Performance
@@ -130,6 +131,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - MockClient sub-client accessors return default mocks (not nil) to prevent nil pointer panics.
 - When removing `agentstate.State` fields, grep all test helpers and reset functions.
 - For cross-platform subprocess tests, use the Go test helper process pattern (`TestHelperProcess` + `os.Args[0]` + env vars) instead of OS-specific binaries like `sleep` or `true`.
+- Use `hashcat.NewTestSession(skipStatusUpdates)` (in `lib/hashcat/session_test_helpers.go`) to create mock sessions — never construct `hashcat.Session` struct literals directly from `testhelpers`, as it bypasses constructor invariants.
+- Status fixture slices (`RecoveredHashes`, `RecoveredSalts`, `Progress`) must have ≥2 elements (`display.MinStatusFields`). Single-element slices cause silent drops in `handleStatusUpdate` and `display.JobStatus`.
 - Run `go test -race ./...` to detect data races.
 
 ## Git

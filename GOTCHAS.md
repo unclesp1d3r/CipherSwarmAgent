@@ -14,6 +14,9 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation. Bare `//nolint:linter` directives fail CI.
 - A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep them contiguous.
 - `.golangci.yml` has `fix: true` — `nolintlint` auto-strips `//nolint:` directives that don't suppress an active warning. Don't add nolint for rules that aren't actually firing; verify with a clean cache first (`golangci-lint cache clean`).
+- `gosec G118` flags goroutines that use `context.Background()` or don't propagate the parent context. Use `//nolint:gosec // G118 - reason` as a standalone comment above `go func()`.
+- `gosec G204` does NOT fire on `exec.CommandContext` when the binary path comes from an internal function return — don't add `//nolint:gosec // G204` unless verified.
+- `gosec G304` does NOT fire on `os.Open` in test helper packages — don't add `//nolint:gosec // G304` unless verified with a clean lint run.
 
 ## golines & nolint Comments
 
@@ -40,6 +43,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 ## Configuration
 
 - `SetDefaultConfigValues` runs before config files/env vars are loaded. Never derive defaults from other viper keys (e.g., `viper.GetString("data_path")`) — they only return the registered default, not user overrides. Derive in `SetupSharedState` instead.
+- `bridgeDeprecatedFlags` must use `cmd.Root().PersistentFlags()` — `cmd.Flags()` only returns local (non-persistent) flags and all agent flags are persistent. Also skip bridging when `canonical.Changed` is true (user explicitly set the canonical flag).
 
 ## Testing
 
