@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,6 +81,35 @@ func TestDeprecatedAliasesRegistered(t *testing.T) {
 			require.Empty(t, canonical.Deprecated, "canonical flag %q should not be deprecated", df.newName)
 		})
 	}
+}
+
+func TestDeprecatedAliasesComplete(t *testing.T) {
+	// Reverse check: every canonical flag whose Viper key contains underscores
+	// but whose flag name uses hyphens should have a deprecated alias entry.
+	flags := RootCmd.PersistentFlags()
+	aliasSet := make(map[string]bool, len(deprecatedFlags))
+	for _, df := range deprecatedFlags {
+		aliasSet[df.newName] = true
+	}
+
+	flags.VisitAll(func(f *pflag.Flag) {
+		if f.Deprecated != "" {
+			return // skip deprecated flags themselves
+		}
+		if !strings.Contains(f.Name, "-") {
+			return // single-word flags (debug, config) don't need aliases
+		}
+
+		// Check if this kebab-case flag has a corresponding underscore alias.
+		underscored := strings.ReplaceAll(f.Name, "-", "_")
+		if flags.Lookup(underscored) != nil && !aliasSet[f.Name] {
+			t.Errorf(
+				"flag %q has underscore alias %q registered but missing from deprecatedFlags table",
+				f.Name,
+				underscored,
+			)
+		}
+	})
 }
 
 func TestBridgeDeprecatedFlags_OldOnly(t *testing.T) {
@@ -197,4 +228,46 @@ func TestBridgeDeprecatedFlags_AllTypes(t *testing.T) {
 			require.True(t, canonical.Changed)
 		})
 	}
+}
+
+func TestDeprecatedFlagBridgesToViper(t *testing.T) {
+	// Verify the full chain: deprecated pflag -> canonical pflag (bridge) -> Viper.
+	// This test uses the real RootCmd (where Viper bindings are wired in init()).
+	// Save and restore flag state to avoid cross-test contamination.
+	flags := RootCmd.PersistentFlags()
+
+	oldFlag := flags.Lookup("api_token")
+	require.NotNil(t, oldFlag)
+	savedOldValue := oldFlag.Value.String()
+	savedOldChanged := oldFlag.Changed
+
+	newFlag := flags.Lookup("api-token")
+	require.NotNil(t, newFlag)
+	savedNewValue := newFlag.Value.String()
+	savedNewChanged := newFlag.Changed
+
+	savedViper := viper.GetString("api_token")
+
+	t.Cleanup(func() {
+		require.NoError(t, oldFlag.Value.Set(savedOldValue))
+		oldFlag.Changed = savedOldChanged
+		require.NoError(t, newFlag.Value.Set(savedNewValue))
+		newFlag.Changed = savedNewChanged
+		viper.Set("api_token", savedViper)
+	})
+
+	// Simulate passing the deprecated flag.
+	require.NoError(t, oldFlag.Value.Set("test-secret"))
+	oldFlag.Changed = true
+	newFlag.Changed = false
+
+	bridgeDeprecatedFlags(RootCmd)
+
+	// The canonical pflag should have the bridged value.
+	require.Equal(t, "test-secret", newFlag.Value.String())
+	require.True(t, newFlag.Changed)
+
+	// Viper should read the bridged value through the BindPFlag binding.
+	require.Equal(t, "test-secret", viper.GetString("api_token"),
+		"viper should read bridged value from canonical flag via BindPFlag")
 }

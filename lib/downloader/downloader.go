@@ -178,7 +178,13 @@ func downloadWithRetry(ctx context.Context, client Getter, maxRetries int, baseD
 			case <-ctx.Done():
 				timer.Stop()
 
-				return ctx.Err()
+				if lastErr != nil {
+					return fmt.Errorf(
+						"download cancelled after %d attempt(s) (last error: %w): %w",
+						attempt, lastErr, ctx.Err())
+				}
+
+				return fmt.Errorf("download cancelled: %w", ctx.Err())
 			}
 		}
 
@@ -271,11 +277,9 @@ func Base64ToHex(b64 string) (string, error) {
 	return hex.EncodeToString(data), nil
 }
 
-// removeExistingFile removes the file specified by filePath if it exists, logging and reporting an error if removal fails.
-// Uses os.Remove directly (no os.Stat) to avoid TOCTOU races.
-// Parameters:
-// - filePath: The path to the file that needs to be removed.
-// Returns an error if file removal fails for reasons other than file not existing.
+// removeExistingFile removes the file at filePath if it exists.
+// Uses os.Remove directly to avoid TOCTOU races.
+// Returns an error if removal fails for reasons other than the file not existing.
 func removeExistingFile(filePath string) error {
 	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("error removing old file %s: %w", filePath, err)

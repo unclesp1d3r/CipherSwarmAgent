@@ -2,6 +2,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
@@ -204,6 +206,8 @@ var deprecatedFlags = []deprecatedAlias{
 func registerDeprecatedAliases() {
 	flags := RootCmd.PersistentFlags()
 	for _, df := range deprecatedFlags {
+		// Zero-value defaults are safe: bridgeDeprecatedFlags only copies when
+		// old.Changed is true (user explicitly passed the flag on the CLI).
 		switch df.flagType {
 		case "string":
 			flags.String(df.oldName, "", "")
@@ -223,6 +227,7 @@ func registerDeprecatedAliases() {
 
 // bridgeDeprecatedFlags copies explicitly-set deprecated underscore flag values
 // into their canonical kebab-case counterparts so Viper picks them up.
+// If both the deprecated and canonical flag are set, the canonical value takes precedence.
 func bridgeDeprecatedFlags(cmd *cobra.Command) {
 	flags := cmd.Root().PersistentFlags()
 	for _, df := range deprecatedFlags {
@@ -238,7 +243,9 @@ func bridgeDeprecatedFlags(cmd *cobra.Command) {
 
 		// Copy value from deprecated flag to canonical flag only when
 		// the canonical flag was not explicitly set by the user.
-		cobra.CheckErr(canonical.Value.Set(old.Value.String()))
+		if err := canonical.Value.Set(old.Value.String()); err != nil {
+			cobra.CheckErr(fmt.Errorf("bridging deprecated flag --%s to --%s: %w", df.oldName, df.newName, err))
+		}
 		canonical.Changed = true
 	}
 }

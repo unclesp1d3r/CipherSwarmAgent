@@ -10,19 +10,16 @@ import (
 
 // NewMockSession creates a minimal hashcat.Session for testing without requiring the hashcat binary.
 // It delegates to hashcat.NewTestSession to respect constructor invariants and avoid direct
-// access to unexported fields.
-// Returns a session that can be used in tests that need a Session reference but don't actually
-// execute hashcat. The Cleanup method is a no-op since no process is started.
+// access to unexported fields. Cleanup is safe to call since no process or temporary files
+// are created.
 //
-// The sessionName parameter is currently unused but kept for API consistency with potential
-// future use cases where session naming might be needed.
+// The sessionName parameter is unused; it exists so NewMockSession can be passed as a
+// session factory callback matching the expected signature.
 func NewMockSession(_ string) (*hashcat.Session, error) {
 	return hashcat.NewTestSession(true), nil
 }
 
-// MockSessionWithChannels creates a session with pre-initialized channels for testing.
-// Similar to NewMockSession but ensures all channels are ready.
-// Useful for tests that need to send data through channels.
+// MockSessionWithChannels is an alias for NewMockSession, retained for backward compatibility.
 func MockSessionWithChannels(sessionName string) (*hashcat.Session, error) {
 	return NewMockSession(sessionName)
 }

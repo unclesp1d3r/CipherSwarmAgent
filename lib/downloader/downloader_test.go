@@ -314,5 +314,6 @@ func TestDownloadWithRetry_ContextCancellation(t *testing.T) {
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, mock.returnError, "should preserve last download error through cancellation")
 	require.Less(t, elapsed, 1*time.Second, "should return promptly on cancellation, not wait for full retry delay")
 }
