@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/jarcoal/httpmock"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
@@ -106,11 +105,8 @@ func TestAuthenticateAgent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(0, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(testhelpers.SetupHTTPMock())
+			t.Cleanup(testhelpers.SetupTestState(0, "https://test.api", "test-token"))
 
 			tt.setupMock(123)
 
@@ -118,7 +114,7 @@ func TestAuthenticateAgent(t *testing.T) {
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
-				assert.Equal(t, int64(123), agentstate.State.AgentID)
+				require.Equal(t, int64(123), agentstate.State.AgentID)
 			} else {
 				require.Error(t, err)
 				// Check error type if it's an API error type, otherwise just verify error was returned
@@ -135,9 +131,9 @@ func TestAuthenticateAgent(t *testing.T) {
 func TestGetAgentConfiguration(t *testing.T) {
 	// Stub setNativeHashcatPath to avoid actual file system operations
 	originalFn := setNativeHashcatPathFn
-	defer func() {
+	t.Cleanup(func() {
 		setNativeHashcatPathFn = originalFn
-	}()
+	})
 	setNativeHashcatPathFn = func(_ context.Context) error {
 		return nil // No-op for tests
 	}
@@ -203,11 +199,8 @@ func TestGetAgentConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(testhelpers.SetupHTTPMock())
+			t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 			tt.setupMock()
 
@@ -215,7 +208,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
-				assert.Equal(t, tt.useNativeHashcat, Configuration.Config.UseNativeHashcat)
+				require.Equal(t, tt.useNativeHashcat, Configuration.Config.UseNativeHashcat)
 			} else {
 				require.Error(t, err)
 				testhelpers.AssertErrorType(t, err, tt.expectedError)
@@ -270,15 +263,11 @@ func TestUpdateAgentMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(testhelpers.SetupHTTPMock())
+			t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 			// Stub getDevicesList to avoid requiring hashcat binary
-			cleanupStub := stubGetDevicesList()
-			defer cleanupStub()
+			t.Cleanup(stubGetDevicesList())
 
 			tt.setupMock(123)
 
@@ -287,10 +276,10 @@ func TestUpdateAgentMetadata(t *testing.T) {
 			if tt.expectedError {
 				require.Error(t, err, "Expected an error but got nil")
 				if tt.expectBadResp {
-					assert.Contains(t, err.Error(), ErrBadResponse.Error())
+					require.Contains(t, err.Error(), ErrBadResponse.Error())
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -358,11 +347,8 @@ func TestSendHeartBeat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(testhelpers.SetupHTTPMock())
+			t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 			tt.setupMock(123)
 
@@ -374,10 +360,10 @@ func TestSendHeartBeat(t *testing.T) {
 			}
 
 			if tt.expectedState == nil {
-				assert.Nil(t, state)
+				require.Nil(t, state)
 			} else {
 				require.NotNil(t, state)
-				assert.Equal(t, *tt.expectedState, *state)
+				require.Equal(t, *tt.expectedState, *state)
 			}
 		})
 	}
@@ -437,16 +423,15 @@ func TestHandleStateResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 			result := handleStateResponse(tt.response)
 
 			if tt.expectedState == nil {
-				assert.Nil(t, result)
+				require.Nil(t, result)
 			} else {
 				require.NotNil(t, result)
-				assert.Equal(t, *tt.expectedState, *result)
+				require.Equal(t, *tt.expectedState, *result)
 			}
 		})
 	}
@@ -487,10 +472,10 @@ func TestMapConfiguration(t *testing.T) {
 			apiVersion:       1,
 			benchmarksNeeded: true,
 			config: api.AdvancedAgentConfiguration{
-				UseNativeHashcat:    ptrBool(true),
-				AgentUpdateInterval: ptrInt(600),
-				BackendDevice:       ptrString("OpenCL"),
-				OpenclDevices:       ptrString("1,2"),
+				UseNativeHashcat:    new(true),
+				AgentUpdateInterval: new(600),
+				BackendDevice:       new("OpenCL"),
+				OpenclDevices:       new("1,2"),
 			},
 			expected: agentConfiguration{
 				APIVersion:       1,
@@ -508,10 +493,10 @@ func TestMapConfiguration(t *testing.T) {
 			apiVersion:       1,
 			benchmarksNeeded: false,
 			config: api.AdvancedAgentConfiguration{
-				UseNativeHashcat:    ptrBool(true),
+				UseNativeHashcat:    new(true),
 				AgentUpdateInterval: nil,
 				BackendDevice:       nil,
-				OpenclDevices:       ptrString("1"),
+				OpenclDevices:       new("1"),
 			},
 			expected: agentConfiguration{
 				APIVersion:       1,
@@ -529,12 +514,12 @@ func TestMapConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := mapConfiguration(tt.apiVersion, tt.config, tt.benchmarksNeeded)
-			assert.Equal(t, tt.expected.APIVersion, result.APIVersion)
-			assert.Equal(t, tt.expected.BenchmarksNeeded, result.BenchmarksNeeded)
-			assert.Equal(t, tt.expected.Config.UseNativeHashcat, result.Config.UseNativeHashcat)
-			assert.Equal(t, tt.expected.Config.AgentUpdateInterval, result.Config.AgentUpdateInterval)
-			assert.Equal(t, tt.expected.Config.BackendDevices, result.Config.BackendDevices)
-			assert.Equal(t, tt.expected.Config.OpenCLDevices, result.Config.OpenCLDevices)
+			require.Equal(t, tt.expected.APIVersion, result.APIVersion)
+			require.Equal(t, tt.expected.BenchmarksNeeded, result.BenchmarksNeeded)
+			require.Equal(t, tt.expected.Config.UseNativeHashcat, result.Config.UseNativeHashcat)
+			require.Equal(t, tt.expected.Config.AgentUpdateInterval, result.Config.AgentUpdateInterval)
+			require.Equal(t, tt.expected.Config.BackendDevices, result.Config.BackendDevices)
+			require.Equal(t, tt.expected.Config.OpenCLDevices, result.Config.OpenCLDevices)
 		})
 	}
 }
@@ -543,44 +528,39 @@ func TestMapConfiguration(t *testing.T) {
 func TestUnwrapOr(t *testing.T) {
 	t.Run("nil pointer returns default", func(t *testing.T) {
 		var p *string
-		assert.Equal(t, "default", UnwrapOr(p, "default"))
+		require.Equal(t, "default", UnwrapOr(p, "default"))
 	})
 
 	t.Run("non-nil pointer returns value", func(t *testing.T) {
 		s := "hello"
-		assert.Equal(t, "hello", UnwrapOr(&s, "default"))
+		require.Equal(t, "hello", UnwrapOr(&s, "default"))
 	})
 
 	t.Run("nil int pointer returns default", func(t *testing.T) {
 		var p *int
-		assert.Equal(t, 42, UnwrapOr(p, 42))
+		require.Equal(t, 42, UnwrapOr(p, 42))
 	})
 
 	t.Run("non-nil int pointer returns value", func(t *testing.T) {
 		v := 7
-		assert.Equal(t, 7, UnwrapOr(&v, 42))
+		require.Equal(t, 7, UnwrapOr(&v, 42))
 	})
 
 	t.Run("nil bool pointer returns default", func(t *testing.T) {
 		var p *bool
-		assert.True(t, UnwrapOr(p, true))
+		require.True(t, UnwrapOr(p, true))
 	})
 
 	t.Run("non-nil bool pointer returns value", func(t *testing.T) {
 		v := false
-		assert.False(t, UnwrapOr(&v, true))
+		require.False(t, UnwrapOr(&v, true))
 	})
 
 	t.Run("zero value pointer returns zero not default", func(t *testing.T) {
 		v := 0
-		assert.Equal(t, 0, UnwrapOr(&v, 99))
+		require.Equal(t, 0, UnwrapOr(&v, 99))
 	})
 }
-
-// Helper functions for creating pointers in tests.
-func ptrBool(b bool) *bool       { return &b }
-func ptrInt(i int) *int          { return &i }
-func ptrString(s string) *string { return &s }
 
 // TestLogHeartbeatSent tests the logHeartbeatSent function.
 func TestLogHeartbeatSent(t *testing.T) {
@@ -600,8 +580,7 @@ func TestLogHeartbeatSent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 			// Set initial state
 			agentstate.State.ExtraDebugging = tt.extraDebugging
@@ -611,7 +590,7 @@ func TestLogHeartbeatSent(t *testing.T) {
 			logHeartbeatSent()
 
 			// Verify JobCheckingStopped is set to false
-			assert.False(t, agentstate.State.GetJobCheckingStopped(), "JobCheckingStopped should be set to false")
+			require.False(t, agentstate.State.GetJobCheckingStopped(), "JobCheckingStopped should be set to false")
 		})
 	}
 }

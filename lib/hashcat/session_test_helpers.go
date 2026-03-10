@@ -14,7 +14,7 @@ func NewTestSession(skipStatusUpdates bool) *Session {
 		StatusUpdates:     make(chan Status, testChannelBufferSize),
 		StderrMessages:    make(chan string, testChannelBufferSize),
 		StdoutLines:       make(chan string, testChannelBufferSize),
-		DoneChan:          make(chan error),
+		DoneChan:          make(chan error, 1),
 		SkipStatusUpdates: skipStatusUpdates,
 	}
 }
