@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -249,7 +250,7 @@ func TestDownloadWithRetry(t *testing.T) {
 			}
 
 			// Use very short delay for fast tests (1ms)
-			err := downloadWithRetry(mock, tt.maxRetries, 1*time.Millisecond)
+			err := downloadWithRetry(context.Background(), mock, tt.maxRetries, 1*time.Millisecond)
 
 			if tt.expectSuccess {
 				require.NoError(t, err, "expected successful download")
@@ -271,7 +272,7 @@ func TestDownloadWithRetryPreservesLastError(t *testing.T) {
 		returnError: expectedErr,
 	}
 
-	err := downloadWithRetry(mock, 3, 1*time.Millisecond)
+	err := downloadWithRetry(context.Background(), mock, 3, 1*time.Millisecond)
 
 	require.Error(t, err)
 	assert.Equal(t, expectedErr, err, "should return the last error from failed attempts")
@@ -284,7 +285,7 @@ func TestDownloadWithRetryNegativeRetries(t *testing.T) {
 		returnError: errors.New("download failed"),
 	}
 
-	err := downloadWithRetry(mock, -5, 1*time.Millisecond)
+	err := downloadWithRetry(context.Background(), mock, -5, 1*time.Millisecond)
 
 	require.NoError(t, err, "should succeed with 1 attempt when maxRetries is negative")
 	assert.Equal(t, 1, mock.getCallCount(), "should make exactly 1 call when maxRetries is negative")
