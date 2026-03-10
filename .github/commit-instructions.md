@@ -11,7 +11,7 @@ Use Conventional Commits: `<type>(<scope>): <description>`
 
 Examples:
 
-- `feat(cmd): add kebab-case CLI flags with deprecated aliases`
-- `fix(downloader): handle context cancellation during retry sleep`
-- `docs(api): update OpenAPI spec for new endpoints`
-- `chore(deps): update golangci-lint to v2.11`
+- `feat(cmd): Add kebab-case CLI flags with deprecated aliases`
+- `fix(downloader): Handle context cancellation during retry sleep`
+- `docs(api): Update OpenAPI spec for new endpoints`
+- `chore(deps): Update golangci-lint to v2.11`
