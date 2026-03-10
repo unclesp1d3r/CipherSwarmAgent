@@ -28,15 +28,16 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 		return
 	}
 
-	// Create timeout channel with configurable duration
+	// Create timeout timer with configurable duration
 	taskTimeout := agentstate.State.TaskTimeout
-	timeoutChan := time.After(taskTimeout)
+	taskTimer := time.NewTimer(taskTimeout)
 
 	waitChan := make(chan struct{})
 
 	//nolint:gosec // G118 - goroutine manages session lifecycle with ctx cancellation
 	go func() {
 		defer close(waitChan)
+		defer taskTimer.Stop()
 
 		for {
 			select {
@@ -57,7 +58,7 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 				sess.Cleanup()
 
 				return
-			case <-timeoutChan:
+			case <-taskTimer.C:
 				agentstate.Logger.Warn("Task timeout reached, killing session", "timeout", taskTimeout)
 
 				if err := sess.Kill(); err != nil {
@@ -102,6 +103,11 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 // so this function only reports JSON parse failures. Non-JSON lines are ignored here
 // (they are already logged by session.handleStdout).
 func handleStdOutLine(ctx context.Context, stdoutLine string, task *api.Task) {
+	// Guard — avoids []byte allocation for non-JSON lines (the common case)
+	if stdoutLine == "" || stdoutLine[0] != '{' {
+		return
+	}
+
 	lineBytes := []byte(stdoutLine)
 	if json.Valid(lineBytes) {
 		var update hashcat.Status
