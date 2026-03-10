@@ -15,9 +15,9 @@ import (
 func withHTTPAndState(t *testing.T, fn func()) {
 	t.Helper()
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 	// Mock SubmitErrorAgent endpoint to avoid recursion and enable call counting
 	testhelpers.MockSubmitErrorSuccess(123)
 	fn()
@@ -60,10 +60,10 @@ func TestHandleStatusUpdateError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			// Mock SubmitErrorAgent endpoint
 			testhelpers.MockSubmitErrorSuccess(123)
@@ -74,7 +74,7 @@ func TestHandleStatusUpdateError(t *testing.T) {
 				t.Skipf("Skipping test: failed to create mock session: %v", err)
 				return
 			}
-			defer sess.Cleanup()
+			t.Cleanup(sess.Cleanup)
 
 			// This function doesn't return an error
 			handleStatusUpdateError(context.Background(), tt.err, tt.task, sess)
@@ -97,10 +97,10 @@ func TestHandleTaskNotFound(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			// Mock SubmitErrorAgent endpoint
 			testhelpers.MockSubmitErrorSuccess(123)
@@ -111,7 +111,7 @@ func TestHandleTaskNotFound(t *testing.T) {
 				t.Skipf("Skipping test: failed to create mock session: %v", err)
 				return
 			}
-			defer sess.Cleanup()
+			t.Cleanup(sess.Cleanup)
 
 			// This function doesn't return an error
 			handleTaskNotFound(context.Background(), tt.task, sess)
@@ -134,10 +134,10 @@ func TestHandleTaskGone(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			// Mock SubmitErrorAgent endpoint
 			testhelpers.MockSubmitErrorSuccess(123)
@@ -148,7 +148,7 @@ func TestHandleTaskGone(t *testing.T) {
 				t.Skipf("Skipping test: failed to create mock session: %v", err)
 				return
 			}
-			defer sess.Cleanup()
+			t.Cleanup(sess.Cleanup)
 
 			// This function doesn't return an error
 			handleTaskGone(context.Background(), tt.task, sess)
@@ -165,6 +165,10 @@ func TestHandleAcceptTaskError(t *testing.T) {
 		{
 			name: "APIError_ClientError",
 			err:  testhelpers.NewValidationAPIError("accept task error"),
+		},
+		{
+			name: "APIError_NotFound",
+			err:  testhelpers.NewAPIError(http.StatusNotFound, "not found"),
 		},
 		{
 			name: "APIError_ServerError",
@@ -228,10 +232,10 @@ func TestHandleTaskError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			// Mock SubmitErrorAgent endpoint
 			testhelpers.MockSubmitErrorSuccess(123)
