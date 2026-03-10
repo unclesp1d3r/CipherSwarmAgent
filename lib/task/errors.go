@@ -84,15 +84,16 @@ func handleTaskGone(ctx context.Context, task *api.Task, sess *hashcat.Session) 
 
 // handleAcceptTaskError handles errors that occur when attempting to accept a task.
 func handleAcceptTaskError(ctx context.Context, err error) {
-	// Client errors (4xx) get Info severity, other errors get Critical
-	var ae *api.APIError
 	severity := api.SeverityCritical
-	if stderrors.As(err, &ae) && ae.StatusCode >= 400 && ae.StatusCode < 500 {
+	message := "Error accepting task"
+
+	if apierrors.IsNotFoundError(err) {
 		severity = api.SeverityInfo
+		message = "Task no longer exists on server"
 	}
 
 	opts := apierrors.Options{
-		Message:      "Error accepting task",
+		Message:      message,
 		Severity:     severity,
 		SendToServer: true,
 	}

@@ -15,6 +15,14 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
+// Package-level compiled URL patterns for test mocks.
+var (
+	taskNewPattern     = regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
+	attackPattern      = regexp.MustCompile(`^https?://[^/]+/api/v1/client/attacks/\d+$`)
+	acceptTaskPattern  = regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
+	abandonTaskPattern = regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/set_abandoned$`)
+)
+
 // newTestManager creates a Manager using the current agentstate API client.
 func newTestManager() *Manager {
 	return NewManager(
@@ -46,8 +54,7 @@ func TestGetNewTask(t *testing.T) {
 					Header:     http.Header{"Content-Type": []string{"application/json"}},
 					Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 				})
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
-				httpmock.RegisterRegexpResponder("GET", pattern, responder)
+				httpmock.RegisterRegexpResponder("GET", taskNewPattern, responder)
 			},
 			expectedTask: &api.Task{Id: 123, AttackId: 456},
 		},
@@ -55,8 +62,7 @@ func TestGetNewTask(t *testing.T) {
 			name: "no task available - HTTP 204",
 			setupMock: func() {
 				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
-				httpmock.RegisterRegexpResponder("GET", pattern, responder)
+				httpmock.RegisterRegexpResponder("GET", taskNewPattern, responder)
 			},
 			wantErr:   true,
 			wantErrIs: ErrNoTaskAvailable,
@@ -65,8 +71,7 @@ func TestGetNewTask(t *testing.T) {
 			name: "bad response - unexpected status",
 			setupMock: func() {
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
-				httpmock.RegisterRegexpResponder("GET", pattern, responder)
+				httpmock.RegisterRegexpResponder("GET", taskNewPattern, responder)
 			},
 			wantErr: true, // API client wraps 4xx as *api.APIError
 		},
@@ -74,12 +79,11 @@ func TestGetNewTask(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Helper()
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			tt.setupMock()
 
@@ -128,8 +132,7 @@ func TestGetAttackParameters(t *testing.T) {
 					Header:     http.Header{"Content-Type": []string{"application/json"}},
 					Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 				})
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/attacks/\d+$`)
-				httpmock.RegisterRegexpResponder("GET", pattern, responder)
+				httpmock.RegisterRegexpResponder("GET", attackPattern, responder)
 			},
 			expectedAttack: &api.Attack{Id: 456},
 		},
@@ -138,8 +141,7 @@ func TestGetAttackParameters(t *testing.T) {
 			attackID: 999,
 			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNotFound, "Not Found")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/attacks/\d+$`)
-				httpmock.RegisterRegexpResponder("GET", pattern, responder)
+				httpmock.RegisterRegexpResponder("GET", attackPattern, responder)
 			},
 			wantErr: true, // API client wraps 4xx as *api.APIError
 		},
@@ -147,12 +149,11 @@ func TestGetAttackParameters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Helper()
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			tt.setupMock(tt.attackID)
 
@@ -180,14 +181,14 @@ func TestAcceptTask(t *testing.T) {
 		task          *api.Task
 		setupMock     func(taskID int64)
 		expectedError bool
+		wantErrIs     error
 	}{
 		{
 			name: "successful task acceptance",
 			task: testhelpers.NewTestTask(123, 456),
 			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				httpmock.RegisterRegexpResponder("POST", acceptTaskPattern, responder)
 			},
 			expectedError: false,
 		},
@@ -198,44 +199,63 @@ func TestAcceptTask(t *testing.T) {
 				// No mock needed for nil task
 			},
 			expectedError: true,
+			wantErrIs:     ErrTaskIsNil,
 		},
 		{
 			name: "API error during acceptance",
 			task: testhelpers.NewTestTask(123, 456),
 			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				httpmock.RegisterRegexpResponder("POST", acceptTaskPattern, responder)
 			},
 			expectedError: true,
+			wantErrIs:     ErrTaskAcceptFailed,
+		},
+		{
+			name: "task not found - HTTP 404",
+			task: testhelpers.NewTestTask(123, 456),
+			setupMock: func(_ int64) {
+				responder := httpmock.NewStringResponder(http.StatusNotFound, "Not Found")
+				httpmock.RegisterRegexpResponder("POST", acceptTaskPattern, responder)
+			},
+			expectedError: true,
+			wantErrIs:     ErrTaskAcceptNotFound,
+		},
+		{
+			name: "server error - HTTP 500",
+			task: testhelpers.NewTestTask(123, 456),
+			setupMock: func(_ int64) {
+				responder := httpmock.NewStringResponder(http.StatusInternalServerError, "Internal Server Error")
+				httpmock.RegisterRegexpResponder("POST", acceptTaskPattern, responder)
+			},
+			expectedError: true,
+			wantErrIs:     ErrTaskAcceptFailed,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Helper()
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			// Mock SubmitErrorAgent endpoint to handle error reporting
 			testhelpers.MockSubmitErrorSuccess(789)
 
-			if tt.task != nil {
-				tt.setupMock(tt.task.Id)
-			} else {
-				tt.setupMock(0)
-			}
+			tt.setupMock(0) // All mocks ignore the task ID argument
 
 			mgr := newTestManager()
 			err := mgr.AcceptTask(context.Background(), tt.task)
 
 			if tt.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
+				if tt.wantErrIs != nil {
+					require.ErrorIs(t, err, tt.wantErrIs)
+				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -253,8 +273,7 @@ func TestAbandonTask(t *testing.T) {
 			task: testhelpers.NewTestTask(123, 456),
 			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusNoContent, "")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/set_abandoned$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				httpmock.RegisterRegexpResponder("POST", abandonTaskPattern, responder)
 			},
 		},
 		{
@@ -269,29 +288,23 @@ func TestAbandonTask(t *testing.T) {
 			task: testhelpers.NewTestTask(123, 456),
 			setupMock: func(_ int64) {
 				responder := httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request")
-				pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/set_abandoned$`)
-				httpmock.RegisterRegexpResponder("POST", pattern, responder)
+				httpmock.RegisterRegexpResponder("POST", abandonTaskPattern, responder)
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Helper()
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			// Mock SubmitErrorAgent endpoint to handle error reporting
 			testhelpers.MockSubmitErrorSuccess(789)
 
-			if tt.task != nil {
-				tt.setupMock(tt.task.Id)
-			} else {
-				tt.setupMock(0)
-			}
+			tt.setupMock(0) // All mocks ignore the task ID argument
 
 			mgr := newTestManager()
 			// AbandonTask doesn't return an error, it just logs

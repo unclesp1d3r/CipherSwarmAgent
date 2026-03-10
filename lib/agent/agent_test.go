@@ -3,16 +3,20 @@ package agent
 import (
 	"bytes"
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/task"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
@@ -591,6 +595,86 @@ func TestHeartbeat_NoContent(t *testing.T) {
 	assert.False(t, agentstate.State.GetReload())
 	assert.False(t, agentstate.State.GetJobCheckingStopped())
 	assert.Equal(t, agentstate.CurrentActivityWaiting, agentstate.State.GetCurrentActivity())
+}
+
+// TestProcessTask_AcceptFailure tests the processTask accept-failure path:
+// - ErrTaskAcceptNotFound (404) should NOT call AbandonTask
+// - Other accept errors (e.g. 500) should call AbandonTask.
+func TestProcessTask_AcceptFailure(t *testing.T) {
+	abandonCallKey := "POST =~^https?://[^/]+/api/v1/client/tasks/\\d+/abandon$"
+
+	tests := []struct {
+		name               string
+		acceptStatus       int
+		acceptBody         string
+		wantErrIs          error
+		wantAbandonCalls   int
+		wantAbandonMessage string
+	}{
+		{
+			name:               "404 not found skips abandon",
+			acceptStatus:       http.StatusNotFound,
+			acceptBody:         "Not Found",
+			wantErrIs:          task.ErrTaskAcceptNotFound,
+			wantAbandonCalls:   0,
+			wantAbandonMessage: "AbandonTask should not be called for ErrTaskAcceptNotFound",
+		},
+		{
+			name:               "500 server error calls abandon",
+			acceptStatus:       http.StatusInternalServerError,
+			acceptBody:         "Internal Server Error",
+			wantErrIs:          task.ErrTaskAcceptFailed,
+			wantAbandonCalls:   1,
+			wantAbandonMessage: "AbandonTask should be called for non-404 accept failures",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanup := saveAndRestoreState(t)
+			t.Cleanup(cleanup)
+
+			cleanupHTTP := testhelpers.SetupHTTPMock()
+			t.Cleanup(cleanupHTTP)
+
+			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+			t.Cleanup(cleanupState)
+
+			testhelpers.MockSubmitErrorSuccess(789)
+
+			// Mock GetAttack → 200 OK with valid attack
+			attackResp := testhelpers.NewTestAttack(456, 0)
+			attackPattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/attacks/\d+$`)
+			httpmock.RegisterRegexpResponder("GET", attackPattern,
+				httpmock.NewJsonResponderOrPanic(http.StatusOK, attackResp))
+
+			// Mock SetTaskAccepted with the test-specified status
+			acceptPattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/accept_task$`)
+			httpmock.RegisterRegexpResponder("POST", acceptPattern,
+				httpmock.NewStringResponder(tt.acceptStatus, tt.acceptBody))
+
+			// Mock SetTaskAbandoned
+			abandonPattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/abandon$`)
+			httpmock.RegisterRegexpResponder("POST", abandonPattern,
+				httpmock.NewStringResponder(http.StatusNoContent, ""))
+
+			agentstate.State.SleepOnFailure = 10 * time.Millisecond
+
+			taskMgr = task.NewManager(
+				agentstate.State.APIClient.Tasks(),
+				agentstate.State.APIClient.Attacks(),
+			)
+
+			testTask := testhelpers.NewTestTask(123, 456)
+			err := processTask(context.Background(), testTask)
+
+			require.Error(t, err)
+			require.ErrorIs(t, err, tt.wantErrIs)
+
+			callInfo := httpmock.GetCallCountInfo()
+			assert.Equal(t, tt.wantAbandonCalls, callInfo[abandonCallKey], tt.wantAbandonMessage)
+		})
+	}
 }
 
 func TestSleepWithContext_Completes(t *testing.T) {

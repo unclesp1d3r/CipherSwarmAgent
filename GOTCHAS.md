@@ -13,6 +13,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `containedctx` flags `context.Context` stored in structs — use `//nolint:containedctx // reason` when the context is intentionally part of the struct lifecycle.
 - `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation. Bare `//nolint:linter` directives fail CI.
 - A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep them contiguous.
+- `errorsastype` suggests replacing `errors.As(err, &target)` with generic `errors.AsType[T]()` (Go 1.26+). Adopt when touching affected code; don't refactor unrelated lines.
 - `.golangci.yml` has `fix: true` — `nolintlint` auto-strips `//nolint:` directives that don't suppress an active warning. Don't add nolint for rules that aren't actually firing; verify with a clean cache first (`golangci-lint cache clean`).
 - `gosec G118` flags goroutines that use `context.Background()` or don't propagate the parent context. Use `//nolint:gosec // G118 - reason` as a standalone comment above `go func()`.
 - `gosec G204` does NOT fire on `exec.CommandContext` when the binary path comes from an internal function return — don't add `//nolint:gosec // G204` unless verified.
@@ -53,6 +54,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `hashcat` package tests cannot import `testhelpers` (circular: testhelpers -> hashcat). Use local test helpers.
 - Package-level `var` test fixtures get mutated by production code across subtests. Use factory functions (e.g., `newSampleData()`) that return fresh copies to prevent cross-test contamination.
 - `nxadm/tail` `Cleanup()` returns void — do not attempt to capture a return value. `Stop()` returns an error; `Cleanup()` does not.
+- httpmock URL patterns must match the generated client paths (check `client.gen.go`), not the Go method names. E.g., `SetTaskAbandoned` hits `/tasks/{id}/abandon`, not `/tasks/{id}/set_abandoned`.
+- `httpmock.ResponderFromResponse` with manually constructed `*http.Response` triggers `bodyclose` lint. Use `httpmock.NewJsonResponderOrPanic` for JSON mocks instead.
 
 ## Tooling
 

@@ -377,11 +377,20 @@ func processTask(ctx context.Context, t *api.Task) error {
 
 	err = taskMgr.AcceptTask(ctx, t)
 	if err != nil {
-		agentstate.Logger.Error("Failed to accept task", "task_id", t.Id)
+		agentstate.Logger.Error("Failed to accept task", "task_id", t.Id, "error", err)
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
+
+		if errors.Is(err, task.ErrTaskAcceptNotFound) {
+			// Task vanished before we could accept it — normal race condition.
+			// No server state transition needed; just clean up local files.
+			task.CleanupTaskFiles(attack.Id)
+			return err
+		}
+
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
 		task.CleanupTaskFiles(attack.Id)
+		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return err
 	}

@@ -182,11 +182,8 @@ func TestHandleStdErrLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(testhelpers.SetupHTTPMock())
+			t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 			// Mock SubmitErrorAgent endpoint
 			testhelpers.MockSubmitErrorSuccess(123)
@@ -301,11 +298,8 @@ func TestHandleDoneChan(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
-
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(testhelpers.SetupHTTPMock())
+			t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
 			// Mock endpoints
 			testhelpers.MockSubmitErrorSuccess(123)
