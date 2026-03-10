@@ -69,6 +69,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 ### Error Handling
 
 - Always check errors. Use `fmt.Errorf` with `%w` to wrap. Use stdlib `errors` only — not `github.com/pkg/errors`.
+- Use `fmt.Errorf("%w: %w", sentinel, inner)` (Go 1.20+) to wrap multiple errors — preserves both in the `errors.Is`/`errors.As` chain. Never use `%s` with `.Error()` for wrapped errors.
 - Use `defer` for resource cleanup. `panic` is not for normal control flow.
 - Never silently correct invalid inputs — always log a warning. Guard against negative values in bit shifts.
 - Handle `obj == nil && err == nil` as a separate error case for API responses to prevent nil pointer dereferences.

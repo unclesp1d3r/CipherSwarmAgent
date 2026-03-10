@@ -211,10 +211,10 @@ func TestSendBenchmarkResults(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			tt.setupMock(789)
 
@@ -234,10 +234,10 @@ func TestSendBenchmarkResults(t *testing.T) {
 // fails to parse, sendBenchmarkResults returns an error indicating nothing was submitted.
 func TestSendBenchmarkResults_AllInvalid(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	allInvalid := []display.BenchmarkResult{
 		{HashType: "bad", RuntimeMs: "100", SpeedHs: "100.0", Device: "1"},
@@ -350,10 +350,10 @@ func TestHandleBenchmarkStdErrLine(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			testhelpers.MockSubmitErrorSuccess(789)
 
@@ -391,10 +391,10 @@ func TestCreateBenchmark_FieldMapping(t *testing.T) {
 // uses cached results when available and submission succeeds.
 func TestUpdateBenchmarks_CachedSubmissionSuccess(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	// Pre-populate cache
 	err := saveBenchmarkCache(newSampleBenchmarkResults())
@@ -414,10 +414,10 @@ func TestUpdateBenchmarks_CachedSubmissionSuccess(t *testing.T) {
 // returns nil (non-fatal) when cached submission fails, preserving cache for retry.
 func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	// Pre-populate cache
 	err := saveBenchmarkCache(newSampleBenchmarkResults())
@@ -442,10 +442,10 @@ func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 // skips submission when all cached results are already marked as submitted.
 func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	// Pre-populate cache with all-submitted results
 	submitted := []display.BenchmarkResult{
@@ -472,10 +472,10 @@ func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 // only sends unsubmitted results from a partially submitted cache.
 func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	// Pre-populate cache with mixed submitted/unsubmitted
 	mixed := []display.BenchmarkResult{
@@ -615,10 +615,10 @@ func TestMarkSubmitted(t *testing.T) {
 // are sent and all results are marked as Submitted.
 func TestProcessBenchmarkOutput_AllBatchesSucceed(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	var callCount atomic.Int32
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
@@ -652,10 +652,10 @@ func TestProcessBenchmarkOutput_AllBatchesSucceed(t *testing.T) {
 // results are submitted as a single final batch.
 func TestProcessBenchmarkOutput_SingleBatch(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	var callCount atomic.Int32
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
@@ -689,10 +689,10 @@ func TestProcessBenchmarkOutput_SingleBatch(t *testing.T) {
 // batch fails, the final send includes all unsubmitted results and marks them.
 func TestProcessBenchmarkOutput_BatchFailsFinalSucceeds(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	// First call fails, second succeeds
 	var callCount atomic.Int32
@@ -732,10 +732,10 @@ func TestProcessBenchmarkOutput_BatchFailsFinalSucceeds(t *testing.T) {
 // stays false when all submissions fail.
 func TestProcessBenchmarkOutput_AllSendsFail(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusInternalServerError, "error"))
@@ -770,10 +770,10 @@ func TestProcessBenchmarkOutput_AllSendsFail(t *testing.T) {
 // completes without producing any results.
 func TestProcessBenchmarkOutput_EmptyResults(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	sess, err := testhelpers.NewMockSession("bench-test")
 	require.NoError(t, err)
@@ -793,10 +793,10 @@ func TestProcessBenchmarkOutput_EmptyResults(t *testing.T) {
 // reported and partial results are still cached.
 func TestProcessBenchmarkOutput_SessionError(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))

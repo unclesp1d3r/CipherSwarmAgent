@@ -57,6 +57,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - Do not name directories `gen/` — the user's global gitignore excludes them.
 - `mdformat` pre-commit hook auto-fixes markdown files on first run, causing `just ci-check` to fail. Re-run after the auto-fix passes.
 - `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
+- Post-save hooks may refactor code beyond the original edit (e.g., changing return types, removing unused sentinels). Check the file state after saves before making further dependent edits.
 
 ## Releasing
 

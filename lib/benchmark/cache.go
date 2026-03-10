@@ -103,7 +103,7 @@ func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 				"error", removeErr, "path", cachePath)
 		}
 
-		return nil, fmt.Errorf("%w: %s", errCacheCorrupt, err.Error())
+		return nil, fmt.Errorf("%w: %w", errCacheCorrupt, err)
 	}
 
 	if len(results) == 0 {

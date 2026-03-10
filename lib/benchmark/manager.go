@@ -18,9 +18,9 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
-const (
-	benchmarkBatchSize = 10 // benchmarkBatchSize is the number of benchmark results to accumulate before submitting an incremental batch to the server.
-)
+// benchmarkBatchSize is the number of benchmark results to accumulate before
+// submitting an incremental batch to the server.
+const benchmarkBatchSize = 10
 
 var errBadResponse = errors.New("bad response from server")
 
@@ -316,12 +316,12 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 	agentstate.Logger.Debug("Starting benchmark session", "cmdline", sess.CmdLine())
 	display.BenchmarkStarting()
 
-	results, done := m.runBenchmarkTask(ctx, sess)
-	if done {
+	results, startErr := m.runBenchmarkTask(ctx, sess)
+	if startErr != nil {
 		return nil, cserrors.LogAndSendError(
 			ctx,
-			"Benchmark session failed to produce results",
-			errors.New("benchmark task failed"),
+			"Benchmark session failed to start",
+			startErr,
 			api.SeverityMajor,
 			nil,
 		)
@@ -333,16 +333,17 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 }
 
 // runBenchmarkTask starts a hashcat benchmark session and processes its output.
-// It returns a slice of benchmark results and a boolean indicating an error state.
-func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) ([]display.BenchmarkResult, bool) {
+// It returns a slice of benchmark results and the start error if the session
+// failed to launch.
+func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) ([]display.BenchmarkResult, error) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start benchmark session", "error", err)
 
-		return nil, true
+		return nil, fmt.Errorf("benchmark session start failed: %w", err)
 	}
 
-	return m.processBenchmarkOutput(ctx, sess), false
+	return m.processBenchmarkOutput(ctx, sess), nil
 }
 
 // submitBatchIfReady sends an incremental batch of benchmark results to the
@@ -433,6 +434,21 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 				if err := sess.Kill(); err != nil {
 					agentstate.Logger.Error("Failed to kill benchmark session on cancellation", "error", err)
+				}
+
+				drainStdout(sess, &benchmarkResults)
+
+				if len(benchmarkResults) > 0 {
+					if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
+						agentstate.Logger.Warn(
+							"Partial benchmark results collected but could not be persisted",
+							"error", saveErr, "count", len(benchmarkResults))
+					} else {
+						agentstate.Logger.Warn("Context cancelled during benchmark, partial results cached",
+							"count", len(benchmarkResults))
+					}
+				} else {
+					agentstate.Logger.Warn("Context cancelled during benchmark, no results to cache")
 				}
 
 				sess.Cleanup()
