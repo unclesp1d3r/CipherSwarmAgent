@@ -196,7 +196,7 @@ func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 				return nil
 			}
 
-			// Mark all as submitted and persist updated cache
+			// Mark all as submitted in-place — safe, single goroutine owns the slice.
 			for i := range cached {
 				cached[i].Submitted = true
 			}
@@ -276,7 +276,7 @@ func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults
 		return fmt.Errorf("benchmark submission failed with no cache for retry: %w", err)
 	}
 
-	// Mark all as submitted and persist cache so restarts skip re-running
+	// Mark all as submitted in-place — safe, single goroutine owns the slice.
 	for i := range benchmarkResults {
 		benchmarkResults[i].Submitted = true
 	}
