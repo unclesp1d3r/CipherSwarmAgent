@@ -76,7 +76,7 @@ func TestSaveBenchmarkCache(t *testing.T) {
 				agentstate.State.BenchmarkCachePath = ""
 			}
 
-			defer func() { agentstate.State.BenchmarkCachePath = "" }()
+			t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
 			err := saveBenchmarkCache(tt.results)
 
@@ -103,7 +103,7 @@ func TestSaveBenchmarkCache_AtomicWrite(t *testing.T) {
 	cachePath := filepath.Join(tmpDir, "benchmark_cache.json")
 	agentstate.State.BenchmarkCachePath = cachePath
 
-	defer func() { agentstate.State.BenchmarkCachePath = "" }()
+	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
 	err := saveBenchmarkCache(newSampleBenchmarkResults())
 	require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestSaveBenchmarkCache_SubmittedField(t *testing.T) {
 	tmpDir := t.TempDir()
 	agentstate.State.BenchmarkCachePath = filepath.Join(tmpDir, "benchmark_cache.json")
 
-	defer func() { agentstate.State.BenchmarkCachePath = "" }()
+	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
 	results := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "100.0", Submitted: true},
@@ -204,12 +204,15 @@ func TestLoadBenchmarkCache(t *testing.T) {
 			tmpDir := t.TempDir()
 			agentstate.State.BenchmarkCachePath = tt.setupCache(t, tmpDir)
 
-			defer func() { agentstate.State.BenchmarkCachePath = "" }()
+			t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
 			results, err := loadBenchmarkCache()
 
 			if tt.expectError {
 				require.Error(t, err)
+				assert.ErrorIs(t, err, errCacheCorrupt,
+					"corrupt cache error should wrap errCacheCorrupt sentinel")
+
 				return
 			}
 
@@ -232,7 +235,7 @@ func TestLoadBenchmarkCache_BackwardCompatible(t *testing.T) {
 	cachePath := filepath.Join(tmpDir, "benchmark_cache.json")
 	agentstate.State.BenchmarkCachePath = cachePath
 
-	defer func() { agentstate.State.BenchmarkCachePath = "" }()
+	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
 	// Write JSON without Submitted field (simulates old cache format)
 	oldFormat := `[{"device":"1","hash_type":"0","runtime":"100","hash_time":"50","hash_speed":"12345.67"}]`
@@ -248,7 +251,7 @@ func TestSaveThenLoadBenchmarkCache(t *testing.T) {
 	tmpDir := t.TempDir()
 	agentstate.State.BenchmarkCachePath = filepath.Join(tmpDir, "benchmark_cache.json")
 
-	defer func() { agentstate.State.BenchmarkCachePath = "" }()
+	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
 	err := saveBenchmarkCache(newSampleBenchmarkResults())
 	require.NoError(t, err)
@@ -364,10 +367,10 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			agentstate.State.BenchmarkCachePath = tt.setupCachePath(t)
 			agentstate.State.SetBenchmarksSubmitted(false)
@@ -441,14 +444,14 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanupHTTP := testhelpers.SetupHTTPMock()
-			defer cleanupHTTP()
+			t.Cleanup(cleanupHTTP)
 
 			cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-			defer cleanupState()
+			t.Cleanup(cleanupState)
 
 			if tt.forceBenchmark {
 				agentstate.State.SetForceBenchmarkRun(true)
-				defer func() { agentstate.State.SetForceBenchmarkRun(false) }()
+				t.Cleanup(func() { agentstate.State.SetForceBenchmarkRun(false) })
 			}
 
 			if tt.setupCache {
@@ -484,10 +487,10 @@ func TestTrySubmitCachedBenchmarks(t *testing.T) {
 // cached results are already marked as submitted, no API call is made.
 func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	submitted := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
@@ -512,10 +515,10 @@ func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
 // unsubmitted items are sent from a partially submitted cache.
 func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	mixed := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
@@ -543,10 +546,10 @@ func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
 // the server rejects a submission of unsubmitted items, the cache is preserved.
 func TestTrySubmitCachedBenchmarks_MixedCacheServerFailure(t *testing.T) {
 	cleanupHTTP := testhelpers.SetupHTTPMock()
-	defer cleanupHTTP()
+	t.Cleanup(cleanupHTTP)
 
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
-	defer cleanupState()
+	t.Cleanup(cleanupState)
 
 	mixed := []display.BenchmarkResult{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},

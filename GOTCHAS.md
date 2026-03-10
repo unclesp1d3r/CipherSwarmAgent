@@ -47,6 +47,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 ## Testing
 
+- `hashcat.NewTestSession` creates sessions with `proc=nil` — calling `Start()` panics. Tests that need `runBenchmarkTask` or `UpdateBenchmarks` to actually run cannot be unit tested without refactoring to accept an interface.
+- `.golangci.yml` has `fix: true` — the linter auto-transforms `assert.True(t, errors.Is(err, sentinel))` → `assert.ErrorIs(t, err, sentinel)` and removes the now-unused `errors` import. Don't manually add `errors` imports for testify-only assertions.
 - `agentstate.State` contains `atomic.Bool` and `sync.RWMutex` — never copy the struct. Use per-field save/restore in test helpers and getter/setter methods for synchronized fields.
 - `hashcat` package tests cannot import `testhelpers` (circular: testhelpers -> hashcat). Use local test helpers.
 - Package-level `var` test fixtures get mutated by production code across subtests. Use factory functions (e.g., `newSampleData()`) that return fresh copies to prevent cross-test contamination.
@@ -57,6 +59,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - Do not name directories `gen/` — the user's global gitignore excludes them.
 - `mdformat` pre-commit hook auto-fixes markdown files on first run, causing `just ci-check` to fail. Re-run after the auto-fix passes.
 - `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
+- IDE/editor post-save hooks (e.g., goimports, golines, LSP actions) may refactor code beyond the original edit (e.g., changing return types, removing unused sentinels). Check the file state after saves before making further dependent edits.
 
 ## Releasing
 

@@ -103,7 +103,7 @@ func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 				"error", removeErr, "path", cachePath)
 		}
 
-		return nil, fmt.Errorf("%w: %s", errCacheCorrupt, err.Error())
+		return nil, fmt.Errorf("%w: %w", errCacheCorrupt, err)
 	}
 
 	if len(results) == 0 {
@@ -157,7 +157,7 @@ func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
 		return false
 	}
 
-	// Mark all as submitted and persist updated cache
+	// Mark all as submitted in-place — safe, single goroutine owns the slice.
 	for i := range cached {
 		cached[i].Submitted = true
 	}

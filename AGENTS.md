@@ -69,6 +69,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 ### Error Handling
 
 - Always check errors. Use `fmt.Errorf` with `%w` to wrap. Use stdlib `errors` only — not `github.com/pkg/errors`.
+- Use `fmt.Errorf("%w: %w", sentinel, inner)` (Go 1.20+) to wrap multiple errors — preserves both in the `errors.Is`/`errors.As` chain. Never use `%s` with `.Error()` for wrapped errors.
 - Use `defer` for resource cleanup. `panic` is not for normal control flow.
 - Never silently correct invalid inputs — always log a warning. Guard against negative values in bit shifts.
 - Handle `obj == nil && err == nil` as a separate error case for API responses to prevent nil pointer dereferences.
@@ -83,6 +84,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - **Synchronized state:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` or `sync.RWMutex`. Always use getter/setter methods — never access directly.
 - **Context propagation:** `StartAgent()` creates a cancellable context threaded through all goroutines. Use `ctx` for stoppable operations; `context.Background()` for must-complete operations (e.g., `AbandonTask`), with `//nolint:contextcheck // must-complete: reason`.
 - **Data-loss logging:** When a channel send is skipped due to `ctx.Done()`, always log the dropped value at Warn level (e.g., dropped cracked hashes, process exit status). Silent data loss during shutdown hides bugs.
+- **Partial result preservation:** Long-running sessions (benchmarks, tasks) should cache partial results to disk on context cancellation for retry on next agent startup. Use atomic writes (write to temp file, then `os.Rename`) for crash safety.
 - **Context-aware sleep:** Use `sleepWithContext(ctx, duration)` (in `lib/agent/agent.go`) instead of `time.Sleep`.
 - **Context-aware retry:** Retry loops with backoff must use `time.NewTimer` + `Stop()` in a `select` with `ctx.Done()` (not `time.After` or `time.Sleep`). `time.After` leaks timers on cancellation. See `downloadWithRetry` in `lib/downloader/downloader.go`.
 - Run tests with `-race` flag to detect data races.
