@@ -141,9 +141,11 @@ The agent requires two essential configuration values:
 export API_TOKEN=your_api_token
 export API_URL=https://your-cipherswarm-server.com:3000
 
-# Or via command line flags
-./cipherswarm-agent --api_token your_api_token --api_url https://your-server.com:3000
+# Or via command line flags (using kebab-case)
+./cipherswarm-agent --api-token your_api_token --api-url https://your-server.com:3000
 ```
+
+**Note:** CLI flags use kebab-case naming (e.g., `--api-token`, `--api-url`). Legacy underscore-style flags (`--api_token`, `--api_url`) are deprecated but still supported for backward compatibility.
 
 ### 3. Create Configuration File (Optional)
 
