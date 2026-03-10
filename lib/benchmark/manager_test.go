@@ -996,3 +996,53 @@ func TestDrainStdout_EmptyChannel(t *testing.T) {
 
 	assert.Empty(t, results)
 }
+
+// TestSession_DoubleCleanup verifies that calling Cleanup twice on a mock
+// session does not panic. Cleanup is idempotent by design.
+func TestSession_DoubleCleanup(t *testing.T) {
+	sess, err := testhelpers.NewMockSession("cleanup-test")
+	require.NoError(t, err)
+
+	// Should not panic on double call
+	sess.Cleanup()
+	sess.Cleanup()
+}
+
+// TestSubmitBatchIfReady_ExactBoundary verifies that submitBatchIfReady triggers
+// a batch submission when exactly benchmarkBatchSize results are accumulated.
+func TestSubmitBatchIfReady_ExactBoundary(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+		httpmock.NewStringResponder(http.StatusNoContent, ""))
+
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+
+	// Exactly benchmarkBatchSize results — should trigger batch
+	results := make([]display.BenchmarkResult, benchmarkBatchSize)
+	for i := range results {
+		results[i] = display.BenchmarkResult{
+			Device: "1", HashType: fmt.Sprintf("%d", i),
+			RuntimeMs: "100", SpeedHs: "1000.0",
+		}
+	}
+
+	newIdx := mgr.submitBatchIfReady(context.Background(), results, 0)
+	assert.Equal(t, benchmarkBatchSize, newIdx, "should have submitted the full batch")
+	assert.True(t, allSubmitted(results), "all results should be marked submitted")
+}
+
+// TestSubmitBatchIfReady_BelowBoundary verifies that submitBatchIfReady does
+// not trigger a submission when below benchmarkBatchSize.
+func TestSubmitBatchIfReady_BelowBoundary(t *testing.T) {
+	mgr := NewManager(nil)
+
+	results := make([]display.BenchmarkResult, benchmarkBatchSize-1)
+	newIdx := mgr.submitBatchIfReady(context.Background(), results, 0)
+	assert.Equal(t, 0, newIdx, "should not have submitted below batch size")
+	assert.False(t, allSubmitted(results))
+}
