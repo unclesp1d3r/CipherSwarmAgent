@@ -70,11 +70,6 @@ func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) 
 	return strings.TrimSpace(string(out)), nil
 }
 
-// GetPlatform returns the platform identifier for Windows systems.
-func GetPlatform() string {
-	return "windows"
-}
-
 // Extract7z extracts the contents of a 7z archive to a specified directory.
 // It takes the source file path of the 7z archive and the destination directory
 // where the contents should be extracted.

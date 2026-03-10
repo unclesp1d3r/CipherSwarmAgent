@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -8,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -69,7 +69,7 @@ func TestFileExistsAndValid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := tt.setupFile()
 			result := FileExistsAndValid(filePath, tt.checksum)
-			assert.Equal(t, tt.expectedResult, result)
+			require.Equal(t, tt.expectedResult, result)
 		})
 	}
 }
@@ -114,7 +114,7 @@ func TestAppendChecksumToURL(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedURL, result)
+				require.Equal(t, tt.expectedURL, result)
 			}
 		})
 	}
@@ -157,7 +157,7 @@ func TestBase64ToHex(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}
@@ -249,7 +249,7 @@ func TestDownloadWithRetry(t *testing.T) {
 			}
 
 			// Use very short delay for fast tests (1ms)
-			err := downloadWithRetry(mock, tt.maxRetries, 1*time.Millisecond)
+			err := downloadWithRetry(context.Background(), mock, tt.maxRetries, 1*time.Millisecond)
 
 			if tt.expectSuccess {
 				require.NoError(t, err, "expected successful download")
@@ -257,7 +257,7 @@ func TestDownloadWithRetry(t *testing.T) {
 				require.Error(t, err, "expected download to fail")
 			}
 
-			assert.Equal(t, tt.expectedCalls, mock.getCallCount(),
+			require.Equal(t, tt.expectedCalls, mock.getCallCount(),
 				"expected %d calls but got %d", tt.expectedCalls, mock.getCallCount())
 		})
 	}
@@ -271,10 +271,10 @@ func TestDownloadWithRetryPreservesLastError(t *testing.T) {
 		returnError: expectedErr,
 	}
 
-	err := downloadWithRetry(mock, 3, 1*time.Millisecond)
+	err := downloadWithRetry(context.Background(), mock, 3, 1*time.Millisecond)
 
 	require.Error(t, err)
-	assert.Equal(t, expectedErr, err, "should return the last error from failed attempts")
+	require.Equal(t, expectedErr, err, "should return the last error from failed attempts")
 }
 
 // TestDownloadWithRetryNegativeRetries verifies that negative maxRetries defaults to 1 attempt.
@@ -284,8 +284,35 @@ func TestDownloadWithRetryNegativeRetries(t *testing.T) {
 		returnError: errors.New("download failed"),
 	}
 
-	err := downloadWithRetry(mock, -5, 1*time.Millisecond)
+	err := downloadWithRetry(context.Background(), mock, -5, 1*time.Millisecond)
 
 	require.NoError(t, err, "should succeed with 1 attempt when maxRetries is negative")
-	assert.Equal(t, 1, mock.getCallCount(), "should make exactly 1 call when maxRetries is negative")
+	require.Equal(t, 1, mock.getCallCount(), "should make exactly 1 call when maxRetries is negative")
+}
+
+// TestDownloadWithRetry_ContextCancellation verifies that downloadWithRetry returns
+// promptly when the context is cancelled during the retry backoff sleep.
+func TestDownloadWithRetry_ContextCancellation(t *testing.T) {
+	mock := &mockGetter{
+		failCount:   100, // always fail so we hit retry sleep
+		returnError: errors.New("download failed"),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	// Cancel the context shortly after the first failure triggers a retry sleep.
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	err := downloadWithRetry(ctx, mock, 5, 10*time.Second)
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, mock.returnError, "should preserve last download error through cancellation")
+	require.Less(t, elapsed, 1*time.Second, "should return promptly on cancellation, not wait for full retry delay")
 }

@@ -103,8 +103,8 @@ func NewTestHashcatStatus(sessionName string) hashcat.Status {
 		Target:          "test.hsh",
 		Progress:        []int64{100, 1000},
 		RestorePoint:    0,
-		RecoveredHashes: []int64{0},
-		RecoveredSalts:  []int64{0},
+		RecoveredHashes: []int64{0, 0},
+		RecoveredSalts:  []int64{0, 0},
 		Rejected:        0,
 		Devices: []hashcat.StatusDevice{
 			{
