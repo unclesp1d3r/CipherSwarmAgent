@@ -7,7 +7,7 @@
     "files.exclude": {
         "**/target/**": true
     },
-    "gitlens.ai.generateCommits.customInstructions": "Use conventional commit message format. If the scope is not clear, use 'chore' as the default scope. If the scope is clear, use it.",
+    "gitlens.ai.generateCommits.customInstructions": "Use conventional commit message format. If the type is not clear, use 'chore' as the default type. If the scope is not clear, choose the narrowest touched area.",
     "chat.todoListTool.enabled": true,
     "git.alwaysSignOff": true,
     "git.autoStash": true,
