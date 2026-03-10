@@ -210,6 +210,9 @@ func TestLoadBenchmarkCache(t *testing.T) {
 
 			if tt.expectError {
 				require.Error(t, err)
+				assert.ErrorIs(t, err, errCacheCorrupt,
+					"corrupt cache error should wrap errCacheCorrupt sentinel")
+
 				return
 			}
 

@@ -825,3 +825,174 @@ func TestProcessBenchmarkOutput_SessionError(t *testing.T) {
 	callCount := testhelpers.GetSubmitErrorCallCount(789, "https://test.api")
 	assert.Positive(t, callCount, "session error should be reported")
 }
+
+// --- Context cancellation tests ---
+
+// TestProcessBenchmarkOutput_ContextCancelledWithResults verifies that partial
+// benchmark results are cached to disk when the context is cancelled.
+func TestProcessBenchmarkOutput_ContextCancelledWithResults(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	sess, err := testhelpers.NewMockSession("bench-cancel")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Pre-buffer lines in the channel before starting processBenchmarkOutput.
+	// Channel buffer is 5, so all 3 lines fit without blocking.
+	lines := makeBenchmarkLines(3, 1)
+	for _, line := range lines {
+		sess.StdoutLines <- line
+	}
+
+	// Cancel immediately — ctx.Done() will be ready when the goroutine starts.
+	// Lines will be captured either via the select case or via drainStdout.
+	cancel()
+
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(ctx, sess)
+
+	// All 3 lines should be captured (via select case and/or drainStdout)
+	assert.Len(t, results, 3)
+
+	// Partial results should be cached to disk
+	cached, loadErr := loadBenchmarkCache()
+	require.NoError(t, loadErr)
+	require.NotNil(t, cached, "partial results should be persisted to cache")
+	assert.Len(t, cached, 3)
+
+	// BenchmarksSubmitted should be false (partial results not submitted)
+	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
+}
+
+// TestProcessBenchmarkOutput_ContextCancelledNoResults verifies that when the
+// context is cancelled before any results are collected, no cache is written.
+func TestProcessBenchmarkOutput_ContextCancelledNoResults(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	sess, err := testhelpers.NewMockSession("bench-cancel-empty")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately — no lines buffered
+
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(ctx, sess)
+
+	assert.Empty(t, results)
+
+	// No cache should be written when there are no results
+	cached, loadErr := loadBenchmarkCache()
+	require.NoError(t, loadErr)
+	assert.Nil(t, cached, "no cache should be written for empty results")
+
+	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
+}
+
+// TestProcessBenchmarkOutput_ContextCancelledCacheFails verifies that results
+// are still returned in memory when the cache save fails during cancellation.
+func TestProcessBenchmarkOutput_ContextCancelledCacheFails(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	// Force cache save to fail by clearing the cache path
+	agentstate.State.BenchmarkCachePath = ""
+
+	sess, err := testhelpers.NewMockSession("bench-cancel-cache-fail")
+	require.NoError(t, err)
+
+	lines := makeBenchmarkLines(3, 1)
+	for _, line := range lines {
+		sess.StdoutLines <- line
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(ctx, sess)
+
+	// Results should still be collected in memory even though cache save failed
+	assert.Len(t, results, 3)
+	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
+}
+
+// TestProcessBenchmarkOutput_FinalizeCacheFails verifies that when the cache
+// save fails during normal finalization (DoneChan path), results are still
+// returned and BenchmarksSubmitted reflects the submission outcome.
+func TestProcessBenchmarkOutput_FinalizeCacheFails(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	// Force cache save to fail
+	agentstate.State.BenchmarkCachePath = ""
+
+	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+		httpmock.NewStringResponder(http.StatusNoContent, ""))
+
+	sess, err := testhelpers.NewMockSession("bench-cache-fail")
+	require.NoError(t, err)
+
+	lines := makeBenchmarkLines(3, 1)
+
+	go func() {
+		for _, line := range lines {
+			sess.StdoutLines <- line
+		}
+		sess.DoneChan <- nil
+	}()
+
+	mgr := NewManager(agentstate.State.APIClient.Agents())
+	results := mgr.processBenchmarkOutput(context.Background(), sess)
+
+	// Results should be returned despite cache save failure
+	assert.Len(t, results, 3)
+	assert.True(t, allSubmitted(results), "results should be submitted")
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
+}
+
+// TestDrainStdout_BufferedLines verifies that drainStdout captures lines
+// already buffered in the StdoutLines channel.
+func TestDrainStdout_BufferedLines(t *testing.T) {
+	sess, err := testhelpers.NewMockSession("drain-test")
+	require.NoError(t, err)
+
+	var results []display.BenchmarkResult
+
+	// Buffer valid benchmark lines
+	sess.StdoutLines <- "1:0:name:100:50:1000.0"
+	sess.StdoutLines <- "2:1:name:200:100:2000.0"
+
+	drainStdout(sess, &results)
+
+	assert.Len(t, results, 2)
+	assert.Equal(t, "1", results[0].Device)
+	assert.Equal(t, "2", results[1].Device)
+}
+
+// TestDrainStdout_EmptyChannel verifies that drainStdout returns immediately
+// when the channel has no buffered lines.
+func TestDrainStdout_EmptyChannel(t *testing.T) {
+	sess, err := testhelpers.NewMockSession("drain-empty")
+	require.NoError(t, err)
+
+	var results []display.BenchmarkResult
+
+	drainStdout(sess, &results)
+
+	assert.Empty(t, results)
+}

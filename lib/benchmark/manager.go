@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
@@ -21,6 +22,8 @@ import (
 // benchmarkBatchSize is the number of benchmark results to accumulate before
 // submitting an incremental batch to the server.
 const benchmarkBatchSize = 10
+
+const processFlushTimeout = 100 * time.Millisecond // processFlushTimeout is the grace period after Kill() for the process to flush remaining stdout.
 
 var errBadResponse = errors.New("bad response from server")
 
@@ -340,7 +343,7 @@ func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) (
 	if err != nil {
 		agentstate.Logger.Error("Failed to start benchmark session", "error", err)
 
-		return nil, fmt.Errorf("benchmark session start failed: %w", err)
+		return nil, fmt.Errorf("failed to start benchmark session: %w", err)
 	}
 
 	return m.processBenchmarkOutput(ctx, sess), nil
@@ -378,7 +381,8 @@ func (m *Manager) submitBatchIfReady(
 
 // finalizeBenchmarkSession handles the DoneChan signal: drains remaining
 // stdout, reports errors, submits any unsubmitted results, and persists
-// the final cache state.
+// the final cache state. results is a pointer because drainStdout may
+// append additional elements that the caller must observe.
 func (m *Manager) finalizeBenchmarkSession(
 	ctx context.Context,
 	sess *hashcat.Session,
@@ -417,7 +421,13 @@ func (m *Manager) finalizeBenchmarkSession(
 // results, and submits them incrementally in batches. It marks each result as
 // Submitted after successful server acknowledgment and persists the cache after
 // each batch. Returns the collected results (with Submitted flags set).
+//
+// On context cancellation, BenchmarksSubmitted remains false; partial results
+// are cached to disk for retry via TrySubmitCachedBenchmarks on the next
+// agent loop iteration.
 func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Session) []display.BenchmarkResult {
+	// benchmarkResults is exclusively owned by the goroutine below until
+	// waitChan is closed, at which point ownership transfers to the caller.
 	var benchmarkResults []display.BenchmarkResult
 
 	waitChan := make(chan struct{})
@@ -436,6 +446,17 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 					agentstate.Logger.Error("Failed to kill benchmark session on cancellation", "error", err)
 				}
 
+				// Wait briefly for the process to exit and flush remaining stdout.
+				// In tests with mock sessions (no process), this always hits the timeout.
+				flushTimer := time.NewTimer(processFlushTimeout)
+				select {
+				case <-sess.DoneChan:
+				case <-flushTimer.C:
+				}
+				flushTimer.Stop()
+
+				// Best-effort drain: may miss lines still in flight between the
+				// OS pipe buffer and the channel.
 				drainStdout(sess, &benchmarkResults)
 
 				if len(benchmarkResults) > 0 {
@@ -451,6 +472,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 					agentstate.Logger.Warn("Context cancelled during benchmark, no results to cache")
 				}
 
+				agentstate.State.SetBenchmarksSubmitted(false)
 				sess.Cleanup()
 
 				return
