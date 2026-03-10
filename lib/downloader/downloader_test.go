@@ -290,3 +290,29 @@ func TestDownloadWithRetryNegativeRetries(t *testing.T) {
 	require.NoError(t, err, "should succeed with 1 attempt when maxRetries is negative")
 	assert.Equal(t, 1, mock.getCallCount(), "should make exactly 1 call when maxRetries is negative")
 }
+
+// TestDownloadWithRetry_ContextCancellation verifies that downloadWithRetry returns
+// promptly when the context is cancelled during the retry backoff sleep.
+func TestDownloadWithRetry_ContextCancellation(t *testing.T) {
+	mock := &mockGetter{
+		failCount:   100, // always fail so we hit retry sleep
+		returnError: errors.New("download failed"),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	// Cancel the context shortly after the first failure triggers a retry sleep.
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	err := downloadWithRetry(ctx, mock, 5, 10*time.Second)
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Less(t, elapsed, 1*time.Second, "should return promptly on cancellation, not wait for full retry delay")
+}

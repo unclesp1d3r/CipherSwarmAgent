@@ -213,6 +213,8 @@ func registerDeprecatedAliases() {
 			flags.Int(df.oldName, 0, "")
 		case "duration":
 			flags.Duration(df.oldName, 0, "")
+		default:
+			panic("unknown flag type " + df.flagType + " for deprecated alias " + df.oldName)
 		}
 
 		cobra.CheckErr(flags.MarkDeprecated(df.oldName, "use --"+df.newName+" instead"))
