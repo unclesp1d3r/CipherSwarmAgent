@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -70,7 +69,7 @@ func TestFileExistsAndValid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := tt.setupFile()
 			result := FileExistsAndValid(filePath, tt.checksum)
-			assert.Equal(t, tt.expectedResult, result)
+			require.Equal(t, tt.expectedResult, result)
 		})
 	}
 }
@@ -115,7 +114,7 @@ func TestAppendChecksumToURL(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedURL, result)
+				require.Equal(t, tt.expectedURL, result)
 			}
 		})
 	}
@@ -158,7 +157,7 @@ func TestBase64ToHex(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}
@@ -258,7 +257,7 @@ func TestDownloadWithRetry(t *testing.T) {
 				require.Error(t, err, "expected download to fail")
 			}
 
-			assert.Equal(t, tt.expectedCalls, mock.getCallCount(),
+			require.Equal(t, tt.expectedCalls, mock.getCallCount(),
 				"expected %d calls but got %d", tt.expectedCalls, mock.getCallCount())
 		})
 	}
@@ -275,7 +274,7 @@ func TestDownloadWithRetryPreservesLastError(t *testing.T) {
 	err := downloadWithRetry(context.Background(), mock, 3, 1*time.Millisecond)
 
 	require.Error(t, err)
-	assert.Equal(t, expectedErr, err, "should return the last error from failed attempts")
+	require.Equal(t, expectedErr, err, "should return the last error from failed attempts")
 }
 
 // TestDownloadWithRetryNegativeRetries verifies that negative maxRetries defaults to 1 attempt.
@@ -288,7 +287,7 @@ func TestDownloadWithRetryNegativeRetries(t *testing.T) {
 	err := downloadWithRetry(context.Background(), mock, -5, 1*time.Millisecond)
 
 	require.NoError(t, err, "should succeed with 1 attempt when maxRetries is negative")
-	assert.Equal(t, 1, mock.getCallCount(), "should make exactly 1 call when maxRetries is negative")
+	require.Equal(t, 1, mock.getCallCount(), "should make exactly 1 call when maxRetries is negative")
 }
 
 // TestDownloadWithRetry_ContextCancellation verifies that downloadWithRetry returns
