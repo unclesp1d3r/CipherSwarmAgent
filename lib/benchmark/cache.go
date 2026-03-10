@@ -157,7 +157,7 @@ func (m *Manager) TrySubmitCachedBenchmarks(ctx context.Context) bool {
 		return false
 	}
 
-	// Mark all as submitted and persist updated cache
+	// Mark all as submitted in-place — safe, single goroutine owns the slice.
 	for i := range cached {
 		cached[i].Submitted = true
 	}
