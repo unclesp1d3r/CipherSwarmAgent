@@ -31,11 +31,11 @@ All configuration options can be set via command-line flags:
 
 ```bash
 ./cipherswarm-agent \
-  --api_token "your_api_token" \
-  --api_url "https://your-server.com:3000" \
-  --data_path "/opt/cipherswarm/data" \
-  --gpu_temp_threshold 85 \
-  --extra_debugging
+  --api-token "your_api_token" \
+  --api-url "https://your-server.com:3000" \
+  --data-path "/opt/cipherswarm/data" \
+  --gpu-temp-threshold 85 \
+  --extra-debugging
 ```
 
 ### Method 2: Environment Variables
@@ -91,81 +91,92 @@ You can specify a custom config file location:
 
 ## Configuration Options Reference
 
+**Note on CLI Flag Compatibility**: All CLI flags have been updated to use kebab-case style (e.g., `--api-token`, `--data-path`) following POSIX/GNU conventions. For backward compatibility, the original underscore-style flags (e.g., `--api_token`, `--data_path`) remain functional as deprecated aliases but will display a deprecation warning.
+
 ### Core Settings
 
 #### `api_token` / `API_TOKEN`
 
-- **Flag**: `--api_token`, `-a`
+- **Flag**: `--api-token`, `-a`
 - **Type**: String
 - **Required**: Yes
 - **Description**: API token for authenticating with the CipherSwarm server
 - **Example**: `csa_1234_abcdef...`
+- **Note**: Deprecated alias `--api_token` remains functional for backward compatibility
 
 #### `api_url` / `API_URL`
 
-- **Flag**: `--api_url`, `-u`
+- **Flag**: `--api-url`, `-u`
 - **Type**: String
 - **Required**: Yes
 - **Description**: Base URL of the CipherSwarm server API
 - **Example**: `https://cipherswarm.example.com:3000`
+- **Note**: Deprecated alias `--api_url` remains functional for backward compatibility
 
 #### `data_path` / `DATA_PATH`
 
-- **Flag**: `--data_path`, `-p`
+- **Flag**: `--data-path`, `-p`
 - **Type**: String
 - **Default**: `./data`
 - **Description**: Directory where the agent stores runtime data
 - **Example**: `/opt/cipherswarm/data`
+- **Note**: Deprecated alias `--data_path` remains functional for backward compatibility
 
 ### Performance Settings
 
 #### `gpu_temp_threshold` / `GPU_TEMP_THRESHOLD`
 
-- **Flag**: `--gpu_temp_threshold`, `-g`
+- **Flag**: `--gpu-temp-threshold`, `-g`
 - **Type**: Integer
 - **Default**: `80`
 - **Description**: GPU temperature threshold in Celsius. Agent pauses tasks if exceeded
 - **Range**: 60-100
+- **Note**: Deprecated alias `--gpu_temp_threshold` remains functional for backward compatibility
 
 #### `status_timer` / `STATUS_TIMER`
 
-- **Flag**: `--status_timer`, `-t`
+- **Flag**: `--status-timer`, `-t`
 - **Type**: Integer
 - **Default**: `10`
 - **Description**: Interval in seconds for sending status updates to server
 - **Range**: 1-60
+- **Note**: Deprecated alias `--status_timer` remains functional for backward compatibility
 
 #### `heartbeat_interval` / `HEARTBEAT_INTERVAL`
 
-- **Flag**: `--heartbeat_interval`
+- **Flag**: `--heartbeat-interval`
 - **Type**: Duration
 - **Default**: `10s` (fallback only - server provides actual value via `agent_update_interval`)
 - **Description**: Interval between heartbeat messages to the server. **Note**: This value is automatically set by the server via the `agent_update_interval` configuration field and should not normally be overridden.
 - **Examples**: `15s`, `1m`, `90s`
+- **Note**: Deprecated alias `--heartbeat_interval` remains functional for backward compatibility
 
 #### `sleep_on_failure` / `SLEEP_ON_FAILURE`
 
-- **Flag**: `--sleep_on_failure`, `-s`
+- **Flag**: `--sleep-on-failure`, `-s`
 - **Type**: Duration
 - **Default**: `60s`
 - **Description**: How long to wait after a task failure before retrying
 - **Examples**: `30s`, `2m`, `1m30s`
+- **Note**: Deprecated alias `--sleep_on_failure` remains functional for backward compatibility
 
 ### Hashcat Integration
 
 #### `always_use_native_hashcat` / `ALWAYS_USE_NATIVE_HASHCAT`
 
-- **Flag**: `--always_use_native_hashcat`, `-n`
+- **Flag**: `--always-use-native-hashcat`, `-n`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Force using system's native Hashcat instead of server-provided binaries
+- **Note**: Deprecated alias `--always_use_native_hashcat` remains functional for backward compatibility
 
 #### `files_path` / `FILES_PATH`
 
-- **Flag**: `--files_path`, `-f`
+- **Flag**: `--files-path`, `-f`
 - **Type**: String
 - **Default**: `{data_path}/files`
 - **Description**: Directory for storing attack files (wordlists, rules, masks)
+- **Note**: Deprecated alias `--files_path` remains functional for backward compatibility
 
 #### `hashcat_path` / `HASHCAT_PATH`
 
@@ -186,33 +197,37 @@ You can specify a custom config file location:
 
 #### `extra_debugging` / `EXTRA_DEBUGGING`
 
-- **Flag**: `--extra_debugging`, `-e`
+- **Flag**: `--extra-debugging`, `-e`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Enable additional debugging information (very verbose)
+- **Note**: Deprecated alias `--extra_debugging` remains functional for backward compatibility
 
 ### ZAP (Zero Application Performance) Integration
 
 #### `write_zaps_to_file` / `WRITE_ZAPS_TO_FILE`
 
-- **Flag**: `--write_zaps_to_file`, `-w`
+- **Flag**: `--write-zaps-to-file`, `-w`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Write ZAP output to files for sharing with other agents
+- **Note**: Deprecated alias `--write_zaps_to_file` remains functional for backward compatibility
 
 #### `zap_path` / `ZAP_PATH`
 
-- **Flag**: `--zap_path`, `-z`
+- **Flag**: `--zap-path`, `-z`
 - **Type**: String
 - **Default**: `{data_path}/zaps`
 - **Description**: Directory for storing ZAP output files
+- **Note**: Deprecated alias `--zap_path` remains functional for backward compatibility
 
 #### `retain_zaps_on_completion` / `RETAIN_ZAPS_ON_COMPLETION`
 
-- **Flag**: `--retain_zaps_on_completion`, `-r`
+- **Flag**: `--retain-zaps-on-completion`, `-r`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Keep ZAP files after task completion instead of deleting them
+- **Note**: Deprecated alias `--retain_zaps_on_completion` remains functional for backward compatibility
 
 ### Fault Tolerance Settings
 
@@ -220,42 +235,47 @@ These settings control retry behavior, timeouts, and circuit breakers for improv
 
 #### `task_timeout` / `TASK_TIMEOUT`
 
-- **Flag**: `--task_timeout`
+- **Flag**: `--task-timeout`
 - **Type**: Duration
 - **Default**: `24h`
 - **Description**: Maximum time allowed for a single task before it's forcefully terminated. Long-running tasks are expected, so this is set high by default.
 - **Examples**: `12h`, `48h`, `6h30m`
+- **Note**: Deprecated alias `--task_timeout` remains functional for backward compatibility
 
 #### `download_max_retries` / `DOWNLOAD_MAX_RETRIES`
 
-- **Flag**: `--download_max_retries`
+- **Flag**: `--download-max-retries`
 - **Type**: Integer
 - **Default**: `3`
 - **Description**: Maximum number of retry attempts for file downloads (wordlists, rules, etc.) when transient errors occur.
 - **Range**: 1-10
+- **Note**: Deprecated alias `--download_max_retries` remains functional for backward compatibility
 
 #### `download_retry_delay` / `DOWNLOAD_RETRY_DELAY`
 
-- **Flag**: `--download_retry_delay`
+- **Flag**: `--download-retry-delay`
 - **Type**: Duration
 - **Default**: `2s`
 - **Description**: Base delay between download retry attempts. Uses exponential backoff (2s, 4s, 8s, etc.).
 - **Examples**: `1s`, `5s`, `500ms`
+- **Note**: Deprecated alias `--download_retry_delay` remains functional for backward compatibility
 
 #### `insecure_downloads` / `INSECURE_DOWNLOADS`
 
-- **Flag**: `--insecure_downloads`
+- **Flag**: `--insecure-downloads`
 - **Type**: Boolean
 - **Default**: `false`
 - **Description**: Skip TLS certificate verification for file downloads. **Warning**: Only use in trusted networks or development environments.
+- **Note**: Deprecated alias `--insecure_downloads` remains functional for backward compatibility
 
 #### `max_heartbeat_backoff` / `MAX_HEARTBEAT_BACKOFF`
 
-- **Flag**: `--max_heartbeat_backoff`
+- **Flag**: `--max-heartbeat-backoff`
 - **Type**: Integer
 - **Default**: `6`
 - **Description**: Maximum multiplier for heartbeat backoff on consecutive failures. With default value of 6, the backoff caps at 64x the normal interval (2^6). The agent uses exponential backoff when heartbeats fail, automatically recovering when connectivity is restored.
 - **Range**: 1-10
+- **Note**: Deprecated alias `--max_heartbeat_backoff` remains functional for backward compatibility
 
 ### Advanced Settings
 
@@ -423,7 +443,7 @@ chmod 750 /var/lib/cipherswarm
 Enable debug mode to see configuration loading:
 
 ```bash
-./cipherswarm-agent --debug --extra_debugging
+./cipherswarm-agent --debug --extra-debugging
 ```
 
 This shows:

@@ -140,7 +140,7 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 	maxRetries := agentstate.State.DownloadMaxRetries
 	baseDelay := agentstate.State.DownloadRetryDelay
 
-	if err := downloadWithRetry(client, maxRetries, baseDelay); err != nil {
+	if err := downloadWithRetry(ctx, client, maxRetries, baseDelay); err != nil {
 		return err
 	}
 
@@ -153,7 +153,9 @@ func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum stri
 
 // downloadWithRetry attempts to download a file with exponential backoff retry logic.
 // It retries up to maxRetries times, with delays doubling after each failed attempt.
-func downloadWithRetry(client Getter, maxRetries int, baseDelay time.Duration) error {
+// The ctx parameter enables context-aware sleep between retries, returning immediately
+// on cancellation instead of blocking for the full delay.
+func downloadWithRetry(ctx context.Context, client Getter, maxRetries int, baseDelay time.Duration) error {
 	// Ensure at least one download attempt is made
 	if maxRetries < 1 {
 		agentstate.Logger.Warn("maxRetries value < 1, defaulting to 1 attempt",
@@ -168,7 +170,22 @@ func downloadWithRetry(client Getter, maxRetries int, baseDelay time.Duration) e
 			// Exponential backoff: baseDelay * 2^(attempt-1)
 			delay := baseDelay * time.Duration(1<<(attempt-1))
 			agentstate.Logger.Debug("Retrying download", "attempt", attempt+1, "delay", delay)
-			time.Sleep(delay)
+
+			timer := time.NewTimer(delay)
+
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				timer.Stop()
+
+				if lastErr != nil {
+					return fmt.Errorf(
+						"download cancelled after %d attempt(s) (last error: %w): %w",
+						attempt, lastErr, ctx.Err())
+				}
+
+				return fmt.Errorf("download cancelled: %w", ctx.Err())
+			}
 		}
 
 		if err := client.Get(); err != nil {
@@ -260,28 +277,15 @@ func Base64ToHex(b64 string) (string, error) {
 	return hex.EncodeToString(data), nil
 }
 
-// removeExistingFile removes the file specified by filePath if it exists, logging and reporting an error if removal fails.
-// Parameters:
-// - filePath: The path to the file that needs to be removed.
-// Returns an error if file removal fails or if stat fails for reasons other than file not existing.
+// removeExistingFile removes the file at filePath if it exists.
+// Uses os.Remove directly to avoid TOCTOU races.
+// Returns an error if removal fails for reasons other than the file not existing.
 func removeExistingFile(filePath string) error {
-	_, err := os.Stat(filePath)
-	if err == nil {
-		// File exists, remove it
-		if err := os.Remove(filePath); err != nil {
-			return fmt.Errorf("error removing old file: %w", err)
-		}
-
-		return nil
+	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error removing old file %s: %w", filePath, err)
 	}
 
-	if os.IsNotExist(err) {
-		// File doesn't exist - nothing to remove
-		return nil
-	}
-
-	// Stat failed for other reasons (permission error, IO error, etc.)
-	return fmt.Errorf("error checking file existence: %w", err)
+	return nil
 }
 
 // writeResponseToFile writes the data from an io.Reader (responseStream) to a file specified by the filePath.

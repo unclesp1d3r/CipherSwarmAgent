@@ -105,7 +105,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 	}
 
 	return &Session{
-		proc: exec.CommandContext( //nolint:gosec // G204 - binary path from internal config, not user input
+		proc: exec.CommandContext(
 			ctx,
 			binaryPath,
 			args...),
@@ -389,7 +389,6 @@ func (sess *Session) Cleanup() {
 	agentstate.Logger.Info("Cleaning up session files")
 
 	removeFile := func(filePath string) {
-		//nolint:gosec // G703 - internal session paths
 		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 			agentstate.Logger.Error("couldn't remove file", "file", filePath, "error", err)
 		}
@@ -459,7 +458,7 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 
 	if err := file.Chmod(perm); err != nil {
 		_ = file.Close()
-		_ = os.Remove(file.Name()) //nolint:gosec // G703 - cleaning up temp file we just created
+		_ = os.Remove(file.Name())
 		return nil, fmt.Errorf("setting temp file permissions: %w", err)
 	}
 
@@ -477,7 +476,7 @@ func createCharsetFiles(charsets []string) ([]*os.File, error) {
 	closeAll := func() {
 		for _, f := range charsetFiles {
 			_ = f.Close()
-			_ = os.Remove(f.Name()) //nolint:gosec // G703 - cleaning up temp files we created
+			_ = os.Remove(f.Name())
 		}
 	}
 
@@ -494,7 +493,7 @@ func createCharsetFiles(charsets []string) ([]*os.File, error) {
 
 		if _, err := charsetFile.WriteString(charset); err != nil {
 			_ = charsetFile.Close()
-			_ = os.Remove(charsetFile.Name()) //nolint:gosec // G703 - cleaning up temp file we just created
+			_ = os.Remove(charsetFile.Name())
 			closeAll()
 			return nil, fmt.Errorf("writing charset file: %w", err)
 		}

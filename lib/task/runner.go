@@ -34,6 +34,7 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 
 	waitChan := make(chan struct{})
 
+	//nolint:gosec // G118 - goroutine manages session lifecycle with ctx cancellation
 	go func() {
 		defer close(waitChan)
 

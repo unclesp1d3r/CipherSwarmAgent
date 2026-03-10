@@ -19,7 +19,7 @@ Once configured, start the agent with:
 API_TOKEN=your_token API_URL=https://server.com ./cipherswarm-agent
 
 # With command line flags
-./cipherswarm-agent --api_token your_token --api_url https://server.com:3000
+./cipherswarm-agent --api-token your_token --api-url https://server.com:3000
 ```
 
 ### Stopping the Agent
@@ -57,33 +57,35 @@ During graceful shutdown, the agent:
 
 # Core configuration flags
 ./cipherswarm-agent \
-  --api_token, -a <token>           # API authentication token
-  --api_url, -u <url>              # CipherSwarm server URL
+  --api-token, -a <token>          # API authentication token
+  --api-url, -u <url>              # CipherSwarm server URL
   --config <path>                  # Custom config file path
-  --data_path, -p <path>           # Data storage directory
+  --data-path, -p <path>           # Data storage directory
 
 # Performance tuning flags
 ./cipherswarm-agent \
-  --gpu_temp_threshold, -g <temp>  # GPU temperature limit (°C)
-  --status_timer, -t <seconds>     # Status update interval
-  --sleep_on_failure, -s <duration> # Retry delay after failures
+  --gpu-temp-threshold, -g <temp>  # GPU temperature limit (°C)
+  --status-timer, -t <seconds>     # Status update interval
+  --sleep-on-failure, -s <duration> # Retry delay after failures
 
 # Hashcat integration flags
 ./cipherswarm-agent \
-  --always_use_native_hashcat, -n # Force native Hashcat binary
-  --files_path, -f <path>          # Attack files directory
+  --always-use-native-hashcat, -n # Force native Hashcat binary
+  --files-path, -f <path>          # Attack files directory
 
 # Debugging flags
 ./cipherswarm-agent \
   --debug, -d                      # Enable debug logging
-  --extra_debugging, -e            # Very verbose debugging
+  --extra-debugging, -e            # Very verbose debugging
 
 # ZAP (shared cracking) flags
 ./cipherswarm-agent \
-  --write_zaps_to_file, -w         # Write ZAPs to shared directory
-  --zap_path, -z <path>            # ZAP files directory
-  --retain_zaps_on_completion, -r  # Keep ZAP files after tasks
+  --write-zaps-to-file, -w         # Write ZAPs to shared directory
+  --zap-path, -z <path>            # ZAP files directory
+  --retain-zaps-on-completion, -r  # Keep ZAP files after tasks
 ```
+
+**Note:** Underscore-style flags (e.g., `--api_token`) are still supported as deprecated aliases for backward compatibility, but kebab-case flags are the recommended standard.
 
 ## Agent Lifecycle and States
 
@@ -207,7 +209,7 @@ go build -o cipherswarm-agent
 go test ./...
 
 # Run with debugging
-go run main.go --debug --extra_debugging
+go run main.go --debug --extra-debugging
 ```
 
 ## Common Workflows
@@ -280,20 +282,20 @@ mv new-cipherswarm-agent cipherswarm-agent
 
 ```bash
 # Conservative temperature limit
-./cipherswarm-agent --gpu_temp_threshold 70
+./cipherswarm-agent --gpu-temp-threshold 70
 
 # Higher performance limit (ensure adequate cooling)
-./cipherswarm-agent --gpu_temp_threshold 85
+./cipherswarm-agent --gpu-temp-threshold 85
 ```
 
 #### Status Update Frequency
 
 ```bash
 # More frequent updates (higher server load)
-./cipherswarm-agent --status_timer 1
+./cipherswarm-agent --status-timer 1
 
 # Less frequent updates (lower server load)
-./cipherswarm-agent --status_timer 10
+./cipherswarm-agent --status-timer 10
 ```
 
 #### Memory and Storage Optimization
@@ -301,12 +303,12 @@ mv new-cipherswarm-agent cipherswarm-agent
 ```bash
 # Use shared storage for large files
 ./cipherswarm-agent \
-  --files_path /mnt/shared/wordlists \
-  --zap_path /mnt/shared/zaps \
-  --write_zaps_to_file
+  --files-path /mnt/shared/wordlists \
+  --zap-path /mnt/shared/zaps \
+  --write-zaps-to-file
 
 # Clean up completed tasks aggressively
-./cipherswarm-agent --retain_zaps_on_completion false
+./cipherswarm-agent --retain-zaps-on-completion false
 ```
 
 ## Troubleshooting
@@ -359,7 +361,7 @@ pkill -9 cipherswarm-agent  # force kill if needed
 
 - Check if multiple agents are running: `ps aux | grep cipherswarm-agent`
 - Monitor Hashcat process: `top -p $(cat data/hashcat.pid)`
-- Adjust status update frequency: `--status_timer 5`
+- Adjust status update frequency: `--status-timer 5`
 
 #### High Memory Usage
 
@@ -369,7 +371,7 @@ pkill -9 cipherswarm-agent  # force kill if needed
 
 #### GPU Overheating
 
-- Lower temperature threshold: `--gpu_temp_threshold 75`
+- Lower temperature threshold: `--gpu-temp-threshold 75`
 - Improve system cooling
 - Check GPU driver status
 
@@ -410,7 +412,7 @@ nvidia-smi  # for NVIDIA GPUs
 #### Enable Verbose Logging
 
 ```bash
-./cipherswarm-agent --debug --extra_debugging 2>&1 | tee debug.log
+./cipherswarm-agent --debug --extra-debugging 2>&1 | tee debug.log
 ```
 
 #### Monitor System Resources

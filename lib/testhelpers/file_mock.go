@@ -42,7 +42,7 @@ func MockDownloadServer(t *testing.T, baseDir string) *httptest.Server {
 		filename := filepath.Base(r.URL.Path)
 		filePath := filepath.Join(baseDir, filename)
 
-		file, err := os.Open(filePath) //nolint:gosec // G703 - test helper with controlled file paths
+		file, err := os.Open(filePath)
 		if err != nil {
 			http.Error(w, "File not found", http.StatusNotFound)
 			return
@@ -81,11 +81,9 @@ func CalculateTestChecksum(content []byte) string {
 // This is specifically useful for testing hashcat session creation.
 func CreateHashListFile(t *testing.T, dir string, hashes []string) string {
 	t.Helper()
-	var content string
-	var contentSb79 strings.Builder
+	var sb strings.Builder
 	for _, hash := range hashes {
-		contentSb79.WriteString(hash + "\n")
+		sb.WriteString(hash + "\n")
 	}
-	content += contentSb79.String()
-	return CreateTestFile(t, dir, "hashes.txt", []byte(content))
+	return CreateTestFile(t, dir, "hashes.txt", []byte(sb.String()))
 }
