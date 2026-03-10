@@ -14,6 +14,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
@@ -43,6 +44,10 @@ var (
 	ErrTaskIsNil = errors.New("task is nil")
 	// ErrNoTaskAvailable is returned when no task is available from the server.
 	ErrNoTaskAvailable = errors.New("no task available")
+	// ErrTaskAcceptNotFound is returned when the server responds 404 to SetTaskAccepted.
+	ErrTaskAcceptNotFound = errors.New("task not found during acceptance")
+	// ErrTaskAcceptFailed is returned for non-404 SetTaskAccepted failures.
+	ErrTaskAcceptFailed = errors.New("task acceptance failed")
 )
 
 // GetNewTask retrieves a new task from the server.
@@ -110,7 +115,11 @@ func (m *Manager) AcceptTask(ctx context.Context, task *api.Task) error {
 	if err != nil {
 		handleAcceptTaskError(ctx, err)
 
-		return err
+		if apierrors.IsNotFoundError(err) {
+			return fmt.Errorf("%w: %w", ErrTaskAcceptNotFound, err)
+		}
+
+		return fmt.Errorf("%w: %w", ErrTaskAcceptFailed, err)
 	}
 
 	agentstate.Logger.Debug("Task accepted")
