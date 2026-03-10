@@ -64,6 +64,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - **Packages/Files**: `snake_case`. **Interfaces/Structs**: `PascalCase`. **Functions/Methods**: `camelCase`/`PascalCase`. **Variables**: `camelCase`.
 - **CLI Flags**: `kebab-case`. Use `Bool`/`String`/`Int`/`Duration` for flags without shorthand — only use `BoolP`/`StringP` variants when providing a short flag letter.
+- **Deprecated flag aliases**: Old underscore-style flags (e.g., `--api_token`) are registered as hidden deprecated aliases in `registerDeprecatedAliases()` in `cmd/root.go`. They are NOT bound to Viper — values are bridged to canonical kebab-case flags via `bridgeDeprecatedFlags()` in `PersistentPreRun`. When adding new flags, use kebab-case only — no alias needed.
 
 ### Error Handling
 
