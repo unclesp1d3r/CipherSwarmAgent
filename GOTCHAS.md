@@ -54,6 +54,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `hashcat` package tests cannot import `testhelpers` (circular: testhelpers -> hashcat). Use local test helpers.
 - Package-level `var` test fixtures get mutated by production code across subtests. Use factory functions (e.g., `newSampleData()`) that return fresh copies to prevent cross-test contamination.
 - `nxadm/tail` `Cleanup()` returns void — do not attempt to capture a return value. `Stop()` returns an error; `Cleanup()` does not.
+- httpmock URL patterns must match the generated client paths (check `client.gen.go`), not the Go method names. E.g., `SetTaskAbandoned` hits `/tasks/{id}/abandon`, not `/tasks/{id}/set_abandoned`.
+- `httpmock.ResponderFromResponse` with manually constructed `*http.Response` triggers `bodyclose` lint. Use `httpmock.NewJsonResponderOrPanic` for JSON mocks instead.
 
 ## Tooling
 
