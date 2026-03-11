@@ -242,31 +242,119 @@ func TestHandleHeartbeatError(t *testing.T) {
 	}
 }
 
+// TestLogAndSendError_EmptyMessage tests that LogAndSendError with empty or whitespace-only
+// messages does not call SubmitErrorAgent, while non-empty messages do (issue #140).
+func TestLogAndSendError_EmptyMessage(t *testing.T) {
+	tests := []struct {
+		name          string
+		message       string
+		expectAPICall bool
+	}{
+		{
+			name:          "empty message",
+			message:       "",
+			expectAPICall: false,
+		},
+		{
+			name:          "whitespace only message",
+			message:       "   ",
+			expectAPICall: false,
+		},
+		{
+			name:          "tab only message",
+			message:       "\t",
+			expectAPICall: false,
+		},
+		{
+			name:          "newline only message",
+			message:       "\n",
+			expectAPICall: false,
+		},
+		{
+			name:          "non-empty message submits normally",
+			message:       "real error occurred",
+			expectAPICall: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanupHTTP := testhelpers.SetupHTTPMock()
+			defer cleanupHTTP()
+
+			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+			defer cleanupState()
+
+			testhelpers.MockSubmitErrorSuccess(123)
+
+			sentinel := errors.New("wrapped error")
+			result := cserrors.LogAndSendError(
+				context.Background(), tt.message, sentinel, api.SeverityCritical, nil,
+			)
+
+			// LogAndSendError always returns the original error
+			require.ErrorIs(t, result, sentinel)
+
+			callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
+			if tt.expectAPICall {
+				assert.Positive(t, callCount, "SubmitErrorAgent should be called for non-empty messages")
+			} else {
+				assert.Zero(t, callCount, "SubmitErrorAgent should not be called for empty/whitespace messages")
+			}
+		})
+	}
+}
+
 // TestSendAgentError tests the cserrors.SendAgentError function.
 func TestSendAgentError(t *testing.T) {
 	tests := []struct {
-		name     string
-		message  string
-		task     *api.Task
-		severity api.Severity
+		name          string
+		message       string
+		task          *api.Task
+		severity      api.Severity
+		expectAPICall bool
 	}{
 		{
-			name:     "with nil task",
-			message:  "test error",
-			task:     nil,
-			severity: api.SeverityCritical,
+			name:          "with nil task",
+			message:       "test error",
+			task:          nil,
+			severity:      api.SeverityCritical,
+			expectAPICall: true,
 		},
 		{
-			name:     "with non-nil task",
-			message:  "test error",
-			task:     testhelpers.NewTestTask(456, 789),
-			severity: api.SeverityCritical,
+			name:          "with non-nil task",
+			message:       "test error",
+			task:          testhelpers.NewTestTask(456, 789),
+			severity:      api.SeverityCritical,
+			expectAPICall: true,
 		},
 		{
-			name:     "different severity levels",
-			message:  "test error",
-			task:     nil,
-			severity: api.SeverityWarning,
+			name:          "different severity levels",
+			message:       "test error",
+			task:          nil,
+			severity:      api.SeverityWarning,
+			expectAPICall: true,
+		},
+		{
+			name:          "empty message",
+			message:       "",
+			task:          nil,
+			severity:      api.SeverityCritical,
+			expectAPICall: false,
+		},
+		{
+			name:          "whitespace only message",
+			message:       "   ",
+			task:          nil,
+			severity:      api.SeverityCritical,
+			expectAPICall: false,
+		},
+		{
+			name:          "tab only message",
+			message:       "\t",
+			task:          nil,
+			severity:      api.SeverityWarning,
+			expectAPICall: false,
 		},
 	}
 
@@ -284,9 +372,13 @@ func TestSendAgentError(t *testing.T) {
 			// This function doesn't return an error
 			cserrors.SendAgentError(context.Background(), tt.message, tt.task, tt.severity)
 
-			// Verify SubmitErrorAgent was called
+			// Verify SubmitErrorAgent was or was not called
 			callCount := testhelpers.GetSubmitErrorCallCount(123, "https://test.api")
-			assert.Positive(t, callCount)
+			if tt.expectAPICall {
+				assert.Positive(t, callCount)
+			} else {
+				assert.Zero(t, callCount)
+			}
 		})
 	}
 }
