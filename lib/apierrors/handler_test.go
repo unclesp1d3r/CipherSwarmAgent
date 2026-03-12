@@ -3,6 +3,7 @@ package apierrors
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -366,6 +367,67 @@ func TestGetStatusCode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GetStatusCode(tt.err)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestHandler_Handle_CircuitOpenSkipsServerReport(t *testing.T) {
+	cleanup := setupTestState()
+	defer cleanup()
+
+	sendCalled := false
+	h := &Handler{
+		SendError: func(_ context.Context, _ string, _ api.Severity) {
+			sendCalled = true
+		},
+	}
+
+	circuitErr := fmt.Errorf("request failed: %w", api.ErrCircuitOpen)
+
+	opts := Options{
+		Message:      "API error",
+		Severity:     api.SeverityCritical,
+		SendToServer: true,
+	}
+
+	result := h.Handle(context.Background(), circuitErr, opts)
+
+	require.Error(t, result)
+	assert.ErrorIs(t, result, api.ErrCircuitOpen)
+	assert.False(t, sendCalled, "SendError should not be called when circuit breaker is open")
+}
+
+func TestIsCircuitOpen(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "Direct ErrCircuitOpen",
+			err:      api.ErrCircuitOpen,
+			expected: true,
+		},
+		{
+			name:     "Wrapped ErrCircuitOpen",
+			err:      fmt.Errorf("transport error: %w", api.ErrCircuitOpen),
+			expected: true,
+		},
+		{
+			name:     "Generic error",
+			err:      errors.New("connection refused"),
+			expected: false,
+		},
+		{
+			name:     "Nil error",
+			err:      nil,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsCircuitOpen(tt.err))
 		})
 	}
 }

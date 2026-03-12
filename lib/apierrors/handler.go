@@ -58,8 +58,10 @@ func (h *Handler) Handle(ctx context.Context, err error, opts Options) error {
 		h.handleAPIError(ctx, ae, opts)
 	default:
 		agentstate.ErrorLogger.Error(opts.Message, "error", err)
-		// Skip server reporting for context cancellation (expected during shutdown)
-		if stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded) {
+		// Skip server reporting for context cancellation and circuit breaker open
+		// (sending errors to the server would fail in both cases)
+		if stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded) ||
+			stderrors.Is(err, api.ErrCircuitOpen) {
 			break
 		}
 		if opts.SendToServer && h.SendError != nil {
@@ -132,6 +134,11 @@ func IsGoneError(err error) bool {
 		return ae.StatusCode == http.StatusGone
 	}
 	return false
+}
+
+// IsCircuitOpen checks if the error is caused by an open circuit breaker.
+func IsCircuitOpen(err error) bool {
+	return stderrors.Is(err, api.ErrCircuitOpen)
 }
 
 // GetStatusCode extracts the HTTP status code from an API error.

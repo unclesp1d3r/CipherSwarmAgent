@@ -15,6 +15,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/benchmark"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
@@ -215,8 +216,14 @@ func startHeartbeatLoop(ctx context.Context, cancel context.CancelFunc) {
 		if err != nil {
 			consecutiveFailures++
 			backoff := calculateHeartbeatBackoff(baseInterval, consecutiveFailures, maxBackoffMultiplier)
-			agentstate.Logger.Warn("Heartbeat failed, backing off",
-				"failures", consecutiveFailures, "next_retry", backoff)
+
+			if apierrors.IsCircuitOpen(err) {
+				agentstate.Logger.Warn("Circuit breaker open, server appears unresponsive",
+					"failures", consecutiveFailures, "next_retry", backoff)
+			} else {
+				agentstate.Logger.Warn("Heartbeat failed, backing off",
+					"failures", consecutiveFailures, "next_retry", backoff)
+			}
 
 			if sleepWithContext(ctx, backoff) {
 				return
@@ -339,7 +346,11 @@ func handleNewTask(ctx context.Context) {
 			return
 		}
 
-		agentstate.Logger.Error("Failed to get new task", "error", err)
+		if apierrors.IsCircuitOpen(err) {
+			agentstate.Logger.Warn("Circuit breaker open, skipping task retrieval")
+		} else {
+			agentstate.Logger.Error("Failed to get new task", "error", err)
+		}
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return
