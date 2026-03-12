@@ -42,7 +42,8 @@ type agentState struct {
 	EnableAdditionalHashTypes           bool          // EnableAdditionalHashTypes specifies whether the agent should enable additional hash types.
 	HashcatPath                         string        // HashcatPath is the path to the Hashcat binary (empty for auto-detection).
 	UseLegacyDeviceIdentificationMethod bool          // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
-	APIClient                           api.APIClient // APIClient is the interface-based client for API operations (enables dependency injection).
+	apiClient                           api.APIClient // apiClient is the interface-based client for API operations (enables dependency injection).
+	apiClientMu                         sync.RWMutex  // apiClientMu protects apiClient during concurrent access.
 	InsecureDownloads                   bool          // InsecureDownloads skips TLS certificate verification for downloads.
 	DownloadMaxRetries                  int           // DownloadMaxRetries is the max number of download retry attempts.
 	DownloadRetryDelay                  time.Duration // DownloadRetryDelay is the base delay between download retries.
@@ -51,7 +52,7 @@ type agentState struct {
 	SleepOnFailure                      time.Duration // SleepOnFailure is how long to wait after a task failure before retrying.
 	ConnectTimeout                      time.Duration // ConnectTimeout is the TCP connect timeout for API requests.
 	ReadTimeout                         time.Duration // ReadTimeout is the read timeout for API responses.
-	WriteTimeout                        time.Duration // WriteTimeout is the write timeout for API requests.
+	WriteTimeout                        time.Duration // WriteTimeout is accepted from server config but not used in the transport chain (Go's http.Transport has no write timeout).
 	RequestTimeout                      time.Duration // RequestTimeout is the overall request timeout for API calls.
 	APIMaxRetries                       int           // APIMaxRetries is the max retry attempts for failed API requests.
 	APIRetryInitialDelay                time.Duration // APIRetryInitialDelay is the initial delay between API retries.
@@ -145,6 +146,21 @@ func (s *agentState) SetCurrentActivity(a Activity) {
 	s.currentActivityMu.Lock()
 	defer s.currentActivityMu.Unlock()
 	s.currentActivity = a
+}
+
+// GetAPIClient returns the current API client (thread-safe).
+func (s *agentState) GetAPIClient() api.APIClient {
+	s.apiClientMu.RLock()
+	defer s.apiClientMu.RUnlock()
+
+	return s.apiClient
+}
+
+// SetAPIClient sets the API client (thread-safe).
+func (s *agentState) SetAPIClient(c api.APIClient) {
+	s.apiClientMu.Lock()
+	defer s.apiClientMu.Unlock()
+	s.apiClient = c
 }
 
 // Logger is a shared logging instance configured to output logs at InfoLevel with timestamps to os.Stdout.
