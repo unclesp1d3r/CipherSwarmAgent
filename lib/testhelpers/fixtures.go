@@ -29,8 +29,33 @@ const (
 // TestAgentConfiguration represents the configuration response body for tests.
 // It mirrors the structure returned by the GetConfiguration API endpoint.
 type TestAgentConfiguration struct {
-	APIVersion int                            `json:"api_version"`
-	Config     api.AdvancedAgentConfiguration `json:"config"`
+	APIVersion                int                            `json:"api_version"`
+	Config                    api.AdvancedAgentConfiguration `json:"config"`
+	BenchmarksNeeded          bool                           `json:"benchmarks_needed"`
+	RecommendedTimeouts       *TestRecommendedTimeouts       `json:"recommended_timeouts,omitempty"`
+	RecommendedRetry          *TestRecommendedRetry          `json:"recommended_retry,omitempty"`
+	RecommendedCircuitBreaker *TestRecommendedCircuitBreaker `json:"recommended_circuit_breaker,omitempty"`
+}
+
+// TestRecommendedTimeouts mirrors server-recommended timeout settings for tests.
+type TestRecommendedTimeouts struct {
+	ConnectTimeout int `json:"connect_timeout"`
+	ReadTimeout    int `json:"read_timeout"`
+	WriteTimeout   int `json:"write_timeout"`
+	RequestTimeout int `json:"request_timeout"`
+}
+
+// TestRecommendedRetry mirrors server-recommended retry settings for tests.
+type TestRecommendedRetry struct {
+	MaxAttempts  int `json:"max_attempts"`
+	InitialDelay int `json:"initial_delay"`
+	MaxDelay     int `json:"max_delay"`
+}
+
+// TestRecommendedCircuitBreaker mirrors server-recommended circuit breaker settings for tests.
+type TestRecommendedCircuitBreaker struct {
+	FailureThreshold int `json:"failure_threshold"`
+	Timeout          int `json:"timeout"`
 }
 
 // NewTestTask creates a minimal valid Task object with the specified IDs and reasonable defaults for other fields.

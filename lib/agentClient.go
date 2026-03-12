@@ -77,10 +77,44 @@ func GetAgentConfiguration(ctx context.Context) error {
 		return ErrConfigurationFailed
 	}
 
+	// Extract server-recommended settings from the configuration response.
+	var recTimeouts *RecommendedTimeouts
+	rt := response.JSON200.RecommendedTimeouts
+	if rt.ConnectTimeout > 0 || rt.ReadTimeout > 0 || rt.WriteTimeout > 0 || rt.RequestTimeout > 0 {
+		recTimeouts = &RecommendedTimeouts{
+			ConnectTimeout: rt.ConnectTimeout,
+			ReadTimeout:    rt.ReadTimeout,
+			WriteTimeout:   rt.WriteTimeout,
+			RequestTimeout: rt.RequestTimeout,
+		}
+	}
+
+	var recRetry *RecommendedRetry
+	rr := response.JSON200.RecommendedRetry
+	if rr.MaxAttempts > 0 {
+		recRetry = &RecommendedRetry{
+			MaxAttempts:  rr.MaxAttempts,
+			InitialDelay: rr.InitialDelay,
+			MaxDelay:     rr.MaxDelay,
+		}
+	}
+
+	var recCB *RecommendedCircuitBreaker
+	rcb := response.JSON200.RecommendedCircuitBreaker
+	if rcb.FailureThreshold > 0 {
+		recCB = &RecommendedCircuitBreaker{
+			FailureThreshold: rcb.FailureThreshold,
+			Timeout:          rcb.Timeout,
+		}
+	}
+
 	agentConfig := mapConfiguration(
 		response.JSON200.ApiVersion,
 		response.JSON200.Config,
 		response.JSON200.BenchmarksNeeded,
+		recTimeouts,
+		recRetry,
+		recCB,
 	)
 
 	if agentConfig.Config.UseNativeHashcat {
@@ -98,8 +132,15 @@ func GetAgentConfiguration(ctx context.Context) error {
 }
 
 // mapConfiguration converts the API configuration response into an agentConfiguration for use within the agent.
-func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration, benchmarksNeeded bool) agentConfiguration {
-	agentConfig := agentConfiguration{
+func mapConfiguration(
+	apiVersion int,
+	config api.AdvancedAgentConfiguration,
+	benchmarksNeeded bool,
+	timeouts *RecommendedTimeouts,
+	retry *RecommendedRetry,
+	circuitBreaker *RecommendedCircuitBreaker,
+) agentConfiguration {
+	return agentConfiguration{
 		APIVersion:       int64(apiVersion),
 		BenchmarksNeeded: benchmarksNeeded,
 		Config: agentConfig{
@@ -108,9 +149,10 @@ func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration, ben
 			BackendDevices:      UnwrapOr(config.BackendDevice, ""),
 			OpenCLDevices:       UnwrapOr(config.OpenclDevices, ""),
 		},
+		RecommendedTimeouts:       timeouts,
+		RecommendedRetry:          retry,
+		RecommendedCircuitBreaker: circuitBreaker,
 	}
-
-	return agentConfig
 }
 
 // UnwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
