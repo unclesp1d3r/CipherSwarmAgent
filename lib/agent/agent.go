@@ -98,9 +98,13 @@ func StartAgent() {
 
 	display.Authenticated()
 
-	// Fetch agent configuration and update metadata
+	// Fetch agent configuration, rebuild client with server-recommended settings, update metadata
 	if err := fetchAgentConfig(ctx); err != nil {
 		agentstate.Logger.Fatal("Failed to fetch agent configuration", "error", err)
+	}
+
+	if err := rebuildAPIClient(); err != nil {
+		agentstate.Logger.Fatal("Failed to rebuild API client with server settings", "error", err)
 	}
 
 	err = lib.UpdateAgentMetadata(ctx)
@@ -303,9 +307,15 @@ func handleReload(ctx context.Context) {
 		return
 	}
 
-	// Update manager configs after reload
+	if err := rebuildAPIClient(); err != nil {
+		agentstate.Logger.Error("Failed to rebuild API client during reload", "error", err)
+	}
+
+	// Recreate managers with new API client sub-clients and update configs
+	benchmarkMgr = benchmark.NewManager(agentstate.State.APIClient.Agents())
 	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+	taskMgr = task.NewManager(agentstate.State.APIClient.Tasks(), agentstate.State.APIClient.Attacks())
 	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 
