@@ -103,10 +103,7 @@ func SendAgentError(
 		Severity: severity,
 		AgentId:  agentstate.State.AgentID,
 		TaskId:   taskID,
-		Metadata: &struct {
-			ErrorDate time.Time       `json:"error_date"`
-			Other     *map[string]any `json:"other"`
-		}{
+		Metadata: &api.ErrorMetadata{
 			ErrorDate: time.Now(),
 			Other:     &otherMap,
 		},
