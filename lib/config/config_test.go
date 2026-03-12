@@ -291,6 +291,71 @@ func TestSetupSharedState_ValidationClampsInvalidTimeouts(t *testing.T) {
 		"circuit_breaker_timeout should be clamped to default when <= 0")
 }
 
+func TestClampDuration(t *testing.T) {
+	ceiling := 5 * time.Minute
+	defaultVal := 10 * time.Second
+
+	tests := []struct {
+		name     string
+		value    time.Duration
+		expected time.Duration
+	}{
+		{"zero returns default", 0, defaultVal},
+		{"negative returns default", -1 * time.Second, defaultVal},
+		{"within range returns value", 30 * time.Second, 30 * time.Second},
+		{"at ceiling returns ceiling", ceiling, ceiling},
+		{"above ceiling returns ceiling", 10 * time.Minute, ceiling},
+		{"just above zero returns value", 1 * time.Nanosecond, 1 * time.Nanosecond},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ClampDuration("test_field", tt.value, ceiling, defaultVal)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestClampInt(t *testing.T) {
+	tests := []struct {
+		name       string
+		value      int
+		minVal     int
+		maxVal     int
+		defaultVal int
+		expected   int
+	}{
+		{"below min returns default", 0, 1, 10, 5, 5},
+		{"at min returns value", 1, 1, 10, 5, 1},
+		{"within range returns value", 5, 1, 10, 5, 5},
+		{"at max returns value", 10, 1, 10, 5, 10},
+		{"above max returns max", 20, 1, 10, 5, 10},
+		{"negative returns default", -1, 1, 10, 5, 5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ClampInt("test_field", tt.value, tt.minVal, tt.maxVal, tt.defaultVal)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSetupSharedState_ValidationClampsRetryDelays(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	viper.Set("api_retry_initial_delay", 0)
+	viper.Set("api_retry_max_delay", -1*time.Second)
+
+	SetupSharedState()
+
+	assert.Equal(t, DefaultAPIRetryInitialDelay, agentstate.State.APIRetryInitialDelay,
+		"api_retry_initial_delay should be clamped to default when <= 0")
+	assert.Equal(t, DefaultAPIRetryMaxDelay, agentstate.State.APIRetryMaxDelay,
+		"api_retry_max_delay should be clamped to default when <= 0")
+}
+
 func TestSetupSharedState_DerivedPathsFromDataRoot(t *testing.T) {
 	t.Run("default data_path derives files_path and zap_path", func(t *testing.T) {
 		viper.Reset()

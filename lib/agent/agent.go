@@ -374,7 +374,7 @@ func handleNewTask(ctx context.Context) {
 		}
 
 		if apierrors.IsCircuitOpen(err) {
-			agentstate.Logger.Warn("Circuit breaker open, skipping task retrieval")
+			agentstate.Logger.Warn("Circuit breaker open, skipping task retrieval", "error", err)
 		} else {
 			agentstate.Logger.Error("Failed to get new task", "error", err)
 		}

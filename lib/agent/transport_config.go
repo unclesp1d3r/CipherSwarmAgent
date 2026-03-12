@@ -46,7 +46,7 @@ func transportConfigFromState() api.TransportConfig {
 		ReadTimeout:    agentstate.State.ReadTimeout,
 		RequestTimeout: agentstate.State.RequestTimeout,
 
-		MaxRetries:        agentstate.State.APIMaxRetries,
+		MaxAttempts:       agentstate.State.APIMaxRetries,
 		RetryInitialDelay: agentstate.State.APIRetryInitialDelay,
 		RetryMaxDelay:     agentstate.State.APIRetryMaxDelay,
 

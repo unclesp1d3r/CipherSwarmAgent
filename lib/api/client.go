@@ -27,7 +27,7 @@ type TransportConfig struct {
 	ReadTimeout    time.Duration // TLS handshake + response header timeout
 	RequestTimeout time.Duration // Overall per-request timeout on http.Client
 
-	MaxRetries        int           // Total attempts (1 = no retry)
+	MaxAttempts       int           // Total attempts (1 = no retry)
 	RetryInitialDelay time.Duration // First retry backoff delay
 	RetryMaxDelay     time.Duration // Cap for exponential backoff
 
@@ -51,8 +51,8 @@ type AgentClient struct {
 	client *ClientWithResponses
 }
 
-// NewAgentClient creates a new AgentClient with a full transport chain:
-// http.Transport (timeouts) -> CircuitTransport -> RetryTransport -> http.Client.
+// NewAgentClient creates a new AgentClient with a layered transport chain.
+// Layers (inner to outer): http.Transport -> CircuitTransport -> RetryTransport -> http.Client.
 func NewAgentClient(serverURL, token string, cfg TransportConfig) (*AgentClient, error) {
 	var base http.RoundTripper
 	if cfg.BaseTransport != nil {
@@ -83,7 +83,7 @@ func NewAgentClient(serverURL, token string, cfg TransportConfig) (*AgentClient,
 
 	retryTransport := &RetryTransport{
 		Base:         circuitTransport,
-		MaxAttempts:  cfg.MaxRetries,
+		MaxAttempts:  cfg.MaxAttempts,
 		InitialDelay: cfg.RetryInitialDelay,
 		MaxDelay:     cfg.RetryMaxDelay,
 		Logger:       cfg.Logger,

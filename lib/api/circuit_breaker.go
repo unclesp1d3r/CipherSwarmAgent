@@ -22,6 +22,9 @@ const (
 // It tracks consecutive failures and opens the circuit when a threshold is reached,
 // preventing further requests until a timeout expires and a probe request succeeds.
 //
+// When used inside a RetryTransport, each retry attempt counts as a separate failure.
+// A threshold of 5 with 3 retries means the circuit can open after 2 logical requests.
+//
 // Thread-safe: all methods use a mutex for synchronization.
 type CircuitBreaker struct {
 	mu               sync.Mutex
@@ -33,7 +36,12 @@ type CircuitBreaker struct {
 }
 
 // NewCircuitBreaker creates a circuit breaker with the given failure threshold and timeout.
+// A failureThreshold < 1 is clamped to 1 to prevent a degenerate breaker that opens
+// on the very first failure.
 func NewCircuitBreaker(failureThreshold int, timeout time.Duration) *CircuitBreaker {
+	if failureThreshold < 1 {
+		failureThreshold = 1
+	}
 	return &CircuitBreaker{
 		failureThreshold: failureThreshold,
 		timeout:          timeout,

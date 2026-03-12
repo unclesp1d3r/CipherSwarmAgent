@@ -54,7 +54,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		ConnectTimeout:                 config.DefaultConnectTimeout,
 		ReadTimeout:                    config.DefaultReadTimeout,
 		RequestTimeout:                 config.DefaultRequestTimeout,
-		MaxRetries:                     1, // No retries in tests
+		MaxAttempts:                    1, // No retries in tests
 		RetryInitialDelay:              config.DefaultAPIRetryInitialDelay,
 		RetryMaxDelay:                  config.DefaultAPIRetryMaxDelay,
 		CircuitBreakerFailureThreshold: config.DefaultCircuitBreakerFailureThreshold,

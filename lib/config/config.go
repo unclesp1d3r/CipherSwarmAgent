@@ -63,9 +63,11 @@ const MaxReasonableTimeout = 5 * time.Minute
 const MaxReasonableRetries = 10
 
 // ClampDuration returns value if it is within (0, ceiling], otherwise returns the default.
-// Logs a warning when clamping is applied.
+// Logs a warning when clamping is applied (both for non-positive values and ceiling breaches).
 func ClampDuration(name string, value, ceiling, defaultVal time.Duration) time.Duration {
 	if value <= 0 {
+		agentstate.Logger.Warn("Server-recommended value is non-positive, using default",
+			"field", name, "value", value, "default", defaultVal)
 		return defaultVal
 	}
 	if value > ceiling {
@@ -77,9 +79,11 @@ func ClampDuration(name string, value, ceiling, defaultVal time.Duration) time.D
 }
 
 // ClampInt returns value if it is within [minVal, maxVal], otherwise returns the default.
-// Logs a warning when clamping is applied.
+// Logs a warning when clamping is applied (both for below-minimum and above-maximum values).
 func ClampInt(name string, value, minVal, maxVal, defaultVal int) int {
 	if value < minVal {
+		agentstate.Logger.Warn("Server-recommended value below minimum, using default",
+			"field", name, "value", value, "min", minVal, "default", defaultVal)
 		return defaultVal
 	}
 	if value > maxVal {
@@ -278,7 +282,18 @@ func SetupSharedState() {
 	}
 
 	agentstate.State.APIRetryInitialDelay = viper.GetDuration("api_retry_initial_delay")
+	if agentstate.State.APIRetryInitialDelay <= 0 {
+		agentstate.Logger.Warn("api_retry_initial_delay must be > 0, using default",
+			"configured", agentstate.State.APIRetryInitialDelay, "default", DefaultAPIRetryInitialDelay)
+		agentstate.State.APIRetryInitialDelay = DefaultAPIRetryInitialDelay
+	}
+
 	agentstate.State.APIRetryMaxDelay = viper.GetDuration("api_retry_max_delay")
+	if agentstate.State.APIRetryMaxDelay <= 0 {
+		agentstate.Logger.Warn("api_retry_max_delay must be > 0, using default",
+			"configured", agentstate.State.APIRetryMaxDelay, "default", DefaultAPIRetryMaxDelay)
+		agentstate.State.APIRetryMaxDelay = DefaultAPIRetryMaxDelay
+	}
 
 	agentstate.State.CircuitBreakerFailureThreshold = viper.GetInt("circuit_breaker_failure_threshold")
 	if agentstate.State.CircuitBreakerFailureThreshold < 1 {

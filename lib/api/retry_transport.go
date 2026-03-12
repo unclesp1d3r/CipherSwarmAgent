@@ -25,10 +25,15 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	maxAttempts := max(t.MaxAttempts, 1)
 
 	var lastErr error
-	var lastResp *http.Response
+	var lastStatusCode int
 
 	for attempt := range maxAttempts {
 		if attempt > 0 {
+			// Reset request body for retries — POST/PUT bodies are consumed by RoundTrip.
+			if err := resetRequestBody(req); err != nil {
+				return nil, fmt.Errorf("failed to reset request body for retry: %w", err)
+			}
+
 			delay := t.backoffDelay(attempt)
 			if err := sleepWithRequestContext(req.Context(), delay); err != nil {
 				if lastErr != nil {
@@ -59,26 +64,49 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			return resp, nil
 		}
 
-		// 5xx: close body before retry to avoid leaking connections
+		// 5xx: drain and close body before retry to avoid leaking connections
 		if t.Logger != nil {
 			t.Logger.Debug("API request returned server error, will retry",
 				"attempt", attempt+1, "max", maxAttempts, "status", resp.StatusCode)
 		}
-		lastResp = resp
+		lastStatusCode = resp.StatusCode
 		if resp.Body != nil {
-			//nolint:errcheck // draining body before close; errors are not actionable
+			//nolint:errcheck // draining body before close; errors not actionable
 			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
 		}
+		lastErr = fmt.Errorf("%w: server returned %d", errServerError, lastStatusCode)
 	}
 
-	if lastErr != nil {
-		return nil, fmt.Errorf("all %d API request attempts failed: %w", maxAttempts, lastErr)
-	}
-
-	// Return last 5xx response if all retries exhausted
-	return lastResp, nil
+	return nil, fmt.Errorf("all %d API request attempts failed: %w", maxAttempts, lastErr)
 }
+
+// errServerError is a sentinel for 5xx responses after retry exhaustion.
+var errServerError = errors.New("server error")
+
+// resetRequestBody resets req.Body from req.GetBody so that POST/PUT requests
+// can be retried with the full body. http.NewRequest sets GetBody for common
+// body types (bytes.Reader, strings.Reader, bytes.Buffer).
+func resetRequestBody(req *http.Request) error {
+	if req.Body == nil || req.Body == http.NoBody {
+		return nil // GET or bodyless request — nothing to reset
+	}
+	if req.GetBody == nil {
+		return errors.New("request body is not re-readable (GetBody is nil)")
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return err
+	}
+	req.Body = body
+	return nil
+}
+
+// Compile-time interface compliance.
+var (
+	_ http.RoundTripper = (*RetryTransport)(nil)
+	_ http.RoundTripper = (*CircuitTransport)(nil)
+)
 
 // maxBackoffShift is the maximum bit shift for exponential backoff to prevent integer overflow.
 const maxBackoffShift = 62

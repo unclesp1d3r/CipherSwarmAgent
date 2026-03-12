@@ -8,6 +8,8 @@ import (
 
 // CircuitTransport wraps an http.RoundTripper with circuit breaker logic.
 // When the circuit is open, requests are rejected immediately with ErrCircuitOpen.
+// Successful responses (non-5xx) reset the failure count; server errors (5xx) and
+// network errors increment it toward the circuit-open threshold.
 type CircuitTransport struct {
 	Base    http.RoundTripper
 	Breaker *CircuitBreaker
@@ -27,11 +29,19 @@ func (ct *CircuitTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	resp, err := ct.Base.RoundTrip(req)
 	if err != nil {
 		ct.Breaker.RecordFailure()
+		if ct.Logger != nil {
+			ct.Logger.Debug("Circuit breaker recorded failure",
+				"reason", "network_error", "error", err)
+		}
 		return nil, err
 	}
 
 	if resp.StatusCode >= http.StatusInternalServerError {
 		ct.Breaker.RecordFailure()
+		if ct.Logger != nil {
+			ct.Logger.Debug("Circuit breaker recorded failure",
+				"reason", "server_error", "status", resp.StatusCode)
+		}
 	} else {
 		ct.Breaker.RecordSuccess()
 	}

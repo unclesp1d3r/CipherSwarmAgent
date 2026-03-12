@@ -84,6 +84,25 @@ func TestCircuitBreaker_SuccessResetsFailureCount(t *testing.T) {
 	require.True(t, cb.Allow()) // only 2 consecutive failures since last success
 }
 
+func TestCircuitBreaker_ZeroThresholdClampedToOne(t *testing.T) {
+	cb := NewCircuitBreaker(0, 100*time.Millisecond)
+
+	// With threshold clamped to 1, circuit should still be closed after construction
+	require.True(t, cb.Allow())
+
+	// One failure should open the circuit (threshold is 1, not 0)
+	cb.RecordFailure()
+	require.False(t, cb.Allow())
+}
+
+func TestCircuitBreaker_NegativeThresholdClampedToOne(t *testing.T) {
+	cb := NewCircuitBreaker(-5, 100*time.Millisecond)
+	require.True(t, cb.Allow())
+
+	cb.RecordFailure()
+	require.False(t, cb.Allow())
+}
+
 func TestCircuitBreaker_ErrCircuitOpen(t *testing.T) {
 	err := fmt.Errorf("wrapped: %w", ErrCircuitOpen)
 	require.ErrorIs(t, err, ErrCircuitOpen)
