@@ -71,7 +71,8 @@ func SendAgentError(
 	severity api.Severity,
 	opts ...ErrorOption,
 ) {
-	if agentstate.State.APIClient == nil {
+	apiClient := agentstate.State.GetAPIClient()
+	if apiClient == nil {
 		agentstate.ErrorLogger.Error("Cannot send error to server: API client not initialized",
 			"message", stdErrLine, "severity", severity)
 
@@ -109,7 +110,7 @@ func SendAgentError(
 		},
 	}
 
-	if _, err := agentstate.State.APIClient.Agents().SubmitErrorAgent(
+	if _, err := apiClient.Agents().SubmitErrorAgent(
 		ctx,
 		agentstate.State.AgentID,
 		agentError,
@@ -134,10 +135,8 @@ func handleSendError(ctx context.Context, err error) {
 // errors that must be delivered even during shutdown.
 func LogAndSendError(ctx context.Context, message string, err error, severity api.Severity, task *api.Task) error {
 	agentstate.ErrorLogger.Error(message, "error", err)
-
-	if agentstate.State.APIClient != nil {
-		SendAgentError(ctx, message, task, severity)
-	}
+	// SendAgentError handles nil APIClient internally — no need to guard here.
+	SendAgentError(ctx, message, task, severity)
 
 	return err
 }

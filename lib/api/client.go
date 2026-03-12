@@ -25,7 +25,6 @@ var (
 type TransportConfig struct {
 	ConnectTimeout time.Duration // TCP dial timeout
 	ReadTimeout    time.Duration // TLS handshake + response header timeout
-	WriteTimeout   time.Duration // Reserved for future write-specific timeouts
 	RequestTimeout time.Duration // Overall per-request timeout on http.Client
 
 	MaxRetries        int           // Total attempts (1 = no retry)
@@ -40,6 +39,11 @@ type TransportConfig struct {
 	// BaseTransport overrides the default http.Transport when set.
 	// Used by tests to inject httpmock's transport into the chain.
 	BaseTransport http.RoundTripper
+
+	// CircuitBreaker reuses an existing circuit breaker when set.
+	// This preserves failure history across client rebuilds (e.g., after server config reload).
+	// When nil, a new circuit breaker is created.
+	CircuitBreaker *CircuitBreaker
 }
 
 // AgentClient wraps the generated ClientWithResponses and implements the APIClient interface.
@@ -63,10 +67,13 @@ func NewAgentClient(serverURL, token string, cfg TransportConfig) (*AgentClient,
 		}
 	}
 
-	circuitBreaker := NewCircuitBreaker(
-		cfg.CircuitBreakerFailureThreshold,
-		cfg.CircuitBreakerTimeout,
-	)
+	circuitBreaker := cfg.CircuitBreaker
+	if circuitBreaker == nil {
+		circuitBreaker = NewCircuitBreaker(
+			cfg.CircuitBreakerFailureThreshold,
+			cfg.CircuitBreakerTimeout,
+		)
+	}
 
 	circuitTransport := &CircuitTransport{
 		Base:    base,

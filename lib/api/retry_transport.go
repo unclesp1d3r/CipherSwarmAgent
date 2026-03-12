@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -41,6 +42,10 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		resp, err := t.Base.RoundTrip(req)
 		if err != nil {
+			// Circuit breaker open — retrying is pointless, fail immediately
+			if errors.Is(err, ErrCircuitOpen) {
+				return nil, err
+			}
 			lastErr = err
 			if t.Logger != nil {
 				t.Logger.Debug("API request failed, will retry",
@@ -75,9 +80,20 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return lastResp, nil
 }
 
+// maxBackoffShift is the maximum bit shift for exponential backoff to prevent integer overflow.
+const maxBackoffShift = 62
+
 // backoffDelay computes exponential backoff: initialDelay * 2^(attempt-1), capped at maxDelay.
+// Guards against integer overflow from both large shift values and large InitialDelay.
 func (t *RetryTransport) backoffDelay(attempt int) time.Duration {
-	delay := t.InitialDelay * time.Duration(1<<(attempt-1))
+	shift := min(attempt-1, maxBackoffShift)
+	multiplier := int64(1) << shift
+	// Guard against multiplication overflow: if the multiplier alone would
+	// exceed MaxDelay/InitialDelay, skip the multiplication entirely.
+	if t.InitialDelay > 0 && multiplier > int64(t.MaxDelay/t.InitialDelay) {
+		return t.MaxDelay
+	}
+	delay := t.InitialDelay * time.Duration(multiplier)
 	return min(delay, t.MaxDelay)
 }
 
