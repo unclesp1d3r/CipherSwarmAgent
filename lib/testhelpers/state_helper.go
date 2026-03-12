@@ -2,8 +2,10 @@
 package testhelpers
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -44,8 +46,22 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	agentstate.State.BenchmarkCachePath = filepath.Join(testDataDir, "benchmark_cache.json")
 	agentstate.State.Debug = false
 	agentstate.State.ExtraDebugging = false
-	// Initialize API client using generated client wrapper
-	apiClient, err := api.NewAgentClient(apiURL, apiToken)
+	// Initialize API client with httpmock-compatible transport.
+	// httpmock.Activate() must be called BEFORE this to install the mock transport.
+	// We pass http.DefaultTransport (which httpmock replaces) as BaseTransport so
+	// the retry/circuit-breaker chain wraps the mock instead of a real http.Transport.
+	apiClient, err := api.NewAgentClient(apiURL, apiToken, api.TransportConfig{
+		ConnectTimeout:                 10 * time.Second,
+		ReadTimeout:                    30 * time.Second,
+		WriteTimeout:                   10 * time.Second,
+		RequestTimeout:                 60 * time.Second,
+		MaxRetries:                     1,
+		RetryInitialDelay:              1 * time.Second,
+		RetryMaxDelay:                  30 * time.Second,
+		CircuitBreakerFailureThreshold: 100,
+		CircuitBreakerTimeout:          30 * time.Second,
+		BaseTransport:                  http.DefaultTransport,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -100,6 +116,15 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.AlwaysUseNativeHashcat = false
 		agentstate.State.Platform = ""
 		agentstate.State.AgentVersion = ""
+		agentstate.State.ConnectTimeout = 0
+		agentstate.State.ReadTimeout = 0
+		agentstate.State.WriteTimeout = 0
+		agentstate.State.RequestTimeout = 0
+		agentstate.State.APIMaxRetries = 0
+		agentstate.State.APIRetryInitialDelay = 0
+		agentstate.State.APIRetryMaxDelay = 0
+		agentstate.State.CircuitBreakerFailureThreshold = 0
+		agentstate.State.CircuitBreakerTimeout = 0
 		// Reset synchronized fields via setters
 		agentstate.State.SetReload(false)
 		agentstate.State.SetCurrentActivity("")
@@ -147,6 +172,15 @@ func ResetTestState() {
 	agentstate.State.AlwaysUseNativeHashcat = false
 	agentstate.State.Platform = ""
 	agentstate.State.AgentVersion = ""
+	agentstate.State.ConnectTimeout = 0
+	agentstate.State.ReadTimeout = 0
+	agentstate.State.WriteTimeout = 0
+	agentstate.State.RequestTimeout = 0
+	agentstate.State.APIMaxRetries = 0
+	agentstate.State.APIRetryInitialDelay = 0
+	agentstate.State.APIRetryMaxDelay = 0
+	agentstate.State.CircuitBreakerFailureThreshold = 0
+	agentstate.State.CircuitBreakerTimeout = 0
 	// Reset synchronized fields via setters
 	agentstate.State.SetReload(false)
 	agentstate.State.SetCurrentActivity("")

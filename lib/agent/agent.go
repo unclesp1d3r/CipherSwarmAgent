@@ -53,8 +53,12 @@ func StartAgent() {
 	config.SetupSharedState()
 	initLogger()
 
-	// Initialize API client
-	apiClient, err := api.NewAgentClient(agentstate.State.URL, agentstate.State.APIToken)
+	// Initialize API client with transport chain (timeouts, retry, circuit breaker)
+	apiClient, err := api.NewAgentClient(
+		agentstate.State.URL,
+		agentstate.State.APIToken,
+		transportConfigFromState(),
+	)
 	if err != nil {
 		agentstate.Logger.Fatal("Failed to initialize API client", "error", err)
 	}

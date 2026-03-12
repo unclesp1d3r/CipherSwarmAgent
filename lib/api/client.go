@@ -5,8 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
+	"net"
 	"net/http"
+	"time"
 )
 
 // Compile-time interface compliance checks.
@@ -18,14 +21,72 @@ var (
 	_ AuthClient    = (*agentAuthClient)(nil)
 )
 
+// TransportConfig holds all configuration for the HTTP transport chain.
+type TransportConfig struct {
+	ConnectTimeout time.Duration // TCP dial timeout
+	ReadTimeout    time.Duration // TLS handshake + response header timeout
+	WriteTimeout   time.Duration // Reserved for future write-specific timeouts
+	RequestTimeout time.Duration // Overall per-request timeout on http.Client
+
+	MaxRetries        int           // Total attempts (1 = no retry)
+	RetryInitialDelay time.Duration // First retry backoff delay
+	RetryMaxDelay     time.Duration // Cap for exponential backoff
+
+	CircuitBreakerFailureThreshold int           // Consecutive failures before opening
+	CircuitBreakerTimeout          time.Duration // Duration before half-open probe
+
+	Logger *slog.Logger // Optional; nil disables transport logging
+
+	// BaseTransport overrides the default http.Transport when set.
+	// Used by tests to inject httpmock's transport into the chain.
+	BaseTransport http.RoundTripper
+}
+
 // AgentClient wraps the generated ClientWithResponses and implements the APIClient interface.
 type AgentClient struct {
 	client *ClientWithResponses
 }
 
-// NewAgentClient creates a new AgentClient from a server URL and bearer token.
-func NewAgentClient(serverURL, token string) (*AgentClient, error) {
-	httpClient := &http.Client{}
+// NewAgentClient creates a new AgentClient with a full transport chain:
+// http.Transport (timeouts) -> CircuitTransport -> RetryTransport -> http.Client.
+func NewAgentClient(serverURL, token string, cfg TransportConfig) (*AgentClient, error) {
+	var base http.RoundTripper
+	if cfg.BaseTransport != nil {
+		base = cfg.BaseTransport
+	} else {
+		base = &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: cfg.ConnectTimeout,
+			}).DialContext,
+			TLSHandshakeTimeout:   cfg.ReadTimeout,
+			ResponseHeaderTimeout: cfg.ReadTimeout,
+		}
+	}
+
+	circuitBreaker := NewCircuitBreaker(
+		cfg.CircuitBreakerFailureThreshold,
+		cfg.CircuitBreakerTimeout,
+	)
+
+	circuitTransport := &CircuitTransport{
+		Base:    base,
+		Breaker: circuitBreaker,
+		Logger:  cfg.Logger,
+	}
+
+	retryTransport := &RetryTransport{
+		Base:         circuitTransport,
+		MaxAttempts:  cfg.MaxRetries,
+		InitialDelay: cfg.RetryInitialDelay,
+		MaxDelay:     cfg.RetryMaxDelay,
+		Logger:       cfg.Logger,
+	}
+
+	httpClient := &http.Client{
+		Transport: retryTransport,
+		Timeout:   cfg.RequestTimeout,
+	}
+
 	authEditor := WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "Bearer "+token)
 		return nil
