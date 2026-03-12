@@ -37,7 +37,8 @@ const (
 	DefaultConnectTimeout = 10 * time.Second
 	// DefaultReadTimeout is the read timeout for API responses.
 	DefaultReadTimeout = 30 * time.Second
-	// DefaultWriteTimeout is the write timeout for API requests.
+	// DefaultWriteTimeout is accepted from server config but not used in the transport chain
+	// (Go's http.Transport has no write timeout — it's a server-side concept).
 	DefaultWriteTimeout = 10 * time.Second
 	// DefaultRequestTimeout is the overall request timeout for API calls.
 	DefaultRequestTimeout = 60 * time.Second
@@ -52,6 +53,42 @@ const (
 	// DefaultCircuitBreakerTimeout is the duration before a tripped circuit half-opens.
 	DefaultCircuitBreakerTimeout = 30 * time.Second
 )
+
+// MaxReasonableTimeout caps server-recommended timeout values to prevent a
+// misconfigured server from setting absurdly large timeouts (e.g., 24 hours).
+const MaxReasonableTimeout = 5 * time.Minute
+
+// MaxReasonableRetries caps server-recommended retry count to prevent excessive
+// retry storms from a misconfigured server.
+const MaxReasonableRetries = 10
+
+// ClampDuration returns value if it is within (0, ceiling], otherwise returns the default.
+// Logs a warning when clamping is applied.
+func ClampDuration(name string, value, ceiling, defaultVal time.Duration) time.Duration {
+	if value <= 0 {
+		return defaultVal
+	}
+	if value > ceiling {
+		agentstate.Logger.Warn("Server-recommended value exceeds maximum, clamping",
+			"field", name, "value", value, "max", ceiling)
+		return ceiling
+	}
+	return value
+}
+
+// ClampInt returns value if it is within [minVal, maxVal], otherwise returns the default.
+// Logs a warning when clamping is applied.
+func ClampInt(name string, value, minVal, maxVal, defaultVal int) int {
+	if value < minVal {
+		return defaultVal
+	}
+	if value > maxVal {
+		agentstate.Logger.Warn("Server-recommended value exceeds maximum, clamping",
+			"field", name, "value", value, "max", maxVal)
+		return maxVal
+	}
+	return value
+}
 
 var scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // Configuration scope
 
