@@ -607,6 +607,9 @@ type ClientInterface interface {
 	// GetConfiguration request
 	GetConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetHealth request
+	GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetNewTask request
 	GetNewTask(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -794,6 +797,18 @@ func (c *Client) Authenticate(ctx context.Context, reqEditors ...RequestEditorFn
 
 func (c *Client) GetConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetConfigurationRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetHealthRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1302,6 +1317,33 @@ func NewGetConfigurationRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetHealthRequest generates requests for GetHealth
+func NewGetHealthRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/client/health")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetNewTaskRequest generates requests for GetNewTask
 func NewGetNewTaskRequest(server string) (*http.Request, error) {
 	var err error
@@ -1674,6 +1716,9 @@ type ClientWithResponsesInterface interface {
 	// GetConfigurationWithResponse request
 	GetConfigurationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetConfigurationResponse, error)
 
+	// GetHealthWithResponse request
+	GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error)
+
 	// GetNewTaskWithResponse request
 	GetNewTaskWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetNewTaskResponse, error)
 
@@ -1982,6 +2027,40 @@ func (r GetConfigurationResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetHealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// ApiVersion API version
+		ApiVersion int `json:"api_version"`
+
+		// Database Database health (healthy or unhealthy)
+		Database string `json:"database"`
+
+		// Status Overall health status (ok or degraded)
+		Status string `json:"status"`
+
+		// Timestamp Server timestamp
+		Timestamp time.Time `json:"timestamp"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetHealthResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2298,6 +2377,15 @@ func (c *ClientWithResponses) GetConfigurationWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseGetConfigurationResponse(rsp)
+}
+
+// GetHealthWithResponse request returning *GetHealthResponse
+func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error) {
+	rsp, err := c.GetHealth(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetHealthResponse(rsp)
 }
 
 // GetNewTaskWithResponse request returning *GetNewTaskResponse
@@ -2751,6 +2839,44 @@ func ParseGetConfigurationResponse(rsp *http.Response) (*GetConfigurationRespons
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetHealthResponse parses an HTTP response from a GetHealthWithResponse call
+func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// ApiVersion API version
+			ApiVersion int `json:"api_version"`
+
+			// Database Database health (healthy or unhealthy)
+			Database string `json:"database"`
+
+			// Status Overall health status (ok or degraded)
+			Status string `json:"status"`
+
+			// Timestamp Server timestamp
+			Timestamp time.Time `json:"timestamp"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	}
 
