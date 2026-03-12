@@ -5,8 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
+	"net"
 	"net/http"
+	"runtime"
+	"time"
 )
 
 // Compile-time interface compliance checks.
@@ -18,14 +22,73 @@ var (
 	_ AuthClient    = (*agentAuthClient)(nil)
 )
 
+// TransportConfig holds all configuration for the HTTP transport chain.
+type TransportConfig struct {
+	ConnectTimeout time.Duration // TCP dial timeout
+	ReadTimeout    time.Duration // TLS handshake + response header timeout
+	RequestTimeout time.Duration // Overall per-request timeout on http.Client
+
+	MaxAttempts       int           // Total attempts (1 = no retry)
+	RetryInitialDelay time.Duration // First retry backoff delay
+	RetryMaxDelay     time.Duration // Cap for exponential backoff
+
+	CircuitBreakerFailureThreshold int           // Consecutive failures before opening
+	CircuitBreakerTimeout          time.Duration // Duration before half-open probe
+
+	Logger *slog.Logger // Optional; nil disables transport logging
+
+	// BaseTransport overrides the default http.Transport when set.
+	// Used by tests to inject httpmock's transport into the chain.
+	BaseTransport http.RoundTripper
+
+	// CircuitBreaker reuses an existing circuit breaker when set.
+	// This preserves failure history across client rebuilds (e.g., after server config reload).
+	// When nil, a new circuit breaker is created.
+	CircuitBreaker *CircuitBreaker
+}
+
 // AgentClient wraps the generated ClientWithResponses and implements the APIClient interface.
 type AgentClient struct {
 	client *ClientWithResponses
 }
 
-// NewAgentClient creates a new AgentClient from a server URL and bearer token.
-func NewAgentClient(serverURL, token string) (*AgentClient, error) {
-	httpClient := &http.Client{}
+// NewAgentClient creates a new AgentClient with a layered transport chain.
+// Layers (inner to outer): http.Transport -> CircuitTransport -> RetryTransport -> http.Client.
+func NewAgentClient(serverURL, token string, cfg TransportConfig) (*AgentClient, error) {
+	var base http.RoundTripper
+	if cfg.BaseTransport != nil {
+		base = cfg.BaseTransport
+	} else {
+		base = defaultTransport(cfg)
+	}
+
+	circuitBreaker := cfg.CircuitBreaker
+	if circuitBreaker == nil {
+		circuitBreaker = NewCircuitBreaker(
+			cfg.CircuitBreakerFailureThreshold,
+			cfg.CircuitBreakerTimeout,
+		)
+	}
+
+	circuitTransport := &CircuitTransport{
+		Base:    base,
+		Breaker: circuitBreaker,
+		Logger:  cfg.Logger,
+	}
+
+	retryTransport := &RetryTransport{
+		Base:         circuitTransport,
+		MaxAttempts:  cfg.MaxAttempts,
+		InitialDelay: cfg.RetryInitialDelay,
+		MaxDelay:     cfg.RetryMaxDelay,
+		Logger:       cfg.Logger,
+	}
+
+	httpClient := &http.Client{
+		Transport: retryTransport,
+		Timeout:   cfg.RequestTimeout,
+	}
+
 	authEditor := WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "Bearer "+token)
 		return nil
@@ -341,6 +404,34 @@ func (a *agentAuthClient) GetConfiguration(ctx context.Context) (*GetConfigurati
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
+
+// Transport defaults matching http.DefaultTransport.
+const (
+	defaultKeepAlive           = 30 * time.Second
+	defaultMaxIdleConns        = 100
+	defaultIdleConnTimeout     = 90 * time.Second
+	defaultExpectContinueTimer = 1 * time.Second
+)
+
+// defaultTransport creates an http.Transport that preserves http.DefaultTransport
+// defaults (ProxyFromEnvironment, HTTP/2, keep-alive, connection pooling) while
+// overriding dial/TLS/response-header timeouts from the TransportConfig.
+func defaultTransport(cfg TransportConfig) *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   cfg.ConnectTimeout,
+			KeepAlive: defaultKeepAlive,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          defaultMaxIdleConns,
+		MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
+		IdleConnTimeout:       defaultIdleConnTimeout,
+		TLSHandshakeTimeout:   cfg.ReadTimeout,
+		ResponseHeaderTimeout: cfg.ReadTimeout,
+		ExpectContinueTimeout: defaultExpectContinueTimer,
+	}
+}
 
 // newAPIError creates an APIError from HTTP response details.
 func newAPIError(statusCode int, status string, body []byte) *APIError {

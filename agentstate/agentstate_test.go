@@ -2,8 +2,10 @@ package agentstate
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestState_DefaultValues(t *testing.T) {
@@ -132,6 +134,21 @@ func TestLogger_NotNil(t *testing.T) {
 
 func TestErrorLogger_NotNil(t *testing.T) {
 	assert.NotNil(t, ErrorLogger)
+}
+
+func TestAgentState_TimeoutFields(t *testing.T) {
+	var s agentState
+
+	// Verify fields exist and are zero-valued by default
+	require.Equal(t, time.Duration(0), s.ConnectTimeout)
+	require.Equal(t, time.Duration(0), s.ReadTimeout)
+	require.Equal(t, time.Duration(0), s.WriteTimeout)
+	require.Equal(t, time.Duration(0), s.RequestTimeout)
+	require.Equal(t, 0, s.APIMaxRetries)
+	require.Equal(t, time.Duration(0), s.APIRetryInitialDelay)
+	require.Equal(t, time.Duration(0), s.APIRetryMaxDelay)
+	require.Equal(t, 0, s.CircuitBreakerFailureThreshold)
+	require.Equal(t, time.Duration(0), s.CircuitBreakerTimeout)
 }
 
 func TestState_BooleanFlags(t *testing.T) {

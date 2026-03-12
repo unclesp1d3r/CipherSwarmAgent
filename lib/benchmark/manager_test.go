@@ -219,7 +219,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 
 			tt.setupMock(789)
 
-			mgr := NewManager(agentstate.State.APIClient.Agents())
+			mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 			err := mgr.sendBenchmarkResults(context.Background(), tt.results)
 
 			if tt.expectedError {
@@ -246,7 +246,7 @@ func TestSendBenchmarkResults_AllInvalid(t *testing.T) {
 		{HashType: "0", RuntimeMs: "100", SpeedHs: "bad", Device: "1"},
 	}
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	err := mgr.sendBenchmarkResults(context.Background(), allInvalid)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
@@ -314,9 +314,9 @@ func TestHandleBenchmarkStdOutLine(t *testing.T) {
 func TestHandleBenchmarkStdOutLine_MultipleLines(t *testing.T) {
 	var results []display.BenchmarkResult
 
-	handleBenchmarkStdOutLine("1:0:md5:100:50:12345.67", &results)
-	handleBenchmarkStdOutLine("2:100:sha1:200:100:54321.09", &results)
-	handleBenchmarkStdOutLine("invalid:line", &results) // skipped
+	handleBenchmarkStdOutLine("1:0:md5:100:50:12345.67", &results)     // DevSkim: ignore DS126858
+	handleBenchmarkStdOutLine("2:100:sha1:200:100:54321.09", &results) // DevSkim: ignore DS126858
+	handleBenchmarkStdOutLine("invalid:line", &results)                // skipped
 
 	assert.Len(t, results, 2)
 	assert.Equal(t, "1", results[0].Device)
@@ -405,7 +405,7 @@ func TestUpdateBenchmarks_CachedSubmissionSuccess(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	err = mgr.UpdateBenchmarks(context.Background())
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
@@ -428,7 +428,7 @@ func TestUpdateBenchmarks_CachedSubmissionFailure(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusInternalServerError, "Server Error"))
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	err = mgr.UpdateBenchmarks(context.Background())
 	require.NoError(t, err, "cached submission failure should be non-fatal")
 	assert.False(t, agentstate.State.GetBenchmarksSubmitted())
@@ -457,7 +457,7 @@ func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 	require.NoError(t, err)
 
 	// No API mock needed — should not make any calls
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	err = mgr.UpdateBenchmarks(context.Background())
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
@@ -489,7 +489,7 @@ func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	err = mgr.UpdateBenchmarks(context.Background())
 	require.NoError(t, err)
 	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
@@ -640,7 +640,7 @@ func TestProcessBenchmarkOutput_AllBatchesSucceed(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 15)
@@ -677,7 +677,7 @@ func TestProcessBenchmarkOutput_SingleBatch(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 5)
@@ -718,7 +718,7 @@ func TestProcessBenchmarkOutput_BatchFailsFinalSucceeds(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 15)
@@ -753,7 +753,7 @@ func TestProcessBenchmarkOutput_AllSendsFail(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 15)
@@ -783,7 +783,7 @@ func TestProcessBenchmarkOutput_EmptyResults(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Empty(t, results)
@@ -815,7 +815,7 @@ func TestProcessBenchmarkOutput_SessionError(t *testing.T) {
 		sess.DoneChan <- errors.New("hashcat process exited with code 1")
 	}()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	assert.Len(t, results, 5)
@@ -854,7 +854,7 @@ func TestProcessBenchmarkOutput_ContextCancelledWithResults(t *testing.T) {
 	// Lines will be captured either via the select case or via drainStdout.
 	cancel()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(ctx, sess)
 
 	// All 3 lines should be captured (via select case and/or drainStdout)
@@ -885,7 +885,7 @@ func TestProcessBenchmarkOutput_ContextCancelledNoResults(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately — no lines buffered
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(ctx, sess)
 
 	assert.Empty(t, results)
@@ -921,7 +921,7 @@ func TestProcessBenchmarkOutput_ContextCancelledCacheFails(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(ctx, sess)
 
 	// Results should still be collected in memory even though cache save failed
@@ -957,7 +957,7 @@ func TestProcessBenchmarkOutput_FinalizeCacheFails(t *testing.T) {
 		sess.DoneChan <- nil
 	}()
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	results := mgr.processBenchmarkOutput(context.Background(), sess)
 
 	// Results should be returned despite cache save failure
@@ -1021,7 +1021,7 @@ func TestSubmitBatchIfReady_ExactBoundary(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
-	mgr := NewManager(agentstate.State.APIClient.Agents())
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 
 	// Exactly benchmarkBatchSize results — should trigger batch
 	results := make([]display.BenchmarkResult, benchmarkBatchSize)

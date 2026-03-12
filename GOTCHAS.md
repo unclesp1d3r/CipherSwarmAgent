@@ -19,6 +19,9 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `gosec G204` does NOT fire on `exec.CommandContext` when the binary path comes from an internal function return — don't add `//nolint:gosec // G204` unless verified.
 - `gosec G304` does NOT fire on `os.Open` in test helper packages — don't add `//nolint:gosec // G304` unless verified with a clean lint run.
 
+- `durationcheck` flags `time.Duration * time.Duration` — use `int64` intermediate for multipliers (e.g., `time.Duration(int64(1) << shift)`).
+- `gocritic` `importShadow` fires when a parameter name matches an imported package name (e.g., `config` parameter shadowing `lib/config` import). Rename the parameter.
+
 ## golines & nolint Comments
 
 - `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint reasons short so total line stays under 120 chars.
@@ -35,6 +38,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - Use `exclude-schemas` in `lib/api/config.yaml` when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface).
 - oapi-codegen's `Parse*Response` methods read and close `HTTPResponse.Body` during parsing. Use the parsed `Body` byte slice (`resp.Body`), not `resp.HTTPResponse.Body` (already drained and closed).
 - When an API method returns HTTP 200, always guard `resp.JSON200 == nil` — oapi-codegen silently sets it to nil if JSON unmarshaling fails.
+- oapi-codegen emits anonymous structs for inline OpenAPI schemas — hand-written struct literals must exactly match JSON tags (including `omitempty`). Use constructor helpers in `lib/api/` (e.g., `NewErrorMetadata`) to co-locate coupling with the generated code. The root fix is extracting inline schemas to named `$ref` components in the server spec.
 
 ## Error Handling
 

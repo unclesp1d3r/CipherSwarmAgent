@@ -3,7 +3,7 @@ package downloader
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec // G501 - checksum verification
+	"crypto/md5" //nolint:gosec // G501 - checksum verification // DevSkim: ignore DS126858
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -70,7 +70,7 @@ func FileExistsAndValid(filePath, checksum string) bool {
 		return true
 	}
 
-	fileChecksum, err := fileMD5(filePath)
+	fileChecksum, err := fileMD5(filePath) // DevSkim: ignore DS126858
 	if err != nil {
 		agentstate.Logger.Error("Error calculating file checksum", "path", filePath, "error", err)
 
@@ -212,7 +212,7 @@ func appendChecksumToURL(rawURL, checksum string) (string, error) {
 	}
 
 	q := u.Query()
-	q.Set("checksum", "md5:"+checksum)
+	q.Set("checksum", "md5:"+checksum) // DevSkim: ignore DS126858
 	u.RawQuery = q.Encode()
 
 	return u.String(), nil
@@ -235,7 +235,7 @@ func DownloadHashList(ctx context.Context, attack *api.Attack) error {
 		return err
 	}
 
-	response, err := agentstate.State.APIClient.Attacks().GetHashList(ctx, attack.Id)
+	response, err := agentstate.State.GetAPIClient().Attacks().GetHashList(ctx, attack.Id)
 	if err != nil {
 		return fmt.Errorf("error downloading hashlist from the CipherSwarm API: %w", err)
 	}
@@ -309,7 +309,7 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 }
 
 // fileMD5 computes the MD5 hex digest of the file at the given path.
-func fileMD5(filePath string) (string, error) {
+func fileMD5(filePath string) (string, error) { // DevSkim: ignore DS126858
 	f, err := os.Open(filePath)
 	if err != nil {
 		return "", err
@@ -322,7 +322,7 @@ func fileMD5(filePath string) (string, error) {
 		}
 	}()
 
-	h := md5.New() //nolint:gosec // G401 - MD5 used for file integrity check, not security
+	h := md5.New() //nolint:gosec // G401 - MD5 used for file integrity check, not security // DevSkim: ignore DS126858
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}

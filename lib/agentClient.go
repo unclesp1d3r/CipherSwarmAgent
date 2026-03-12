@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	cserrors "github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 )
@@ -46,7 +48,7 @@ func AuthenticateAgent(ctx context.Context) error {
 	// Set agent version in shared state so cserrors.SendAgentError can include it in error reports.
 	agentstate.State.AgentVersion = AgentVersion
 
-	response, err := agentstate.State.APIClient.Auth().Authenticate(ctx)
+	response, err := agentstate.State.GetAPIClient().Auth().Authenticate(ctx)
 	if err != nil {
 		return handleAuthenticationError(ctx, err)
 	}
@@ -66,7 +68,7 @@ func AuthenticateAgent(ctx context.Context) error {
 // It updates the global Configuration variable with the fetched configuration.
 // If UseNativeHashcat is true in the configuration, it sets the native Hashcat path.
 func GetAgentConfiguration(ctx context.Context) error {
-	response, err := agentstate.State.APIClient.Auth().GetConfiguration(ctx)
+	response, err := agentstate.State.GetAPIClient().Auth().GetConfiguration(ctx)
 	if err != nil {
 		return handleConfigurationError(ctx, err)
 	}
@@ -77,11 +79,47 @@ func GetAgentConfiguration(ctx context.Context) error {
 		return ErrConfigurationFailed
 	}
 
+	// Extract server-recommended settings from the configuration response.
+	var recTimeouts *RecommendedTimeouts
+	rt := response.JSON200.RecommendedTimeouts
+	if rt.ConnectTimeout > 0 || rt.ReadTimeout > 0 || rt.WriteTimeout > 0 || rt.RequestTimeout > 0 {
+		recTimeouts = &RecommendedTimeouts{
+			ConnectTimeout: rt.ConnectTimeout,
+			ReadTimeout:    rt.ReadTimeout,
+			WriteTimeout:   rt.WriteTimeout,
+			RequestTimeout: rt.RequestTimeout,
+		}
+	}
+
+	var recRetry *RecommendedRetry
+	rr := response.JSON200.RecommendedRetry
+	if rr.MaxAttempts > 0 {
+		recRetry = &RecommendedRetry{
+			MaxAttempts:  rr.MaxAttempts,
+			InitialDelay: rr.InitialDelay,
+			MaxDelay:     rr.MaxDelay,
+		}
+	}
+
+	var recCB *RecommendedCircuitBreaker
+	rcb := response.JSON200.RecommendedCircuitBreaker
+	if rcb.FailureThreshold > 0 {
+		recCB = &RecommendedCircuitBreaker{
+			FailureThreshold: rcb.FailureThreshold,
+			Timeout:          rcb.Timeout,
+		}
+	}
+
 	agentConfig := mapConfiguration(
 		response.JSON200.ApiVersion,
 		response.JSON200.Config,
 		response.JSON200.BenchmarksNeeded,
+		recTimeouts,
+		recRetry,
+		recCB,
 	)
+
+	applyRecommendedSettings(agentConfig)
 
 	if agentConfig.Config.UseNativeHashcat {
 		if err := setNativeHashcatPathFn(ctx); err != nil {
@@ -98,19 +136,81 @@ func GetAgentConfiguration(ctx context.Context) error {
 }
 
 // mapConfiguration converts the API configuration response into an agentConfiguration for use within the agent.
-func mapConfiguration(apiVersion int, config api.AdvancedAgentConfiguration, benchmarksNeeded bool) agentConfiguration {
-	agentConfig := agentConfiguration{
+func mapConfiguration(
+	apiVersion int,
+	agentCfg api.AdvancedAgentConfiguration,
+	benchmarksNeeded bool,
+	timeouts *RecommendedTimeouts,
+	retry *RecommendedRetry,
+	circuitBreaker *RecommendedCircuitBreaker,
+) agentConfiguration {
+	return agentConfiguration{
 		APIVersion:       int64(apiVersion),
 		BenchmarksNeeded: benchmarksNeeded,
 		Config: agentConfig{
-			UseNativeHashcat:    UnwrapOr(config.UseNativeHashcat, false),
-			AgentUpdateInterval: int64(UnwrapOr(config.AgentUpdateInterval, defaultAgentUpdateInterval)),
-			BackendDevices:      UnwrapOr(config.BackendDevice, ""),
-			OpenCLDevices:       UnwrapOr(config.OpenclDevices, ""),
+			UseNativeHashcat:    UnwrapOr(agentCfg.UseNativeHashcat, false),
+			AgentUpdateInterval: int64(UnwrapOr(agentCfg.AgentUpdateInterval, defaultAgentUpdateInterval)),
+			BackendDevices:      UnwrapOr(agentCfg.BackendDevice, ""),
+			OpenCLDevices:       UnwrapOr(agentCfg.OpenclDevices, ""),
 		},
+		RecommendedTimeouts:       timeouts,
+		RecommendedRetry:          retry,
+		RecommendedCircuitBreaker: circuitBreaker,
+	}
+}
+
+// applyRecommendedSettings overrides agentstate timeout/retry/circuit-breaker
+// values with server-recommended settings when present. Server values are in
+// seconds and are converted to time.Duration.
+func applyRecommendedSettings(cfg agentConfiguration) {
+	if t := cfg.RecommendedTimeouts; t != nil {
+		maxTimeout := config.MaxReasonableTimeout
+		agentstate.State.ConnectTimeout = config.ClampDuration(
+			"connect_timeout", time.Duration(t.ConnectTimeout)*time.Second,
+			maxTimeout, agentstate.State.ConnectTimeout)
+		agentstate.State.ReadTimeout = config.ClampDuration(
+			"read_timeout", time.Duration(t.ReadTimeout)*time.Second,
+			maxTimeout, agentstate.State.ReadTimeout)
+		agentstate.State.WriteTimeout = config.ClampDuration(
+			"write_timeout", time.Duration(t.WriteTimeout)*time.Second,
+			maxTimeout, agentstate.State.WriteTimeout)
+		agentstate.State.RequestTimeout = config.ClampDuration(
+			"request_timeout", time.Duration(t.RequestTimeout)*time.Second,
+			maxTimeout, agentstate.State.RequestTimeout)
+		agentstate.Logger.Info("Applied server-recommended timeouts",
+			"connect", agentstate.State.ConnectTimeout,
+			"read", agentstate.State.ReadTimeout,
+			"write", agentstate.State.WriteTimeout,
+			"request", agentstate.State.RequestTimeout)
 	}
 
-	return agentConfig
+	if r := cfg.RecommendedRetry; r != nil {
+		agentstate.State.APIMaxRetries = config.ClampInt(
+			"max_attempts", r.MaxAttempts, 1, config.MaxReasonableRetries,
+			agentstate.State.APIMaxRetries)
+		agentstate.State.APIRetryInitialDelay = config.ClampDuration(
+			"initial_delay", time.Duration(r.InitialDelay)*time.Second,
+			config.MaxReasonableTimeout, agentstate.State.APIRetryInitialDelay)
+		agentstate.State.APIRetryMaxDelay = config.ClampDuration(
+			"max_delay", time.Duration(r.MaxDelay)*time.Second,
+			config.MaxReasonableTimeout, agentstate.State.APIRetryMaxDelay)
+		agentstate.Logger.Info("Applied server-recommended retry settings",
+			"max_attempts", agentstate.State.APIMaxRetries,
+			"initial_delay", agentstate.State.APIRetryInitialDelay,
+			"max_delay", agentstate.State.APIRetryMaxDelay)
+	}
+
+	if cb := cfg.RecommendedCircuitBreaker; cb != nil {
+		agentstate.State.CircuitBreakerFailureThreshold = config.ClampInt(
+			"failure_threshold", cb.FailureThreshold, 1, config.MaxReasonableRetries,
+			agentstate.State.CircuitBreakerFailureThreshold)
+		agentstate.State.CircuitBreakerTimeout = config.ClampDuration(
+			"circuit_breaker_timeout", time.Duration(cb.Timeout)*time.Second,
+			config.MaxReasonableTimeout, agentstate.State.CircuitBreakerTimeout)
+		agentstate.Logger.Info("Applied server-recommended circuit breaker settings",
+			"failure_threshold", agentstate.State.CircuitBreakerFailureThreshold,
+			"timeout", agentstate.State.CircuitBreakerTimeout)
+	}
 }
 
 // UnwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
@@ -157,7 +257,7 @@ func UpdateAgentMetadata(ctx context.Context) error {
 		"api_url", agentstate.State.URL,
 		"has_token", agentstate.State.APIToken != "")
 
-	response, err := agentstate.State.APIClient.Agents().UpdateAgent(
+	response, err := agentstate.State.GetAPIClient().Agents().UpdateAgent(
 		ctx,
 		agentstate.State.AgentID,
 		agentUpdate,
@@ -195,7 +295,7 @@ func getDevicesList(ctx context.Context) ([]string, error) {
 // It returns the agent's state object (or nil for no state change) and an error if the heartbeat failed.
 func SendHeartBeat(ctx context.Context) (*api.SendHeartbeat200State, error) {
 	activity := string(agentstate.State.GetCurrentActivity())
-	resp, err := agentstate.State.APIClient.Agents().SendHeartbeat(ctx, agentstate.State.AgentID, activity)
+	resp, err := agentstate.State.GetAPIClient().Agents().SendHeartbeat(ctx, agentstate.State.AgentID, activity)
 	if err != nil {
 		handleHeartbeatError(ctx, err)
 
@@ -267,7 +367,7 @@ func handleStateResponse(stateResponse *struct {
 // SendAgentShutdown notifies the server of the agent shutdown and handles any errors during the API call.
 // Callers control context: pass context.Background() for shutdown notifications that must complete.
 func SendAgentShutdown(ctx context.Context) {
-	_, err := agentstate.State.APIClient.Agents().SetAgentShutdown(ctx, agentstate.State.AgentID)
+	_, err := agentstate.State.GetAPIClient().Agents().SetAgentShutdown(ctx, agentstate.State.AgentID)
 	if err != nil {
 		handleAPIError(ctx, "Error notifying server of agent shutdown", err)
 	}

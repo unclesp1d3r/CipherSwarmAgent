@@ -36,21 +36,21 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - `cmd/`: Main application entry points using the Cobra framework.
 - `lib/`: Core agent logic, decomposed into focused sub-packages:
-  - `agent/`: Agent lifecycle — startup, heartbeat loop, task polling, shutdown.
-  - `api/`: API client layer — generated client (`client.gen.go`), wrapper (`client.go`), errors (`errors.go`), interfaces (`interfaces.go`), mocks (`mock.go`).
-  - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
-  - `arch/`: OS-specific abstractions (Linux, macOS, Windows). Platform identity comes from `host.InfoStat.OS` (in `UpdateAgentMetadata`), not from `arch` — don't add `GetPlatform()` functions here.
-  - `benchmark/`: Benchmark execution, caching, and submission.
-  - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
-  - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
-  - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
-  - `display/`: User-facing output (status, progress, benchmark results).
-  - `downloader/`: File download with checksum verification.
-  - `hashcat/`: Hashcat session management, parameters, and output parsing.
-  - `progress/`: Progress calculation utilities.
-  - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
-  - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
-  - `zap/`: Zap file monitoring for cracked hashes.
+    - `agent/`: Agent lifecycle — startup, heartbeat loop, task polling, shutdown.
+    - `api/`: API client layer — generated client (`client.gen.go`), wrapper (`client.go`), errors (`errors.go`), interfaces (`interfaces.go`), mocks (`mock.go`). Transport chain: `http.Transport` → `CircuitTransport` → `RetryTransport` → `http.Client`.
+    - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
+    - `arch/`: OS-specific abstractions (Linux, macOS, Windows). Platform identity comes from `host.InfoStat.OS` (in `UpdateAgentMetadata`), not from `arch` — don't add `GetPlatform()` functions here.
+    - `benchmark/`: Benchmark execution, caching, and submission.
+    - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
+    - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
+    - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
+    - `display/`: User-facing output (status, progress, benchmark results).
+    - `downloader/`: File download with checksum verification.
+    - `hashcat/`: Hashcat session management, parameters, and output parsing.
+    - `progress/`: Progress calculation utilities.
+    - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
+    - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
+    - `zap/`: Zap file monitoring for cracked hashes.
 - `agentstate/`: Global agent state, loggers, and synchronized fields.
 - `docs/`: Project documentation, including the OpenAPI specification.
 
@@ -81,12 +81,13 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - Use goroutines and channels for async operations. Prefer channel-based communication over mutexes.
 - Use `context.Context` for cancellation and deadlines in all long-running or networked operations.
-- **Synchronized state:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` or `sync.RWMutex`. Always use getter/setter methods — never access directly.
+- **Synchronized state:** Cross-goroutine fields in `agentstate.State` use `atomic.Bool` or `sync.RWMutex`. Always use getter/setter methods — never access directly. `APIClient` uses `GetAPIClient()`/`SetAPIClient()` with `sync.RWMutex`.
 - **Context propagation:** `StartAgent()` creates a cancellable context threaded through all goroutines. Use `ctx` for stoppable operations; `context.Background()` for must-complete operations (e.g., `AbandonTask`), with `//nolint:contextcheck // must-complete: reason`.
 - **Data-loss logging:** When a channel send is skipped due to `ctx.Done()`, always log the dropped value at Warn level (e.g., dropped cracked hashes, process exit status). Silent data loss during shutdown hides bugs.
 - **Partial result preservation:** Long-running sessions (benchmarks, tasks) should cache partial results to disk on context cancellation for retry on next agent startup. Use atomic writes (write to temp file, then `os.Rename`) for crash safety.
 - **Context-aware sleep:** Use `sleepWithContext(ctx, duration)` (in `lib/agent/agent.go`) instead of `time.Sleep`.
 - **Context-aware retry:** Retry loops with backoff must use `time.NewTimer` + `Stop()` in a `select` with `ctx.Done()` (not `time.After` or `time.Sleep`). `time.After` leaks timers on cancellation. See `downloadWithRetry` in `lib/downloader/downloader.go`.
+- **Shared transport state:** The circuit breaker instance (`lib/agent/transport_config.go`) survives API client rebuilds via a package-level var passed through `TransportConfig.CircuitBreaker`. When adding similar shared transport state, follow this pattern.
 - Run tests with `-race` flag to detect data races.
 
 ### Performance
@@ -103,6 +104,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `spf13/viper` for config. Treat `viper.WriteConfig()` failures as non-fatal warnings.
 - **Config access:** Read from `agentstate.State` (wired in `SetupSharedState()`), not `viper.Get*()` directly.
 - Validate numeric/duration config fields in `SetupSharedState()` — clamp invalid values to defaults with a warning.
+- **Server-recommended config validation:** `applyRecommendedSettings` in `lib/agentClient.go` uses `config.ClampDuration`/`config.ClampInt` to cap server values. Never trust server-recommended values without clamping — treat them as external input.
 
 ### Tooling
 
@@ -131,7 +133,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `lib/testhelpers/` for fixtures (`SetupHTTPMock`, `SetupTestState`), `error_helpers.go` for test errors.
 - Use `any` (not `interface{}`), `require.Error/NoError` (not `assert`), `t.Cleanup` (not `defer`), `atomic.Int32` for mock counters.
 - MockClient sub-client accessors return default mocks (not nil) to prevent nil pointer panics.
-- When removing `agentstate.State` fields, grep all test helpers and reset functions.
+- When adding or removing `agentstate.State` fields, grep all test helpers and reset functions — including `saveAndRestoreState` in `agent_test.go`, `ResetTestState`, `SetupTestState`, and `SetupMinimalTestState` in `testhelpers/state_helper.go`.
 - For cross-platform subprocess tests, use the Go test helper process pattern (`TestHelperProcess` + `os.Args[0]` + env vars) instead of OS-specific binaries like `sleep` or `true`.
 - Use `hashcat.NewTestSession(skipStatusUpdates)` (in `lib/hashcat/session_test_helpers.go`) to create mock sessions — never construct `hashcat.Session` struct literals directly from `testhelpers`, as it bypasses constructor invariants.
 - Status fixture slices (`RecoveredHashes`, `RecoveredSalts`, `Progress`) must have ≥2 elements (`display.MinStatusFields`). Single-element slices cause silent drops in `handleStatusUpdate` and `display.JobStatus`.
@@ -159,3 +161,7 @@ Conventional Commits: `<type>(<scope>): <description>`. Types: `feat`, `fix`, `d
 ## Documentation
 
 - **MkDocs:** Markdown in `docs/`, built with `mkdocs` (Material theme). API docs use OpenAPI v3 spec from the CipherSwarm server repo.
+
+# Agent Rules <!-- tessl-managed -->
+
+@.tessl/RULES.md follow the [instructions](.tessl/RULES.md)

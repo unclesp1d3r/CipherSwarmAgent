@@ -166,6 +166,23 @@ func TestSetDefaultConfigValues(t *testing.T) {
 	})
 }
 
+func TestDefaultConstants_Exist(t *testing.T) {
+	// Verify new timeout defaults exist and have sensible values
+	require.Equal(t, 10*time.Second, DefaultConnectTimeout)
+	require.Equal(t, 30*time.Second, DefaultReadTimeout)
+	require.Equal(t, 10*time.Second, DefaultWriteTimeout)
+	require.Equal(t, 60*time.Second, DefaultRequestTimeout)
+
+	// Verify retry defaults
+	require.Equal(t, 3, DefaultAPIMaxRetries)
+	require.Equal(t, 1*time.Second, DefaultAPIRetryInitialDelay)
+	require.Equal(t, 30*time.Second, DefaultAPIRetryMaxDelay)
+
+	// Verify circuit breaker defaults
+	require.Equal(t, 5, DefaultCircuitBreakerFailureThreshold)
+	require.Equal(t, 30*time.Second, DefaultCircuitBreakerTimeout)
+}
+
 func TestSetDefaultConfigValues_ResetBetweenCalls(t *testing.T) {
 	// This test verifies that calling SetDefaultConfigValues after viper.Reset
 	// correctly resets all values to defaults
@@ -228,6 +245,115 @@ func TestSetupSharedState_ValidationAcceptsValidValues(t *testing.T) {
 	assert.Equal(t, 10, agentstate.State.DownloadMaxRetries)
 	assert.Equal(t, 1*time.Hour, agentstate.State.TaskTimeout)
 	assert.Equal(t, 10, agentstate.State.MaxHeartbeatBackoff)
+}
+
+func TestSetupSharedState_DefaultTimeouts(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+	SetupSharedState()
+
+	require.Equal(t, DefaultConnectTimeout, agentstate.State.ConnectTimeout)
+	require.Equal(t, DefaultReadTimeout, agentstate.State.ReadTimeout)
+	require.Equal(t, DefaultWriteTimeout, agentstate.State.WriteTimeout)
+	require.Equal(t, DefaultRequestTimeout, agentstate.State.RequestTimeout)
+	require.Equal(t, DefaultAPIMaxRetries, agentstate.State.APIMaxRetries)
+	require.Equal(t, DefaultAPIRetryInitialDelay, agentstate.State.APIRetryInitialDelay)
+	require.Equal(t, DefaultAPIRetryMaxDelay, agentstate.State.APIRetryMaxDelay)
+	require.Equal(t, DefaultCircuitBreakerFailureThreshold, agentstate.State.CircuitBreakerFailureThreshold)
+	require.Equal(t, DefaultCircuitBreakerTimeout, agentstate.State.CircuitBreakerTimeout)
+}
+
+func TestSetupSharedState_ValidationClampsInvalidTimeouts(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	// Set invalid values
+	viper.Set("connect_timeout", 0)
+	viper.Set("read_timeout", -1*time.Second)
+	viper.Set("request_timeout", 0)
+	viper.Set("api_max_retries", 0)
+	viper.Set("circuit_breaker_failure_threshold", 0)
+	viper.Set("circuit_breaker_timeout", 0)
+
+	SetupSharedState()
+
+	assert.Equal(t, DefaultConnectTimeout, agentstate.State.ConnectTimeout,
+		"connect_timeout should be clamped to default when <= 0")
+	assert.Equal(t, DefaultReadTimeout, agentstate.State.ReadTimeout,
+		"read_timeout should be clamped to default when <= 0")
+	assert.Equal(t, DefaultRequestTimeout, agentstate.State.RequestTimeout,
+		"request_timeout should be clamped to default when <= 0")
+	assert.Equal(t, DefaultAPIMaxRetries, agentstate.State.APIMaxRetries,
+		"api_max_retries should be clamped to default when < 1")
+	assert.Equal(t, DefaultCircuitBreakerFailureThreshold, agentstate.State.CircuitBreakerFailureThreshold,
+		"circuit_breaker_failure_threshold should be clamped to default when < 1")
+	assert.Equal(t, DefaultCircuitBreakerTimeout, agentstate.State.CircuitBreakerTimeout,
+		"circuit_breaker_timeout should be clamped to default when <= 0")
+}
+
+func TestClampDuration(t *testing.T) {
+	ceiling := 5 * time.Minute
+	defaultVal := 10 * time.Second
+
+	tests := []struct {
+		name     string
+		value    time.Duration
+		expected time.Duration
+	}{
+		{"zero returns default", 0, defaultVal},
+		{"negative returns default", -1 * time.Second, defaultVal},
+		{"within range returns value", 30 * time.Second, 30 * time.Second},
+		{"at ceiling returns ceiling", ceiling, ceiling},
+		{"above ceiling returns ceiling", 10 * time.Minute, ceiling},
+		{"just above zero returns value", 1 * time.Nanosecond, 1 * time.Nanosecond},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ClampDuration("test_field", tt.value, ceiling, defaultVal)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestClampInt(t *testing.T) {
+	tests := []struct {
+		name       string
+		value      int
+		minVal     int
+		maxVal     int
+		defaultVal int
+		expected   int
+	}{
+		{"below min returns default", 0, 1, 10, 5, 5},
+		{"at min returns value", 1, 1, 10, 5, 1},
+		{"within range returns value", 5, 1, 10, 5, 5},
+		{"at max returns value", 10, 1, 10, 5, 10},
+		{"above max returns max", 20, 1, 10, 5, 10},
+		{"negative returns default", -1, 1, 10, 5, 5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ClampInt("test_field", tt.value, tt.minVal, tt.maxVal, tt.defaultVal)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSetupSharedState_ValidationClampsRetryDelays(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	viper.Set("api_retry_initial_delay", 0)
+	viper.Set("api_retry_max_delay", -1*time.Second)
+
+	SetupSharedState()
+
+	assert.Equal(t, DefaultAPIRetryInitialDelay, agentstate.State.APIRetryInitialDelay,
+		"api_retry_initial_delay should be clamped to default when <= 0")
+	assert.Equal(t, DefaultAPIRetryMaxDelay, agentstate.State.APIRetryMaxDelay,
+		"api_retry_max_delay should be clamped to default when <= 0")
 }
 
 func TestSetupSharedState_DerivedPathsFromDataRoot(t *testing.T) {

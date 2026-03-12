@@ -113,43 +113,63 @@ checksum = "sha256:f2b8c692d9488c3313d7786e2099976151c10fd8f76580b12d045bb9683a8
 url = "https://github.com/orhun/git-cliff/releases/download/v2.12.0/git-cliff-2.12.0-x86_64-pc-windows-msvc.zip"
 
 [[tools."github:anchore/quill"]]
-version = "0.7.0"
+version = "0.7.1"
 backend = "github:anchore/quill"
 
 [tools."github:anchore/quill"."platforms.linux-arm64"]
-checksum = "sha256:99e89b4223545903601ee9a5d9ee22f12ab440495b951b59bac54458ee4bc289"
-url = "https://github.com/anchore/quill/releases/download/v0.7.0/quill_0.7.0_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370299825"
+checksum = "sha256:b3d5bbc006f1aa0387e06349db1a988597ce348913e6e8d38d4bfb34cc93e78d"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939409"
 
 [tools."github:anchore/quill"."platforms.linux-arm64-musl"]
-checksum = "sha256:99e89b4223545903601ee9a5d9ee22f12ab440495b951b59bac54458ee4bc289"
-url = "https://github.com/anchore/quill/releases/download/v0.7.0/quill_0.7.0_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370299825"
+checksum = "sha256:b3d5bbc006f1aa0387e06349db1a988597ce348913e6e8d38d4bfb34cc93e78d"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939409"
 
 [tools."github:anchore/quill"."platforms.linux-x64"]
-checksum = "sha256:5beb5dde4abb83c26383ad48ed0cb04dfd6600e00e543129cb227feb71763914"
-url = "https://github.com/anchore/quill/releases/download/v0.7.0/quill_0.7.0_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370299808"
+checksum = "sha256:e58c6f86378a22507c1123e24412afd4ee2d3bb32ebd94d6059827dc0c1b3fbf"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939435"
+
+[tools."github:anchore/quill"."platforms.linux-x64-baseline"]
+checksum = "sha256:e58c6f86378a22507c1123e24412afd4ee2d3bb32ebd94d6059827dc0c1b3fbf"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939435"
 
 [tools."github:anchore/quill"."platforms.linux-x64-musl"]
-checksum = "sha256:5beb5dde4abb83c26383ad48ed0cb04dfd6600e00e543129cb227feb71763914"
-url = "https://github.com/anchore/quill/releases/download/v0.7.0/quill_0.7.0_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370299808"
+checksum = "sha256:e58c6f86378a22507c1123e24412afd4ee2d3bb32ebd94d6059827dc0c1b3fbf"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939435"
+
+[tools."github:anchore/quill"."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:e58c6f86378a22507c1123e24412afd4ee2d3bb32ebd94d6059827dc0c1b3fbf"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939435"
 
 [tools."github:anchore/quill"."platforms.macos-arm64"]
-checksum = "sha256:2e57dc1b6032d978a2c543238d2338a4f20c0aebab5f7a032dafba081c8faeff"
-url = "https://github.com/anchore/quill/releases/download/v0.7.0/quill_0.7.0_darwin_arm64.tar.gz"
-url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370299822"
+checksum = "sha256:086cfb3fc69a305d55d9aa5131bed7739d706bbd8bab78c18d011e7260111e96"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939432"
 
 [tools."github:anchore/quill"."platforms.macos-x64"]
-checksum = "sha256:ee448b7b48a7c77d87b1e5ba050ef5f8cbfa107aa914ed848d5f9d3d2632a2be"
-url = "https://github.com/anchore/quill/releases/download/v0.7.0/quill_0.7.0_darwin_amd64.tar.gz"
-url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370299824"
+checksum = "sha256:af17fae8d8dd1c8c13ef8ca541ee8205ff28a1a6e0e7cf93f636f9fc14f18ed5"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_darwin_amd64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939436"
+
+[tools."github:anchore/quill"."platforms.macos-x64-baseline"]
+checksum = "sha256:af17fae8d8dd1c8c13ef8ca541ee8205ff28a1a6e0e7cf93f636f9fc14f18ed5"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_darwin_amd64.tar.gz"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939436"
 
 [tools."github:anchore/quill"."platforms.windows-x64"]
-checksum = "sha256:3b627805d33285f781d5f9893956fa3aa169df3ffa5730a62103634172d92b6d"
-url = "https://github.com/anchore/quill/releases/download/v0.7.0/quill_0.7.0_windows_amd64.zip"
-url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370299827"
+checksum = "sha256:aa078a209228ef1a4a96a5b06ab40edc8a3454d055f34be9a351cc74ac898b85"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_windows_amd64.zip"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939478"
+
+[tools."github:anchore/quill"."platforms.windows-x64-baseline"]
+checksum = "sha256:aa078a209228ef1a4a96a5b06ab40edc8a3454d055f34be9a351cc74ac898b85"
+url = "https://github.com/anchore/quill/releases/download/v0.7.1/quill_0.7.1_windows_amd64.zip"
+url_api = "https://api.github.com/repos/anchore/quill/releases/assets/370939478"
 
 [[tools.go]]
 version = "1.26.1"
@@ -192,36 +212,53 @@ version = "2.24.7"
 backend = "go:github.com/securego/gosec/v2/cmd/gosec"
 
 [[tools.golangci-lint]]
-version = "2.11.2"
+version = "2.11.3"
 backend = "aqua:golangci/golangci-lint"
 
 [tools.golangci-lint."platforms.linux-arm64"]
-checksum = "sha256:c3c83c7ed003e881991af21361c487151abd37969927ed9062cd0b48f3cd1d8d"
-url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.2/golangci-lint-2.11.2-linux-arm64.tar.gz"
+checksum = "sha256:ee3d95f301359e7d578e6d99c8ad5aeadbabc5a13009a30b2b0df11c8058afe9"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-linux-arm64.tar.gz"
 
 [tools.golangci-lint."platforms.linux-arm64-musl"]
-checksum = "sha256:c3c83c7ed003e881991af21361c487151abd37969927ed9062cd0b48f3cd1d8d"
-url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.2/golangci-lint-2.11.2-linux-arm64.tar.gz"
+checksum = "sha256:ee3d95f301359e7d578e6d99c8ad5aeadbabc5a13009a30b2b0df11c8058afe9"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-linux-arm64.tar.gz"
 
 [tools.golangci-lint."platforms.linux-x64"]
-checksum = "sha256:852741ea769f4543ab4b6cf86b313cb7173f2e8d2d39f00eb0cd5ef5d4d5eda9"
-url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.2/golangci-lint-2.11.2-linux-amd64.tar.gz"
+checksum = "sha256:87bb8cddbcc825d5778b64e8a91b46c0526b247f4e2f2904dea74ec7450475d1"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-linux-amd64.tar.gz"
+
+[tools.golangci-lint."platforms.linux-x64-baseline"]
+checksum = "sha256:87bb8cddbcc825d5778b64e8a91b46c0526b247f4e2f2904dea74ec7450475d1"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-linux-amd64.tar.gz"
 
 [tools.golangci-lint."platforms.linux-x64-musl"]
-checksum = "sha256:852741ea769f4543ab4b6cf86b313cb7173f2e8d2d39f00eb0cd5ef5d4d5eda9"
-url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.2/golangci-lint-2.11.2-linux-amd64.tar.gz"
+checksum = "sha256:87bb8cddbcc825d5778b64e8a91b46c0526b247f4e2f2904dea74ec7450475d1"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-linux-amd64.tar.gz"
+
+[tools.golangci-lint."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:87bb8cddbcc825d5778b64e8a91b46c0526b247f4e2f2904dea74ec7450475d1"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-linux-amd64.tar.gz"
 
 [tools.golangci-lint."platforms.macos-arm64"]
-checksum = "sha256:11e9549b955bae4bfb71aa3b5c2762e446e2d3f975fe963d6d767b8f745d9344"
-url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.2/golangci-lint-2.11.2-darwin-arm64.tar.gz"
+checksum = "sha256:30ee39979c516b9d1adca289a3f93429d130c4c0fda5e57d637850894221f6cc"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-darwin-arm64.tar.gz"
+provenance = "github-attestations"
 
 [tools.golangci-lint."platforms.macos-x64"]
-checksum = "sha256:1dbbbe745eadba9cf012d49bd0b8c9290cbcb50dbf2cf9611f75a715b46ae3af"
-url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.2/golangci-lint-2.11.2-darwin-amd64.tar.gz"
+checksum = "sha256:f93bda1f2cc981fd1326464020494be62f387bbf262706e1b3b644e5afacc440"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-darwin-amd64.tar.gz"
+
+[tools.golangci-lint."platforms.macos-x64-baseline"]
+checksum = "sha256:f93bda1f2cc981fd1326464020494be62f387bbf262706e1b3b644e5afacc440"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-darwin-amd64.tar.gz"
 
 [tools.golangci-lint."platforms.windows-x64"]
-checksum = "sha256:60e50178253d276d1c808ef00845eddcabca63b7d69d86a6dbaa41e88bc843f3"
-url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.2/golangci-lint-2.11.2-windows-amd64.zip"
+checksum = "sha256:cd42e890176bc5cfeb36225a77e66b9410ddd3a59a03551e23f6b210d29e1f67"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-windows-amd64.zip"
+
+[tools.golangci-lint."platforms.windows-x64-baseline"]
+checksum = "sha256:cd42e890176bc5cfeb36225a77e66b9410ddd3a59a03551e23f6b210d29e1f67"
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.11.3/golangci-lint-2.11.3-windows-amd64.zip"
 
 [[tools.goreleaser]]
 version = "2.14.3"
@@ -304,22 +341,6 @@ uvx_args = "--with mkdocs-material --with pymdown-extensions"
 version = "4.5.1"
 backend = "pipx:pre-commit"
 
-[[tools.pre-commit]]
-version = "4.5.1"
-backend = "aqua:pre-commit/pre-commit"
-
-[tools.pre-commit."platforms.linux-x64"]
-checksum = "sha256:19d00ba35cbf9c04dc3736cd8bb641e8633f3eddd4cedde71809574ae68a2cd1"
-url = "https://github.com/pre-commit/pre-commit/releases/download/v4.5.1/pre-commit-4.5.1.pyz"
-
-[tools.pre-commit."platforms.macos-arm64"]
-checksum = "sha256:19d00ba35cbf9c04dc3736cd8bb641e8633f3eddd4cedde71809574ae68a2cd1"
-url = "https://github.com/pre-commit/pre-commit/releases/download/v4.5.1/pre-commit-4.5.1.pyz"
-
-[tools.pre-commit."platforms.macos-x64"]
-checksum = "sha256:19d00ba35cbf9c04dc3736cd8bb641e8633f3eddd4cedde71809574ae68a2cd1"
-url = "https://github.com/pre-commit/pre-commit/releases/download/v4.5.1/pre-commit-4.5.1.pyz"
-
 [[tools.python]]
 version = "3.14.3"
 backend = "core:python"
@@ -329,17 +350,17 @@ checksum = "sha256:e9b0aef9baafb6b9e7a4d47b82d6d9778eeafb2c95d23fb5247d3a5f8e52c
 url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260211/cpython-3.14.3+20260211-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz"
 
 [tools.python."platforms.linux-x64"]
-checksum = "sha256:0a73413f89efd417871876c9accaab28a9d1e3cd6358fbfff171a38ec99302f0"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260303/cpython-3.14.3+20260303-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+checksum = "sha256:0023aa5e9930a70585e1b639055f4928f76080b2e1dcc2458453b595155a50ee"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260310/cpython-3.14.3+20260310-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
 
 [tools.python."platforms.macos-arm64"]
-checksum = "sha256:4703cdf18b26798fde7b49b6b66149674c25f97127be6a10dbcf29309bdcdcdb"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260303/cpython-3.14.3+20260303-aarch64-apple-darwin-install_only_stripped.tar.gz"
+checksum = "sha256:1a98bbe7e63547d2f764bc9119f6d604dfb333f21afab5f4885dc362b4f3a921"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260310/cpython-3.14.3+20260310-aarch64-apple-darwin-install_only_stripped.tar.gz"
 
 [tools.python."platforms.macos-x64"]
-checksum = "sha256:76f1cc26e3d262eae8ca546a93e8bded10cf0323613f7e246fea2e10a8115eb7"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260303/cpython-3.14.3+20260303-x86_64-apple-darwin-install_only_stripped.tar.gz"
+checksum = "sha256:a974fefb14c2b724ca87830240d36fc865780391ec9e1e2db28a1d5f58f5fae2"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260310/cpython-3.14.3+20260310-x86_64-apple-darwin-install_only_stripped.tar.gz"
 
 [tools.python."platforms.windows-x64"]
-checksum = "sha256:950c5f21a015c1bdd1337f233456df2470fab71e4d794407d27a84cb8b9909a0"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260303/cpython-3.14.3+20260303-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+checksum = "sha256:8458fdf45b9b47685a7dea76d72a4b8cf946091fe48cac43d3564f7f318e8c0f"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260310/cpython-3.14.3+20260310-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"

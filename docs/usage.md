@@ -83,9 +83,33 @@ During graceful shutdown, the agent:
   --write-zaps-to-file, -w         # Write ZAPs to shared directory
   --zap-path, -z <path>            # ZAP files directory
   --retain-zaps-on-completion, -r  # Keep ZAP files after tasks
+
+# HTTP resilience flags
+./cipherswarm-agent \
+  --connect-timeout <duration>     # TCP connection timeout (default: 10s)
+  --read-timeout <duration>        # Response read timeout (default: 30s)
+  --write-timeout <duration>       # Request write timeout (default: 10s)
+  --request-timeout <duration>     # Total request timeout (default: 60s)
+  --api-max-retries <count>        # Max retry attempts (default: 3)
+  --api-retry-initial-delay <duration>  # Initial retry delay (default: 1s)
+  --api-retry-max-delay <duration> # Maximum retry delay (default: 30s)
+  --circuit-breaker-failure-threshold <count>  # Failures before circuit opens (default: 5)
+  --circuit-breaker-timeout <duration>  # Time in open state (default: 30s)
 ```
 
 **Note:** Underscore-style flags (e.g., `--api_token`) are still supported as deprecated aliases for backward compatibility, but kebab-case flags are the recommended standard.
+
+#### HTTP Resilience Features
+
+The agent includes built-in HTTP resilience mechanisms to handle network issues and server outages gracefully:
+
+- **Automatic Retries with Exponential Backoff**: Failed API requests are automatically retried up to the configured maximum attempts. The delay between retries increases exponentially (with jitter) from the initial delay up to the maximum delay, preventing server overload during recovery.
+
+- **Circuit Breaker Pattern**: When consecutive API failures reach the configured threshold, the circuit breaker "opens" and fails subsequent requests immediately with "circuit open" errors. This prevents cascading failures and reduces load on an unresponsive server.
+
+- **Half-Open State Testing**: After the circuit breaker timeout expires, the circuit enters a "half-open" state and allows a single probe request to test if the server has recovered. If successful, the circuit closes and normal operation resumes; if it fails, the circuit reopens.
+
+**Note**: These settings are automatically applied from server-recommended values during agent startup. Manual overrides via command-line flags or configuration files take precedence.
 
 ## Agent Lifecycle and States
 
@@ -130,6 +154,7 @@ INFO [Task 123] Starting attack: Dictionary
 INFO [Task 123] Progress: 15.2% complete
 INFO [Task 123] Found hash: 5d41402abc4b2a76b9719d911017c592:hello
 INFO [Task 123] Task completed successfully
+WARN Circuit breaker open, server appears unresponsive
 ```
 
 ### Log Levels
@@ -330,6 +355,8 @@ nslookup your-server.com
 telnet your-server.com 3000
 ```
 
+**Circuit Breaker State**: If you see "circuit breaker open" or "circuit open" messages in the logs, this indicates the agent has detected repeated failures communicating with the server. The circuit breaker will automatically test for server recovery after the configured timeout (default: 30s). This is a protective mechanism and not an agent malfunction.
+
 #### Permission Errors
 
 ```bash
@@ -406,6 +433,19 @@ nvidia-smi  # for NVIDIA GPUs
 - Check server-side task timeouts
 - Monitor network stability
 - Verify system resource availability
+- Review HTTP timeout settings if requests are timing out prematurely
+
+#### Network Resilience Issues
+
+If you experience frequent circuit breaker activations or retry exhaustion:
+
+- **Check network stability**: Use `ping` and `traceroute` to identify connectivity issues
+- **Verify server health**: Confirm the CipherSwarm server is running and responsive
+- **Review timeout settings**: Adjust `--request-timeout` if legitimate requests are timing out
+- **Adjust retry settings**: Increase `--api-max-retries` or `--api-retry-max-delay` for unreliable networks
+- **Tune circuit breaker**: Increase `--circuit-breaker-failure-threshold` for networks with intermittent failures
+
+The agent automatically recovers when the server becomes available. Circuit breaker state transitions (closed → open → half-open → closed) indicate server health issues rather than agent problems.
 
 ### Debugging Techniques
 

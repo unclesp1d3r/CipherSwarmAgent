@@ -15,6 +15,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/benchmark"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
@@ -53,12 +54,22 @@ func StartAgent() {
 	config.SetupSharedState()
 	initLogger()
 
-	// Initialize API client
-	apiClient, err := api.NewAgentClient(agentstate.State.URL, agentstate.State.APIToken)
+	// Create a shared circuit breaker that survives client rebuilds
+	circuitBreaker = api.NewCircuitBreaker(
+		agentstate.State.CircuitBreakerFailureThreshold,
+		agentstate.State.CircuitBreakerTimeout,
+	)
+
+	// Initialize API client with transport chain (timeouts, retry, circuit breaker)
+	apiClient, err := api.NewAgentClient(
+		agentstate.State.URL,
+		agentstate.State.APIToken,
+		transportConfigFromState(),
+	)
 	if err != nil {
 		agentstate.Logger.Fatal("Failed to initialize API client", "error", err)
 	}
-	agentstate.State.APIClient = apiClient
+	agentstate.State.SetAPIClient(apiClient)
 
 	display.Startup()
 
@@ -93,9 +104,13 @@ func StartAgent() {
 
 	display.Authenticated()
 
-	// Fetch agent configuration and update metadata
+	// Fetch agent configuration, rebuild client with server-recommended settings, update metadata
 	if err := fetchAgentConfig(ctx); err != nil {
 		agentstate.Logger.Fatal("Failed to fetch agent configuration", "error", err)
+	}
+
+	if err := rebuildAPIClient(); err != nil {
+		agentstate.Logger.Fatal("Failed to rebuild API client with server settings", "error", err)
 	}
 
 	err = lib.UpdateAgentMetadata(ctx)
@@ -109,18 +124,24 @@ func StartAgent() {
 	go startHeartbeatLoop(ctx, cancel)
 
 	// Initialize managers
-	benchmarkMgr = benchmark.NewManager(agentstate.State.APIClient.Agents())
+	client := agentstate.State.GetAPIClient()
+	benchmarkMgr = benchmark.NewManager(client.Agents())
 	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 
-	taskMgr = task.NewManager(agentstate.State.APIClient.Tasks(), agentstate.State.APIClient.Attacks())
+	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
 	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 
-	// BenchmarksNeeded is set by the server during configuration. When false, the
-	// server already has valid benchmarks for this agent and a re-run is unnecessary.
+	// Run benchmarks when the server requests them OR when the user explicitly
+	// passed --force-benchmark. Without this check the CLI flag is silently
+	// ignored whenever the server reports valid benchmarks on file.
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
-	if lib.Configuration.BenchmarksNeeded {
+	forceBenchmark := agentstate.State.GetForceBenchmarkRun()
+	if lib.Configuration.BenchmarksNeeded || forceBenchmark {
+		if forceBenchmark && !lib.Configuration.BenchmarksNeeded {
+			agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
+		}
 		if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
 			agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
 		}
@@ -211,8 +232,14 @@ func startHeartbeatLoop(ctx context.Context, cancel context.CancelFunc) {
 		if err != nil {
 			consecutiveFailures++
 			backoff := calculateHeartbeatBackoff(baseInterval, consecutiveFailures, maxBackoffMultiplier)
-			agentstate.Logger.Warn("Heartbeat failed, backing off",
-				"failures", consecutiveFailures, "next_retry", backoff)
+
+			if apierrors.IsCircuitOpen(err) {
+				agentstate.Logger.Warn("Circuit breaker open, server appears unresponsive",
+					"failures", consecutiveFailures, "next_retry", backoff)
+			} else {
+				agentstate.Logger.Warn("Heartbeat failed, backing off",
+					"failures", consecutiveFailures, "next_retry", backoff)
+			}
 
 			if sleepWithContext(ctx, backoff) {
 				return
@@ -292,9 +319,20 @@ func handleReload(ctx context.Context) {
 		return
 	}
 
-	// Update manager configs after reload
+	if err := rebuildAPIClient(); err != nil {
+		agentstate.Logger.Error("Failed to rebuild API client during reload, skipping reload", "error", err)
+		cserrors.SendAgentError(ctx, "Failed to rebuild API client during reload", nil, api.SeverityFatal)
+		agentstate.State.SetReload(false)
+
+		return
+	}
+
+	// Recreate managers with new API client sub-clients and update configs
+	reloadClient := agentstate.State.GetAPIClient()
+	benchmarkMgr = benchmark.NewManager(reloadClient.Agents())
 	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
 	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 
@@ -335,7 +373,11 @@ func handleNewTask(ctx context.Context) {
 			return
 		}
 
-		agentstate.Logger.Error("Failed to get new task", "error", err)
+		if apierrors.IsCircuitOpen(err) {
+			agentstate.Logger.Warn("Circuit breaker open, skipping task retrieval", "error", err)
+		} else {
+			agentstate.Logger.Error("Failed to get new task", "error", err)
+		}
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return

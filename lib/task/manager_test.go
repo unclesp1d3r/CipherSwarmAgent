@@ -26,8 +26,8 @@ var (
 // newTestManager creates a Manager using the current agentstate API client.
 func newTestManager() *Manager {
 	return NewManager(
-		agentstate.State.APIClient.Tasks(),
-		agentstate.State.APIClient.Attacks(),
+		agentstate.State.GetAPIClient().Tasks(),
+		agentstate.State.GetAPIClient().Attacks(),
 	)
 }
 

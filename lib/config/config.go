@@ -33,7 +33,66 @@ const (
 	DefaultInsecureDownloads = false
 	// DefaultMaxHeartbeatBackoff is the max heartbeat backoff multiplier (caps at 64x).
 	DefaultMaxHeartbeatBackoff = 6
+	// DefaultConnectTimeout is the TCP connect timeout for API requests.
+	DefaultConnectTimeout = 10 * time.Second
+	// DefaultReadTimeout is the read timeout for API responses.
+	DefaultReadTimeout = 30 * time.Second
+	// DefaultWriteTimeout is accepted from server config but not used in the transport chain
+	// (Go's http.Transport has no write timeout — it's a server-side concept).
+	DefaultWriteTimeout = 10 * time.Second
+	// DefaultRequestTimeout is the overall request timeout for API calls.
+	DefaultRequestTimeout = 60 * time.Second
+	// DefaultAPIMaxRetries is the max retry attempts for failed API requests.
+	DefaultAPIMaxRetries = 3
+	// DefaultAPIRetryInitialDelay is the initial delay between API retries.
+	DefaultAPIRetryInitialDelay = 1 * time.Second
+	// DefaultAPIRetryMaxDelay is the maximum delay between API retries.
+	DefaultAPIRetryMaxDelay = 30 * time.Second
+	// DefaultCircuitBreakerFailureThreshold is the number of failures before the circuit opens.
+	DefaultCircuitBreakerFailureThreshold = 5
+	// DefaultCircuitBreakerTimeout is the duration before a tripped circuit half-opens.
+	DefaultCircuitBreakerTimeout = 30 * time.Second
 )
+
+// MaxReasonableTimeout caps server-recommended timeout values to prevent a
+// misconfigured server from setting absurdly large timeouts (e.g., 24 hours).
+const MaxReasonableTimeout = 5 * time.Minute
+
+// MaxReasonableRetries caps server-recommended retry count to prevent excessive
+// retry storms from a misconfigured server.
+const MaxReasonableRetries = 10
+
+// ClampDuration returns value if it is within (0, ceiling], otherwise returns the default.
+// Logs a warning when clamping is applied (both for non-positive values and ceiling breaches).
+func ClampDuration(name string, value, ceiling, defaultVal time.Duration) time.Duration {
+	if value <= 0 {
+		agentstate.Logger.Warn("Server-recommended value is non-positive, using default",
+			"field", name, "value", value, "default", defaultVal)
+		return defaultVal
+	}
+	if value > ceiling {
+		agentstate.Logger.Warn("Server-recommended value exceeds maximum, clamping",
+			"field", name, "value", value, "max", ceiling)
+		return ceiling
+	}
+	return value
+}
+
+// ClampInt returns value if it is within [minVal, maxVal], otherwise returns the default.
+// Logs a warning when clamping is applied (both for below-minimum and above-maximum values).
+func ClampInt(name string, value, minVal, maxVal, defaultVal int) int {
+	if value < minVal {
+		agentstate.Logger.Warn("Server-recommended value below minimum, using default",
+			"field", name, "value", value, "min", minVal, "default", defaultVal)
+		return defaultVal
+	}
+	if value > maxVal {
+		agentstate.Logger.Warn("Server-recommended value exceeds maximum, clamping",
+			"field", name, "value", value, "max", maxVal)
+		return maxVal
+	}
+	return value
+}
 
 var scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // Configuration scope
 
@@ -186,6 +245,70 @@ func SetupSharedState() {
 	}
 
 	agentstate.State.SleepOnFailure = viper.GetDuration("sleep_on_failure")
+
+	agentstate.State.ConnectTimeout = viper.GetDuration("connect_timeout")
+	if agentstate.State.ConnectTimeout <= 0 {
+		agentstate.Logger.Warn("connect_timeout must be > 0, using default",
+			"configured", agentstate.State.ConnectTimeout, "default", DefaultConnectTimeout)
+		agentstate.State.ConnectTimeout = DefaultConnectTimeout
+	}
+
+	agentstate.State.ReadTimeout = viper.GetDuration("read_timeout")
+	if agentstate.State.ReadTimeout <= 0 {
+		agentstate.Logger.Warn("read_timeout must be > 0, using default",
+			"configured", agentstate.State.ReadTimeout, "default", DefaultReadTimeout)
+		agentstate.State.ReadTimeout = DefaultReadTimeout
+	}
+
+	agentstate.State.WriteTimeout = viper.GetDuration("write_timeout")
+	if agentstate.State.WriteTimeout <= 0 {
+		agentstate.Logger.Warn("write_timeout must be > 0, using default",
+			"configured", agentstate.State.WriteTimeout, "default", DefaultWriteTimeout)
+		agentstate.State.WriteTimeout = DefaultWriteTimeout
+	}
+
+	agentstate.State.RequestTimeout = viper.GetDuration("request_timeout")
+	if agentstate.State.RequestTimeout <= 0 {
+		agentstate.Logger.Warn("request_timeout must be > 0, using default",
+			"configured", agentstate.State.RequestTimeout, "default", DefaultRequestTimeout)
+		agentstate.State.RequestTimeout = DefaultRequestTimeout
+	}
+
+	agentstate.State.APIMaxRetries = viper.GetInt("api_max_retries")
+	if agentstate.State.APIMaxRetries < 1 {
+		agentstate.Logger.Warn("api_max_retries must be >= 1, using default",
+			"configured", agentstate.State.APIMaxRetries, "default", DefaultAPIMaxRetries)
+		agentstate.State.APIMaxRetries = DefaultAPIMaxRetries
+	}
+
+	agentstate.State.APIRetryInitialDelay = viper.GetDuration("api_retry_initial_delay")
+	if agentstate.State.APIRetryInitialDelay <= 0 {
+		agentstate.Logger.Warn("api_retry_initial_delay must be > 0, using default",
+			"configured", agentstate.State.APIRetryInitialDelay, "default", DefaultAPIRetryInitialDelay)
+		agentstate.State.APIRetryInitialDelay = DefaultAPIRetryInitialDelay
+	}
+
+	agentstate.State.APIRetryMaxDelay = viper.GetDuration("api_retry_max_delay")
+	if agentstate.State.APIRetryMaxDelay <= 0 {
+		agentstate.Logger.Warn("api_retry_max_delay must be > 0, using default",
+			"configured", agentstate.State.APIRetryMaxDelay, "default", DefaultAPIRetryMaxDelay)
+		agentstate.State.APIRetryMaxDelay = DefaultAPIRetryMaxDelay
+	}
+
+	agentstate.State.CircuitBreakerFailureThreshold = viper.GetInt("circuit_breaker_failure_threshold")
+	if agentstate.State.CircuitBreakerFailureThreshold < 1 {
+		agentstate.Logger.Warn("circuit_breaker_failure_threshold must be >= 1, using default",
+			"configured", agentstate.State.CircuitBreakerFailureThreshold,
+			"default", DefaultCircuitBreakerFailureThreshold)
+		agentstate.State.CircuitBreakerFailureThreshold = DefaultCircuitBreakerFailureThreshold
+	}
+
+	agentstate.State.CircuitBreakerTimeout = viper.GetDuration("circuit_breaker_timeout")
+	if agentstate.State.CircuitBreakerTimeout <= 0 {
+		agentstate.Logger.Warn("circuit_breaker_timeout must be > 0, using default",
+			"configured", agentstate.State.CircuitBreakerTimeout, "default", DefaultCircuitBreakerTimeout)
+		agentstate.State.CircuitBreakerTimeout = DefaultCircuitBreakerTimeout
+	}
 }
 
 // SetDefaultConfigValues sets default configuration values.
@@ -214,4 +337,13 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("insecure_downloads", DefaultInsecureDownloads)
 	viper.SetDefault("max_heartbeat_backoff", DefaultMaxHeartbeatBackoff)
 	viper.SetDefault("force_benchmark_run", false)
+	viper.SetDefault("connect_timeout", DefaultConnectTimeout)
+	viper.SetDefault("read_timeout", DefaultReadTimeout)
+	viper.SetDefault("write_timeout", DefaultWriteTimeout)
+	viper.SetDefault("request_timeout", DefaultRequestTimeout)
+	viper.SetDefault("api_max_retries", DefaultAPIMaxRetries)
+	viper.SetDefault("api_retry_initial_delay", DefaultAPIRetryInitialDelay)
+	viper.SetDefault("api_retry_max_delay", DefaultAPIRetryMaxDelay)
+	viper.SetDefault("circuit_breaker_failure_threshold", DefaultCircuitBreakerFailureThreshold)
+	viper.SetDefault("circuit_breaker_timeout", DefaultCircuitBreakerTimeout)
 }

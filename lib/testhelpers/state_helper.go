@@ -2,12 +2,14 @@
 package testhelpers
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 )
 
 const dirPerm os.FileMode = 0o755
@@ -44,12 +46,25 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	agentstate.State.BenchmarkCachePath = filepath.Join(testDataDir, "benchmark_cache.json")
 	agentstate.State.Debug = false
 	agentstate.State.ExtraDebugging = false
-	// Initialize API client using generated client wrapper
-	apiClient, err := api.NewAgentClient(apiURL, apiToken)
+	// Initialize API client with httpmock-compatible transport.
+	// httpmock.Activate() must be called BEFORE this to install the mock transport.
+	// We pass http.DefaultTransport (which httpmock replaces) as BaseTransport so
+	// the retry/circuit-breaker chain wraps the mock instead of a real http.Transport.
+	apiClient, err := api.NewAgentClient(apiURL, apiToken, api.TransportConfig{
+		ConnectTimeout:                 config.DefaultConnectTimeout,
+		ReadTimeout:                    config.DefaultReadTimeout,
+		RequestTimeout:                 config.DefaultRequestTimeout,
+		MaxAttempts:                    1, // No retries in tests
+		RetryInitialDelay:              config.DefaultAPIRetryInitialDelay,
+		RetryMaxDelay:                  config.DefaultAPIRetryMaxDelay,
+		CircuitBreakerFailureThreshold: config.DefaultCircuitBreakerFailureThreshold,
+		CircuitBreakerTimeout:          config.DefaultCircuitBreakerTimeout,
+		BaseTransport:                  http.DefaultTransport,
+	})
 	if err != nil {
 		panic(err)
 	}
-	agentstate.State.APIClient = apiClient
+	agentstate.State.SetAPIClient(apiClient)
 
 	// Create directories
 	mustMkdirAll(agentstate.State.DataPath)
@@ -89,7 +104,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.RetainZapsOnCompletion = false
 		agentstate.State.EnableAdditionalHashTypes = false
 		agentstate.State.UseLegacyDeviceIdentificationMethod = false
-		agentstate.State.APIClient = nil
+		agentstate.State.SetAPIClient(nil)
 		agentstate.State.SetForceBenchmarkRun(false)
 		agentstate.State.InsecureDownloads = false
 		agentstate.State.DownloadMaxRetries = 0
@@ -100,6 +115,15 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.AlwaysUseNativeHashcat = false
 		agentstate.State.Platform = ""
 		agentstate.State.AgentVersion = ""
+		agentstate.State.ConnectTimeout = 0
+		agentstate.State.ReadTimeout = 0
+		agentstate.State.WriteTimeout = 0
+		agentstate.State.RequestTimeout = 0
+		agentstate.State.APIMaxRetries = 0
+		agentstate.State.APIRetryInitialDelay = 0
+		agentstate.State.APIRetryMaxDelay = 0
+		agentstate.State.CircuitBreakerFailureThreshold = 0
+		agentstate.State.CircuitBreakerTimeout = 0
 		// Reset synchronized fields via setters
 		agentstate.State.SetReload(false)
 		agentstate.State.SetCurrentActivity("")
@@ -136,7 +160,7 @@ func ResetTestState() {
 	agentstate.State.RetainZapsOnCompletion = false
 	agentstate.State.EnableAdditionalHashTypes = false
 	agentstate.State.UseLegacyDeviceIdentificationMethod = false
-	agentstate.State.APIClient = nil
+	agentstate.State.SetAPIClient(nil)
 	agentstate.State.SetForceBenchmarkRun(false)
 	agentstate.State.InsecureDownloads = false
 	agentstate.State.DownloadMaxRetries = 0
@@ -147,6 +171,15 @@ func ResetTestState() {
 	agentstate.State.AlwaysUseNativeHashcat = false
 	agentstate.State.Platform = ""
 	agentstate.State.AgentVersion = ""
+	agentstate.State.ConnectTimeout = 0
+	agentstate.State.ReadTimeout = 0
+	agentstate.State.WriteTimeout = 0
+	agentstate.State.RequestTimeout = 0
+	agentstate.State.APIMaxRetries = 0
+	agentstate.State.APIRetryInitialDelay = 0
+	agentstate.State.APIRetryMaxDelay = 0
+	agentstate.State.CircuitBreakerFailureThreshold = 0
+	agentstate.State.CircuitBreakerTimeout = 0
 	// Reset synchronized fields via setters
 	agentstate.State.SetReload(false)
 	agentstate.State.SetCurrentActivity("")
@@ -189,6 +222,15 @@ func SetupMinimalTestState(agentID int64) func() {
 		agentstate.State.FilePath = ""
 		agentstate.State.RestoreFilePath = ""
 		agentstate.State.BenchmarkCachePath = ""
+		agentstate.State.ConnectTimeout = 0
+		agentstate.State.ReadTimeout = 0
+		agentstate.State.WriteTimeout = 0
+		agentstate.State.RequestTimeout = 0
+		agentstate.State.APIMaxRetries = 0
+		agentstate.State.APIRetryInitialDelay = 0
+		agentstate.State.APIRetryMaxDelay = 0
+		agentstate.State.CircuitBreakerFailureThreshold = 0
+		agentstate.State.CircuitBreakerTimeout = 0
 	}
 }
 
