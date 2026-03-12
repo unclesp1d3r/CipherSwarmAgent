@@ -33,6 +33,24 @@ const (
 	DefaultInsecureDownloads = false
 	// DefaultMaxHeartbeatBackoff is the max heartbeat backoff multiplier (caps at 64x).
 	DefaultMaxHeartbeatBackoff = 6
+	// DefaultConnectTimeout is the TCP connect timeout for API requests.
+	DefaultConnectTimeout = 10 * time.Second
+	// DefaultReadTimeout is the read timeout for API responses.
+	DefaultReadTimeout = 30 * time.Second
+	// DefaultWriteTimeout is the write timeout for API requests.
+	DefaultWriteTimeout = 10 * time.Second
+	// DefaultRequestTimeout is the overall request timeout for API calls.
+	DefaultRequestTimeout = 60 * time.Second
+	// DefaultAPIMaxRetries is the max retry attempts for failed API requests.
+	DefaultAPIMaxRetries = 3
+	// DefaultAPIRetryInitialDelay is the initial delay between API retries.
+	DefaultAPIRetryInitialDelay = 1 * time.Second
+	// DefaultAPIRetryMaxDelay is the maximum delay between API retries.
+	DefaultAPIRetryMaxDelay = 30 * time.Second
+	// DefaultCircuitBreakerFailureThreshold is the number of failures before the circuit opens.
+	DefaultCircuitBreakerFailureThreshold = 5
+	// DefaultCircuitBreakerTimeout is the duration before a tripped circuit half-opens.
+	DefaultCircuitBreakerTimeout = 30 * time.Second
 )
 
 var scope = gap.NewScope(gap.User, "CipherSwarm") //nolint:gochecknoglobals // Configuration scope

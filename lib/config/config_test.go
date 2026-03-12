@@ -166,6 +166,23 @@ func TestSetDefaultConfigValues(t *testing.T) {
 	})
 }
 
+func TestDefaultConstants_Exist(t *testing.T) {
+	// Verify new timeout defaults exist and have sensible values
+	require.Equal(t, 10*time.Second, DefaultConnectTimeout)
+	require.Equal(t, 30*time.Second, DefaultReadTimeout)
+	require.Equal(t, 10*time.Second, DefaultWriteTimeout)
+	require.Equal(t, 60*time.Second, DefaultRequestTimeout)
+
+	// Verify retry defaults
+	require.Equal(t, 3, DefaultAPIMaxRetries)
+	require.Equal(t, 1*time.Second, DefaultAPIRetryInitialDelay)
+	require.Equal(t, 30*time.Second, DefaultAPIRetryMaxDelay)
+
+	// Verify circuit breaker defaults
+	require.Equal(t, 5, DefaultCircuitBreakerFailureThreshold)
+	require.Equal(t, 30*time.Second, DefaultCircuitBreakerTimeout)
+}
+
 func TestSetDefaultConfigValues_ResetBetweenCalls(t *testing.T) {
 	// This test verifies that calling SetDefaultConfigValues after viper.Reset
 	// correctly resets all values to defaults
