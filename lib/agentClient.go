@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -117,6 +118,8 @@ func GetAgentConfiguration(ctx context.Context) error {
 		recCB,
 	)
 
+	applyRecommendedSettings(agentConfig)
+
 	if agentConfig.Config.UseNativeHashcat {
 		if err := setNativeHashcatPathFn(ctx); err != nil {
 			return err
@@ -152,6 +155,59 @@ func mapConfiguration(
 		RecommendedTimeouts:       timeouts,
 		RecommendedRetry:          retry,
 		RecommendedCircuitBreaker: circuitBreaker,
+	}
+}
+
+// applyRecommendedSettings overrides agentstate timeout/retry/circuit-breaker
+// values with server-recommended settings when present. Server values are in
+// seconds and are converted to time.Duration.
+func applyRecommendedSettings(cfg agentConfiguration) {
+	if t := cfg.RecommendedTimeouts; t != nil {
+		if t.ConnectTimeout > 0 {
+			agentstate.State.ConnectTimeout = time.Duration(t.ConnectTimeout) * time.Second
+		}
+		if t.ReadTimeout > 0 {
+			agentstate.State.ReadTimeout = time.Duration(t.ReadTimeout) * time.Second
+		}
+		if t.WriteTimeout > 0 {
+			agentstate.State.WriteTimeout = time.Duration(t.WriteTimeout) * time.Second
+		}
+		if t.RequestTimeout > 0 {
+			agentstate.State.RequestTimeout = time.Duration(t.RequestTimeout) * time.Second
+		}
+		agentstate.Logger.Info("Applied server-recommended timeouts",
+			"connect", agentstate.State.ConnectTimeout,
+			"read", agentstate.State.ReadTimeout,
+			"write", agentstate.State.WriteTimeout,
+			"request", agentstate.State.RequestTimeout)
+	}
+
+	if r := cfg.RecommendedRetry; r != nil {
+		if r.MaxAttempts > 0 {
+			agentstate.State.APIMaxRetries = r.MaxAttempts
+		}
+		if r.InitialDelay > 0 {
+			agentstate.State.APIRetryInitialDelay = time.Duration(r.InitialDelay) * time.Second
+		}
+		if r.MaxDelay > 0 {
+			agentstate.State.APIRetryMaxDelay = time.Duration(r.MaxDelay) * time.Second
+		}
+		agentstate.Logger.Info("Applied server-recommended retry settings",
+			"max_attempts", agentstate.State.APIMaxRetries,
+			"initial_delay", agentstate.State.APIRetryInitialDelay,
+			"max_delay", agentstate.State.APIRetryMaxDelay)
+	}
+
+	if cb := cfg.RecommendedCircuitBreaker; cb != nil {
+		if cb.FailureThreshold > 0 {
+			agentstate.State.CircuitBreakerFailureThreshold = cb.FailureThreshold
+		}
+		if cb.Timeout > 0 {
+			agentstate.State.CircuitBreakerTimeout = time.Duration(cb.Timeout) * time.Second
+		}
+		agentstate.Logger.Info("Applied server-recommended circuit breaker settings",
+			"failure_threshold", agentstate.State.CircuitBreakerFailureThreshold,
+			"timeout", agentstate.State.CircuitBreakerTimeout)
 	}
 }
 

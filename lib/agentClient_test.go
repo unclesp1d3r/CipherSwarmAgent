@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/require"
@@ -560,6 +561,64 @@ func TestMapConfiguration_RecommendedSettings(t *testing.T) {
 	require.NotNil(t, result.RecommendedCircuitBreaker)
 	require.Equal(t, 10, result.RecommendedCircuitBreaker.FailureThreshold)
 	require.Equal(t, 60, result.RecommendedCircuitBreaker.Timeout)
+}
+
+// TestApplyRecommendedSettings_OverridesDefaults verifies server values override defaults.
+func TestApplyRecommendedSettings_OverridesDefaults(t *testing.T) {
+	t.Cleanup(testhelpers.SetupMinimalTestState(1))
+
+	// Set initial defaults
+	agentstate.State.ConnectTimeout = 10 * time.Second
+	agentstate.State.RequestTimeout = 60 * time.Second
+	agentstate.State.APIMaxRetries = 3
+	agentstate.State.CircuitBreakerFailureThreshold = 5
+
+	cfg := agentConfiguration{
+		RecommendedTimeouts: &RecommendedTimeouts{
+			ConnectTimeout: 15,
+			ReadTimeout:    45,
+			WriteTimeout:   15,
+			RequestTimeout: 90,
+		},
+		RecommendedRetry: &RecommendedRetry{
+			MaxAttempts:  5,
+			InitialDelay: 2,
+			MaxDelay:     60,
+		},
+		RecommendedCircuitBreaker: &RecommendedCircuitBreaker{
+			FailureThreshold: 10,
+			Timeout:          60,
+		},
+	}
+
+	applyRecommendedSettings(cfg)
+
+	require.Equal(t, 15*time.Second, agentstate.State.ConnectTimeout)
+	require.Equal(t, 45*time.Second, agentstate.State.ReadTimeout)
+	require.Equal(t, 15*time.Second, agentstate.State.WriteTimeout)
+	require.Equal(t, 90*time.Second, agentstate.State.RequestTimeout)
+	require.Equal(t, 5, agentstate.State.APIMaxRetries)
+	require.Equal(t, 2*time.Second, agentstate.State.APIRetryInitialDelay)
+	require.Equal(t, 60*time.Second, agentstate.State.APIRetryMaxDelay)
+	require.Equal(t, 10, agentstate.State.CircuitBreakerFailureThreshold)
+	require.Equal(t, 60*time.Second, agentstate.State.CircuitBreakerTimeout)
+}
+
+// TestApplyRecommendedSettings_NilKeepsDefaults verifies nil sections don't override.
+func TestApplyRecommendedSettings_NilKeepsDefaults(t *testing.T) {
+	t.Cleanup(testhelpers.SetupMinimalTestState(1))
+
+	agentstate.State.ConnectTimeout = 10 * time.Second
+	agentstate.State.APIMaxRetries = 3
+	agentstate.State.CircuitBreakerFailureThreshold = 5
+
+	cfg := agentConfiguration{} // all nil pointers
+
+	applyRecommendedSettings(cfg)
+
+	require.Equal(t, 10*time.Second, agentstate.State.ConnectTimeout)
+	require.Equal(t, 3, agentstate.State.APIMaxRetries)
+	require.Equal(t, 5, agentstate.State.CircuitBreakerFailureThreshold)
 }
 
 // TestMapConfiguration_NilRecommendedSettings verifies nil pointers are preserved.
