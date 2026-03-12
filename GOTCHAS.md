@@ -35,6 +35,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - Use `exclude-schemas` in `lib/api/config.yaml` when a generated type needs manual customization (e.g., `ErrorObject` excluded so it can implement the `error` interface).
 - oapi-codegen's `Parse*Response` methods read and close `HTTPResponse.Body` during parsing. Use the parsed `Body` byte slice (`resp.Body`), not `resp.HTTPResponse.Body` (already drained and closed).
 - When an API method returns HTTP 200, always guard `resp.JSON200 == nil` — oapi-codegen silently sets it to nil if JSON unmarshaling fails.
+- oapi-codegen emits anonymous structs for inline OpenAPI schemas — hand-written struct literals must exactly match JSON tags (including `omitempty`). Use constructor helpers in `lib/api/` (e.g., `NewErrorMetadata`) to co-locate coupling with the generated code. The root fix is extracting inline schemas to named `$ref` components in the server spec.
 
 ## Error Handling
 
