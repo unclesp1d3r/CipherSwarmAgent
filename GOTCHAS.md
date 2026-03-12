@@ -19,6 +19,9 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `gosec G204` does NOT fire on `exec.CommandContext` when the binary path comes from an internal function return — don't add `//nolint:gosec // G204` unless verified.
 - `gosec G304` does NOT fire on `os.Open` in test helper packages — don't add `//nolint:gosec // G304` unless verified with a clean lint run.
 
+- `durationcheck` flags `time.Duration * time.Duration` — use `int64` intermediate for multipliers (e.g., `time.Duration(int64(1) << shift)`).
+- `gocritic` `importShadow` fires when a parameter name matches an imported package name (e.g., `config` parameter shadowing `lib/config` import). Rename the parameter.
+
 ## golines & nolint Comments
 
 - `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint reasons short so total line stays under 120 chars.
