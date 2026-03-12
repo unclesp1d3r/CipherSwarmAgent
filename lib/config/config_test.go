@@ -247,6 +247,50 @@ func TestSetupSharedState_ValidationAcceptsValidValues(t *testing.T) {
 	assert.Equal(t, 10, agentstate.State.MaxHeartbeatBackoff)
 }
 
+func TestSetupSharedState_DefaultTimeouts(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+	SetupSharedState()
+
+	require.Equal(t, DefaultConnectTimeout, agentstate.State.ConnectTimeout)
+	require.Equal(t, DefaultReadTimeout, agentstate.State.ReadTimeout)
+	require.Equal(t, DefaultWriteTimeout, agentstate.State.WriteTimeout)
+	require.Equal(t, DefaultRequestTimeout, agentstate.State.RequestTimeout)
+	require.Equal(t, DefaultAPIMaxRetries, agentstate.State.APIMaxRetries)
+	require.Equal(t, DefaultAPIRetryInitialDelay, agentstate.State.APIRetryInitialDelay)
+	require.Equal(t, DefaultAPIRetryMaxDelay, agentstate.State.APIRetryMaxDelay)
+	require.Equal(t, DefaultCircuitBreakerFailureThreshold, agentstate.State.CircuitBreakerFailureThreshold)
+	require.Equal(t, DefaultCircuitBreakerTimeout, agentstate.State.CircuitBreakerTimeout)
+}
+
+func TestSetupSharedState_ValidationClampsInvalidTimeouts(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	// Set invalid values
+	viper.Set("connect_timeout", 0)
+	viper.Set("read_timeout", -1*time.Second)
+	viper.Set("request_timeout", 0)
+	viper.Set("api_max_retries", 0)
+	viper.Set("circuit_breaker_failure_threshold", 0)
+	viper.Set("circuit_breaker_timeout", 0)
+
+	SetupSharedState()
+
+	assert.Equal(t, DefaultConnectTimeout, agentstate.State.ConnectTimeout,
+		"connect_timeout should be clamped to default when <= 0")
+	assert.Equal(t, DefaultReadTimeout, agentstate.State.ReadTimeout,
+		"read_timeout should be clamped to default when <= 0")
+	assert.Equal(t, DefaultRequestTimeout, agentstate.State.RequestTimeout,
+		"request_timeout should be clamped to default when <= 0")
+	assert.Equal(t, DefaultAPIMaxRetries, agentstate.State.APIMaxRetries,
+		"api_max_retries should be clamped to default when < 1")
+	assert.Equal(t, DefaultCircuitBreakerFailureThreshold, agentstate.State.CircuitBreakerFailureThreshold,
+		"circuit_breaker_failure_threshold should be clamped to default when < 1")
+	assert.Equal(t, DefaultCircuitBreakerTimeout, agentstate.State.CircuitBreakerTimeout,
+		"circuit_breaker_timeout should be clamped to default when <= 0")
+}
+
 func TestSetupSharedState_DerivedPathsFromDataRoot(t *testing.T) {
 	t.Run("default data_path derives files_path and zap_path", func(t *testing.T) {
 		viper.Reset()
