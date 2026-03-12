@@ -3,6 +3,7 @@ package cserrors
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -62,6 +63,8 @@ func WithClassification(category string, retryable bool) ErrorOption {
 // SendAgentError sends an error message to the centralized server, including metadata and severity level.
 // Optional ErrorOption arguments can enhance the error with classification metadata.
 // Safe to call before API client initialization — logs locally and returns if client is nil.
+// Empty or whitespace-only messages are silently dropped with a Warn-level log to prevent
+// noise in server logs (see issue #140).
 // Callers control context: pass ctx for cancellable operations, or context.Background() for
 // errors that must be delivered even during shutdown.
 func SendAgentError(
@@ -75,6 +78,12 @@ func SendAgentError(
 	if apiClient == nil {
 		agentstate.ErrorLogger.Error("Cannot send error to server: API client not initialized",
 			"message", stdErrLine, "severity", severity)
+
+		return
+	}
+
+	if strings.TrimSpace(stdErrLine) == "" {
+		agentstate.ErrorLogger.Warn("Skipping empty error message", "severity", severity)
 
 		return
 	}
@@ -130,6 +139,8 @@ func handleSendError(ctx context.Context, err error) {
 // LogAndSendError logs an error message with severity and sends it to the CipherSwarm API.
 // When task is nil, the error is reported without a task context. API submission is
 // skipped only when the APIClient has not been initialized yet.
+// Empty or whitespace-only messages are handled by the centralised guard inside SendAgentError,
+// so callers do not need their own empty-message check.
 // Returns the original error for further handling.
 // Callers control context: pass ctx for cancellable operations, or context.Background() for
 // errors that must be delivered even during shutdown.

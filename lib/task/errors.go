@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	stderrors "errors"
+	"strings"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
@@ -116,7 +117,12 @@ func handleTaskError(ctx context.Context, err error, message string) {
 			"details",
 			details,
 		)
-		cserrors.SendAgentError(ctx, e1.Error(), nil, api.SeverityWarning)
+		errMsg := e1.Error()
+		if strings.TrimSpace(errMsg) == "" {
+			agentstate.Logger.Warn("SetTaskAbandonedError has no message to report")
+			return
+		}
+		cserrors.SendAgentError(ctx, errMsg, nil, api.SeverityWarning)
 		return
 	}
 
