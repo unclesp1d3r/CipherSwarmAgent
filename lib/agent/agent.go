@@ -54,6 +54,12 @@ func StartAgent() {
 	config.SetupSharedState()
 	initLogger()
 
+	// Create a shared circuit breaker that survives client rebuilds
+	circuitBreaker = api.NewCircuitBreaker(
+		agentstate.State.CircuitBreakerFailureThreshold,
+		agentstate.State.CircuitBreakerTimeout,
+	)
+
 	// Initialize API client with transport chain (timeouts, retry, circuit breaker)
 	apiClient, err := api.NewAgentClient(
 		agentstate.State.URL,
@@ -63,7 +69,7 @@ func StartAgent() {
 	if err != nil {
 		agentstate.Logger.Fatal("Failed to initialize API client", "error", err)
 	}
-	agentstate.State.APIClient = apiClient
+	agentstate.State.SetAPIClient(apiClient)
 
 	display.Startup()
 
@@ -118,18 +124,24 @@ func StartAgent() {
 	go startHeartbeatLoop(ctx, cancel)
 
 	// Initialize managers
-	benchmarkMgr = benchmark.NewManager(agentstate.State.APIClient.Agents())
+	client := agentstate.State.GetAPIClient()
+	benchmarkMgr = benchmark.NewManager(client.Agents())
 	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 
-	taskMgr = task.NewManager(agentstate.State.APIClient.Tasks(), agentstate.State.APIClient.Attacks())
+	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
 	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 
-	// BenchmarksNeeded is set by the server during configuration. When false, the
-	// server already has valid benchmarks for this agent and a re-run is unnecessary.
+	// Run benchmarks when the server requests them OR when the user explicitly
+	// passed --force-benchmark. Without this check the CLI flag is silently
+	// ignored whenever the server reports valid benchmarks on file.
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
-	if lib.Configuration.BenchmarksNeeded {
+	forceBenchmark := agentstate.State.GetForceBenchmarkRun()
+	if lib.Configuration.BenchmarksNeeded || forceBenchmark {
+		if forceBenchmark && !lib.Configuration.BenchmarksNeeded {
+			agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
+		}
 		if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
 			agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
 		}
@@ -308,14 +320,19 @@ func handleReload(ctx context.Context) {
 	}
 
 	if err := rebuildAPIClient(); err != nil {
-		agentstate.Logger.Error("Failed to rebuild API client during reload", "error", err)
+		agentstate.Logger.Error("Failed to rebuild API client during reload, skipping reload", "error", err)
+		cserrors.SendAgentError(ctx, "Failed to rebuild API client during reload", nil, api.SeverityFatal)
+		agentstate.State.SetReload(false)
+
+		return
 	}
 
 	// Recreate managers with new API client sub-clients and update configs
-	benchmarkMgr = benchmark.NewManager(agentstate.State.APIClient.Agents())
+	reloadClient := agentstate.State.GetAPIClient()
+	benchmarkMgr = benchmark.NewManager(reloadClient.Agents())
 	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
-	taskMgr = task.NewManager(agentstate.State.APIClient.Tasks(), agentstate.State.APIClient.Attacks())
+	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
 	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
 	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
 

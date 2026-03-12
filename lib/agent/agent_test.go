@@ -30,7 +30,7 @@ func saveAndRestoreState(t *testing.T) func() {
 	origAgentID := agentstate.State.AgentID
 	origURL := agentstate.State.URL
 	origAPIToken := agentstate.State.APIToken
-	origAPIClient := agentstate.State.APIClient
+	origAPIClient := agentstate.State.GetAPIClient()
 	origHashcatPath := agentstate.State.HashcatPath
 	origForceBenchmarkRun := agentstate.State.GetForceBenchmarkRun()
 	origInsecureDownloads := agentstate.State.InsecureDownloads
@@ -40,6 +40,15 @@ func saveAndRestoreState(t *testing.T) func() {
 	origMaxHeartbeatBackoff := agentstate.State.MaxHeartbeatBackoff
 	origSleepOnFailure := agentstate.State.SleepOnFailure
 	origAlwaysUseNativeHashcat := agentstate.State.AlwaysUseNativeHashcat
+	origConnectTimeout := agentstate.State.ConnectTimeout
+	origReadTimeout := agentstate.State.ReadTimeout
+	origWriteTimeout := agentstate.State.WriteTimeout
+	origRequestTimeout := agentstate.State.RequestTimeout
+	origAPIMaxRetries := agentstate.State.APIMaxRetries
+	origAPIRetryInitialDelay := agentstate.State.APIRetryInitialDelay
+	origAPIRetryMaxDelay := agentstate.State.APIRetryMaxDelay
+	origCBFailureThreshold := agentstate.State.CircuitBreakerFailureThreshold
+	origCBTimeout := agentstate.State.CircuitBreakerTimeout
 
 	// Save synchronized fields via getters
 	origReload := agentstate.State.GetReload()
@@ -53,7 +62,7 @@ func saveAndRestoreState(t *testing.T) func() {
 		agentstate.State.AgentID = origAgentID
 		agentstate.State.URL = origURL
 		agentstate.State.APIToken = origAPIToken
-		agentstate.State.APIClient = origAPIClient
+		agentstate.State.SetAPIClient(origAPIClient)
 		agentstate.State.HashcatPath = origHashcatPath
 		agentstate.State.SetForceBenchmarkRun(origForceBenchmarkRun)
 		agentstate.State.InsecureDownloads = origInsecureDownloads
@@ -63,6 +72,15 @@ func saveAndRestoreState(t *testing.T) func() {
 		agentstate.State.MaxHeartbeatBackoff = origMaxHeartbeatBackoff
 		agentstate.State.SleepOnFailure = origSleepOnFailure
 		agentstate.State.AlwaysUseNativeHashcat = origAlwaysUseNativeHashcat
+		agentstate.State.ConnectTimeout = origConnectTimeout
+		agentstate.State.ReadTimeout = origReadTimeout
+		agentstate.State.WriteTimeout = origWriteTimeout
+		agentstate.State.RequestTimeout = origRequestTimeout
+		agentstate.State.APIMaxRetries = origAPIMaxRetries
+		agentstate.State.APIRetryInitialDelay = origAPIRetryInitialDelay
+		agentstate.State.APIRetryMaxDelay = origAPIRetryMaxDelay
+		agentstate.State.CircuitBreakerFailureThreshold = origCBFailureThreshold
+		agentstate.State.CircuitBreakerTimeout = origCBTimeout
 
 		agentstate.State.SetReload(origReload)
 		agentstate.State.SetJobCheckingStopped(origJobCheckingStopped)
@@ -660,9 +678,10 @@ func TestProcessTask_AcceptFailure(t *testing.T) {
 
 			agentstate.State.SleepOnFailure = 10 * time.Millisecond
 
+			testClient := agentstate.State.GetAPIClient()
 			taskMgr = task.NewManager(
-				agentstate.State.APIClient.Tasks(),
-				agentstate.State.APIClient.Attacks(),
+				testClient.Tasks(),
+				testClient.Attacks(),
 			)
 
 			testTask := testhelpers.NewTestTask(123, 456)
