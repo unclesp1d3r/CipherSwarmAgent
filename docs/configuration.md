@@ -81,6 +81,17 @@ download_max_retries: 3
 download_retry_delay: 2s
 insecure_downloads: false
 max_heartbeat_backoff: 6
+
+# HTTP resilience settings (server can override via /configuration endpoint)
+connect_timeout: 10s
+read_timeout: 30s
+write_timeout: 10s
+request_timeout: 60s
+api_max_retries: 3
+api_retry_initial_delay: 1s
+api_retry_max_delay: 30s
+circuit_breaker_failure_threshold: 5
+circuit_breaker_timeout: 60s
 ```
 
 You can specify a custom config file location:
@@ -277,6 +288,93 @@ These settings control retry behavior, timeouts, and circuit breakers for improv
 - **Range**: 1-10
 - **Note**: Deprecated alias `--max_heartbeat_backoff` remains functional for backward compatibility
 
+### HTTP Resilience Settings
+
+These settings control HTTP transport behavior including connection timeouts, request/response timeouts, automatic retries, and circuit breaker patterns for improved resilience when communicating with the CipherSwarm server.
+
+**Server-Driven Configuration**: These values can be overridden by server-recommended settings fetched from the `/configuration` endpoint. When the server provides `recommended_timeouts`, `recommended_retry`, or `recommended_circuit_breaker` settings, the agent applies them at startup and on configuration reload. This allows central management of resilience parameters across your agent fleet.
+
+#### `connect_timeout` / `CONNECT_TIMEOUT`
+
+- **Flag**: `--connect-timeout`
+- **Type**: Duration
+- **Default**: `10s`
+- **Description**: Maximum time to wait for TCP connection establishment to the server
+- **Environment**: `CIPHERSWARM_CONNECT_TIMEOUT`
+- **Examples**: `5s`, `15s`, `30s`
+
+#### `read_timeout` / `READ_TIMEOUT`
+
+- **Flag**: `--read-timeout`
+- **Type**: Duration
+- **Default**: `30s`
+- **Description**: Maximum time to wait for reading response data from the server
+- **Environment**: `CIPHERSWARM_READ_TIMEOUT`
+- **Examples**: `15s`, `45s`, `1m`
+
+#### `write_timeout` / `WRITE_TIMEOUT`
+
+- **Flag**: `--write-timeout`
+- **Type**: Duration
+- **Default**: `10s`
+- **Description**: Maximum time to wait for writing request data to the server
+- **Environment**: `CIPHERSWARM_WRITE_TIMEOUT`
+- **Examples**: `5s`, `15s`, `30s`
+
+#### `request_timeout` / `REQUEST_TIMEOUT`
+
+- **Flag**: `--request-timeout`
+- **Type**: Duration
+- **Default**: `60s`
+- **Description**: Maximum total time for an entire HTTP request/response cycle
+- **Environment**: `CIPHERSWARM_REQUEST_TIMEOUT`
+- **Examples**: `30s`, `2m`, `5m`
+
+#### `api_max_retries` / `API_MAX_RETRIES`
+
+- **Flag**: `--api-max-retries`
+- **Type**: Integer
+- **Default**: `3`
+- **Description**: Maximum number of retry attempts for failed API requests (network errors and 5xx responses)
+- **Environment**: `CIPHERSWARM_API_MAX_RETRIES`
+- **Range**: 1-10
+
+#### `api_retry_initial_delay` / `API_RETRY_INITIAL_DELAY`
+
+- **Flag**: `--api-retry-initial-delay`
+- **Type**: Duration
+- **Default**: `1s`
+- **Description**: Initial delay before the first retry attempt (uses exponential backoff)
+- **Environment**: `CIPHERSWARM_API_RETRY_INITIAL_DELAY`
+- **Examples**: `500ms`, `2s`, `5s`
+
+#### `api_retry_max_delay` / `API_RETRY_MAX_DELAY`
+
+- **Flag**: `--api-retry-max-delay`
+- **Type**: Duration
+- **Default**: `30s`
+- **Description**: Maximum delay between retry attempts (caps exponential backoff)
+- **Environment**: `CIPHERSWARM_API_RETRY_MAX_DELAY`
+- **Examples**: `15s`, `1m`, `2m`
+
+#### `circuit_breaker_failure_threshold` / `CIRCUIT_BREAKER_FAILURE_THRESHOLD`
+
+- **Flag**: `--circuit-breaker-failure-threshold`
+- **Type**: Integer
+- **Default**: `5`
+- **Description**: Number of consecutive failures before circuit breaker opens
+- **Environment**: `CIPHERSWARM_CIRCUIT_BREAKER_FAILURE_THRESHOLD`
+- **Range**: 1-20
+
+#### `circuit_breaker_timeout` / `CIRCUIT_BREAKER_TIMEOUT`
+
+- **Flag**: `--circuit-breaker-timeout`
+- **Type**: Duration
+- **Default**: `60s`
+- **Description**: Time to wait in open state before attempting to close the circuit breaker
+- **Environment**: `CIPHERSWARM_CIRCUIT_BREAKER_TIMEOUT`
+- **Examples**: `30s`, `2m`, `5m`
+
 ### Advanced Settings
 
 #### `enable_additional_hash_types` / `ENABLE_ADDITIONAL_HASH_TYPES`
@@ -340,6 +438,13 @@ task_timeout: 48h  # Allow longer tasks
 download_max_retries: 5  # More retries for network issues
 download_retry_delay: 5s  # Longer delay between retries
 max_heartbeat_backoff: 8  # Allow more backoff during network issues
+
+# HTTP resilience for production
+connect_timeout: 15s
+read_timeout: 45s
+request_timeout: 2m
+api_max_retries: 5
+circuit_breaker_failure_threshold: 10
 ```
 
 ### Development/Debug Setup
@@ -373,6 +478,16 @@ environment:
   - DOWNLOAD_MAX_RETRIES=3
   - DOWNLOAD_RETRY_DELAY=2s
   - MAX_HEARTBEAT_BACKOFF=6
+  # HTTP resilience settings
+  - CIPHERSWARM_CONNECT_TIMEOUT=10s
+  - CIPHERSWARM_READ_TIMEOUT=30s
+  - CIPHERSWARM_WRITE_TIMEOUT=10s
+  - CIPHERSWARM_REQUEST_TIMEOUT=60s
+  - CIPHERSWARM_API_MAX_RETRIES=3
+  - CIPHERSWARM_API_RETRY_INITIAL_DELAY=1s
+  - CIPHERSWARM_API_RETRY_MAX_DELAY=30s
+  - CIPHERSWARM_CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+  - CIPHERSWARM_CIRCUIT_BREAKER_TIMEOUT=60s
 ```
 
 ## Configuration Validation
