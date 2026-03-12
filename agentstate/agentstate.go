@@ -49,6 +49,15 @@ type agentState struct {
 	TaskTimeout                         time.Duration // TaskTimeout is the max time for a single task before forced termination.
 	MaxHeartbeatBackoff                 int           // MaxHeartbeatBackoff is the max multiplier for heartbeat backoff.
 	SleepOnFailure                      time.Duration // SleepOnFailure is how long to wait after a task failure before retrying.
+	ConnectTimeout                      time.Duration // ConnectTimeout is the TCP connect timeout for API requests.
+	ReadTimeout                         time.Duration // ReadTimeout is the read timeout for API responses.
+	WriteTimeout                        time.Duration // WriteTimeout is the write timeout for API requests.
+	RequestTimeout                      time.Duration // RequestTimeout is the overall request timeout for API calls.
+	APIMaxRetries                       int           // APIMaxRetries is the max retry attempts for failed API requests.
+	APIRetryInitialDelay                time.Duration // APIRetryInitialDelay is the initial delay between API retries.
+	APIRetryMaxDelay                    time.Duration // APIRetryMaxDelay is the maximum delay between API retries.
+	CircuitBreakerFailureThreshold      int           // CircuitBreakerFailureThreshold is failures before circuit opens.
+	CircuitBreakerTimeout               time.Duration // CircuitBreakerTimeout is the duration before half-open retry.
 	AlwaysUseNativeHashcat              bool          // AlwaysUseNativeHashcat forces using the system's native Hashcat binary.
 	Platform                            string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin"). Set once before goroutines start; safe to read from any goroutine.
 	AgentVersion                        string        // AgentVersion is the current version of the agent software. Set once in AuthenticateAgent before goroutines start; safe to read from any goroutine.
