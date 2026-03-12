@@ -31,10 +31,10 @@ type RecommendedCircuitBreaker struct {
 
 // agentConfiguration holds the configuration settings and API version for the agent client.
 type agentConfiguration struct {
-	Config                    agentConfig                `json:"config"                               yaml:"config"`
-	APIVersion                int64                      `json:"api_version"                          yaml:"api_version"`
-	BenchmarksNeeded          bool                       `json:"benchmarks_needed"                    yaml:"benchmarks_needed"`
-	RecommendedTimeouts       *RecommendedTimeouts       `json:"recommended_timeouts,omitempty"       yaml:"recommended_timeouts,omitempty"`
-	RecommendedRetry          *RecommendedRetry          `json:"recommended_retry,omitempty"          yaml:"recommended_retry,omitempty"`
+	Config                    agentConfig                `json:"config"                                yaml:"config"`
+	APIVersion                int64                      `json:"api_version"                           yaml:"api_version"`
+	BenchmarksNeeded          bool                       `json:"benchmarks_needed"                     yaml:"benchmarks_needed"`
+	RecommendedTimeouts       *RecommendedTimeouts       `json:"recommended_timeouts,omitempty"        yaml:"recommended_timeouts,omitempty"`
+	RecommendedRetry          *RecommendedRetry          `json:"recommended_retry,omitempty"           yaml:"recommended_retry,omitempty"`
 	RecommendedCircuitBreaker *RecommendedCircuitBreaker `json:"recommended_circuit_breaker,omitempty" yaml:"recommended_circuit_breaker,omitempty"`
 }
