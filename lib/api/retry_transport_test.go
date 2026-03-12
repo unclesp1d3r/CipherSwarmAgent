@@ -181,17 +181,39 @@ func TestRetryTransport_MaxAttemptsZeroDefaultsToOne(t *testing.T) {
 	require.Equal(t, int32(1), calls.Load())
 }
 
-func TestBackoffDelay_ExponentialWithCap(t *testing.T) {
+func TestBackoffDelay_ExponentialWithCapAndJitter(t *testing.T) {
 	rt := &RetryTransport{
 		InitialDelay: 100 * time.Millisecond,
 		MaxDelay:     500 * time.Millisecond,
 	}
 
-	require.Equal(t, 100*time.Millisecond, rt.backoffDelay(1))
-	require.Equal(t, 200*time.Millisecond, rt.backoffDelay(2))
-	require.Equal(t, 400*time.Millisecond, rt.backoffDelay(3))
-	require.Equal(t, 500*time.Millisecond, rt.backoffDelay(4)) // capped
-	require.Equal(t, 500*time.Millisecond, rt.backoffDelay(5)) // still capped
+	// Jitter returns [base/2, base], so we check ranges.
+	tests := []struct {
+		attempt int
+		minD    time.Duration // base/2
+		maxD    time.Duration // base (or cap)
+	}{
+		{1, 50 * time.Millisecond, 100 * time.Millisecond},
+		{2, 100 * time.Millisecond, 200 * time.Millisecond},
+		{3, 200 * time.Millisecond, 400 * time.Millisecond},
+		{4, 250 * time.Millisecond, 500 * time.Millisecond}, // capped at MaxDelay
+		{5, 250 * time.Millisecond, 500 * time.Millisecond}, // still capped
+	}
+
+	for _, tt := range tests {
+		delay := rt.backoffDelay(tt.attempt)
+		require.GreaterOrEqual(t, delay, tt.minD, "attempt %d", tt.attempt)
+		require.LessOrEqual(t, delay, tt.maxD, "attempt %d", tt.attempt)
+	}
+}
+
+func TestBackoffDelay_ZeroMaxDelayReturnsInitialDelay(t *testing.T) {
+	rt := &RetryTransport{
+		InitialDelay: 100 * time.Millisecond,
+		MaxDelay:     0,
+	}
+	delay := rt.backoffDelay(1)
+	require.Equal(t, 100*time.Millisecond, delay)
 }
 
 func TestRetryTransport_ShortCircuitsOnErrCircuitOpen(t *testing.T) {
@@ -308,6 +330,27 @@ func TestBackoffDelay_OverflowProtection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRetryTransport_RetriesOn429(t *testing.T) {
+	var calls atomic.Int32
+	rt := newTestRetryTransport(roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		n := calls.Add(1)
+		if n < 3 {
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       io.NopCloser(strings.NewReader("rate limited")),
+			}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+	}))
+
+	req := mustNewRequest(context.Background(), t)
+	resp, err := rt.RoundTrip(req) //nolint:bodyclose // http.NoBody
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, int32(3), calls.Load())
 }
 
 func TestSleepWithRequestContext_CompletesNormally(t *testing.T) {

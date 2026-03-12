@@ -57,11 +57,15 @@ func (h *Handler) Handle(ctx context.Context, err error, opts Options) error {
 	case stderrors.As(err, &ae):
 		h.handleAPIError(ctx, ae, opts)
 	default:
+		// Circuit breaker open is expected degraded-mode behavior, not an error
+		if stderrors.Is(err, api.ErrCircuitOpen) {
+			agentstate.Logger.Warn(opts.Message, "error", err)
+			break
+		}
 		agentstate.ErrorLogger.Error(opts.Message, "error", err)
-		// Skip server reporting for context cancellation and circuit breaker open
-		// (sending errors to the server would fail in both cases)
-		if stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded) ||
-			stderrors.Is(err, api.ErrCircuitOpen) {
+		// Skip server reporting for context cancellation
+		// (sending errors to the server would fail)
+		if stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded) {
 			break
 		}
 		if opts.SendToServer && h.SendError != nil {

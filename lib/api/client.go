@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"runtime"
 	"time"
 )
 
@@ -58,13 +59,7 @@ func NewAgentClient(serverURL, token string, cfg TransportConfig) (*AgentClient,
 	if cfg.BaseTransport != nil {
 		base = cfg.BaseTransport
 	} else {
-		base = &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: cfg.ConnectTimeout,
-			}).DialContext,
-			TLSHandshakeTimeout:   cfg.ReadTimeout,
-			ResponseHeaderTimeout: cfg.ReadTimeout,
-		}
+		base = defaultTransport(cfg)
 	}
 
 	circuitBreaker := cfg.CircuitBreaker
@@ -409,6 +404,34 @@ func (a *agentAuthClient) GetConfiguration(ctx context.Context) (*GetConfigurati
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
+
+// Transport defaults matching http.DefaultTransport.
+const (
+	defaultKeepAlive           = 30 * time.Second
+	defaultMaxIdleConns        = 100
+	defaultIdleConnTimeout     = 90 * time.Second
+	defaultExpectContinueTimer = 1 * time.Second
+)
+
+// defaultTransport creates an http.Transport that preserves http.DefaultTransport
+// defaults (ProxyFromEnvironment, HTTP/2, keep-alive, connection pooling) while
+// overriding dial/TLS/response-header timeouts from the TransportConfig.
+func defaultTransport(cfg TransportConfig) *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   cfg.ConnectTimeout,
+			KeepAlive: defaultKeepAlive,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          defaultMaxIdleConns,
+		MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
+		IdleConnTimeout:       defaultIdleConnTimeout,
+		TLSHandshakeTimeout:   cfg.ReadTimeout,
+		ResponseHeaderTimeout: cfg.ReadTimeout,
+		ExpectContinueTimeout: defaultExpectContinueTimer,
+	}
+}
 
 // newAPIError creates an APIError from HTTP response details.
 func newAPIError(statusCode int, status string, body []byte) *APIError {
