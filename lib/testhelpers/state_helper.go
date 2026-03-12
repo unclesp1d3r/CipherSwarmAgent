@@ -53,7 +53,6 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	apiClient, err := api.NewAgentClient(apiURL, apiToken, api.TransportConfig{
 		ConnectTimeout:                 config.DefaultConnectTimeout,
 		ReadTimeout:                    config.DefaultReadTimeout,
-		WriteTimeout:                   config.DefaultWriteTimeout,
 		RequestTimeout:                 config.DefaultRequestTimeout,
 		MaxRetries:                     1, // No retries in tests
 		RetryInitialDelay:              config.DefaultAPIRetryInitialDelay,
@@ -65,7 +64,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	if err != nil {
 		panic(err)
 	}
-	agentstate.State.APIClient = apiClient
+	agentstate.State.SetAPIClient(apiClient)
 
 	// Create directories
 	mustMkdirAll(agentstate.State.DataPath)
@@ -105,7 +104,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.RetainZapsOnCompletion = false
 		agentstate.State.EnableAdditionalHashTypes = false
 		agentstate.State.UseLegacyDeviceIdentificationMethod = false
-		agentstate.State.APIClient = nil
+		agentstate.State.SetAPIClient(nil)
 		agentstate.State.SetForceBenchmarkRun(false)
 		agentstate.State.InsecureDownloads = false
 		agentstate.State.DownloadMaxRetries = 0
@@ -161,7 +160,7 @@ func ResetTestState() {
 	agentstate.State.RetainZapsOnCompletion = false
 	agentstate.State.EnableAdditionalHashTypes = false
 	agentstate.State.UseLegacyDeviceIdentificationMethod = false
-	agentstate.State.APIClient = nil
+	agentstate.State.SetAPIClient(nil)
 	agentstate.State.SetForceBenchmarkRun(false)
 	agentstate.State.InsecureDownloads = false
 	agentstate.State.DownloadMaxRetries = 0
@@ -223,6 +222,15 @@ func SetupMinimalTestState(agentID int64) func() {
 		agentstate.State.FilePath = ""
 		agentstate.State.RestoreFilePath = ""
 		agentstate.State.BenchmarkCachePath = ""
+		agentstate.State.ConnectTimeout = 0
+		agentstate.State.ReadTimeout = 0
+		agentstate.State.WriteTimeout = 0
+		agentstate.State.RequestTimeout = 0
+		agentstate.State.APIMaxRetries = 0
+		agentstate.State.APIRetryInitialDelay = 0
+		agentstate.State.APIRetryMaxDelay = 0
+		agentstate.State.CircuitBreakerFailureThreshold = 0
+		agentstate.State.CircuitBreakerTimeout = 0
 	}
 }
 
