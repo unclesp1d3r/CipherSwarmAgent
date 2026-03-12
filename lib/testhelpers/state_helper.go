@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 )
 
 const dirPerm os.FileMode = 0o755
@@ -51,15 +51,15 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 	// We pass http.DefaultTransport (which httpmock replaces) as BaseTransport so
 	// the retry/circuit-breaker chain wraps the mock instead of a real http.Transport.
 	apiClient, err := api.NewAgentClient(apiURL, apiToken, api.TransportConfig{
-		ConnectTimeout:                 10 * time.Second,
-		ReadTimeout:                    30 * time.Second,
-		WriteTimeout:                   10 * time.Second,
-		RequestTimeout:                 60 * time.Second,
-		MaxRetries:                     1,
-		RetryInitialDelay:              1 * time.Second,
-		RetryMaxDelay:                  30 * time.Second,
-		CircuitBreakerFailureThreshold: 100,
-		CircuitBreakerTimeout:          30 * time.Second,
+		ConnectTimeout:                 config.DefaultConnectTimeout,
+		ReadTimeout:                    config.DefaultReadTimeout,
+		WriteTimeout:                   config.DefaultWriteTimeout,
+		RequestTimeout:                 config.DefaultRequestTimeout,
+		MaxRetries:                     1, // No retries in tests
+		RetryInitialDelay:              config.DefaultAPIRetryInitialDelay,
+		RetryMaxDelay:                  config.DefaultAPIRetryMaxDelay,
+		CircuitBreakerFailureThreshold: config.DefaultCircuitBreakerFailureThreshold,
+		CircuitBreakerTimeout:          config.DefaultCircuitBreakerTimeout,
 		BaseTransport:                  http.DefaultTransport,
 	})
 	if err != nil {

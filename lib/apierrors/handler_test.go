@@ -392,9 +392,8 @@ func TestHandler_Handle_CircuitOpenSkipsServerReport(t *testing.T) {
 
 	result := h.Handle(context.Background(), circuitErr, opts)
 
-	require.Error(t, result)
-	assert.ErrorIs(t, result, api.ErrCircuitOpen)
-	assert.False(t, sendCalled, "SendError should not be called when circuit breaker is open")
+	require.ErrorIs(t, result, api.ErrCircuitOpen)
+	require.False(t, sendCalled, "SendError should not be called when circuit breaker is open")
 }
 
 func TestIsCircuitOpen(t *testing.T) {

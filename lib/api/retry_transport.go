@@ -61,6 +61,7 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 		lastResp = resp
 		if resp.Body != nil {
+			//nolint:errcheck // draining body before close; errors are not actionable
 			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
 		}

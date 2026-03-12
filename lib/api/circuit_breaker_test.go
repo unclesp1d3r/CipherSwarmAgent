@@ -1,7 +1,7 @@
 package api
 
 import (
-	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -85,5 +85,6 @@ func TestCircuitBreaker_SuccessResetsFailureCount(t *testing.T) {
 }
 
 func TestCircuitBreaker_ErrCircuitOpen(t *testing.T) {
-	require.True(t, errors.Is(ErrCircuitOpen, ErrCircuitOpen))
+	err := fmt.Errorf("wrapped: %w", ErrCircuitOpen)
+	require.ErrorIs(t, err, ErrCircuitOpen)
 }

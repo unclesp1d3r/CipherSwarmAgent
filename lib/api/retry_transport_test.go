@@ -29,6 +29,14 @@ func newTestRetryTransport(base http.RoundTripper) *RetryTransport {
 	}
 }
 
+// mustNewRequest creates an HTTP request or fails the test.
+func mustNewRequest(ctx context.Context, t *testing.T) *http.Request {
+	t.Helper()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com", http.NoBody)
+	require.NoError(t, err)
+	return req
+}
+
 func TestRetryTransport_SuccessOnFirstAttempt(t *testing.T) {
 	var calls atomic.Int32
 	rt := newTestRetryTransport(roundTripFunc(func(_ *http.Request) (*http.Response, error) {
@@ -36,8 +44,8 @@ func TestRetryTransport_SuccessOnFirstAttempt(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
 	}))
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
-	resp, err := rt.RoundTrip(req)
+	req := mustNewRequest(context.Background(), t)
+	resp, err := rt.RoundTrip(req) //nolint:bodyclose // http.NoBody
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -55,8 +63,8 @@ func TestRetryTransport_RetriesOnNetworkError(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
 	}))
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
-	resp, err := rt.RoundTrip(req)
+	req := mustNewRequest(context.Background(), t)
+	resp, err := rt.RoundTrip(req) //nolint:bodyclose // http.NoBody
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -76,8 +84,8 @@ func TestRetryTransport_RetriesOn5xx(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
 	}))
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
-	resp, err := rt.RoundTrip(req)
+	req := mustNewRequest(context.Background(), t)
+	resp, err := rt.RoundTrip(req) //nolint:bodyclose // http.NoBody
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -91,8 +99,8 @@ func TestRetryTransport_DoesNotRetry4xx(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusNotFound, Body: http.NoBody}, nil
 	}))
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
-	resp, err := rt.RoundTrip(req)
+	req := mustNewRequest(context.Background(), t)
+	resp, err := rt.RoundTrip(req) //nolint:bodyclose // http.NoBody
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -109,8 +117,8 @@ func TestRetryTransport_ReturnsLast5xxAfterExhaustion(t *testing.T) {
 		}, nil
 	}))
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
-	resp, err := rt.RoundTrip(req)
+	req := mustNewRequest(context.Background(), t)
+	resp, err := rt.RoundTrip(req) //nolint:bodyclose // test fixture body
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
@@ -123,8 +131,8 @@ func TestRetryTransport_ReturnsErrorAfterExhaustion(t *testing.T) {
 		return nil, errNetwork
 	}))
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
-	resp, err := rt.RoundTrip(req)
+	req := mustNewRequest(context.Background(), t)
+	resp, err := rt.RoundTrip(req) //nolint:bodyclose // error path, resp is nil
 
 	require.Nil(t, resp)
 	require.Error(t, err)
@@ -146,8 +154,8 @@ func TestRetryTransport_RespectsContextCancellation(t *testing.T) {
 		cancel()
 	}()
 
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com", nil)
-	_, err := rt.RoundTrip(req)
+	req := mustNewRequest(ctx, t)
+	_, err := rt.RoundTrip(req) //nolint:bodyclose // error path, no body
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.Canceled)
@@ -163,8 +171,8 @@ func TestRetryTransport_MaxAttemptsZeroDefaultsToOne(t *testing.T) {
 		MaxAttempts: 0,
 	}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
-	resp, err := rt.RoundTrip(req)
+	req := mustNewRequest(context.Background(), t)
+	resp, err := rt.RoundTrip(req) //nolint:bodyclose // http.NoBody
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
