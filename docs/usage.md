@@ -109,6 +109,33 @@ The agent includes built-in HTTP resilience mechanisms to handle network issues 
 
 - **Half-Open State Testing**: After the circuit breaker timeout expires, the circuit enters a "half-open" state and allows a single probe request to test if the server has recovered. If successful, the circuit closes and normal operation resumes; if it fails, the circuit reopens.
 
+**Circuit Breaker State Transitions:**
+
+1. **Closed State (Normal)**: All requests proceed normally. Failures are tracked.
+2. **Open State (Protecting)**: After reaching the failure threshold (default: 5 failures), the circuit opens. API requests fail immediately with `ErrCircuitOpen` instead of attempting network calls.
+3. **Half-Open State (Testing)**: After the timeout period (default: 60s), the circuit allows one probe request to test server recovery.
+4. **Recovery**: If the probe succeeds, the circuit closes and normal operation resumes. If it fails, the circuit reopens for another timeout period.
+
+**What You'll See in Logs:**
+
+During circuit open state:
+```
+[Warn] Circuit breaker open, server appears unresponsive
+[Warn] Circuit breaker open, skipping task retrieval
+```
+
+After recovery:
+```
+[Info] Applied server-recommended timeouts - connect=10s, read=30s, write=10s, request=60s
+[Info] Agent authenticated successfully
+```
+
+**Recovery Actions:**
+- Agent automatically recovers - no manual intervention needed
+- Error reporting is skipped when circuit is open to prevent cascading failures
+- No agent restart required
+- If circuit remains open for >5 minutes, investigate server availability
+
 **Note**: These settings are automatically applied from server-recommended values during agent startup. Manual overrides via command-line flags or configuration files take precedence.
 
 ## Agent Lifecycle and States
@@ -403,6 +430,16 @@ pkill -9 cipherswarm-agent  # force kill if needed
 - Check GPU driver status
 
 #### Task Failures
+
+#### Task Acceptance Failures
+
+Task acceptance can fail in two ways:
+
+1. **404 Not Found (ErrTaskAcceptNotFound)**: The task disappeared between assignment and acceptance - a normal race condition when multiple agents compete for work. The agent skips the AbandonTask call, cleans up local files immediately, and requests new work without delay. This is expected behavior.
+
+2. **Non-404 Acceptance Failure (ErrTaskAcceptFailed)**: Server rejected acceptance for other reasons (validation error, server error, permission issue). The agent calls AbandonTask to release the task, cleans up local files, sleeps for configured delay, then requests new work. This is concerning and requires investigation.
+
+For detailed troubleshooting of acceptance failures, see [Task Acceptance Failures](https://github.com/unclesp1d3r/CipherSwarm/blob/main/docs/user-guide/troubleshooting-agents.md#task-acceptance-failures) in the CipherSwarm troubleshooting guide.
 
 #### Download Failures
 
