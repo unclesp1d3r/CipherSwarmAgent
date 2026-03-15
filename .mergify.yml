@@ -37,15 +37,12 @@ queue_rules:
       - check-success = Build and test (stable, windows-latest)
       - check-success = DCO
 
-  # Maintainer: merge protections + lgtm label
+  # Maintainer: manually enqueued
   - name: maintainer
     merge_method: squash
-    autoqueue: true
+    autoqueue: false
     queue_conditions:
-      - author = unclesp1d3r
       - base = main
-      - label = lgtm
-      - label != do-not-merge
     merge_conditions:
       - check-success = lint
       - check-success = Build and test (stable, ubuntu-latest)
@@ -53,17 +50,12 @@ queue_rules:
       - check-success = Build and test (stable, windows-latest)
       - check-success = DCO
 
-  # External contributors: merge protections + approved review
+  # External contributors: manually enqueued
   - name: external
     merge_method: squash
-    autoqueue: true
+    autoqueue: false
     queue_conditions:
       - base = main
-      - author != unclesp1d3r
-      - author != dependabot[bot]
-      - author != dosubot[bot]
-      - label != do-not-merge
-      - branch-protection-review-decision = APPROVED
     merge_conditions:
       - check-success = lint
       - check-success = Build and test (stable, ubuntu-latest)
