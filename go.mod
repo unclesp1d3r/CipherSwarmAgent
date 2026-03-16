@@ -6,7 +6,7 @@ require (
 	github.com/charmbracelet/log v1.0.0
 	github.com/cheggaaa/pb/v3 v3.1.7
 	github.com/dustin/go-humanize v1.0.1
-	github.com/hashicorp/go-getter v1.8.4
+	github.com/hashicorp/go-getter v1.8.5
 	github.com/jarcoal/httpmock v1.4.1
 	github.com/muesli/go-app-paths v0.2.2
 	github.com/nxadm/tail v1.4.11
