@@ -238,7 +238,8 @@ func handleNonExhaustedError(
 		// restore file has been removed)
 		errorInfo := hashcat.ClassifyStderr(err.Error())
 		cserrors.SendAgentError(ctx, err.Error(), task, errorInfo.Severity,
-			cserrors.WithClassification(errorInfo.Category.String(), errorInfo.Retryable))
+			cserrors.WithClassification(errorInfo.Category.String(), errorInfo.Retryable),
+			cserrors.WithContext(errorInfo.Context))
 		display.JobFailed(err)
 
 		return
