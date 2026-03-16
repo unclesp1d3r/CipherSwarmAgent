@@ -5,23 +5,40 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
-// Hashcat exit codes.
-// Codes 0-4 and -1 are documented in hashcat source (types.h).
-// Negative codes -2 through -7 are observed from specific failure modes
-// and may vary by hashcat version; they are not officially documented.
+// Hashcat exit codes from types.h (hashcat 7.x).
+// Positive codes are RC_FINAL_* (official), negative codes map to shell values
+// 245-255 via unsigned conversion.
 const (
-	ExitCodeSuccess        = 0  // Success/Cracked (official: RC_FINAL_OK)
-	ExitCodeExhausted      = 1  // Exhausted (official: RC_FINAL_EXHAUSTED)
-	ExitCodeAborted        = 2  // Aborted (official: RC_FINAL_ABORT)
-	ExitCodeCheckpoint     = 3  // Aborted by checkpoint (official: RC_FINAL_ABORT_CHECKPOINT)
-	ExitCodeRuntimeLimit   = 4  // Aborted by runtime limit (official: RC_FINAL_ABORT_RUNTIME)
-	ExitCodeGeneralError   = -1 // General error (official: RC_FINAL_ERROR)
-	ExitCodeGPUWatchdog    = -2 // GPU watchdog alarm (observed, not official)
-	ExitCodeBackendAbort   = -3 // Backend abort (observed, not official)
-	ExitCodeBackendChkpt   = -4 // Backend checkpoint abort (observed, not official)
-	ExitCodeBackendRuntime = -5 // Backend runtime abort (observed, not official)
-	ExitCodeSelftestFail   = -6 // Backend selftest fail (observed, not official)
-	ExitCodeAutotuneFail   = -7 // Backend autotune fail (observed, not official)
+	// ExitCodeSuccess indicates at least one hash was cracked.
+	ExitCodeSuccess = 0 // RC_FINAL_OK
+	// ExitCodeExhausted indicates the keyspace was fully exhausted.
+	ExitCodeExhausted = 1 // RC_FINAL_EXHAUSTED
+	// ExitCodeAborted indicates the session was aborted by the user.
+	ExitCodeAborted = 2 // RC_FINAL_ABORT
+	// ExitCodeCheckpoint indicates the session was aborted at a checkpoint.
+	ExitCodeCheckpoint = 3 // RC_FINAL_ABORT_CHECKPOINT
+	// ExitCodeRuntimeLimit indicates the session hit the runtime limit.
+	ExitCodeRuntimeLimit = 4 // RC_FINAL_ABORT_RUNTIME
+	// ExitCodeAbortFinish indicates the session was aborted after the finish flag was set.
+	ExitCodeAbortFinish = 5 // RC_FINAL_ABORT_FINISH
+	// ExitCodeGeneralError indicates a general error (STATUS_ERROR).
+	ExitCodeGeneralError = -1 // shell: 255
+	// ExitCodeRuntimeSkip indicates all backend devices were skipped at runtime.
+	ExitCodeRuntimeSkip = -3 // shell: 253
+	// ExitCodeMemoryHit indicates insufficient device memory.
+	ExitCodeMemoryHit = -4 // shell: 252
+	// ExitCodeKernelBuild indicates kernel compilation failed.
+	ExitCodeKernelBuild = -5 // shell: 251
+	// ExitCodeKernelCreate indicates kernel creation failed.
+	ExitCodeKernelCreate = -6 // shell: 250
+	// ExitCodeKernelAccel indicates autotune failed on all devices.
+	ExitCodeKernelAccel = -7 // shell: 249
+	// ExitCodeExtraSize indicates an extra_size backend issue.
+	ExitCodeExtraSize = -8 // shell: 248
+	// ExitCodeMixedWarnings indicates multiple backend issues.
+	ExitCodeMixedWarnings = -9 // shell: 247
+	// ExitCodeSelftestFail indicates the kernel self-test failed.
+	ExitCodeSelftestFail = -11 // shell: 245
 )
 
 // ExitCodeInfo contains information about a hashcat exit code.
@@ -31,6 +48,7 @@ type ExitCodeInfo struct {
 	Retryable bool
 	Status    string
 	ExitCode  int
+	Context   map[string]any
 }
 
 // ClassifyExitCode classifies a hashcat exit code and returns detailed information.
@@ -43,6 +61,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "cracked",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "success"},
 		}
 	case ExitCodeExhausted:
 		return ExitCodeInfo{
@@ -51,6 +70,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "exhausted",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "exhausted"},
 		}
 	case ExitCodeAborted:
 		return ExitCodeInfo{
@@ -59,6 +79,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: true,
 			Status:    "aborted",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "aborted"},
 		}
 	case ExitCodeCheckpoint:
 		return ExitCodeInfo{
@@ -67,6 +88,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: true,
 			Status:    "checkpoint",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "checkpoint"},
 		}
 	case ExitCodeRuntimeLimit:
 		return ExitCodeInfo{
@@ -75,6 +97,16 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: true,
 			Status:    "runtime_limit",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "runtime_limit"},
+		}
+	case ExitCodeAbortFinish:
+		return ExitCodeInfo{
+			Category:  ErrorCategoryRetryable,
+			Severity:  api.SeverityMinor,
+			Retryable: true,
+			Status:    "abort_finish",
+			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "abort_finish"},
 		}
 	case ExitCodeGeneralError:
 		return ExitCodeInfo{
@@ -83,38 +115,70 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "error",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "general_error"},
 		}
-	case ExitCodeGPUWatchdog:
+	case ExitCodeRuntimeSkip:
+		return ExitCodeInfo{
+			Category:  ErrorCategoryBackend,
+			Severity:  api.SeverityCritical,
+			Retryable: false,
+			Status:    "runtime_skip",
+			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "runtime_skip"},
+		}
+	case ExitCodeMemoryHit:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryDevice,
 			Severity:  api.SeverityFatal,
 			Retryable: false,
-			Status:    "gpu_watchdog",
+			Status:    "memory_hit",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "memory_hit"},
 		}
-	case ExitCodeBackendAbort:
+	case ExitCodeKernelBuild:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
 			Severity:  api.SeverityCritical,
 			Retryable: false,
-			Status:    "backend_abort",
+			Status:    "kernel_build",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "kernel_build"},
 		}
-	case ExitCodeBackendChkpt:
+	case ExitCodeKernelCreate:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
 			Severity:  api.SeverityCritical,
 			Retryable: false,
-			Status:    "backend_checkpoint",
+			Status:    "kernel_create",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "kernel_create"},
 		}
-	case ExitCodeBackendRuntime:
+	case ExitCodeKernelAccel:
 		return ExitCodeInfo{
 			Category:  ErrorCategoryBackend,
 			Severity:  api.SeverityCritical,
 			Retryable: false,
-			Status:    "backend_runtime",
+			Status:    "kernel_accel",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "kernel_accel"},
+		}
+	case ExitCodeExtraSize:
+		return ExitCodeInfo{
+			Category:  ErrorCategoryBackend,
+			Severity:  api.SeverityCritical,
+			Retryable: false,
+			Status:    "extra_size",
+			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "extra_size"},
+		}
+	case ExitCodeMixedWarnings:
+		return ExitCodeInfo{
+			Category:  ErrorCategoryBackend,
+			Severity:  api.SeverityCritical,
+			Retryable: false,
+			Status:    "mixed_warnings",
+			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "mixed_warnings"},
 		}
 	case ExitCodeSelftestFail:
 		return ExitCodeInfo{
@@ -123,22 +187,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "selftest_fail",
 			ExitCode:  exitCode,
-		}
-	case ExitCodeAutotuneFail:
-		return ExitCodeInfo{
-			Category:  ErrorCategoryBackend,
-			Severity:  api.SeverityCritical,
-			Retryable: false,
-			Status:    "autotune_fail",
-			ExitCode:  exitCode,
-		}
-	case -8, -9, -10, -11:
-		return ExitCodeInfo{
-			Category:  ErrorCategoryBackend,
-			Severity:  api.SeverityCritical,
-			Retryable: false,
-			Status:    "backend_error",
-			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "selftest_fail"},
 		}
 	default:
 		return ExitCodeInfo{
@@ -147,6 +196,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "unknown",
 			ExitCode:  exitCode,
+			Context:   map[string]any{"exit_code_name": "unknown"},
 		}
 	}
 }
