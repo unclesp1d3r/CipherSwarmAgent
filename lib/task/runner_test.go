@@ -244,6 +244,18 @@ func TestClassifyStderr_KnownPatterns(t *testing.T) {
 			expectedCategory: hashcat.ErrorCategoryHashFormat,
 			expectedSeverity: api.SeverityCritical,
 		},
+		{
+			name:             "v7 hashfile parsing error",
+			line:             "Hash parsing error in hashfile: '/tmp/h.txt' on line 5 ($2a$10$abc): Token length exception",
+			expectedCategory: hashcat.ErrorCategoryHashFormat,
+			expectedSeverity: api.SeverityCritical,
+		},
+		{
+			name:             "machine-readable hash error",
+			line:             "/tmp/hashes.txt:5:$2a$10$abc:Token length exception",
+			expectedCategory: hashcat.ErrorCategoryHashFormat,
+			expectedSeverity: api.SeverityCritical,
+		},
 	}
 
 	for _, tt := range errorPatterns {
