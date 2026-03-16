@@ -53,6 +53,7 @@ type Session struct {
 	DoneChan           chan error     // Channel signaling process completion
 	SkipStatusUpdates  bool           // Flag to disable status update parsing
 	RestoreFilePath    string         // Path to session restore file
+	sessionName        string         // Hashcat session name (e.g., "attack-123") for file cleanup
 	pStdout            io.ReadCloser  // Stdout pipe from hashcat process
 	pStderr            io.ReadCloser  // Stderr pipe from hashcat process
 }
@@ -104,6 +105,8 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		}
 	}
 
+	sessionName := "attack-" + id
+
 	return &Session{
 		proc: exec.CommandContext(
 			ctx,
@@ -122,6 +125,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		DoneChan:           make(chan error),
 		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
 		RestoreFilePath:    params.RestoreFilePath,
+		sessionName:        sessionName,
 	}, nil
 }
 
@@ -459,6 +463,14 @@ func (sess *Session) Cleanup() {
 	if strings.TrimSpace(sess.RestoreFilePath) != "" {
 		removeFile(sess.RestoreFilePath)
 		sess.RestoreFilePath = ""
+	}
+
+	// Remove hashcat session .log and .pid files.
+	// Hashcat creates these automatically when invoked with --session.
+	if sess.sessionName != "" {
+		removeFile(sess.sessionName + ".log")
+		removeFile(sess.sessionName + ".pid")
+		sess.sessionName = ""
 	}
 }
 

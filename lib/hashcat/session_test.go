@@ -97,6 +97,63 @@ func TestCleanup_SkipsEmptyRestoreFilePath(t *testing.T) {
 	sess.Cleanup()
 }
 
+// TestCleanup_RemovesSessionLogAndPidFiles verifies that Cleanup removes
+// the .log and .pid files created by hashcat for the session.
+func TestCleanup_RemovesSessionLogAndPidFiles(t *testing.T) {
+	setupSessionTestState(t)
+
+	tempDir := t.TempDir()
+
+	sessionName := "attack-42"
+	logFile := filepath.Join(tempDir, sessionName+".log")
+	pidFile := filepath.Join(tempDir, sessionName+".pid")
+
+	require.NoError(t, os.WriteFile(logFile, []byte("log data"), 0o600))
+	require.NoError(t, os.WriteFile(pidFile, []byte("12345"), 0o600))
+
+	// Change to tempDir so Cleanup finds the session files (hashcat uses CWD)
+	t.Chdir(tempDir)
+
+	sess := &Session{
+		sessionName: sessionName,
+	}
+
+	sess.Cleanup()
+
+	_, err := os.Stat(logFile)
+	require.True(t, os.IsNotExist(err), ".log file should be removed after Cleanup")
+	_, err = os.Stat(pidFile)
+	require.True(t, os.IsNotExist(err), ".pid file should be removed after Cleanup")
+	require.Empty(t, sess.sessionName, "sessionName should be cleared after Cleanup")
+}
+
+// TestCleanup_IdempotentSessionFiles verifies that Cleanup does not error
+// when session .log and .pid files do not exist.
+func TestCleanup_IdempotentSessionFiles(t *testing.T) {
+	setupSessionTestState(t)
+
+	sess := &Session{
+		sessionName: "attack-nonexistent",
+	}
+
+	// Should not panic or error
+	sess.Cleanup()
+	require.Empty(t, sess.sessionName, "sessionName should be cleared even when files don't exist")
+}
+
+// TestCleanup_SkipsEmptySessionName verifies that Cleanup handles
+// an empty sessionName gracefully without attempting file removal.
+func TestCleanup_SkipsEmptySessionName(t *testing.T) {
+	setupSessionTestState(t)
+
+	sess := &Session{
+		sessionName: "",
+	}
+
+	// Should not panic
+	sess.Cleanup()
+}
+
 // testTimeout is the maximum time to wait for a goroutine to exit in cancellation tests.
 const testTimeout = 5 * time.Second
 
