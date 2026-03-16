@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
@@ -359,7 +360,8 @@ func TestHandleBenchmarkStdErrLine(t *testing.T) {
 			testhelpers.MockSubmitErrorSuccess(789)
 
 			// Should not panic
-			handleBenchmarkStdErrLine(context.Background(), tt.line)
+			errInfo := hashcat.ClassifyStderr(tt.line)
+			handleBenchmarkStdErrLine(context.Background(), errInfo)
 
 			if tt.expectAPICall {
 				callCount := testhelpers.GetSubmitErrorCallCount(789, "https://test.api")
