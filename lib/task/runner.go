@@ -81,8 +81,8 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 				return
 			case stdoutLine := <-sess.StdoutLines:
 				handleStdOutLine(ctx, stdoutLine, task)
-			case stdErrLine := <-sess.StderrMessages:
-				handleStdErrLine(ctx, stdErrLine, task)
+			case errInfo := <-sess.StderrMessages:
+				handleStdErrLine(ctx, errInfo, task)
 			case statusUpdate := <-sess.StatusUpdates:
 				m.handleStatusUpdate(ctx, statusUpdate, task, sess)
 			case crackedHash := <-sess.CrackedHashes:
@@ -125,16 +125,15 @@ func handleStdOutLine(ctx context.Context, stdoutLine string, task *api.Task) {
 	}
 }
 
-// handleStdErrLine handles a single line of standard error output by classifying it
-// and sending it to the server with the appropriate severity level.
-func handleStdErrLine(ctx context.Context, stdErrLine string, task *api.Task) {
-	display.JobError(stdErrLine)
+// handleStdErrLine handles a pre-classified error from hashcat by displaying it
+// and sending it to the server with the classified severity and structured context.
+func handleStdErrLine(ctx context.Context, errInfo hashcat.ErrorInfo, task *api.Task) {
+	display.JobError(errInfo.Message)
 
-	if strings.TrimSpace(stdErrLine) != "" {
-		// Classify the stderr line to determine appropriate severity
-		errorInfo := hashcat.ClassifyStderr(stdErrLine)
-		cserrors.SendAgentError(ctx, stdErrLine, task, errorInfo.Severity,
-			cserrors.WithClassification(errorInfo.Category.String(), errorInfo.Retryable))
+	if strings.TrimSpace(errInfo.Message) != "" {
+		cserrors.SendAgentError(ctx, errInfo.Message, task, errInfo.Severity,
+			cserrors.WithClassification(errInfo.Category.String(), errInfo.Retryable),
+			cserrors.WithContext(errInfo.Context))
 	}
 }
 
@@ -245,13 +244,14 @@ func handleNonExhaustedError(
 		return
 	}
 
-	// Send error with classified severity and metadata
+	// Send error with classified severity, metadata, and structured context
 	cserrors.SendAgentError(
 		ctx,
 		err.Error(),
 		task,
 		exitInfo.Severity,
 		cserrors.WithClassification(exitInfo.Category.String(), exitInfo.Retryable),
+		cserrors.WithContext(exitInfo.Context),
 	)
 	display.JobFailed(err)
 }
