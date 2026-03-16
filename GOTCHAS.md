@@ -42,6 +42,12 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - When `golines` splits multi-line expressions, even short inline `//nolint:` comments get displaced. Place nolint as a standalone comment on the line above.
 - `//nolint:revive` on `APIError`, `Error_`, and `APIClient` can be stripped by `golines` or other formatters. Verify they survive after running formatters.
 
+## Hashcat Output Routing
+
+- Hashcat `event_log_warning` and `event_log_advice` go to **stdout**, not stderr — only `event_log_error` goes to stderr. Hash parse errors (Token length exception, Separator unmatched, etc.) are warnings, so they appear on stdout.
+- `--status-json` only structures the periodic status display — errors/warnings remain plain text regardless of output mode.
+- v7.x changed per-hash error prefix from `Hashfile '...'` to `Hash parsing error in hashfile: '...'` — patterns must match both.
+
 ## Code Generation (oapi-codegen)
 
 - oapi-codegen v2 config does NOT support `input-spec` — the spec path must be a positional CLI argument.
