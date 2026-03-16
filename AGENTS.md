@@ -35,7 +35,9 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - **Version-specific formats:** v6.x uses `Hashfile '<file>' on line N (<hash>): <error>`, v7.x changed to `Hash parsing error in hashfile: '<file>' on line N (<hash>): <error>`. Machine-readable mode (`--machine-readable`) uses `<file>:<line>:<hash>:<error>`. Patterns must handle both versions.
 - **Stdout→StderrMessages routing:** Non-JSON stdout lines are classified by `ClassifyStderr` in `handleStdout()` (`lib/hashcat/session.go`). Error/warning categories are forwarded as `ErrorInfo` (not raw strings) to the `StderrMessages` channel. Consumers: `lib/task/runner.go`, `lib/testManager.go`, `lib/benchmark/parse.go`. Info/success categories are logged locally only.
 - **Exit codes** (`lib/hashcat/exitcode.go`): Constants and classifications are sourced from hashcat `types.h` — not observed behavior. `ExitCodeInfo` includes `Context map[string]any` with `exit_code_name`.
+- **Shell exit code normalization:** On Unix, hashcat's negative exit codes (e.g., -11) arrive as unsigned 8-bit (e.g., 245). `normalizeExitCode` in `lib/task/runner.go` converts 245-255 → -11 to -1 before `ClassifyExitCode`.
 - **Structured error metadata:** `cserrors.WithContext(map[string]any)` merges extracted fields into the API error metadata `other` map. Always pair with `WithClassification` when sending classified errors.
+- **Metadata key precedence:** In `SendAgentError`, context fields are copied first, then reserved keys (`platform`, `version`, `category`, `retryable`) are set — so reserved keys always win over context collisions.
 
 ## Go
 
