@@ -47,6 +47,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - Hashcat `event_log_warning` and `event_log_advice` go to **stdout**, not stderr — only `event_log_error` goes to stderr. Hash parse errors (Token length exception, Separator unmatched, etc.) are warnings, so they appear on stdout.
 - `--status-json` only structures the periodic status display — errors/warnings remain plain text regardless of output mode.
 - v7.x changed per-hash error prefix from `Hashfile '...'` to `Hash parsing error in hashfile: '...'` — patterns must match both.
+- Machine-readable error format (`<file>:<line>:<hash>:<error>`) uses colons as delimiters, but many hash types also contain colons (MD5:salt, PBKDF2 `sha256:20000:salt`, Kerberos). The regex uses non-greedy `(.+?)` for the file path capture — greedy `(.+)` misparses by consuming hash colons into the file group. Any new colon-delimited parsing must account for hash types with embedded colons.
 
 ## Code Generation (oapi-codegen)
 
