@@ -48,7 +48,7 @@ type Session struct {
 	cancelMu           sync.Mutex    // Protects cancel field from concurrent access
 	CrackedHashes      chan Result   // Channel for successfully cracked hashes
 	StatusUpdates      chan Status   // Channel for periodic status updates
-	StderrMessages     chan string   // Channel for error messages from hashcat
+	StderrMessages     chan ErrorInfo // Channel for classified error messages from hashcat
 	StdoutLines        chan string   // Channel for stdout lines from hashcat
 	DoneChan           chan error    // Channel signaling process completion
 	SkipStatusUpdates  bool          // Flag to disable status update parsing
@@ -117,7 +117,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		shardedCharsetFile: nil,
 		CrackedHashes:      make(chan Result, channelBufferSize),
 		StatusUpdates:      make(chan Status, channelBufferSize),
-		StderrMessages:     make(chan string, channelBufferSize),
+		StderrMessages:     make(chan ErrorInfo, channelBufferSize),
 		StdoutLines:        make(chan string, channelBufferSize),
 		DoneChan:           make(chan error),
 		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
@@ -312,7 +312,7 @@ scanLoop:
 						agentstate.Logger.Warn("hashcat stdout warning", "line", line)
 
 						select {
-						case sess.StderrMessages <- line:
+						case sess.StderrMessages <- errInfo:
 						case <-sess.ctx.Done():
 							agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
 								"line", line)
@@ -325,7 +325,7 @@ scanLoop:
 							"severity", errInfo.Severity)
 
 						select {
-						case sess.StderrMessages <- line:
+						case sess.StderrMessages <- errInfo:
 						case <-sess.ctx.Done():
 							agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
 								"line", line)
@@ -360,15 +360,17 @@ scanLoop:
 }
 
 // handleStderr processes stderr output from the hashcat process.
-// Each line is logged and sent through the StderrMessages channel.
+// Each line is classified and sent through the StderrMessages channel as ErrorInfo.
 func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
 		line := scanner.Text()
 		agentstate.Logger.Error("read stderr", "text", line)
 
+		errInfo := ClassifyStderr(line)
+
 		select {
-		case sess.StderrMessages <- line:
+		case sess.StderrMessages <- errInfo:
 		case <-sess.ctx.Done():
 			agentstate.Logger.Warn("Stderr line dropped due to context cancellation",
 				"text", line)

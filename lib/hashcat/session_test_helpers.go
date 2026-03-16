@@ -12,7 +12,7 @@ func NewTestSession(skipStatusUpdates bool) *Session {
 	return &Session{
 		CrackedHashes:     make(chan Result, testChannelBufferSize),
 		StatusUpdates:     make(chan Status, testChannelBufferSize),
-		StderrMessages:    make(chan string, testChannelBufferSize),
+		StderrMessages:    make(chan ErrorInfo, testChannelBufferSize),
 		StdoutLines:       make(chan string, testChannelBufferSize),
 		DoneChan:          make(chan error, 1),
 		SkipStatusUpdates: skipStatusUpdates,
