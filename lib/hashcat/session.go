@@ -299,41 +299,8 @@ scanLoop:
 
 					break scanLoop
 				}
-			} else {
-				if strings.Contains(line, "starting in restore mode") {
-					agentstate.Logger.Info("Hashcat is starting in restore mode")
-				} else {
-					errInfo := ClassifyStderr(line)
-
-					switch errInfo.Category {
-					case ErrorCategoryInfo, ErrorCategorySuccess:
-						agentstate.Logger.Info("hashcat stdout", "line", line)
-					case ErrorCategoryWarning:
-						agentstate.Logger.Warn("hashcat stdout warning", "line", line)
-
-						select {
-						case sess.StderrMessages <- errInfo:
-						case <-sess.ctx.Done():
-							agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
-								"line", line)
-
-							break scanLoop
-						}
-					default:
-						agentstate.Logger.Error("hashcat stdout error", "line", line,
-							"category", errInfo.Category.String(),
-							"severity", errInfo.Severity)
-
-						select {
-						case sess.StderrMessages <- errInfo:
-						case <-sess.ctx.Done():
-							agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
-								"line", line)
-
-							break scanLoop
-						}
-					}
-				}
+			} else if !sess.classifyAndForwardStdout(line) {
+				break scanLoop
 			}
 		}
 	}
@@ -377,6 +344,42 @@ func (sess *Session) handleStderr() {
 
 			return // return directly: stderr goroutine does not own DoneChan
 		}
+	}
+}
+
+// classifyAndForwardStdout classifies a non-JSON stdout line and forwards it to
+// StderrMessages if it represents a warning or error. Info/success lines are logged
+// locally only. Returns true to continue processing, false if context was cancelled.
+func (sess *Session) classifyAndForwardStdout(line string) bool {
+	if strings.Contains(line, "starting in restore mode") {
+		agentstate.Logger.Info("Hashcat is starting in restore mode")
+
+		return true
+	}
+
+	errInfo := ClassifyStderr(line)
+
+	switch errInfo.Category {
+	case ErrorCategoryInfo, ErrorCategorySuccess:
+		agentstate.Logger.Info("hashcat stdout", "line", line)
+
+		return true
+	case ErrorCategoryWarning:
+		agentstate.Logger.Warn("hashcat stdout warning", "line", line)
+	default:
+		agentstate.Logger.Error("hashcat stdout error", "line", line,
+			"category", errInfo.Category.String(),
+			"severity", errInfo.Severity)
+	}
+
+	select {
+	case sess.StderrMessages <- errInfo:
+		return true
+	case <-sess.ctx.Done():
+		agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
+			"line", line)
+
+		return false
 	}
 }
 

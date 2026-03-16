@@ -190,6 +190,8 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Context:   map[string]any{"exit_code_name": "selftest_fail"},
 		}
 	default:
+		// Exit codes -2 and -10 are not defined in hashcat types.h;
+		// they fall through here intentionally.
 		return ExitCodeInfo{
 			Category:  ErrorCategoryUnknown,
 			Severity:  api.SeverityCritical,
