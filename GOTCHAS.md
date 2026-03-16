@@ -5,21 +5,35 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 ## Linting
 
 - `//go:fix inline` directives conflict with `gocheckcompilerdirectives` — avoid adding them.
+
 - `just ci-check` includes a `go fix -diff` dry-run whose output is informational only, not a failure.
+
 - `contextcheck` flags functions not propagating context — use `//nolint:contextcheck // reason` when the callee genuinely cannot accept a context parameter.
+
 - `revive` requires each exported constant to have its own `// ConstName is...` doc comment. A group comment alone doesn't satisfy it.
+
 - `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
+
 - `//nolint:errcheck` does NOT suppress `gosec` G104 (unhandled error return) — list both (e.g., `//nolint:gosec,errcheck // G104 - reason`).
+
 - `containedctx` flags `context.Context` stored in structs — use `//nolint:containedctx // reason` when the context is intentionally part of the struct lifecycle.
+
 - `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation. Bare `//nolint:linter` directives fail CI.
+
 - A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep them contiguous.
+
 - `errorsastype` suggests replacing `errors.As(err, &target)` with generic `errors.AsType[T]()` (Go 1.26+). Adopt when touching affected code; don't refactor unrelated lines.
+
 - `.golangci.yml` has `fix: true` — `nolintlint` auto-strips `//nolint:` directives that don't suppress an active warning. Don't add nolint for rules that aren't actually firing; verify with a clean cache first (`golangci-lint cache clean`).
+
 - `gosec G118` flags goroutines that use `context.Background()` or don't propagate the parent context. Use `//nolint:gosec // G118 - reason` as a standalone comment above `go func()`.
+
 - `gosec G204` does NOT fire on `exec.CommandContext` when the binary path comes from an internal function return — don't add `//nolint:gosec // G204` unless verified.
+
 - `gosec G304` does NOT fire on `os.Open` in test helper packages — don't add `//nolint:gosec // G304` unless verified with a clean lint run.
 
 - `durationcheck` flags `time.Duration * time.Duration` — use `int64` intermediate for multipliers (e.g., `time.Duration(int64(1) << shift)`).
+
 - `gocritic` `importShadow` fires when a parameter name matches an imported package name (e.g., `config` parameter shadowing `lib/config` import). Rename the parameter.
 
 ## golines & nolint Comments
