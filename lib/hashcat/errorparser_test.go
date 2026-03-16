@@ -427,6 +427,305 @@ func TestErrorInfo_Fields(t *testing.T) {
 	assert.Equal(t, "Hash 'test': Separator unmatched", info.Message)
 }
 
+func TestClassifyStderr_SummaryContext(t *testing.T) {
+	info := ClassifyStderr("* Token length exception: 1024/1024 hashes")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "token_length_exception", info.Context["error_type"])
+	assert.Equal(t, 1024, info.Context["affected_count"])
+	assert.Equal(t, 1024, info.Context["total_count"])
+}
+
+func TestClassifyStderr_SummaryContextPartialHashes(t *testing.T) {
+	info := ClassifyStderr("* Separator unmatched: 5/100 hashes")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "separator_unmatched", info.Context["error_type"])
+	assert.Equal(t, 5, info.Context["affected_count"])
+	assert.Equal(t, 100, info.Context["total_count"])
+}
+
+func TestClassifyStderr_V6HashfileContext(t *testing.T) {
+	info := ClassifyStderr(
+		"Hashfile '/path/to/2.hsh' on line 1023 ($abc...): Token length exception",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "token_length_exception", info.Context["error_type"])
+	assert.Equal(t, "/path/to/2.hsh", info.Context["hashfile"])
+	assert.Equal(t, 1023, info.Context["line_number"])
+	assert.Equal(t, "$abc...", info.Context["hash_preview"])
+}
+
+func TestClassifyStderr_V7HashfileContext(t *testing.T) {
+	info := ClassifyStderr(
+		"Hash parsing error in hashfile: '/tmp/hashes.txt' on line 5 ($2a$10$abc): Token length exception",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "token_length_exception", info.Context["error_type"])
+	assert.Equal(t, "/tmp/hashes.txt", info.Context["hashfile"])
+	assert.Equal(t, 5, info.Context["line_number"])
+	assert.Equal(t, "$2a$10$abc", info.Context["hash_preview"])
+}
+
+func TestClassifyStderr_V7SingleHashContext(t *testing.T) {
+	info := ClassifyStderr("Hash parsing error: '$2a$10$abc123': Token length exception")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "token_length_exception", info.Context["error_type"])
+	assert.Equal(t, "$2a$10$abc123", info.Context["hash_preview"])
+}
+
+func TestClassifyStderr_MachineReadableContext(t *testing.T) {
+	info := ClassifyStderr("/tmp/hashes.txt:5:$2a$10$abc:Token length exception")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "token_length_exception", info.Context["error_type"])
+	assert.Equal(t, "/tmp/hashes.txt", info.Context["hashfile"])
+	assert.Equal(t, 5, info.Context["line_number"])
+	assert.Equal(t, "$2a$10$abc", info.Context["hash_preview"])
+}
+
+func TestClassifyStderr_NoHashesLoadedContext(t *testing.T) {
+	info := ClassifyStderr("No hashes loaded.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "no_hashes_loaded", info.Context["error_type"])
+	assert.Equal(t, true, info.Context["terminal"])
+}
+
+func TestClassifyStderr_HashfileEmptyContext(t *testing.T) {
+	info := ClassifyStderr("hashfile is empty or corrupt.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "hashfile_empty_or_corrupt", info.Context["error_type"])
+	assert.Equal(t, true, info.Context["terminal"])
+}
+
+func TestClassifyStderr_NoHashModeMatchContext(t *testing.T) {
+	info := ClassifyStderr("No hash-mode matches the structure of the input hash.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "no_hash_mode_match", info.Context["error_type"])
+	assert.Equal(t, true, info.Context["terminal"])
+}
+
+func TestClassifyStderr_SelftestAbortContext(t *testing.T) {
+	info := ClassifyStderr("Aborting session due to kernel self-test failure.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "selftest_failure", info.Context["error_type"])
+	assert.Equal(t, ErrorCategoryBackend, info.Category)
+	assert.Equal(t, api.SeverityFatal, info.Severity)
+}
+
+func TestClassifyStderr_AutotuneAbortContext(t *testing.T) {
+	info := ClassifyStderr(
+		"Aborting session due to kernel autotune failures, for all active devices.",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "autotune_failure", info.Context["error_type"])
+	assert.Equal(t, ErrorCategoryBackend, info.Category)
+	assert.Equal(t, api.SeverityFatal, info.Severity)
+}
+
+func TestClassifyStderr_KernelBuildContext(t *testing.T) {
+	info := ClassifyStderr(
+		"* Device #1: Kernel /usr/share/hashcat/OpenCL/m00010_a0-pure.cl build failed.",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "kernel_build_failed", info.Context["error_type"])
+	assert.Equal(t, 1, info.Context["device_id"])
+	assert.Equal(t,
+		"/usr/share/hashcat/OpenCL/m00010_a0-pure.cl",
+		info.Context["kernel_path"],
+	)
+}
+
+func TestClassifyStderr_InvalidHashModeContext(t *testing.T) {
+	info := ClassifyStderr("Invalid hash-mode '99999' selected.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "invalid_hash_mode", info.Context["error_type"])
+	assert.Equal(t, 99999, info.Context["hash_mode"])
+	assert.Equal(t, ErrorCategoryConfiguration, info.Category)
+}
+
+func TestClassifyStderr_TemperatureContext(t *testing.T) {
+	info := ClassifyStderr("Temperature limit on GPU #2 reached, aborting")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "temperature_limit", info.Context["error_type"])
+	assert.Equal(t, 2, info.Context["device_id"])
+	assert.Equal(t, ErrorCategoryDevice, info.Category)
+	assert.True(t, info.Retryable)
+}
+
+func TestClassifyStderr_DeviceMemoryContext(t *testing.T) {
+	info := ClassifyStderr("Device #1: ATTENTION! out of memory")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "device_memory", info.Context["error_type"])
+	assert.Equal(t, 1, info.Context["device_id"])
+}
+
+func TestClassifyStderr_DeviceWarningContext(t *testing.T) {
+	info := ClassifyStderr("Device #3: WARNING! Kernel exec timeout is not disabled.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "device_warning", info.Context["error_type"])
+	assert.Equal(t, 3, info.Context["device_id"])
+}
+
+func TestClassifyStderr_BackendAPIContext(t *testing.T) {
+	tests := []struct {
+		name        string
+		line        string
+		backendAPI  string
+		apiError    string
+	}{
+		{
+			"OpenCL out of host memory",
+			"OpenCL API (clCreateBuffer) CL_OUT_OF_HOST_MEMORY",
+			"OpenCL",
+			"CL_OUT_OF_HOST_MEMORY",
+		},
+		{
+			"OpenCL out of resources",
+			"OpenCL API (clEnqueueNDRangeKernel) CL_OUT_OF_RESOURCES",
+			"OpenCL",
+			"CL_OUT_OF_RESOURCES",
+		},
+		{
+			"CUDA error",
+			"cuDeviceGet() CUDA_ERROR_NO_DEVICE",
+			"CUDA",
+			"CUDA_ERROR_NO_DEVICE",
+		},
+		{
+			"HIP error",
+			"hipDeviceGet() HIP_ERROR_NO_DEVICE",
+			"HIP",
+			"HIP_ERROR_NO_DEVICE",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info := ClassifyStderr(tt.line)
+
+			require.NotNil(t, info.Context)
+			assert.Equal(t, "backend_api_error", info.Context["error_type"])
+			assert.Equal(t, tt.backendAPI, info.Context["backend_api"])
+			assert.Equal(t, tt.apiError, info.Context["api_error"])
+		})
+	}
+}
+
+func TestClassifyStderr_KeyspaceOverflowContext(t *testing.T) {
+	info := ClassifyStderr("Integer overflow detected in keyspace of mask: ?a?a?a?a?a?a?a?a?a?a")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "keyspace_overflow", info.Context["error_type"])
+	assert.Equal(t, ErrorCategoryConfiguration, info.Category)
+}
+
+func TestClassifyStderr_StdinTimeoutContext(t *testing.T) {
+	info := ClassifyStderr("No password candidates received in stdin mode, aborting")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "stdin_timeout", info.Context["error_type"])
+	assert.Equal(t, ErrorCategoryConfiguration, info.Category)
+}
+
+func TestClassifyStderr_HashfileAccessContext(t *testing.T) {
+	info := ClassifyStderr("Hashfile '/tmp/hashes.txt': No such file or directory")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "hashfile_access_error", info.Context["error_type"])
+	assert.Equal(t, "/tmp/hashes.txt", info.Context["hashfile"])
+	assert.Equal(t, ErrorCategoryFileAccess, info.Category)
+}
+
+func TestClassifyStderr_NilContextForUnmatchedPatterns(t *testing.T) {
+	info := ClassifyStderr("Some random unmatched output")
+
+	assert.Nil(t, info.Context)
+	assert.Equal(t, ErrorCategoryUnknown, info.Category)
+}
+
+func TestClassifyStderr_NilContextForInfoPatterns(t *testing.T) {
+	info := ClassifyStderr("  This error happens if the wrong hash type is specified")
+
+	assert.Nil(t, info.Context)
+	assert.Equal(t, ErrorCategoryInfo, info.Category)
+}
+
+func TestClassifyStderr_V6SingleHashContext(t *testing.T) {
+	info := ClassifyStderr("Hash 'abc123def': Separator unmatched")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "separator_unmatched", info.Context["error_type"])
+	assert.Equal(t, "abc123def", info.Context["hash_preview"])
+}
+
+func TestClassifyStderr_HashPreviewTruncation(t *testing.T) {
+	longHash := "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789extra"
+	info := ClassifyStderr("Hash '" + longHash + "': Token length exception")
+
+	require.NotNil(t, info.Context)
+	preview, ok := info.Context["hash_preview"].(string)
+	require.True(t, ok)
+	assert.LessOrEqual(t, len(preview), maxHashPreviewLen+3) // +3 for "..."
+	assert.Contains(t, preview, "...")
+}
+
+func TestNormalizeErrorType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Token length exception", "token_length_exception"},
+		{"Separator unmatched", "separator_unmatched"},
+		{"Line-length exception", "line_length_exception"},
+		{"Salt-length exception", "salt_length_exception"},
+		{"Hash-value exception", "hash_value_exception"},
+		{"  Spaces around  ", "spaces_around"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.expected, normalizeErrorType(tt.input))
+		})
+	}
+}
+
+func TestClassifyStderr_MetalAPIContext(t *testing.T) {
+	info := ClassifyStderr("Metal API error during kernel compilation")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "metal_api_error", info.Context["error_type"])
+}
+
+func TestClassifyStderr_CLBuildProgramContext(t *testing.T) {
+	info := ClassifyStderr("clBuildProgram(): CL_BUILD_PROGRAM_FAILURE")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "cl_build_program_failure", info.Context["error_type"])
+	assert.Equal(t, ErrorCategoryBackend, info.Category)
+}
+
+func TestClassifyStderr_CannotLoadModuleContext(t *testing.T) {
+	info := ClassifyStderr("Cannot load module /usr/share/hashcat/modules/module_99999.so")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "cannot_load_module", info.Context["error_type"])
+	assert.Equal(t, ErrorCategoryConfiguration, info.Category)
+}
+
 func TestErrorCategory_String(t *testing.T) {
 	tests := []struct {
 		category ErrorCategory
