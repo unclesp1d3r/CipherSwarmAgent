@@ -238,6 +238,12 @@ func TestClassifyStderr_KnownPatterns(t *testing.T) {
 			expectedCategory: hashcat.ErrorCategoryRetryable,
 			expectedSeverity: api.SeverityMinor,
 		},
+		{
+			name:             "stdout summary token length exception",
+			line:             "* Token length exception: 1024/1024 hashes",
+			expectedCategory: hashcat.ErrorCategoryHashFormat,
+			expectedSeverity: api.SeverityCritical,
+		},
 	}
 
 	for _, tt := range errorPatterns {
