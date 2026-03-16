@@ -487,6 +487,20 @@ func TestClassifyStderr_MachineReadableContext(t *testing.T) {
 	assert.Equal(t, "$2a$10$abc", info.Context["hash_preview"])
 }
 
+func TestClassifyStderr_MachineReadableColonsInHash(t *testing.T) {
+	// Hash formats like MD5:salt or PBKDF2 (sha256:20000:salt) contain colons.
+	// The non-greedy file path capture must stop at the first :<digits>: boundary.
+	info := ClassifyStderr(
+		"/tmp/hashes.txt:3:sha256:20000:saltvalue:Hash-encoding exception",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "hash_encoding_exception", info.Context["error_type"])
+	assert.Equal(t, "/tmp/hashes.txt", info.Context["hashfile"])
+	assert.Equal(t, 3, info.Context["line_number"])
+	assert.Equal(t, "sha256:20000:saltvalue", info.Context["hash_preview"])
+}
+
 func TestClassifyStderr_NoHashesLoadedContext(t *testing.T) {
 	info := ClassifyStderr("No hashes loaded.")
 
@@ -647,6 +661,7 @@ func TestClassifyStderr_HashfileAccessContext(t *testing.T) {
 	require.NotNil(t, info.Context)
 	assert.Equal(t, "hashfile_access_error", info.Context["error_type"])
 	assert.Equal(t, "/tmp/hashes.txt", info.Context["hashfile"])
+	assert.Equal(t, "No such file or directory", info.Context["os_error"])
 	assert.Equal(t, ErrorCategoryFileAccess, info.Category)
 }
 

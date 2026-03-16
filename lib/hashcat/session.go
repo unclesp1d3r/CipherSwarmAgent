@@ -330,19 +330,23 @@ scanLoop:
 
 // handleStderr processes stderr output from the hashcat process.
 // Each line is classified and sent through the StderrMessages channel as ErrorInfo.
+// Raw lines are not logged to avoid leaking sensitive hash data; only classified
+// metadata (category, severity) is logged.
 func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
 		line := scanner.Text()
-		agentstate.Logger.Error("read stderr", "text", line)
-
 		errInfo := ClassifyStderr(line)
+
+		agentstate.Logger.Debug("hashcat stderr classified",
+			"category", errInfo.Category.String(),
+			"severity", errInfo.Severity)
 
 		select {
 		case sess.StderrMessages <- errInfo:
 		case <-sess.ctx.Done():
 			agentstate.Logger.Warn("Stderr line dropped due to context cancellation",
-				"text", line)
+				"category", errInfo.Category.String())
 
 			return // return directly: stderr goroutine does not own DoneChan
 		}
@@ -363,13 +367,15 @@ func (sess *Session) classifyAndForwardStdout(line string) bool {
 
 	switch errInfo.Category {
 	case ErrorCategoryInfo, ErrorCategorySuccess:
-		agentstate.Logger.Info("hashcat stdout", "line", line)
+		agentstate.Logger.Info("hashcat stdout",
+			"category", errInfo.Category.String())
 
 		return true
 	case ErrorCategoryWarning:
-		agentstate.Logger.Warn("hashcat stdout warning", "line", line)
+		agentstate.Logger.Warn("hashcat stdout warning",
+			"category", errInfo.Category.String())
 	default:
-		agentstate.Logger.Error("hashcat stdout error", "line", line,
+		agentstate.Logger.Error("hashcat stdout error",
 			"category", errInfo.Category.String(),
 			"severity", errInfo.Severity)
 	}
@@ -379,7 +385,7 @@ func (sess *Session) classifyAndForwardStdout(line string) bool {
 		return true
 	case <-sess.ctx.Done():
 		agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
-			"line", line)
+			"category", errInfo.Category.String())
 
 		return false
 	}

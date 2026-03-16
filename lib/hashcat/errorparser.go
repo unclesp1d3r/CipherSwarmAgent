@@ -143,8 +143,10 @@ var errorPatterns = []errorPattern{
 	// Machine-readable per-hash errors: "<file>:<line>:<hash>:<parser_error>"
 	// Emitted when --machine-readable is active. The parser error is always the last
 	// colon-separated field and matches a known strparser() string.
+	// Uses non-greedy (.+?) for the file path so hashes containing colons
+	// (e.g., MD5:salt, PBKDF2 sha256:20000:salt) don't consume into the file capture.
 	{
-		regexp.MustCompile(`^(.+):(\d+):(.+):(Token length exception|Separator unmatched|` +
+		regexp.MustCompile(`^(.+?):(\d+):(.+):(Token length exception|Separator unmatched|` +
 			`Line-length exception|Salt-length exception|Hash-length exception|` +
 			`Hash-value exception|Salt-value exception|Salt-iteration count exception|` +
 			`Signature unmatched|Hash-file exception|Hash-encoding exception|` +
@@ -511,6 +513,7 @@ func extractHashfileAccessContext(_ string, submatch []string) map[string]any {
 	return map[string]any{
 		"error_type": "hashfile_access_error",
 		"hashfile":   submatch[1],
+		"os_error":   submatch[2],
 	}
 }
 
