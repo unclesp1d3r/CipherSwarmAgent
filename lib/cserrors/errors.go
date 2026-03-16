@@ -3,6 +3,7 @@ package cserrors
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +46,7 @@ type errorReportConfig struct {
 	category          string
 	retryable         bool
 	hasClassification bool
+	context           map[string]any
 }
 
 // ErrorOption configures optional error reporting behavior.
@@ -57,6 +59,17 @@ func WithClassification(category string, retryable bool) ErrorOption {
 		c.category = category
 		c.retryable = retryable
 		c.hasClassification = true
+	}
+}
+
+// WithContext adds structured context fields to the error metadata.
+// Fields are merged into the metadata map alongside classification and platform info.
+// Nil or empty maps are ignored.
+func WithContext(ctx map[string]any) ErrorOption {
+	return func(c *errorReportConfig) {
+		if len(ctx) > 0 {
+			c.context = ctx
+		}
 	}
 }
 
@@ -107,6 +120,8 @@ func SendAgentError(
 		otherMap["category"] = cfg.category
 		otherMap["retryable"] = cfg.retryable
 	}
+
+	maps.Copy(otherMap, cfg.context)
 
 	agentError := api.SubmitErrorAgentJSONRequestBody{
 		Message:  stdErrLine,
