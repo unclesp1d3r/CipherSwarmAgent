@@ -28,6 +28,13 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - All API interactions must adhere to the v1 Agent API contract.
 - Implement exponential backoff for failed API requests.
 
+### Hashcat Output Parsing
+
+- **stdout vs stderr:** Hashcat routes `event_log_warning` (hash parse errors) and `event_log_advice` (summary blocks) to **stdout**. Only `event_log_error` goes to stderr. `--status-json` does NOT produce JSON error objects — only affects periodic status output.
+- **Error parser patterns** (`lib/hashcat/errorparser.go`): `ClassifyStderr` classifies both stderr and stdout lines. Prefer generic patterns (e.g., `^Hash '.+':`) over enumerating specific parser errors — hashcat's `strparser()` returns 20+ error strings.
+- **Version-specific formats:** v6.x uses `Hashfile '<file>' on line N (<hash>): <error>`, v7.x changed to `Hash parsing error in hashfile: '<file>' on line N (<hash>): <error>`. Machine-readable mode (`--machine-readable`) uses `<file>:<line>:<hash>:<error>`. Patterns must handle both versions.
+- **Stdout→StderrMessages routing:** Non-JSON stdout lines are classified by `ClassifyStderr` in `handleStdout()` (`lib/hashcat/session.go`). Error/warning categories are forwarded to the `StderrMessages` channel so `handleStdErrLine` in `lib/task/runner.go` reports them to the server. Info/success categories are logged locally only.
+
 ## Go
 
 The project follows standard, idiomatic Go practices (version 1.26+).
