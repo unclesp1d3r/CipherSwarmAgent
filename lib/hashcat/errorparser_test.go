@@ -222,7 +222,7 @@ func TestClassifyStderr_GeneralErrors(t *testing.T) {
 
 func TestClassifyStderr_StdoutErrorPatterns(t *testing.T) {
 	runStderrTests(t, []stderrTestCase{
-		// Summary lines
+		// Summary lines (generic "* <error>: N/N hashes" pattern)
 		{
 			"summary token length exception",
 			"* Token length exception: 1024/1024 hashes",
@@ -251,7 +251,34 @@ func TestClassifyStderr_StdoutErrorPatterns(t *testing.T) {
 			api.SeverityCritical,
 			false,
 		},
-		// Edge case: 0/0 hashes
+		{
+			"summary hash-value exception",
+			"* Hash-value exception: 3/200 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"summary signature unmatched",
+			"* Signature unmatched: 50/50 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"summary hash-encoding exception",
+			"* Hash-encoding exception: 1/10 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"summary insufficient entropy",
+			"* Insufficient entropy exception: 2/2 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
 		{
 			"summary zero hashes",
 			"* Token length exception: 0/0 hashes",
@@ -259,25 +286,125 @@ func TestClassifyStderr_StdoutErrorPatterns(t *testing.T) {
 			api.SeverityCritical,
 			false,
 		},
-		// Per-hash with file path
+
+		// v6.x per-hash with file path: "Hashfile '<file>' on line N (<hash>): <error>"
 		{
-			"hashfile per-line error",
+			"v6 hashfile per-line error",
 			"Hashfile '/path/to/2.hsh' on line 1023 ($abc...): Token length exception",
 			ErrorCategoryHashFormat,
 			api.SeverityCritical,
 			false,
 		},
 		{
-			"hashfile with long path",
-			"Hashfile '/very/long/path/to/some/deeply/nested/directory/hashes.txt' on line 1 (abc): Separator unmatched",
+			"v6 hashfile with long path",
+			"Hashfile '/very/long/nested/dir/hashes.txt' on line 1 (abc): Separator unmatched",
 			ErrorCategoryHashFormat,
 			api.SeverityCritical,
 			false,
 		},
-		// Multi-line context
+		{
+			"v6 hashfile file-level error",
+			"Hashfile '/tmp/hashes.txt': No such file or directory",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+
+		// v7.x per-hash format: "Hash parsing error in hashfile: '<file>' on line N (<hash>): <error>"
+		{
+			"v7 hashfile per-line error",
+			"Hash parsing error in hashfile: '/tmp/hashes.txt' on line 5 ($2a$10$abc): Token length exception",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		// v7.x single-hash format: "Hash parsing error: '<hash>': <error>"
+		{
+			"v7 single hash parsing error",
+			"Hash parsing error: '$2a$10$abc123def456': Token length exception",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+
+		// Machine-readable per-hash errors: "<file>:<line>:<hash>:<parser_error>"
+		{
+			"machine-readable token length",
+			"/tmp/hashes.txt:5:$2a$10$abc:Token length exception",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable separator unmatched",
+			"/tmp/hashes.txt:1:abc123:Separator unmatched",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable signature unmatched",
+			"/tmp/hashes.txt:10:badhash:Signature unmatched",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable hash-encoding exception",
+			"/tmp/hashes.txt:3:xyz:Hash-encoding exception",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable insufficient entropy",
+			"/tmp/hashes.txt:1:short:Insufficient entropy exception",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+
+		// Advisory line before single-hash errors
+		{
+			"commandline argument advisory",
+			"Hash was parsed as a commandline argument (not as a file, maybe the file doesn't exist?)",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+
+		// Indented advisory context lines
 		{
 			"explanatory context line",
 			"  This error happens if the wrong hash type is specified, if the hashes are",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+		{
+			"malformed continuation line",
+			"  malformed or if the hash type is not supported by the installed version",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+		{
+			"username hint line",
+			"  --username to enable it.",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+		{
+			"dynamic-x hint line (v7)",
+			"  --dynamic-x to enable it.",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+		{
+			"generic indented advisory line",
+			"  Consider using --force to bypass this check.",
 			ErrorCategoryInfo,
 			api.SeverityInfo,
 			false,

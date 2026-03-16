@@ -85,59 +85,69 @@ type errorPattern struct {
 //
 //nolint:gochecknoglobals // Patterns are intentionally global for performance
 var errorPatterns = []errorPattern{
-	// Stdout summary lines (hashcat writes these to stdout, not stderr)
+	// Stdout summary lines: hashcat emits "* <parser_error>: N/N hashes" via event_log_advice
+	// to stdout. A single generic pattern covers all parser error types (Token length exception,
+	// Separator unmatched, Line-length exception, Salt-length exception, Hash-value exception,
+	// Signature unmatched, etc.) so new parser errors are caught automatically.
 	{
-		regexp.MustCompile(`^\* Token length exception: \d+/\d+ hashes`),
-		ErrorCategoryHashFormat,
-		api.SeverityCritical,
-		false,
-	},
-	{
-		regexp.MustCompile(`^\* Separator unmatched: \d+/\d+ hashes`),
-		ErrorCategoryHashFormat,
-		api.SeverityCritical,
-		false,
-	},
-	{
-		regexp.MustCompile(`^\* Line-length exception: \d+/\d+ hashes`),
-		ErrorCategoryHashFormat,
-		api.SeverityCritical,
-		false,
-	},
-	{
-		regexp.MustCompile(`^\* Salt-length exception: \d+/\d+ hashes`),
+		regexp.MustCompile(`^\* .+: \d+/\d+ hashes`),
 		ErrorCategoryHashFormat,
 		api.SeverityCritical,
 		false,
 	},
 
-	// Stdout per-hash errors with file path context
+	// Stdout per-hash errors with file path context.
+	// v7.x format: "Hash parsing error in hashfile: '<file>' on line <N> (<hash>): <error>"
+	// v6.x format: "Hashfile '<file>' on line <N> (<hash>): <error>"
+	// v7.x single-hash format: "Hash parsing error: '<hash>': <error>"
 	{
-		regexp.MustCompile(`^Hashfile '.+' on line \d+`),
+		regexp.MustCompile(`^Hash parsing error`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+	},
+	{
+		regexp.MustCompile(`^Hashfile '.+'`),
 		ErrorCategoryHashFormat,
 		api.SeverityCritical,
 		false,
 	},
 
-	// Stdout explanatory context lines (indented help text)
-	{regexp.MustCompile(`^ {2}This error happens if`), ErrorCategoryInfo, api.SeverityInfo, false},
+	// Machine-readable per-hash errors: "<file>:<line>:<hash>:<parser_error>"
+	// Emitted when --machine-readable is active. The parser error is always the last
+	// colon-separated field and matches a known strparser() string.
+	{
+		regexp.MustCompile(`^.+:\d+:.+:(Token length exception|Separator unmatched|` +
+			`Line-length exception|Salt-length exception|Hash-length exception|` +
+			`Hash-value exception|Salt-value exception|Salt-iteration count exception|` +
+			`Signature unmatched|Hash-file exception|Hash-encoding exception|` +
+			`Salt-encoding exception|Token encoding exception|` +
+			`Insufficient entropy exception)$`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+	},
 
-	// Hash format errors (non-retryable, critical)
-	{regexp.MustCompile(`Hash '.+': Separator unmatched`), ErrorCategoryHashFormat, api.SeverityCritical, false},
+	// Advisory line emitted before single-hash errors on stdout.
 	{
-		regexp.MustCompile(`Hash '.+': Token length exception`),
-		ErrorCategoryHashFormat,
-		api.SeverityCritical,
+		regexp.MustCompile(`^Hash was parsed as a commandline argument`),
+		ErrorCategoryInfo,
+		api.SeverityInfo,
 		false,
 	},
+
+	// Stdout explanatory context lines (indented help text from hashcat's parser error block).
+	// These lines follow summary/per-hash error lines and provide advisory context such as
+	// "This error happens if...", "malformed...", "--username", "--dynamic-x" hints, etc.
+	// A broad 2+-space-indented matcher covers current and future wording variants so they
+	// classify as informational rather than falling through to unknown/retryable.
+	{regexp.MustCompile(`^ {2}\S`), ErrorCategoryInfo, api.SeverityInfo, false},
+
+	// Hash format errors on stderr (non-retryable, critical).
+	// v6.x stderr format: "Hash '<hash>': <parser_error>"
+	// A single pattern covers all strparser() error strings.
 	{
-		regexp.MustCompile(`Hash '.+': Line-length exception`),
-		ErrorCategoryHashFormat,
-		api.SeverityCritical,
-		false,
-	},
-	{
-		regexp.MustCompile(`Hash '.+': Salt-length exception`),
+		regexp.MustCompile(`^Hash '.+':`),
 		ErrorCategoryHashFormat,
 		api.SeverityCritical,
 		false,
