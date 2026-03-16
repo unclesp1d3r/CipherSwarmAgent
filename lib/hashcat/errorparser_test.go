@@ -582,10 +582,10 @@ func TestClassifyStderr_DeviceWarningContext(t *testing.T) {
 
 func TestClassifyStderr_BackendAPIContext(t *testing.T) {
 	tests := []struct {
-		name        string
-		line        string
-		backendAPI  string
-		apiError    string
+		name       string
+		line       string
+		backendAPI string
+		apiError   string
 	}{
 		{
 			"OpenCL out of host memory",

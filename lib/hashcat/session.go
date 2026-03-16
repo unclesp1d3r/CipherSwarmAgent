@@ -45,16 +45,16 @@ type Session struct {
 	shardedCharsetFile *os.File        // Sharded charset file for distributed attacks
 	ctx                context.Context //nolint:containedctx // session lifecycle context for I/O goroutines
 	cancel             context.CancelFunc
-	cancelMu           sync.Mutex    // Protects cancel field from concurrent access
-	CrackedHashes      chan Result   // Channel for successfully cracked hashes
-	StatusUpdates      chan Status   // Channel for periodic status updates
+	cancelMu           sync.Mutex     // Protects cancel field from concurrent access
+	CrackedHashes      chan Result    // Channel for successfully cracked hashes
+	StatusUpdates      chan Status    // Channel for periodic status updates
 	StderrMessages     chan ErrorInfo // Channel for classified error messages from hashcat
-	StdoutLines        chan string   // Channel for stdout lines from hashcat
-	DoneChan           chan error    // Channel signaling process completion
-	SkipStatusUpdates  bool          // Flag to disable status update parsing
-	RestoreFilePath    string        // Path to session restore file
-	pStdout            io.ReadCloser // Stdout pipe from hashcat process
-	pStderr            io.ReadCloser // Stderr pipe from hashcat process
+	StdoutLines        chan string    // Channel for stdout lines from hashcat
+	DoneChan           chan error     // Channel signaling process completion
+	SkipStatusUpdates  bool           // Flag to disable status update parsing
+	RestoreFilePath    string         // Path to session restore file
+	pStdout            io.ReadCloser  // Stdout pipe from hashcat process
+	pStderr            io.ReadCloser  // Stderr pipe from hashcat process
 }
 
 // NewHashcatSession creates and initializes a new hashcat session.

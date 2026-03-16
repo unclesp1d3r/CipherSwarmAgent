@@ -616,7 +616,7 @@ func truncateHash(hash string) string {
 }
 
 // normalizeErrorType converts a human-readable error type to snake_case.
-// e.g., "Token length exception" -> "token_length_exception"
+// e.g., "Token length exception" -> "token_length_exception".
 func normalizeErrorType(errorType string) string {
 	s := strings.ToLower(strings.TrimSpace(errorType))
 	s = strings.ReplaceAll(s, " ", "_")
