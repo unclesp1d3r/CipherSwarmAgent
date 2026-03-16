@@ -111,17 +111,20 @@ func SendAgentError(
 		taskID = &task.Id
 	}
 
-	otherMap := map[string]any{
-		"platform": agentstate.State.Platform,
-		"version":  agentstate.State.AgentVersion,
-	}
+	// Copy context first so reserved keys always take precedence.
+	// reservedKeyCount covers platform, version, category, retryable.
+	const reservedKeyCount = 4
+	otherMap := make(map[string]any, reservedKeyCount+len(cfg.context))
+	maps.Copy(otherMap, cfg.context)
+
+	// Reserved keys overwrite any collisions from context
+	otherMap["platform"] = agentstate.State.Platform
+	otherMap["version"] = agentstate.State.AgentVersion
 
 	if cfg.hasClassification {
 		otherMap["category"] = cfg.category
 		otherMap["retryable"] = cfg.retryable
 	}
-
-	maps.Copy(otherMap, cfg.context)
 
 	agentError := api.SubmitErrorAgentJSONRequestBody{
 		Message:  stdErrLine,
