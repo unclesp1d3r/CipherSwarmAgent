@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
@@ -305,7 +306,7 @@ func TestClassifyStderr_StdoutErrorPatterns(t *testing.T) {
 		{
 			"v6 hashfile file-level error",
 			"Hashfile '/tmp/hashes.txt': No such file or directory",
-			ErrorCategoryHashFormat,
+			ErrorCategoryFileAccess,
 			api.SeverityCritical,
 			false,
 		},
