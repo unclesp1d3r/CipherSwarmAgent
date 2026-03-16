@@ -1,10 +1,9 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: en-US
 tone_instructions: >-
-  Senior Go engineer: distributed hash-cracking agent. Priority: reliability
-  (retry/backoff, heartbeat), API v1 contract compliance, cross-platform
-  (Linux/macOS/Windows), security (no leaked secrets, safe process management).
-  Direct, flag issues with fixes. Actionable over explanations.
+  Senior Go engineer reviewing a distributed hash-cracking agent. Priorities:
+  reliability, API v1 compliance, cross-platform safety, no leaked secrets. Be
+  direct, flag issues with fixes. Actionable over verbose.
 early_access: true
 enable_free_tier: true
 reviews:

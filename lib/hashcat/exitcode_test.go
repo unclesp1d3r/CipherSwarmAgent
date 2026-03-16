@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
@@ -15,6 +16,7 @@ func TestClassifyExitCode_SuccessAndExhausted(t *testing.T) {
 		expectedSeverity api.Severity
 		expectedRetry    bool
 		expectedStatus   string
+		expectedCtxName  string
 	}{
 		{
 			name:             "exit code 0 - success/cracked",
@@ -23,6 +25,7 @@ func TestClassifyExitCode_SuccessAndExhausted(t *testing.T) {
 			expectedSeverity: api.SeverityInfo,
 			expectedRetry:    false,
 			expectedStatus:   "cracked",
+			expectedCtxName:  "success",
 		},
 		{
 			name:             "exit code 1 - exhausted",
@@ -31,6 +34,7 @@ func TestClassifyExitCode_SuccessAndExhausted(t *testing.T) {
 			expectedSeverity: api.SeverityInfo,
 			expectedRetry:    false,
 			expectedStatus:   "exhausted",
+			expectedCtxName:  "exhausted",
 		},
 	}
 
@@ -42,6 +46,8 @@ func TestClassifyExitCode_SuccessAndExhausted(t *testing.T) {
 			assert.Equal(t, tt.expectedSeverity, info.Severity, "severity mismatch")
 			assert.Equal(t, tt.expectedRetry, info.Retryable, "retryable mismatch")
 			assert.Equal(t, tt.expectedStatus, info.Status, "status mismatch")
+			require.NotNil(t, info.Context)
+			assert.Equal(t, tt.expectedCtxName, info.Context["exit_code_name"])
 		})
 	}
 }
@@ -54,6 +60,7 @@ func TestClassifyExitCode_AbortedStates(t *testing.T) {
 		expectedSeverity api.Severity
 		expectedRetry    bool
 		expectedStatus   string
+		expectedCtxName  string
 	}{
 		{
 			name:             "exit code 2 - aborted",
@@ -62,6 +69,7 @@ func TestClassifyExitCode_AbortedStates(t *testing.T) {
 			expectedSeverity: api.SeverityMinor,
 			expectedRetry:    true,
 			expectedStatus:   "aborted",
+			expectedCtxName:  "aborted",
 		},
 		{
 			name:             "exit code 3 - aborted by checkpoint",
@@ -70,6 +78,7 @@ func TestClassifyExitCode_AbortedStates(t *testing.T) {
 			expectedSeverity: api.SeverityMinor,
 			expectedRetry:    true,
 			expectedStatus:   "checkpoint",
+			expectedCtxName:  "checkpoint",
 		},
 		{
 			name:             "exit code 4 - aborted by runtime limit",
@@ -78,6 +87,16 @@ func TestClassifyExitCode_AbortedStates(t *testing.T) {
 			expectedSeverity: api.SeverityMinor,
 			expectedRetry:    true,
 			expectedStatus:   "runtime_limit",
+			expectedCtxName:  "runtime_limit",
+		},
+		{
+			name:             "exit code 5 - abort after finish",
+			exitCode:         5,
+			expectedCategory: ErrorCategoryRetryable,
+			expectedSeverity: api.SeverityMinor,
+			expectedRetry:    true,
+			expectedStatus:   "abort_finish",
+			expectedCtxName:  "abort_finish",
 		},
 	}
 
@@ -89,6 +108,8 @@ func TestClassifyExitCode_AbortedStates(t *testing.T) {
 			assert.Equal(t, tt.expectedSeverity, info.Severity, "severity mismatch")
 			assert.Equal(t, tt.expectedRetry, info.Retryable, "retryable mismatch")
 			assert.Equal(t, tt.expectedStatus, info.Status, "status mismatch")
+			require.NotNil(t, info.Context)
+			assert.Equal(t, tt.expectedCtxName, info.Context["exit_code_name"])
 		})
 	}
 }
@@ -101,6 +122,7 @@ func TestClassifyExitCode_NegativeErrors(t *testing.T) {
 		expectedSeverity api.Severity
 		expectedRetry    bool
 		expectedStatus   string
+		expectedCtxName  string
 	}{
 		{
 			name:             "exit code -1 - general error",
@@ -109,14 +131,16 @@ func TestClassifyExitCode_NegativeErrors(t *testing.T) {
 			expectedSeverity: api.SeverityCritical,
 			expectedRetry:    false,
 			expectedStatus:   "error",
+			expectedCtxName:  "general_error",
 		},
 		{
-			name:             "exit code -2 - GPU watchdog alarm",
+			name:             "exit code -2 - unknown (not in hashcat source)",
 			exitCode:         -2,
-			expectedCategory: ErrorCategoryDevice,
-			expectedSeverity: api.SeverityFatal,
+			expectedCategory: ErrorCategoryUnknown,
+			expectedSeverity: api.SeverityCritical,
 			expectedRetry:    false,
-			expectedStatus:   "gpu_watchdog",
+			expectedStatus:   "unknown",
+			expectedCtxName:  "unknown",
 		},
 	}
 
@@ -128,6 +152,8 @@ func TestClassifyExitCode_NegativeErrors(t *testing.T) {
 			assert.Equal(t, tt.expectedSeverity, info.Severity, "severity mismatch")
 			assert.Equal(t, tt.expectedRetry, info.Retryable, "retryable mismatch")
 			assert.Equal(t, tt.expectedStatus, info.Status, "status mismatch")
+			require.NotNil(t, info.Context)
+			assert.Equal(t, tt.expectedCtxName, info.Context["exit_code_name"])
 		})
 	}
 }
@@ -140,46 +166,79 @@ func TestClassifyExitCode_BackendErrors(t *testing.T) {
 		expectedSeverity api.Severity
 		expectedRetry    bool
 		expectedStatus   string
+		expectedCtxName  string
 	}{
 		{
-			name:             "exit code -3 - backend abort",
+			name:             "exit code -3 - runtime skip (all devices skipped)",
 			exitCode:         -3,
 			expectedCategory: ErrorCategoryBackend,
 			expectedSeverity: api.SeverityCritical,
 			expectedRetry:    false,
-			expectedStatus:   "backend_abort",
+			expectedStatus:   "runtime_skip",
+			expectedCtxName:  "runtime_skip",
 		},
 		{
-			name:             "exit code -4 - backend checkpoint abort",
+			name:             "exit code -4 - memory hit (insufficient device memory)",
 			exitCode:         -4,
-			expectedCategory: ErrorCategoryBackend,
-			expectedSeverity: api.SeverityCritical,
+			expectedCategory: ErrorCategoryDevice,
+			expectedSeverity: api.SeverityFatal,
 			expectedRetry:    false,
-			expectedStatus:   "backend_checkpoint",
+			expectedStatus:   "memory_hit",
+			expectedCtxName:  "memory_hit",
 		},
 		{
-			name:             "exit code -5 - backend runtime abort",
+			name:             "exit code -5 - kernel build failure",
 			exitCode:         -5,
 			expectedCategory: ErrorCategoryBackend,
 			expectedSeverity: api.SeverityCritical,
 			expectedRetry:    false,
-			expectedStatus:   "backend_runtime",
+			expectedStatus:   "kernel_build",
+			expectedCtxName:  "kernel_build",
 		},
 		{
-			name:             "exit code -6 - backend selftest fail",
+			name:             "exit code -6 - kernel create failure",
 			exitCode:         -6,
 			expectedCategory: ErrorCategoryBackend,
 			expectedSeverity: api.SeverityCritical,
 			expectedRetry:    false,
-			expectedStatus:   "selftest_fail",
+			expectedStatus:   "kernel_create",
+			expectedCtxName:  "kernel_create",
 		},
 		{
-			name:             "exit code -7 - backend autotune fail",
+			name:             "exit code -7 - kernel accel (autotune failure)",
 			exitCode:         -7,
 			expectedCategory: ErrorCategoryBackend,
 			expectedSeverity: api.SeverityCritical,
 			expectedRetry:    false,
-			expectedStatus:   "autotune_fail",
+			expectedStatus:   "kernel_accel",
+			expectedCtxName:  "kernel_accel",
+		},
+		{
+			name:             "exit code -8 - extra size",
+			exitCode:         -8,
+			expectedCategory: ErrorCategoryBackend,
+			expectedSeverity: api.SeverityCritical,
+			expectedRetry:    false,
+			expectedStatus:   "extra_size",
+			expectedCtxName:  "extra_size",
+		},
+		{
+			name:             "exit code -9 - mixed warnings",
+			exitCode:         -9,
+			expectedCategory: ErrorCategoryBackend,
+			expectedSeverity: api.SeverityCritical,
+			expectedRetry:    false,
+			expectedStatus:   "mixed_warnings",
+			expectedCtxName:  "mixed_warnings",
+		},
+		{
+			name:             "exit code -11 - selftest fail",
+			exitCode:         -11,
+			expectedCategory: ErrorCategoryBackend,
+			expectedSeverity: api.SeverityCritical,
+			expectedRetry:    false,
+			expectedStatus:   "selftest_fail",
+			expectedCtxName:  "selftest_fail",
 		},
 	}
 
@@ -191,6 +250,8 @@ func TestClassifyExitCode_BackendErrors(t *testing.T) {
 			assert.Equal(t, tt.expectedSeverity, info.Severity, "severity mismatch")
 			assert.Equal(t, tt.expectedRetry, info.Retryable, "retryable mismatch")
 			assert.Equal(t, tt.expectedStatus, info.Status, "status mismatch")
+			require.NotNil(t, info.Context)
+			assert.Equal(t, tt.expectedCtxName, info.Context["exit_code_name"])
 		})
 	}
 }
@@ -221,39 +282,15 @@ func TestClassifyExitCode_UnknownCodes(t *testing.T) {
 			expectedStatus:   "unknown",
 		},
 		{
-			name:             "exit code -8 backend error",
-			exitCode:         -8,
-			expectedCategory: ErrorCategoryBackend,
-			expectedSeverity: api.SeverityCritical,
-			expectedRetry:    false,
-			expectedStatus:   "backend_error",
-		},
-		{
-			name:             "exit code -9 backend error",
-			exitCode:         -9,
-			expectedCategory: ErrorCategoryBackend,
-			expectedSeverity: api.SeverityCritical,
-			expectedRetry:    false,
-			expectedStatus:   "backend_error",
-		},
-		{
-			name:             "exit code -10 backend error",
+			name:             "exit code -10 is unknown (gap in hashcat codes)",
 			exitCode:         -10,
-			expectedCategory: ErrorCategoryBackend,
+			expectedCategory: ErrorCategoryUnknown,
 			expectedSeverity: api.SeverityCritical,
 			expectedRetry:    false,
-			expectedStatus:   "backend_error",
+			expectedStatus:   "unknown",
 		},
 		{
-			name:             "exit code -11 backend error",
-			exitCode:         -11,
-			expectedCategory: ErrorCategoryBackend,
-			expectedSeverity: api.SeverityCritical,
-			expectedRetry:    false,
-			expectedStatus:   "backend_error",
-		},
-		{
-			name:             "exit code -12 is unknown (boundary outside backend range)",
+			name:             "exit code -12 is unknown",
 			exitCode:         -12,
 			expectedCategory: ErrorCategoryUnknown,
 			expectedSeverity: api.SeverityCritical,
@@ -270,24 +307,20 @@ func TestClassifyExitCode_UnknownCodes(t *testing.T) {
 			assert.Equal(t, tt.expectedSeverity, info.Severity, "severity mismatch")
 			assert.Equal(t, tt.expectedRetry, info.Retryable, "retryable mismatch")
 			assert.Equal(t, tt.expectedStatus, info.Status, "status mismatch")
+			require.NotNil(t, info.Context)
+			assert.Equal(t, "unknown", info.Context["exit_code_name"])
 		})
 	}
 }
 
-func TestExitCodeInfo_Fields(t *testing.T) {
-	info := ExitCodeInfo{
-		Category:  ErrorCategoryDevice,
-		Severity:  api.SeverityFatal,
-		Retryable: false,
-		Status:    "gpu_watchdog",
-		ExitCode:  -2,
-	}
+func TestExitCodeInfo_ContextField(t *testing.T) {
+	info := ClassifyExitCode(ExitCodeKernelBuild)
 
-	assert.Equal(t, ErrorCategoryDevice, info.Category)
-	assert.Equal(t, api.SeverityFatal, info.Severity)
-	assert.False(t, info.Retryable)
-	assert.Equal(t, "gpu_watchdog", info.Status)
-	assert.Equal(t, -2, info.ExitCode)
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "kernel_build", info.Context["exit_code_name"])
+	assert.Equal(t, ErrorCategoryBackend, info.Category)
+	assert.Equal(t, "kernel_build", info.Status)
+	assert.Equal(t, -5, info.ExitCode)
 }
 
 func TestIsExhausted(t *testing.T) {

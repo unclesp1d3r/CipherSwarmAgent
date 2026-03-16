@@ -119,18 +119,21 @@ The agent includes built-in HTTP resilience mechanisms to handle network issues 
 **What You'll See in Logs:**
 
 During circuit open state:
-```
+
+```text
 [Warn] Circuit breaker open, server appears unresponsive
 [Warn] Circuit breaker open, skipping task retrieval
 ```
 
 After recovery:
-```
+
+```text
 [Info] Applied server-recommended timeouts - connect=10s, read=30s, write=10s, request=60s
 [Info] Agent authenticated successfully
 ```
 
 **Recovery Actions:**
+
 - Agent automatically recovers - no manual intervention needed
 - Error reporting is skipped when circuit is open to prevent cascading failures
 - No agent restart required

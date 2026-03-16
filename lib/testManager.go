@@ -112,11 +112,19 @@ func handleTestStdOutLine(stdoutLine string) {
 	}
 }
 
-// handleTestStdErrLine sends the specified stderr line to the central server and returns an error if the line is not empty.
-func handleTestStdErrLine(ctx context.Context, stdErrLine string) error {
-	if strings.TrimSpace(stdErrLine) != "" {
-		cserrors.SendAgentError(ctx, stdErrLine, nil, api.SeverityMinor)
-		return errors.New(stdErrLine)
+// handleTestStdErrLine sends the classified error to the central server and returns
+// an error only for non-informational messages. Info/success categories (e.g.,
+// advisory lines routed from stdout) are reported to the server but do not fail the test.
+func handleTestStdErrLine(ctx context.Context, errInfo hashcat.ErrorInfo) error {
+	if strings.TrimSpace(errInfo.Message) != "" {
+		cserrors.SendAgentError(ctx, errInfo.Message, nil, errInfo.Severity,
+			cserrors.WithClassification(errInfo.Category.String(), errInfo.Retryable),
+			cserrors.WithContext(errInfo.Context))
+
+		if errInfo.Category != hashcat.ErrorCategoryInfo &&
+			errInfo.Category != hashcat.ErrorCategorySuccess {
+			return errors.New(errInfo.Message)
+		}
 	}
 
 	return nil

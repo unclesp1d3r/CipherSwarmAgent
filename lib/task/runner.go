@@ -81,8 +81,8 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 				return
 			case stdoutLine := <-sess.StdoutLines:
 				handleStdOutLine(ctx, stdoutLine, task)
-			case stdErrLine := <-sess.StderrMessages:
-				handleStdErrLine(ctx, stdErrLine, task)
+			case errInfo := <-sess.StderrMessages:
+				handleStdErrLine(ctx, errInfo, task)
 			case statusUpdate := <-sess.StatusUpdates:
 				m.handleStatusUpdate(ctx, statusUpdate, task, sess)
 			case crackedHash := <-sess.CrackedHashes:
@@ -125,16 +125,15 @@ func handleStdOutLine(ctx context.Context, stdoutLine string, task *api.Task) {
 	}
 }
 
-// handleStdErrLine handles a single line of standard error output by classifying it
-// and sending it to the server with the appropriate severity level.
-func handleStdErrLine(ctx context.Context, stdErrLine string, task *api.Task) {
-	display.JobError(stdErrLine)
+// handleStdErrLine handles a pre-classified error from hashcat by displaying it
+// and sending it to the server with the classified severity and structured context.
+func handleStdErrLine(ctx context.Context, errInfo hashcat.ErrorInfo, task *api.Task) {
+	display.JobError(errInfo.Message)
 
-	if strings.TrimSpace(stdErrLine) != "" {
-		// Classify the stderr line to determine appropriate severity
-		errorInfo := hashcat.ClassifyStderr(stdErrLine)
-		cserrors.SendAgentError(ctx, stdErrLine, task, errorInfo.Severity,
-			cserrors.WithClassification(errorInfo.Category.String(), errorInfo.Retryable))
+	if strings.TrimSpace(errInfo.Message) != "" {
+		cserrors.SendAgentError(ctx, errInfo.Message, task, errInfo.Severity,
+			cserrors.WithClassification(errInfo.Category.String(), errInfo.Retryable),
+			cserrors.WithContext(errInfo.Context))
 	}
 }
 
@@ -197,6 +196,9 @@ func (m *Manager) handleDoneChan(ctx context.Context, err error, task *api.Task,
 }
 
 // parseExitCode extracts the exit code from an error message like "exit status N".
+// On Unix, negative exit codes (e.g., hashcat's -11) are reported by the kernel as
+// unsigned 8-bit values (e.g., 245). This function normalizes codes in the 245-255
+// range back to their signed equivalents (-11 to -1) so ClassifyExitCode matches them.
 // Returns -1 (general error) for non-standard error formats, including:
 // - Signal-based terminations (e.g., "signal: killed", "signal: terminated")
 // - Any other error format that doesn't match "exit status N".
@@ -205,12 +207,29 @@ func parseExitCode(errMsg string) int {
 
 	// Try to parse "exit status N" format
 	if _, err := fmt.Sscanf(errMsg, "exit status %d", &exitCode); err == nil {
-		return exitCode
+		return normalizeExitCode(exitCode)
 	}
 
 	// Default to -1 (general error) for non-standard formats
 	// This includes signal-based terminations like "signal: killed"
 	return -1
+}
+
+// normalizeExitCode converts unsigned shell exit codes (245-255) back to their
+// signed equivalents (-11 to -1). Hashcat documents negative exit codes in types.h
+// but Unix only reports the low 8 bits, so -11 appears as 245 (256 - 11).
+func normalizeExitCode(code int) int {
+	const (
+		shellExitMin = 245 // -11 as unsigned 8-bit
+		shellExitMax = 255 // -1 as unsigned 8-bit
+		signedOffset = 256
+	)
+
+	if code >= shellExitMin && code <= shellExitMax {
+		return code - signedOffset
+	}
+
+	return code
 }
 
 // handleNonExhaustedError handles errors which are not related to exhaustion
@@ -239,19 +258,21 @@ func handleNonExhaustedError(
 		// restore file has been removed)
 		errorInfo := hashcat.ClassifyStderr(err.Error())
 		cserrors.SendAgentError(ctx, err.Error(), task, errorInfo.Severity,
-			cserrors.WithClassification(errorInfo.Category.String(), errorInfo.Retryable))
+			cserrors.WithClassification(errorInfo.Category.String(), errorInfo.Retryable),
+			cserrors.WithContext(errorInfo.Context))
 		display.JobFailed(err)
 
 		return
 	}
 
-	// Send error with classified severity and metadata
+	// Send error with classified severity, metadata, and structured context
 	cserrors.SendAgentError(
 		ctx,
 		err.Error(),
 		task,
 		exitInfo.Severity,
 		cserrors.WithClassification(exitInfo.Category.String(), exitInfo.Retryable),
+		cserrors.WithContext(exitInfo.Context),
 	)
 	display.JobFailed(err)
 }

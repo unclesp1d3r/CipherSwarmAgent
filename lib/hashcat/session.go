@@ -45,16 +45,16 @@ type Session struct {
 	shardedCharsetFile *os.File        // Sharded charset file for distributed attacks
 	ctx                context.Context //nolint:containedctx // session lifecycle context for I/O goroutines
 	cancel             context.CancelFunc
-	cancelMu           sync.Mutex    // Protects cancel field from concurrent access
-	CrackedHashes      chan Result   // Channel for successfully cracked hashes
-	StatusUpdates      chan Status   // Channel for periodic status updates
-	StderrMessages     chan string   // Channel for error messages from hashcat
-	StdoutLines        chan string   // Channel for stdout lines from hashcat
-	DoneChan           chan error    // Channel signaling process completion
-	SkipStatusUpdates  bool          // Flag to disable status update parsing
-	RestoreFilePath    string        // Path to session restore file
-	pStdout            io.ReadCloser // Stdout pipe from hashcat process
-	pStderr            io.ReadCloser // Stderr pipe from hashcat process
+	cancelMu           sync.Mutex     // Protects cancel field from concurrent access
+	CrackedHashes      chan Result    // Channel for successfully cracked hashes
+	StatusUpdates      chan Status    // Channel for periodic status updates
+	StderrMessages     chan ErrorInfo // Channel for classified error messages from hashcat
+	StdoutLines        chan string    // Channel for stdout lines from hashcat
+	DoneChan           chan error     // Channel signaling process completion
+	SkipStatusUpdates  bool           // Flag to disable status update parsing
+	RestoreFilePath    string         // Path to session restore file
+	pStdout            io.ReadCloser  // Stdout pipe from hashcat process
+	pStderr            io.ReadCloser  // Stderr pipe from hashcat process
 }
 
 // NewHashcatSession creates and initializes a new hashcat session.
@@ -117,7 +117,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		shardedCharsetFile: nil,
 		CrackedHashes:      make(chan Result, channelBufferSize),
 		StatusUpdates:      make(chan Status, channelBufferSize),
-		StderrMessages:     make(chan string, channelBufferSize),
+		StderrMessages:     make(chan ErrorInfo, channelBufferSize),
 		StdoutLines:        make(chan string, channelBufferSize),
 		DoneChan:           make(chan error),
 		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
@@ -282,29 +282,27 @@ scanLoop:
 			continue
 		}
 
-		if !sess.SkipStatusUpdates {
-			lineBytes := []byte(line)
-			if json.Valid(lineBytes) {
-				var status Status
-				if err := json.Unmarshal(lineBytes, &status); err != nil {
-					agentstate.Logger.Error("couldn't unmarshal hashcat status", "error", err)
+		// JSON status parsing is conditional on SkipStatusUpdates (disabled in benchmark mode).
+		// Non-JSON classification always runs so warnings/errors are never silently dropped.
+		lineBytes := []byte(line)
+		if !sess.SkipStatusUpdates && json.Valid(lineBytes) {
+			var status Status
+			if err := json.Unmarshal(lineBytes, &status); err != nil {
+				agentstate.Logger.Error("couldn't unmarshal hashcat status", "error", err)
 
-					continue
-				}
+				continue
+			}
 
-				select {
-				case sess.StatusUpdates <- status:
-				case <-sess.ctx.Done():
-					agentstate.Logger.Warn("Status update dropped due to context cancellation")
+			select {
+			case sess.StatusUpdates <- status:
+			case <-sess.ctx.Done():
+				agentstate.Logger.Warn("Status update dropped due to context cancellation")
 
-					break scanLoop
-				}
-			} else {
-				if strings.Contains(line, "starting in restore mode") {
-					agentstate.Logger.Info("Hashcat is starting in restore mode")
-				} else {
-					agentstate.Logger.Error("unexpected stdout line", "line", line)
-				}
+				break scanLoop
+			}
+		} else if !json.Valid(lineBytes) {
+			if !sess.classifyAndForwardStdout(line) {
+				break scanLoop
 			}
 		}
 	}
@@ -331,21 +329,65 @@ scanLoop:
 }
 
 // handleStderr processes stderr output from the hashcat process.
-// Each line is logged and sent through the StderrMessages channel.
+// Each line is classified and sent through the StderrMessages channel as ErrorInfo.
+// Raw lines are not logged to avoid leaking sensitive hash data; only classified
+// metadata (category, severity) is logged.
 func (sess *Session) handleStderr() {
 	scanner := bufio.NewScanner(sess.pStderr)
 	for scanner.Scan() {
 		line := scanner.Text()
-		agentstate.Logger.Error("read stderr", "text", line)
+		errInfo := ClassifyStderr(line)
+
+		agentstate.Logger.Debug("hashcat stderr classified",
+			"category", errInfo.Category.String(),
+			"severity", errInfo.Severity)
 
 		select {
-		case sess.StderrMessages <- line:
+		case sess.StderrMessages <- errInfo:
 		case <-sess.ctx.Done():
 			agentstate.Logger.Warn("Stderr line dropped due to context cancellation",
-				"text", line)
+				"category", errInfo.Category.String())
 
 			return // return directly: stderr goroutine does not own DoneChan
 		}
+	}
+}
+
+// classifyAndForwardStdout classifies a non-JSON stdout line and forwards it to
+// StderrMessages if it represents a warning or error. Info/success lines are logged
+// locally only. Returns true to continue processing, false if context was cancelled.
+func (sess *Session) classifyAndForwardStdout(line string) bool {
+	if strings.Contains(line, "starting in restore mode") {
+		agentstate.Logger.Info("Hashcat is starting in restore mode")
+
+		return true
+	}
+
+	errInfo := ClassifyStderr(line)
+
+	switch errInfo.Category {
+	case ErrorCategoryInfo, ErrorCategorySuccess:
+		agentstate.Logger.Info("hashcat stdout",
+			"category", errInfo.Category.String())
+
+		return true
+	case ErrorCategoryWarning:
+		agentstate.Logger.Warn("hashcat stdout warning",
+			"category", errInfo.Category.String())
+	default:
+		agentstate.Logger.Error("hashcat stdout error",
+			"category", errInfo.Category.String(),
+			"severity", errInfo.Severity)
+	}
+
+	select {
+	case sess.StderrMessages <- errInfo:
+		return true
+	case <-sess.ctx.Done():
+		agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
+			"category", errInfo.Category.String())
+
+		return false
 	}
 }
 

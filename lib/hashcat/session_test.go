@@ -222,12 +222,14 @@ func TestHandleStderr_ExitsOnContextCancellation(t *testing.T) {
 		ctx:            ctx,
 		cancel:         cancel,
 		pStderr:        pr,
-		StderrMessages: make(chan string, channelBufferSize),
+		StderrMessages: make(chan ErrorInfo, channelBufferSize),
 	}
 
 	// Fill StderrMessages to capacity so the next send blocks
 	for i := range channelBufferSize {
-		sess.StderrMessages <- fmt.Sprintf("prefill-%d", i)
+		sess.StderrMessages <- ErrorInfo{
+			Message: fmt.Sprintf("prefill-%d", i),
+		}
 	}
 
 	done := make(chan struct{})

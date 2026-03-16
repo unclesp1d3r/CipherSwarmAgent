@@ -28,6 +28,19 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - All API interactions must adhere to the v1 Agent API contract.
 - Implement exponential backoff for failed API requests.
 
+### Hashcat Output Parsing
+
+- **stdout vs stderr:** Hashcat routes `event_log_warning` (hash parse errors) and `event_log_advice` (summary blocks) to **stdout**. Only `event_log_error` goes to stderr. `--status-json` does NOT produce JSON error objects — only affects periodic status output.
+- **Error parser patterns** (`lib/hashcat/errorparser.go`): `ClassifyStderr` classifies both stderr and stdout lines using `FindStringSubmatch` + optional `contextExtractor` functions that populate `ErrorInfo.Context map[string]any`. When adding new patterns, include an extractor to populate well-known keys (`error_type`, `device_id`, `hashfile`, `line_number`, `affected_count`, `total_count`, `terminal`, `backend_api`, `api_error`).
+- **Version-specific formats:** v6.x uses `Hashfile '<file>' on line N (<hash>): <error>`, v7.x changed to `Hash parsing error in hashfile: '<file>' on line N (<hash>): <error>`. Machine-readable mode (`--machine-readable`) uses `<file>:<line>:<hash>:<error>`. Patterns must handle both versions.
+- **Stdout→StderrMessages routing:** Non-JSON stdout lines are classified by `ClassifyStderr` in `handleStdout()` (`lib/hashcat/session.go`). Error/warning categories are forwarded as `ErrorInfo` (not raw strings) to the `StderrMessages` channel. Consumers: `lib/task/runner.go`, `lib/testManager.go`, `lib/benchmark/parse.go`. Info/success categories are logged locally only.
+- **Exit codes** (`lib/hashcat/exitcode.go`): Constants and classifications are sourced from hashcat `types.h` — not observed behavior. `ExitCodeInfo` includes `Context map[string]any` with `exit_code_name`.
+- **Shell exit code normalization:** On Unix, hashcat's negative exit codes (e.g., -11) arrive as unsigned 8-bit (e.g., 245). `normalizeExitCode` in `lib/task/runner.go` converts 245-255 → -11 to -1 before `ClassifyExitCode`.
+- **No raw hashcat lines in logs:** `handleStderr` and `classifyAndForwardStdout` log classified metadata (`category`, `severity`) — never raw `line` content, which may contain hashes or file paths.
+- **Colon-aware parsing:** Many hash types contain colons (MD5:salt, PBKDF2 `sha256:20000:salt`, Kerberos `krb5asrep$23$user@REALM$hash`). Any regex parsing colon-delimited hashcat output (especially machine-readable `<file>:<line>:<hash>:<error>`) must use non-greedy captures for the file path (`(.+?)`) or anchor on the known numeric line field — greedy `(.+)` will consume hash colons into the file capture group.
+- **Structured error metadata:** `cserrors.WithContext(map[string]any)` merges extracted fields into the API error metadata `other` map. Always pair with `WithClassification` when sending classified errors.
+- **Metadata key precedence:** In `SendAgentError`, context fields are copied first, then reserved keys (`platform`, `version`, `category`, `retryable`) are set — so reserved keys always win over context collisions.
+
 ## Go
 
 The project follows standard, idiomatic Go practices (version 1.26+).
@@ -53,6 +66,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
     - `zap/`: Zap file monitoring for cracked hashes.
 - `agentstate/`: Global agent state, loggers, and synchronized fields.
 - `docs/`: Project documentation, including the OpenAPI specification.
+    - `docs/plans/`: Working design documents — NOT committed to git.
 
 ### Formatting & Linting
 

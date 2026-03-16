@@ -5,21 +5,35 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 ## Linting
 
 - `//go:fix inline` directives conflict with `gocheckcompilerdirectives` — avoid adding them.
+
 - `just ci-check` includes a `go fix -diff` dry-run whose output is informational only, not a failure.
+
 - `contextcheck` flags functions not propagating context — use `//nolint:contextcheck // reason` when the callee genuinely cannot accept a context parameter.
+
 - `revive` requires each exported constant to have its own `// ConstName is...` doc comment. A group comment alone doesn't satisfy it.
+
 - `//nolint:revive` does NOT suppress `staticcheck` for the same issue — list all linters (e.g., `//nolint:revive,staticcheck`).
+
 - `//nolint:errcheck` does NOT suppress `gosec` G104 (unhandled error return) — list both (e.g., `//nolint:gosec,errcheck // G104 - reason`).
+
 - `containedctx` flags `context.Context` stored in structs — use `//nolint:containedctx // reason` when the context is intentionally part of the struct lifecycle.
+
 - `gocritic` `whyNoLint` rule requires every `//nolint:` directive to include an explanation. Bare `//nolint:linter` directives fail CI.
+
 - A blank `//` line between a doc comment and a type/func declaration breaks the linter's comment association — keep them contiguous.
+
 - `errorsastype` suggests replacing `errors.As(err, &target)` with generic `errors.AsType[T]()` (Go 1.26+). Adopt when touching affected code; don't refactor unrelated lines.
+
 - `.golangci.yml` has `fix: true` — `nolintlint` auto-strips `//nolint:` directives that don't suppress an active warning. Don't add nolint for rules that aren't actually firing; verify with a clean cache first (`golangci-lint cache clean`).
+
 - `gosec G118` flags goroutines that use `context.Background()` or don't propagate the parent context. Use `//nolint:gosec // G118 - reason` as a standalone comment above `go func()`.
+
 - `gosec G204` does NOT fire on `exec.CommandContext` when the binary path comes from an internal function return — don't add `//nolint:gosec // G204` unless verified.
+
 - `gosec G304` does NOT fire on `os.Open` in test helper packages — don't add `//nolint:gosec // G304` unless verified with a clean lint run.
 
 - `durationcheck` flags `time.Duration * time.Duration` — use `int64` intermediate for multipliers (e.g., `time.Duration(int64(1) << shift)`).
+
 - `gocritic` `importShadow` fires when a parameter name matches an imported package name (e.g., `config` parameter shadowing `lib/config` import). Rename the parameter.
 
 ## golines & nolint Comments
@@ -27,6 +41,13 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint reasons short so total line stays under 120 chars.
 - When `golines` splits multi-line expressions, even short inline `//nolint:` comments get displaced. Place nolint as a standalone comment on the line above.
 - `//nolint:revive` on `APIError`, `Error_`, and `APIClient` can be stripped by `golines` or other formatters. Verify they survive after running formatters.
+
+## Hashcat Output Routing
+
+- Hashcat `event_log_warning` and `event_log_advice` go to **stdout**, not stderr — only `event_log_error` goes to stderr. Hash parse errors (Token length exception, Separator unmatched, etc.) are warnings, so they appear on stdout.
+- `--status-json` only structures the periodic status display — errors/warnings remain plain text regardless of output mode.
+- v7.x changed per-hash error prefix from `Hashfile '...'` to `Hash parsing error in hashfile: '...'` — patterns must match both.
+- Machine-readable error format (`<file>:<line>:<hash>:<error>`) uses colons as delimiters, but many hash types also contain colons (MD5:salt, PBKDF2 `sha256:20000:salt`, Kerberos). The regex uses non-greedy `(.+?)` for the file path capture — greedy `(.+)` misparses by consuming hash colons into the file group. Any new colon-delimited parsing must account for hash types with embedded colons.
 
 ## Code Generation (oapi-codegen)
 

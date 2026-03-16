@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
@@ -49,11 +48,20 @@ func drainStdout(sess *hashcat.Session, results *[]display.BenchmarkResult) {
 	}
 }
 
-// handleBenchmarkStdErrLine processes each line from the benchmark's standard error output, logs it, and reports warnings to the server.
-func handleBenchmarkStdErrLine(ctx context.Context, line string) {
-	display.BenchmarkError(line)
+// handleBenchmarkStdErrLine processes a classified error from the benchmark's stderr,
+// logs it, and reports to the server. Info/success messages are skipped since they are
+// advisory lines routed from stdout (not actual errors).
+func handleBenchmarkStdErrLine(ctx context.Context, errInfo hashcat.ErrorInfo) {
+	if errInfo.Category == hashcat.ErrorCategoryInfo ||
+		errInfo.Category == hashcat.ErrorCategorySuccess {
+		return
+	}
 
-	if strings.TrimSpace(line) != "" {
-		cserrors.SendAgentError(ctx, line, nil, api.SeverityWarning)
+	display.BenchmarkError(errInfo.Message)
+
+	if strings.TrimSpace(errInfo.Message) != "" {
+		cserrors.SendAgentError(ctx, errInfo.Message, nil, errInfo.Severity,
+			cserrors.WithClassification(errInfo.Category.String(), errInfo.Retryable),
+			cserrors.WithContext(errInfo.Context))
 	}
 }

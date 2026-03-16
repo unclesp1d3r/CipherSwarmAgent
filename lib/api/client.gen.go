@@ -2049,6 +2049,19 @@ type GetHealthResponse struct {
 		// Timestamp Server timestamp
 		Timestamp time.Time `json:"timestamp"`
 	}
+	JSON503 *struct {
+		// ApiVersion API version
+		ApiVersion int `json:"api_version"`
+
+		// Database Database health (healthy or unhealthy)
+		Database string `json:"database"`
+
+		// Status Overall health status (ok or degraded)
+		Status string `json:"status"`
+
+		// Timestamp Server timestamp
+		Timestamp time.Time `json:"timestamp"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -2877,6 +2890,25 @@ func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest struct {
+			// ApiVersion API version
+			ApiVersion int `json:"api_version"`
+
+			// Database Database health (healthy or unhealthy)
+			Database string `json:"database"`
+
+			// Status Overall health status (ok or degraded)
+			Status string `json:"status"`
+
+			// Timestamp Server timestamp
+			Timestamp time.Time `json:"timestamp"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
