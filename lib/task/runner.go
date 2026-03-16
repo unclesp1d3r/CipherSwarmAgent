@@ -196,6 +196,9 @@ func (m *Manager) handleDoneChan(ctx context.Context, err error, task *api.Task,
 }
 
 // parseExitCode extracts the exit code from an error message like "exit status N".
+// On Unix, negative exit codes (e.g., hashcat's -11) are reported by the kernel as
+// unsigned 8-bit values (e.g., 245). This function normalizes codes in the 245-255
+// range back to their signed equivalents (-11 to -1) so ClassifyExitCode matches them.
 // Returns -1 (general error) for non-standard error formats, including:
 // - Signal-based terminations (e.g., "signal: killed", "signal: terminated")
 // - Any other error format that doesn't match "exit status N".
@@ -204,12 +207,29 @@ func parseExitCode(errMsg string) int {
 
 	// Try to parse "exit status N" format
 	if _, err := fmt.Sscanf(errMsg, "exit status %d", &exitCode); err == nil {
-		return exitCode
+		return normalizeExitCode(exitCode)
 	}
 
 	// Default to -1 (general error) for non-standard formats
 	// This includes signal-based terminations like "signal: killed"
 	return -1
+}
+
+// normalizeExitCode converts unsigned shell exit codes (245-255) back to their
+// signed equivalents (-11 to -1). Hashcat documents negative exit codes in types.h
+// but Unix only reports the low 8 bits, so -11 appears as 245 (256 - 11).
+func normalizeExitCode(code int) int {
+	const (
+		shellExitMin = 245 // -11 as unsigned 8-bit
+		shellExitMax = 255 // -1 as unsigned 8-bit
+		signedOffset = 256
+	)
+
+	if code >= shellExitMin && code <= shellExitMax {
+		return code - signedOffset
+	}
+
+	return code
 }
 
 // handleNonExhaustedError handles errors which are not related to exhaustion

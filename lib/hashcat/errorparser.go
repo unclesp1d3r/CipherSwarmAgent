@@ -220,7 +220,7 @@ var errorPatterns = []errorPattern{
 		staticContext("selftest_failure"),
 	},
 	{
-		regexp.MustCompile(`Aborting session due to kernel autotune failure`),
+		regexp.MustCompile(`Aborting session due to kernel autotune failures?`),
 		ErrorCategoryBackend,
 		api.SeverityFatal,
 		false,
@@ -238,11 +238,11 @@ var errorPatterns = []errorPattern{
 		extractKernelBuildContext,
 	},
 	{
-		regexp.MustCompile(`clBuildProgram\(\): CL_BUILD_PROGRAM_FAILURE`),
+		regexp.MustCompile(`clBuildProgram\(\): (CL_BUILD_PROGRAM_FAILURE)`),
 		ErrorCategoryBackend,
 		api.SeverityCritical,
 		false,
-		staticContext("cl_build_program_failure"),
+		extractBackendContextWithType("cl_build_program_failure", "OpenCL"),
 	},
 
 	// Module / hash-mode errors (non-retryable)
@@ -346,7 +346,7 @@ var errorPatterns = []errorPattern{
 		ErrorCategoryBackend,
 		api.SeverityCritical,
 		false,
-		staticContext("metal_api_error"),
+		extractBackendContextWithType("metal_api_error", "Metal"),
 	},
 
 	// Configuration errors (non-retryable, critical)
@@ -584,6 +584,24 @@ func extractDeviceWarningContext(_ string, submatch []string) map[string]any {
 	}
 
 	return ctx
+}
+
+// extractBackendContextWithType returns an extractor for backend errors with a known error type.
+// Used for patterns where the error type is fixed (e.g., CL_BUILD_PROGRAM_FAILURE, Metal API)
+// but we still want consistent backend_api metadata.
+func extractBackendContextWithType(errorType, backendAPI string) contextExtractor {
+	return func(_ string, submatch []string) map[string]any {
+		ctx := map[string]any{
+			"error_type":  errorType,
+			"backend_api": backendAPI,
+		}
+
+		if len(submatch) > 1 {
+			ctx["api_error"] = submatch[1]
+		}
+
+		return ctx
+	}
 }
 
 // extractBackendAPIContext returns an extractor for backend API errors.

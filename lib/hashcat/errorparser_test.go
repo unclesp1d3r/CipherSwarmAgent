@@ -708,6 +708,7 @@ func TestClassifyStderr_MetalAPIContext(t *testing.T) {
 
 	require.NotNil(t, info.Context)
 	assert.Equal(t, "metal_api_error", info.Context["error_type"])
+	assert.Equal(t, "Metal", info.Context["backend_api"])
 }
 
 func TestClassifyStderr_CLBuildProgramContext(t *testing.T) {
@@ -715,6 +716,8 @@ func TestClassifyStderr_CLBuildProgramContext(t *testing.T) {
 
 	require.NotNil(t, info.Context)
 	assert.Equal(t, "cl_build_program_failure", info.Context["error_type"])
+	assert.Equal(t, "OpenCL", info.Context["backend_api"])
+	assert.Equal(t, "CL_BUILD_PROGRAM_FAILURE", info.Context["api_error"])
 	assert.Equal(t, ErrorCategoryBackend, info.Category)
 }
 

@@ -40,9 +40,9 @@ func TestParseExitCode(t *testing.T) {
 			expected: 2,
 		},
 		{
-			name:     "exit status 255 - high value",
+			name:     "exit status 255 - normalized to -1 (general error)",
 			errMsg:   "exit status 255",
-			expected: 255,
+			expected: -1,
 		},
 		{
 			name:     "exit status -1 - negative exit code",
@@ -109,28 +109,88 @@ func TestParseExitCode(t *testing.T) {
 	}
 }
 
-// TestParseExitCode_AllHashcatCodes tests parseExitCode with all documented hashcat exit codes.
+// TestParseExitCode_AllHashcatCodes tests parseExitCode with all documented hashcat exit codes,
+// including both signed (direct) and unsigned shell (245-255) representations.
 func TestParseExitCode_AllHashcatCodes(t *testing.T) {
 	hashcatExitCodes := []int{
-		0,  // Cracked
-		1,  // Exhausted
-		2,  // Aborted
-		3,  // Checkpoint abort
-		4,  // Runtime limit
-		-1, // General error
-		-2, // GPU watchdog
-		-3, // Backend abort
-		-4, // Backend checkpoint abort
-		-5, // Backend runtime abort
-		-6, // Selftest fail
-		-7, // Autotune fail
+		0, // Cracked
+		1, // Exhausted
+		2, // Aborted
+		3, // Checkpoint abort
+		4, // Runtime limit
+		5, // Abort after finish
 	}
 
 	for _, exitCode := range hashcatExitCodes {
 		t.Run(fmt.Sprintf("hashcat_exit_code_%d", exitCode), func(t *testing.T) {
 			errMsg := fmt.Sprintf("exit status %d", exitCode)
 			result := parseExitCode(errMsg)
-			assert.Equal(t, exitCode, result, "parseExitCode should correctly parse hashcat exit code %d", exitCode)
+			assert.Equal(t, exitCode, result)
+		})
+	}
+}
+
+// TestParseExitCode_SignedNegativeCodes tests that directly negative exit codes
+// (e.g., "exit status -1") are preserved as-is.
+func TestParseExitCode_SignedNegativeCodes(t *testing.T) {
+	negCodes := []int{-1, -3, -4, -5, -6, -7, -8, -9, -11}
+
+	for _, exitCode := range negCodes {
+		t.Run(fmt.Sprintf("signed_%d", exitCode), func(t *testing.T) {
+			errMsg := fmt.Sprintf("exit status %d", exitCode)
+			result := parseExitCode(errMsg)
+			assert.Equal(t, exitCode, result)
+		})
+	}
+}
+
+// TestParseExitCode_ShellUnsignedNormalization tests that unsigned shell exit codes
+// (245-255) are normalized back to their signed equivalents. On Unix, hashcat's
+// negative exit codes (e.g., -11) appear as unsigned 8-bit values (e.g., 245).
+func TestParseExitCode_ShellUnsignedNormalization(t *testing.T) {
+	tests := []struct {
+		name      string
+		shellCode int
+		expected  int
+	}{
+		{"255 normalizes to -1 (general error)", 255, -1},
+		{"253 normalizes to -3 (runtime skip)", 253, -3},
+		{"252 normalizes to -4 (memory hit)", 252, -4},
+		{"251 normalizes to -5 (kernel build)", 251, -5},
+		{"250 normalizes to -6 (kernel create)", 250, -6},
+		{"249 normalizes to -7 (kernel accel)", 249, -7},
+		{"248 normalizes to -8 (extra size)", 248, -8},
+		{"247 normalizes to -9 (mixed warnings)", 247, -9},
+		{"245 normalizes to -11 (selftest fail)", 245, -11},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errMsg := fmt.Sprintf("exit status %d", tt.shellCode)
+			result := parseExitCode(errMsg)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestNormalizeExitCode_BoundaryValues tests normalization boundaries.
+func TestNormalizeExitCode_BoundaryValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     int
+		expected int
+	}{
+		{"244 stays as-is (below range)", 244, 244},
+		{"245 normalizes to -11", 245, -11},
+		{"255 normalizes to -1", 255, -1},
+		{"0 stays as-is", 0, 0},
+		{"1 stays as-is", 1, 1},
+		{"128 stays as-is (signal range)", 128, 128},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, normalizeExitCode(tt.code))
 		})
 	}
 }

@@ -282,24 +282,26 @@ scanLoop:
 			continue
 		}
 
-		if !sess.SkipStatusUpdates {
-			lineBytes := []byte(line)
-			if json.Valid(lineBytes) {
-				var status Status
-				if err := json.Unmarshal(lineBytes, &status); err != nil {
-					agentstate.Logger.Error("couldn't unmarshal hashcat status", "error", err)
+		// JSON status parsing is conditional on SkipStatusUpdates (disabled in benchmark mode).
+		// Non-JSON classification always runs so warnings/errors are never silently dropped.
+		lineBytes := []byte(line)
+		if !sess.SkipStatusUpdates && json.Valid(lineBytes) {
+			var status Status
+			if err := json.Unmarshal(lineBytes, &status); err != nil {
+				agentstate.Logger.Error("couldn't unmarshal hashcat status", "error", err)
 
-					continue
-				}
+				continue
+			}
 
-				select {
-				case sess.StatusUpdates <- status:
-				case <-sess.ctx.Done():
-					agentstate.Logger.Warn("Status update dropped due to context cancellation")
+			select {
+			case sess.StatusUpdates <- status:
+			case <-sess.ctx.Done():
+				agentstate.Logger.Warn("Status update dropped due to context cancellation")
 
-					break scanLoop
-				}
-			} else if !sess.classifyAndForwardStdout(line) {
+				break scanLoop
+			}
+		} else if !json.Valid(lineBytes) {
+			if !sess.classifyAndForwardStdout(line) {
 				break scanLoop
 			}
 		}
