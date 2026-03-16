@@ -48,8 +48,15 @@ func drainStdout(sess *hashcat.Session, results *[]display.BenchmarkResult) {
 	}
 }
 
-// handleBenchmarkStdErrLine processes a classified error from the benchmark's stderr, logs it, and reports to the server.
+// handleBenchmarkStdErrLine processes a classified error from the benchmark's stderr,
+// logs it, and reports to the server. Info/success messages are skipped since they are
+// advisory lines routed from stdout (not actual errors).
 func handleBenchmarkStdErrLine(ctx context.Context, errInfo hashcat.ErrorInfo) {
+	if errInfo.Category == hashcat.ErrorCategoryInfo ||
+		errInfo.Category == hashcat.ErrorCategorySuccess {
+		return
+	}
+
 	display.BenchmarkError(errInfo.Message)
 
 	if strings.TrimSpace(errInfo.Message) != "" {
