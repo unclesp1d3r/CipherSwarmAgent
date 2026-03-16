@@ -85,6 +85,43 @@ type errorPattern struct {
 //
 //nolint:gochecknoglobals // Patterns are intentionally global for performance
 var errorPatterns = []errorPattern{
+	// Stdout summary lines (hashcat writes these to stdout, not stderr)
+	{
+		regexp.MustCompile(`^\* Token length exception: \d+/\d+ hashes`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+	},
+	{
+		regexp.MustCompile(`^\* Separator unmatched: \d+/\d+ hashes`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+	},
+	{
+		regexp.MustCompile(`^\* Line-length exception: \d+/\d+ hashes`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+	},
+	{
+		regexp.MustCompile(`^\* Salt-length exception: \d+/\d+ hashes`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+	},
+
+	// Stdout per-hash errors with file path context
+	{
+		regexp.MustCompile(`^Hashfile '.+' on line \d+`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+	},
+
+	// Stdout explanatory context lines (indented help text)
+	{regexp.MustCompile(`^ {2}This error happens if`), ErrorCategoryInfo, api.SeverityInfo, false},
+
 	// Hash format errors (non-retryable, critical)
 	{regexp.MustCompile(`Hash '.+': Separator unmatched`), ErrorCategoryHashFormat, api.SeverityCritical, false},
 	{

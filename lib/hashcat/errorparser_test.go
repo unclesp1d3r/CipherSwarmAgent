@@ -220,6 +220,71 @@ func TestClassifyStderr_GeneralErrors(t *testing.T) {
 	})
 }
 
+func TestClassifyStderr_StdoutErrorPatterns(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		// Summary lines
+		{
+			"summary token length exception",
+			"* Token length exception: 1024/1024 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"summary separator unmatched",
+			"* Separator unmatched: 5/100 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"summary line-length exception",
+			"* Line-length exception: 2/50 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"summary salt-length exception",
+			"* Salt-length exception: 10/10 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		// Edge case: 0/0 hashes
+		{
+			"summary zero hashes",
+			"* Token length exception: 0/0 hashes",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		// Per-hash with file path
+		{
+			"hashfile per-line error",
+			"Hashfile '/path/to/2.hsh' on line 1023 ($abc...): Token length exception",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"hashfile with long path",
+			"Hashfile '/very/long/path/to/some/deeply/nested/directory/hashes.txt' on line 1 (abc): Separator unmatched",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		// Multi-line context
+		{
+			"explanatory context line",
+			"  This error happens if the wrong hash type is specified, if the hashes are",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+	})
+}
+
 func TestErrorInfo_Fields(t *testing.T) {
 	info := ErrorInfo{
 		Category:  ErrorCategoryHashFormat,

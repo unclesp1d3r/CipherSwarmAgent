@@ -303,7 +303,36 @@ scanLoop:
 				if strings.Contains(line, "starting in restore mode") {
 					agentstate.Logger.Info("Hashcat is starting in restore mode")
 				} else {
-					agentstate.Logger.Error("unexpected stdout line", "line", line)
+					errInfo := ClassifyStderr(line)
+
+					switch errInfo.Category {
+					case ErrorCategoryInfo, ErrorCategorySuccess:
+						agentstate.Logger.Info("hashcat stdout", "line", line)
+					case ErrorCategoryWarning:
+						agentstate.Logger.Warn("hashcat stdout warning", "line", line)
+
+						select {
+						case sess.StderrMessages <- line:
+						case <-sess.ctx.Done():
+							agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
+								"line", line)
+
+							break scanLoop
+						}
+					default:
+						agentstate.Logger.Error("hashcat stdout error", "line", line,
+							"category", errInfo.Category.String(),
+							"severity", errInfo.Severity)
+
+						select {
+						case sess.StderrMessages <- line:
+						case <-sess.ctx.Done():
+							agentstate.Logger.Warn("Stderr message dropped due to context cancellation",
+								"line", line)
+
+							break scanLoop
+						}
+					}
 				}
 			}
 		}
