@@ -194,6 +194,7 @@ The main business logic of the agent, organized by functional area:
 - **Purpose**: Hashcat process lifecycle management
 - **Key Types**:
   - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines
+  - `Session.StderrMessages`: Channel type is `chan ErrorInfo` (changed from `chan string`). Consumers receive structured error information with classification and context instead of raw strings. Stdout lines are classified before being sent to this channel for error/warning lines.
 - **Key Functions**:
   - `NewHashcatSession()`: Create configured session
   - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines
@@ -216,10 +217,30 @@ The main business logic of the agent, organized by functional area:
 #### `lib/hashcat/exitcode.go`
 
 - **Purpose**: Hashcat exit code interpretation
+- **Key Types**:
+  - `ExitCodeInfo`: Adds `Context map[string]any` field for structured metadata
+- **Exit Codes**:
+  - **Corrected mappings** (codes -3 through -7 match hashcat 7.x `types.h`):
+    - `-3` (`ExitCodeRuntimeSkip`): All backend devices skipped at runtime
+    - `-4` (`ExitCodeMemoryHit`): Insufficient device memory
+    - `-5` (`ExitCodeKernelBuild`): Kernel compilation failed
+    - `-6` (`ExitCodeKernelCreate`): Kernel creation failed
+    - `-7` (`ExitCodeKernelAccel`): Autotune failed on all devices
+  - **New codes**:
+    - `5` (`ExitCodeAbortFinish`): Aborted after finish flag set (RC_FINAL_ABORT_FINISH)
+    - `-8` (`ExitCodeExtraSize`): Extra size backend issue (shell: 248)
+    - `-9` (`ExitCodeMixedWarnings`): Multiple backend issues (shell: 247)
+    - `-11` (`ExitCodeSelftestFail`): Kernel self-test failed (shell: 245)
 
 #### `lib/hashcat/errorparser.go`
 
-- **Purpose**: Hashcat stderr error message parsing
+- **Purpose**: Hashcat error message parsing and classification
+- **Key Types**:
+  - `ErrorInfo`: Adds `Context map[string]any` field containing extracted structured metadata. Fields include `error_type`, `hashfile`, `line_number`, `hash_preview`, `affected_count`, `total_count`, `device_id`, `backend_api`, `api_error`, `terminal`, and others.
+  - `contextExtractor`: Function type for extracting structured context from matched lines
+  - `errorPattern`: Pattern matcher with optional `extract` field for context extraction
+- **Key Functions**:
+  - `ClassifyStderr()`: Classifies error/warning lines from hashcat. Despite the name, processes both stdout and stderr lines, as hashcat emits hash parsing errors via stdout.
 
 ### 11. Task Management (`lib/task/`)
 
@@ -259,6 +280,15 @@ The main business logic of the agent, organized by functional area:
 - **Key Functions**:
   - `SendAgentError()`: Report errors with severity and metadata
   - `LogAndSendError()`: Combined logging and server reporting
+  - `WithContext(ctx map[string]any)`: Adds structured context fields to error metadata. Fields are merged into the metadata map alongside classification and platform info.
+
+**Example usage with context**:
+
+```go
+cserrors.SendAgentError(ctx, client, api.SeverityCritical, errorMsg,
+    cserrors.WithClassification("backend", false),
+    cserrors.WithContext(map[string]any{"device_id": 1, "error_type": "memory_hit"}))
+```
 
 ### 13. OS Abstractions (`lib/arch/`)
 
