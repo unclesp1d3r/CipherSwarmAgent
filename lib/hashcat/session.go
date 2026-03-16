@@ -53,6 +53,8 @@ type Session struct {
 	DoneChan           chan error     // Channel signaling process completion
 	SkipStatusUpdates  bool           // Flag to disable status update parsing
 	RestoreFilePath    string         // Path to session restore file
+	sessionLogFile     string         // Absolute path to hashcat session .log file for cleanup
+	sessionPidFile     string         // Absolute path to hashcat session .pid file for cleanup
 	pStdout            io.ReadCloser  // Stdout pipe from hashcat process
 	pStderr            io.ReadCloser  // Stderr pipe from hashcat process
 }
@@ -104,6 +106,9 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		}
 	}
 
+	sessionName := "attack-" + id
+	sessDir := hashcatSessionDir(binaryPath)
+
 	return &Session{
 		proc: exec.CommandContext(
 			ctx,
@@ -122,6 +127,8 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		DoneChan:           make(chan error),
 		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
 		RestoreFilePath:    params.RestoreFilePath,
+		sessionLogFile:     filepath.Join(sessDir, sessionName+".log"),
+		sessionPidFile:     filepath.Join(sessDir, sessionName+".pid"),
 	}, nil
 }
 
@@ -422,9 +429,9 @@ func (sess *Session) Kill() error {
 }
 
 // Cleanup cancels the session context and removes all session-related temporary
-// files: output file, charset files, hash file, restore file, and optionally
-// the zaps directory. It is idempotent — already-removed files are silently skipped.
-// Errors during cleanup are logged but don't halt the cleanup process.
+// files: output file, charset files, hash file, restore file, session log/pid
+// files, and optionally the zaps directory. It is idempotent — already-removed
+// files are silently skipped. Errors are logged but don't halt the cleanup.
 func (sess *Session) Cleanup() {
 	sess.Cancel()
 
@@ -459,6 +466,19 @@ func (sess *Session) Cleanup() {
 	if strings.TrimSpace(sess.RestoreFilePath) != "" {
 		removeFile(sess.RestoreFilePath)
 		sess.RestoreFilePath = ""
+	}
+
+	// Remove hashcat session .log and .pid files.
+	// Hashcat creates these in its session directory (e.g., ~/.hashcat/sessions/).
+	if sess.sessionLogFile != "" {
+		agentstate.Logger.Debug("Removing session log file", "file", sess.sessionLogFile)
+		removeFile(sess.sessionLogFile)
+		sess.sessionLogFile = ""
+	}
+	if sess.sessionPidFile != "" {
+		agentstate.Logger.Debug("Removing session pid file", "file", sess.sessionPidFile)
+		removeFile(sess.sessionPidFile)
+		sess.sessionPidFile = ""
 	}
 }
 

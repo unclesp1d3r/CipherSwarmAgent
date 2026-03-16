@@ -193,13 +193,13 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Hashcat process lifecycle management
 - **Key Types**:
-  - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines
+  - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines. Includes `sessionName` field for tracking hashcat session name.
   - `Session.StderrMessages`: Channel type is `chan ErrorInfo` (changed from `chan string`). Consumers receive structured error information with classification and context instead of raw strings. Stdout lines are classified before being sent to this channel for error/warning lines.
 - **Key Functions**:
   - `NewHashcatSession()`: Create configured session
   - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines
   - `Kill()`: Terminate process gracefully
-  - `Cleanup()`: Resource cleanup (temp files, charset files)
+  - `Cleanup()`: Resource cleanup including temporary files (output files, charset files, hash files, restore files, zaps directory) and hashcat-created session files (.log and .pid files)
 
 #### `lib/hashcat/params.go`
 

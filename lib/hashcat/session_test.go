@@ -97,6 +97,88 @@ func TestCleanup_SkipsEmptyRestoreFilePath(t *testing.T) {
 	sess.Cleanup()
 }
 
+// TestCleanup_RemovesSessionLogAndPidFiles verifies that Cleanup removes
+// the .log and .pid files created by hashcat for the session.
+func TestCleanup_RemovesSessionLogAndPidFiles(t *testing.T) {
+	setupSessionTestState(t)
+
+	tempDir := t.TempDir()
+
+	logFile := filepath.Join(tempDir, "attack-42.log")
+	pidFile := filepath.Join(tempDir, "attack-42.pid")
+
+	require.NoError(t, os.WriteFile(logFile, []byte("log data"), 0o600))
+	require.NoError(t, os.WriteFile(pidFile, []byte("12345"), 0o600))
+
+	sess := &Session{
+		sessionLogFile: logFile,
+		sessionPidFile: pidFile,
+	}
+
+	sess.Cleanup()
+
+	_, err := os.Stat(logFile)
+	require.True(t, os.IsNotExist(err), ".log file should be removed after Cleanup")
+	_, err = os.Stat(pidFile)
+	require.True(t, os.IsNotExist(err), ".pid file should be removed after Cleanup")
+	require.Empty(t, sess.sessionLogFile, "sessionLogFile should be cleared after Cleanup")
+	require.Empty(t, sess.sessionPidFile, "sessionPidFile should be cleared after Cleanup")
+}
+
+// TestCleanup_IdempotentSessionFiles verifies that Cleanup does not error
+// when session .log and .pid files do not exist.
+func TestCleanup_IdempotentSessionFiles(t *testing.T) {
+	setupSessionTestState(t)
+
+	sess := &Session{
+		sessionLogFile: filepath.Join(t.TempDir(), "attack-nonexistent.log"),
+		sessionPidFile: filepath.Join(t.TempDir(), "attack-nonexistent.pid"),
+	}
+
+	// Should not panic or error
+	sess.Cleanup()
+	require.Empty(t, sess.sessionLogFile, "sessionLogFile should be cleared even when files don't exist")
+	require.Empty(t, sess.sessionPidFile, "sessionPidFile should be cleared even when files don't exist")
+}
+
+// TestCleanup_SkipsEmptySessionFilePaths verifies that Cleanup handles
+// empty session file paths gracefully without attempting file removal.
+func TestCleanup_SkipsEmptySessionFilePaths(t *testing.T) {
+	setupSessionTestState(t)
+
+	sess := &Session{
+		sessionLogFile: "",
+		sessionPidFile: "",
+	}
+
+	// Should not panic
+	sess.Cleanup()
+}
+
+// TestCleanup_DoubleCallIdempotent verifies that calling Cleanup twice
+// does not error — the second call is a no-op since paths are cleared.
+func TestCleanup_DoubleCallIdempotent(t *testing.T) {
+	setupSessionTestState(t)
+
+	tempDir := t.TempDir()
+	logFile := filepath.Join(tempDir, "attack-99.log")
+	pidFile := filepath.Join(tempDir, "attack-99.pid")
+
+	require.NoError(t, os.WriteFile(logFile, []byte("log data"), 0o600))
+	require.NoError(t, os.WriteFile(pidFile, []byte("99"), 0o600))
+
+	sess := &Session{
+		sessionLogFile: logFile,
+		sessionPidFile: pidFile,
+	}
+
+	sess.Cleanup()
+	sess.Cleanup() // Second call should be a no-op
+
+	_, err := os.Stat(logFile)
+	require.True(t, os.IsNotExist(err), ".log file should still be removed")
+}
+
 // testTimeout is the maximum time to wait for a goroutine to exit in cancellation tests.
 const testTimeout = 5 * time.Second
 
