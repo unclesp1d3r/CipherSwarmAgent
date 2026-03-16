@@ -49,24 +49,24 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - `cmd/`: Main application entry points using the Cobra framework.
 - `lib/`: Core agent logic, decomposed into focused sub-packages:
-  - `agent/`: Agent lifecycle — startup, heartbeat loop, task polling, shutdown.
-  - `api/`: API client layer — generated client (`client.gen.go`), wrapper (`client.go`), errors (`errors.go`), interfaces (`interfaces.go`), mocks (`mock.go`). Transport chain: `http.Transport` → `CircuitTransport` → `RetryTransport` → `http.Client`.
-  - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
-  - `arch/`: OS-specific abstractions (Linux, macOS, Windows). Platform identity comes from `host.InfoStat.OS` (in `UpdateAgentMetadata`), not from `arch` — don't add `GetPlatform()` functions here.
-  - `benchmark/`: Benchmark execution, caching, and submission.
-  - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
-  - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
-  - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
-  - `display/`: User-facing output (status, progress, benchmark results).
-  - `downloader/`: File download with checksum verification.
-  - `hashcat/`: Hashcat session management, parameters, and output parsing.
-  - `progress/`: Progress calculation utilities.
-  - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
-  - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
-  - `zap/`: Zap file monitoring for cracked hashes.
+    - `agent/`: Agent lifecycle — startup, heartbeat loop, task polling, shutdown.
+    - `api/`: API client layer — generated client (`client.gen.go`), wrapper (`client.go`), errors (`errors.go`), interfaces (`interfaces.go`), mocks (`mock.go`). Transport chain: `http.Transport` → `CircuitTransport` → `RetryTransport` → `http.Client`.
+    - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
+    - `arch/`: OS-specific abstractions (Linux, macOS, Windows). Platform identity comes from `host.InfoStat.OS` (in `UpdateAgentMetadata`), not from `arch` — don't add `GetPlatform()` functions here.
+    - `benchmark/`: Benchmark execution, caching, and submission.
+    - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
+    - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
+    - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
+    - `display/`: User-facing output (status, progress, benchmark results).
+    - `downloader/`: File download with checksum verification.
+    - `hashcat/`: Hashcat session management, parameters, and output parsing.
+    - `progress/`: Progress calculation utilities.
+    - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
+    - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
+    - `zap/`: Zap file monitoring for cracked hashes.
 - `agentstate/`: Global agent state, loggers, and synchronized fields.
 - `docs/`: Project documentation, including the OpenAPI specification.
-  - `docs/plans/`: Working design documents — NOT committed to git.
+    - `docs/plans/`: Working design documents — NOT committed to git.
 
 ### Formatting & Linting
 
