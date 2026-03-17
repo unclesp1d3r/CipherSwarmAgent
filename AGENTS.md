@@ -32,6 +32,7 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 
 - **Session file location:** Hashcat writes `.log`, `.pid`, and default `.restore` files to its session directory — NOT the process CWD. On POSIX: `~/.hashcat/sessions/` (legacy) or `$XDG_DATA_HOME/hashcat/sessions/` or `~/.local/share/hashcat/sessions/`. On Windows: the hashcat binary's install directory. Use `hashcatSessionDir(binaryPath)` in `lib/hashcat/session_dir.go` to resolve. The `--restore-file-path` flag only relocates the `.restore` file, not `.log`/`.pid`.
 - **Session naming:** All agent-created hashcat sessions use the `sessionPrefix` constant (`"attack-"`) from `lib/hashcat/session_dir.go`. Use this constant — don't hardcode `"attack-"`.
+- **Solution reference:** See `docs/solutions/logic-errors/hashcat-session-file-cleanup-wrong-directory.md` for the full investigation, root cause, and prevention strategies.
 
 ### Hashcat Output Parsing
 
