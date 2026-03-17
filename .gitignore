@@ -150,6 +150,7 @@ undefined/
 
 # AI assistant artifacts
 .claude.local.md
+compound-engineering.local.md
 .full-review
 docs/plans
 .cursor/commands
