@@ -45,6 +45,17 @@ func TestFileExistsAndValid(t *testing.T) {
 			expectedResult: true,
 		},
 		{
+			name: "empty file with no checksum triggers re-download",
+			setupFile: func() string {
+				filePath := filepath.Join(tempDir, "test_empty.txt")
+				err := os.WriteFile(filePath, []byte{}, 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			checksum:       "",
+			expectedResult: false,
+		},
+		{
 			name: "file exists with mismatched checksum",
 			setupFile: func() string {
 				filePath := filepath.Join(tempDir, "test3.txt")

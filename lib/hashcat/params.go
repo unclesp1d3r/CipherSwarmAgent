@@ -315,7 +315,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 // It returns a minimal argument set for session restoration using the restore file.
 func (params Params) toRestoreArgs(session string) []string {
 	return []string{
-		"--session", sessionPrefix+session,
+		"--session", sessionPrefix + session,
 		"--restore-file-path", params.RestoreFilePath,
 		"--restore",
 	}
