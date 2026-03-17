@@ -3,6 +3,7 @@ package hashcat
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,6 +58,10 @@ func TestCleanupOrphanedInDir_SkipsRestoreFiles(t *testing.T) {
 }
 
 func TestCleanupOrphanedInDir_SkipsSymlinks(t *testing.T) {
+	if runtime.GOOS == windowsOS {
+		t.Skip("os.Symlink requires elevated privileges on Windows")
+	}
+
 	dir := t.TempDir()
 
 	// Create a real file and a symlink matching the pattern

@@ -92,7 +92,7 @@ func cleanupOrphanedInDir(dir string) {
 
 	for _, entry := range entries {
 		name := entry.Name()
-		if !entry.Type().IsRegular() {
+		if !isRegularFile(entry) {
 			continue
 		}
 
@@ -118,4 +118,22 @@ func cleanupOrphanedInDir(dir string) {
 	if removed > 0 {
 		agentstate.Logger.Debug("removed orphaned session files", "count", removed, "dir", dir)
 	}
+}
+
+// isRegularFile checks whether a directory entry is a regular file.
+// It uses the fast DirEntry.Type() check first, falling back to
+// os.Lstat via entry.Info() when the type is unknown (Type == 0),
+// which can happen on some filesystems/platforms.
+func isRegularFile(entry os.DirEntry) bool {
+	if entry.Type() != 0 {
+		return entry.Type().IsRegular()
+	}
+
+	// Type unknown — fall back to Info() (calls os.Lstat)
+	info, err := entry.Info()
+	if err != nil {
+		return false
+	}
+
+	return info.Mode().IsRegular()
 }

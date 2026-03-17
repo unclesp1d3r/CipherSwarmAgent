@@ -90,10 +90,14 @@ func StartAgent() {
 
 	defer cleanupLockFile(agentstate.State.PidFile)
 
-	// Clean up orphaned session files from previous agent runs
-	if binaryPath, err := cracker.FindHashcatBinary(); err == nil {
-		hashcat.CleanupOrphanedSessionFiles(binaryPath)
+	// Clean up orphaned session files from previous agent runs.
+	// On POSIX, the session directory is resolved from $HOME, not the binary path,
+	// so cleanup works even when hashcat is not yet installed.
+	binaryPath, binaryErr := cracker.FindHashcatBinary()
+	if binaryErr != nil {
+		agentstate.Logger.Debug("hashcat binary not found, using empty path for session cleanup", "error", binaryErr)
 	}
+	hashcat.CleanupOrphanedSessionFiles(binaryPath)
 
 	// Create context that cancels on OS signal (SIGINT, SIGTERM)
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
