@@ -1,5 +1,5 @@
 ---
-title: "Hashcat session .log and .pid files accumulate without cleanup"
+title: Hashcat session .log and .pid files accumulate without cleanup
 category: logic-errors
 date: 2026-03-16
 tags:
@@ -10,8 +10,8 @@ tags:
   - cross-platform
   - os-isnotexist
 module: lib/hashcat
-symptom: "Hashcat .log and .pid files accumulate in ~/.hashcat/sessions/ across task runs and agent restarts, consuming disk space indefinitely"
-root_cause: "Cleanup used CWD-relative paths instead of hashcat's actual session directory; os.IsNotExist guard silently masked the wrong-directory error"
+symptom: Hashcat .log and .pid files accumulate in ~/.hashcat/sessions/ across task runs and agent restarts, consuming disk space indefinitely
+root_cause: Cleanup used CWD-relative paths instead of hashcat's actual session directory; os.IsNotExist guard silently masked the wrong-directory error
 resolution_type: two-phase
 severity: medium
 affected_files:
@@ -82,6 +82,7 @@ func cleanupOrphanedInDir(dir string) {
 ```
 
 Safety properties:
+
 - `isRegularFile()` rejects symlinks/directories (with `DirEntry.Type()` fallback for unknown types)
 - Windows skipped entirely (session dir = binary install dir, too broad)
 - Errors logged but never propagated (cleanup failure cannot block startup)
@@ -115,8 +116,8 @@ Safety properties:
 
 ## Key Files
 
-| File | Role |
-|------|------|
+| File                         | Role                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
 | `lib/hashcat/session_dir.go` | `hashcatSessionDir()`, `CleanupOrphanedSessionFiles()`, `isRegularFile()`, `sessionPrefix` |
-| `lib/hashcat/session.go` | `sessionLogFile`/`sessionPidFile` fields, `Cleanup()` removal |
-| `lib/agent/agent.go` | Wires startup cleanup into `StartAgent()` |
+| `lib/hashcat/session.go`     | `sessionLogFile`/`sessionPidFile` fields, `Cleanup()` removal                              |
+| `lib/agent/agent.go`         | Wires startup cleanup into `StartAgent()`                                                  |

@@ -55,10 +55,12 @@ func DownloadFile(ctx context.Context, fileURL, filePath, checksum string) error
 }
 
 // FileExistsAndValid checks if a file exists at the given path and, if a checksum is provided, verifies its validity.
-// The function returns true if the file exists and matches the given checksum, or if no checksum is provided.
-// If the file does not exist or the checksum verification fails, appropriate error messages are logged.
+// The function returns true if the file exists and matches the given checksum, or if no checksum is provided
+// and the file is non-empty. If the file does not exist or the checksum verification fails, appropriate error
+// messages are logged.
 func FileExistsAndValid(filePath, checksum string) bool {
-	if _, err := os.Stat(filePath); err != nil {
+	info, err := os.Stat(filePath)
+	if err != nil {
 		if !os.IsNotExist(err) {
 			agentstate.Logger.Error("Error checking file existence", "path", filePath, "error", err)
 		}
@@ -67,6 +69,12 @@ func FileExistsAndValid(filePath, checksum string) bool {
 	}
 
 	if strings.TrimSpace(checksum) == "" {
+		if info.Size() == 0 {
+			agentstate.Logger.Warn("Existing file is empty, will re-download", "path", filePath)
+
+			return false
+		}
+
 		return true
 	}
 
