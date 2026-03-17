@@ -121,7 +121,7 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Agent main loop and lifecycle management
 - **Key Functions**:
-  - `StartAgent()`: Main agent loop (heartbeat, task polling, benchmark gating)
+  - `StartAgent()`: Main agent loop (heartbeat, task polling, benchmark gating). After creating the lock file, calls `hashcat.CleanupOrphanedSessionFiles()` to remove stale session files from previous ungraceful shutdowns before entering the main loop.
   - `sleepWithContext()`: Context-aware sleep utility
 
 ### 6. API Client Layer (`lib/api/`)
@@ -241,6 +241,16 @@ The main business logic of the agent, organized by functional area:
   - `errorPattern`: Pattern matcher with optional `extract` field for context extraction
 - **Key Functions**:
   - `ClassifyStderr()`: Classifies error/warning lines from hashcat. Despite the name, processes both stdout and stderr lines, as hashcat emits hash parsing errors via stdout.
+
+#### `lib/hashcat/session_dir.go`
+
+- **Purpose**: Hashcat session directory resolution and orphaned file cleanup
+- **Constants**:
+  - `sessionPrefix` (`"attack-"`): Shared constant for agent-created session names, used across `session.go`, `params.go`, and cleanup functions
+- **Key Functions**:
+  - `hashcatSessionDir(binaryPath)`: Resolves platform-specific session directory (`~/.hashcat/sessions/` on Linux/macOS, binary directory on Windows)
+  - `CleanupOrphanedSessionFiles(binaryPath)`: Removes stale `attack-*.log` and `attack-*.pid` files from hashcat's session directory at agent startup. Skipped on Windows where the session directory equals the binary directory. Errors are logged but never propagate — cleanup failure cannot prevent agent startup.
+  - `cleanupOrphanedInDir(dir)`: Internal function that scans a directory for orphaned session files matching the `attack-*` pattern and removes only regular files (symlinks, directories, and `.restore` files are preserved)
 
 ### 11. Task Management (`lib/task/`)
 

@@ -106,7 +106,7 @@ func NewHashcatSession(id string, params Params) (*Session, error) {
 		}
 	}
 
-	sessionName := "attack-" + id
+	sessionName := sessionPrefix + id
 	sessDir := hashcatSessionDir(binaryPath)
 
 	return &Session{

@@ -147,6 +147,12 @@ cipherswarmagent
 cipherswarm-agent
 
 undefined/
+
+# AI assistant artifacts
 .claude.local.md
+.full-review
+docs/plans
+.cursor/commands
+.github/prompts
+.kiro/specs/*
 .worktrees/
-docs/plans/

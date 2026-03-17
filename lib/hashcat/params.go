@@ -196,7 +196,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	args = append(
 		args,
 		"--quiet",
-		"--session", "attack-"+session,
+		"--session", sessionPrefix+session,
 		"--outfile-format", "1,3,5",
 		"--outfile", outFile,
 		"--status",
@@ -315,7 +315,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 // It returns a minimal argument set for session restoration using the restore file.
 func (params Params) toRestoreArgs(session string) []string {
 	return []string{
-		"--session", "attack-" + session,
+		"--session", sessionPrefix+session,
 		"--restore-file-path", params.RestoreFilePath,
 		"--restore",
 	}

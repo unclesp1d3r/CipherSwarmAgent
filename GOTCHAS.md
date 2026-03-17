@@ -36,6 +36,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 - `gocritic` `importShadow` fires when a parameter name matches an imported package name (e.g., `config` parameter shadowing `lib/config` import). Rename the parameter.
 
+- `errcheck` flags discarded errors (`val, _ := fn()`) — even when intentional. Either handle the error explicitly or log at Debug level. `//nolint:errcheck` is acceptable but must include a reason per `gocritic` `whyNoLint`.
+
 ## golines & nolint Comments
 
 - `golines` (max-len 120) splits long lines, moving `//nolint:` off the flagged line. Keep nolint reasons short so total line stays under 120 chars.
@@ -81,6 +83,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `nxadm/tail` `Cleanup()` returns void — do not attempt to capture a return value. `Stop()` returns an error; `Cleanup()` does not.
 - httpmock URL patterns must match the generated client paths (check `client.gen.go`), not the Go method names. E.g., `SetTaskAbandoned` hits `/tasks/{id}/abandon`, not `/tasks/{id}/set_abandoned`.
 - `httpmock.ResponderFromResponse` with manually constructed `*http.Response` triggers `bodyclose` lint. Use `httpmock.NewJsonResponderOrPanic` for JSON mocks instead.
+- `os.Symlink` requires elevated privileges (or Developer Mode) on Windows. Tests using symlinks must skip on Windows: `if runtime.GOOS == "windows" { t.Skip("os.Symlink requires elevated privileges on Windows") }`.
+- `os.DirEntry.Type()` can return 0 (unknown) on some filesystems/platforms, causing `IsRegular()` to return false for real files. When filtering directory entries, fall back to `entry.Info()` (calls `os.Lstat`) when type is unknown. See `isRegularFile()` in `lib/hashcat/session_dir.go`.
 
 ## Tooling
 
