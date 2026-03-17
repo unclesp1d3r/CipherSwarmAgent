@@ -28,6 +28,11 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - All API interactions must adhere to the v1 Agent API contract.
 - Implement exponential backoff for failed API requests.
 
+### Hashcat Session Files
+
+- **Session file location:** Hashcat writes `.log`, `.pid`, and default `.restore` files to its session directory — NOT the process CWD. On POSIX: `~/.hashcat/sessions/` (legacy) or `$XDG_DATA_HOME/hashcat/sessions/` or `~/.local/share/hashcat/sessions/`. On Windows: the hashcat binary's install directory. Use `hashcatSessionDir(binaryPath)` in `lib/hashcat/session_dir.go` to resolve. The `--restore-file-path` flag only relocates the `.restore` file, not `.log`/`.pid`.
+- **Session naming:** All agent-created hashcat sessions use the `sessionPrefix` constant (`"attack-"`) from `lib/hashcat/session_dir.go`. Use this constant — don't hardcode `"attack-"`.
+
 ### Hashcat Output Parsing
 
 - **stdout vs stderr:** Hashcat routes `event_log_warning` (hash parse errors) and `event_log_advice` (summary blocks) to **stdout**. Only `event_log_error` goes to stderr. `--status-json` does NOT produce JSON error objects — only affects periodic status output.
