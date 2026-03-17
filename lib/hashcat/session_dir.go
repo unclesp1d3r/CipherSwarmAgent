@@ -104,14 +104,18 @@ func cleanupOrphanedInDir(dir string) {
 			continue
 		}
 
-		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
-			agentstate.Logger.Error("couldn't remove orphaned session file", "file", name, "error", err)
-		} else {
+		err := os.Remove(filepath.Join(dir, name))
+		switch {
+		case err == nil:
 			removed++
+		case os.IsNotExist(err):
+			// File already gone — skip silently
+		default:
+			agentstate.Logger.Error("couldn't remove orphaned session file", "file", name, "error", err)
 		}
 	}
 
 	if removed > 0 {
-		agentstate.Logger.Debug("Removed orphaned session files", "count", removed, "dir", dir)
+		agentstate.Logger.Debug("removed orphaned session files", "count", removed, "dir", dir)
 	}
 }
