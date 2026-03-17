@@ -30,6 +30,8 @@ CipherSwarmAgent/
 │   └── zap/               # Zap file monitoring for cracked hashes
 ├── agentstate/             # Global agent state, loggers, synchronized fields
 ├── docs/                   # Documentation (this directory)
+│   └── solutions/         # Solution references for bugs and fixes
+│       └── logic-errors/  # Logic error investigations and resolutions
 ├── .github/               # GitHub workflows and templates
 ├── .chglog/               # Changelog configuration
 ├── Dockerfile             # Container build for agent
