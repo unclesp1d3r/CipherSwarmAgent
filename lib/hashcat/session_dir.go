@@ -4,10 +4,17 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
+
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
-// sessionsSubdir is the subdirectory name hashcat uses for session files.
-const sessionsSubdir = "sessions"
+const (
+	// sessionsSubdir is the subdirectory name hashcat uses for session files.
+	sessionsSubdir = "sessions"
+	// sessionPrefix is the prefix used for all agent-created hashcat session names.
+	sessionPrefix = "attack-"
+)
 
 // hashcatSessionDir resolves the directory where hashcat stores session files
 // (.log, .pid, .restore). This mirrors the logic in hashcat's folder.c:
@@ -51,4 +58,60 @@ func posixSessionDir() string {
 
 	// Default: ~/.local/share/hashcat/sessions
 	return filepath.Join(home, ".local", "share", "hashcat", sessionsSubdir)
+}
+
+// CleanupOrphanedSessionFiles removes stale session .log and .pid files
+// from hashcat's session directory. It is safe to call at agent startup —
+// at that point, any leftover attack-* files are orphaned by definition.
+// Errors are logged but never returned; cleanup failure must not prevent
+// agent startup. On Windows, cleanup is skipped because the session
+// directory is the hashcat binary directory, which is too broad for removal.
+func CleanupOrphanedSessionFiles(binaryPath string) {
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	sessDir := hashcatSessionDir(binaryPath)
+	cleanupOrphanedInDir(sessDir)
+}
+
+// cleanupOrphanedInDir scans the given directory for orphaned session files
+// matching the attack-* naming pattern and removes them. Only regular files
+// are removed — symlinks, directories, and special files are skipped.
+func cleanupOrphanedInDir(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			agentstate.Logger.Warn("couldn't read session directory", "dir", dir, "error", err)
+		}
+
+		return
+	}
+
+	removed := 0
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.Type().IsRegular() {
+			continue
+		}
+
+		if !strings.HasPrefix(name, sessionPrefix) {
+			continue
+		}
+
+		if !strings.HasSuffix(name, ".log") && !strings.HasSuffix(name, ".pid") {
+			continue
+		}
+
+		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
+			agentstate.Logger.Error("couldn't remove orphaned session file", "file", name, "error", err)
+		} else {
+			removed++
+		}
+	}
+
+	if removed > 0 {
+		agentstate.Logger.Debug("Removed orphaned session files", "count", removed, "dir", dir)
+	}
 }

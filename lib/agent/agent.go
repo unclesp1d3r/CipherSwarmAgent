@@ -21,6 +21,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/task"
 )
 
@@ -88,6 +89,11 @@ func StartAgent() {
 	}
 
 	defer cleanupLockFile(agentstate.State.PidFile)
+
+	// Clean up orphaned session files from previous agent runs
+	if binaryPath, err := cracker.FindHashcatBinary(); err == nil {
+		hashcat.CleanupOrphanedSessionFiles(binaryPath)
+	}
 
 	// Create context that cancels on OS signal (SIGINT, SIGTERM)
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
