@@ -147,7 +147,6 @@ func (g *grabDownloader) Get() error {
 			dp.Update(resp.BytesComplete())
 
 			if resp.IsComplete() {
-				dp.Update(resp.BytesComplete())
 				dp.Finish()
 
 				if err := resp.Err(); err != nil {
