@@ -218,6 +218,11 @@ func SetupSharedState() {
 	) // Set the use legacy device identification method flag in the shared state
 	agentstate.State.SetForceBenchmarkRun(viper.GetBool("force_benchmark_run"))
 	agentstate.State.InsecureDownloads = viper.GetBool("insecure_downloads")
+	if agentstate.State.InsecureDownloads {
+		agentstate.Logger.Warn(
+			"TLS certificate verification is disabled for downloads — this is insecure and should only be used in test environments",
+		)
+	}
 	agentstate.State.AlwaysUseNativeHashcat = viper.GetBool("always_use_native_hashcat")
 
 	// Validate numeric/duration config fields — clamp to defaults with a warning.

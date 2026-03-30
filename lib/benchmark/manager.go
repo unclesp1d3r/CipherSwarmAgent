@@ -308,8 +308,7 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
 	}
 
-	//nolint:contextcheck // NewHashcatSession does not accept context
-	sess, err := hashcat.NewHashcatSession("benchmark", jobParams)
+	sess, err := hashcat.NewHashcatSession(ctx, "benchmark", jobParams)
 	if err != nil {
 		return nil, cserrors.LogAndSendError(
 			ctx, "Failed to create benchmark session", err, api.SeverityMajor, nil,

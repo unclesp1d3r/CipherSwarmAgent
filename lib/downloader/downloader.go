@@ -317,6 +317,9 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 }
 
 // fileMD5 computes the MD5 hex digest of the file at the given path.
+// MD5 is used because the CipherSwarm server provides MD5 checksums in its API.
+// This is for integrity verification (bit-flip detection), not cryptographic security.
+// Migration to SHA-256 requires a server-side API change.
 func fileMD5(filePath string) (string, error) { // DevSkim: ignore DS126858
 	f, err := os.Open(filePath)
 	if err != nil {

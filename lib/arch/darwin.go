@@ -69,6 +69,10 @@ func GetDevices(ctx context.Context) ([]string, error) {
 //   - A string representing the version of Hashcat.
 //   - An error if the command execution fails or if Hashcat is not found.
 func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) {
+	if err := ValidateExecutablePath(hashcatPath); err != nil {
+		return "0.0.0", err
+	}
+
 	out, err := exec.CommandContext(ctx, hashcatPath, "--version", "--quiet").Output()
 	if err != nil {
 		return "0.0.0", err
@@ -88,6 +92,10 @@ func GetHashcatVersion(ctx context.Context, hashcatPath string) (string, error) 
 // Returns:
 //   - error: An error object if the extraction fails, otherwise nil.
 func Extract7z(ctx context.Context, srcFile, destDir string) error {
+	if err := ValidateArchivePaths(srcFile, destDir); err != nil {
+		return err
+	}
+
 	_, err := exec.CommandContext(ctx, "7z", "x", srcFile, "-o"+destDir).
 		Output()
 

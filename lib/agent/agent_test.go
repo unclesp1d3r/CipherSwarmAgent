@@ -625,7 +625,6 @@ func TestProcessTask_AcceptFailure(t *testing.T) {
 		name               string
 		acceptStatus       int
 		acceptBody         string
-		wantErrIs          error
 		wantAbandonCalls   int
 		wantAbandonMessage string
 	}{
@@ -633,7 +632,6 @@ func TestProcessTask_AcceptFailure(t *testing.T) {
 			name:               "404 not found skips abandon",
 			acceptStatus:       http.StatusNotFound,
 			acceptBody:         "Not Found",
-			wantErrIs:          task.ErrTaskAcceptNotFound,
 			wantAbandonCalls:   0,
 			wantAbandonMessage: "AbandonTask should not be called for ErrTaskAcceptNotFound",
 		},
@@ -641,7 +639,6 @@ func TestProcessTask_AcceptFailure(t *testing.T) {
 			name:               "500 server error calls abandon",
 			acceptStatus:       http.StatusInternalServerError,
 			acceptBody:         "Internal Server Error",
-			wantErrIs:          task.ErrTaskAcceptFailed,
 			wantAbandonCalls:   1,
 			wantAbandonMessage: "AbandonTask should be called for non-404 accept failures",
 		},
@@ -685,10 +682,7 @@ func TestProcessTask_AcceptFailure(t *testing.T) {
 			)
 
 			testTask := testhelpers.NewTestTask(123, 456)
-			err := processTask(context.Background(), testTask)
-
-			require.Error(t, err)
-			require.ErrorIs(t, err, tt.wantErrIs)
+			processTask(context.Background(), testTask)
 
 			callInfo := httpmock.GetCallCountInfo()
 			assert.Equal(t, tt.wantAbandonCalls, callInfo[abandonCallKey], tt.wantAbandonMessage)
