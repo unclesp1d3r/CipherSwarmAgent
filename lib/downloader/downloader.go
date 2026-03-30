@@ -136,7 +136,7 @@ func (g *grabDownloader) Get() error {
 	}
 
 	resp := g.client.Do(req)
-	dp := g.tracker.StartTracking(g.url, resp.Size())
+	dp := g.tracker.StartTracking(g.dst, resp.Size())
 
 	ticker := time.NewTicker(progressPollInterval)
 	defer ticker.Stop()
@@ -220,14 +220,23 @@ func applyInsecureTransport(grabClient *grab.Client) error {
 		return fmt.Errorf("unexpected HTTP client type %T", grabClient.HTTPClient)
 	}
 
-	transport, ok := httpClient.Transport.(*http.Transport)
+	// A nil Transport means http.DefaultTransport is used implicitly.
+	roundTripper := httpClient.Transport
+	if roundTripper == nil {
+		roundTripper = http.DefaultTransport
+	}
+
+	transport, ok := roundTripper.(*http.Transport)
 	if !ok {
-		return fmt.Errorf("unexpected transport type %T", httpClient.Transport)
+		return fmt.Errorf("unexpected transport type %T", roundTripper)
 	}
 
 	cloned := transport.Clone()
-	//nolint:gosec // G402 - user-configured insecure download mode
-	cloned.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	if cloned.TLSClientConfig == nil {
+		cloned.TLSClientConfig = &tls.Config{}
+	}
+
+	cloned.TLSClientConfig.InsecureSkipVerify = true
 	httpClient.Transport = cloned
 
 	return nil
