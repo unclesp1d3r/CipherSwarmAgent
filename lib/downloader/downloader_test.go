@@ -288,6 +288,38 @@ func TestDownloadWithRetry_ContextCancellation(t *testing.T) {
 	require.Less(t, elapsed, 1*time.Second, "should return promptly on cancellation, not wait for full retry delay")
 }
 
+func TestApplyInsecureTransport_Success(t *testing.T) {
+	client := grab.NewClient()
+	err := applyInsecureTransport(client)
+	require.NoError(t, err)
+
+	// Verify TLS config was applied
+	httpClient, ok := client.HTTPClient.(*http.Client)
+	require.True(t, ok)
+	transport, ok := httpClient.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, transport.TLSClientConfig)
+	require.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+}
+
+func TestApplyInsecureTransport_BadHTTPClient(t *testing.T) {
+	client := grab.NewClient()
+	client.HTTPClient = http.DefaultClient // *http.Client — but let's test with a non-standard type
+
+	// Replace with a custom type that doesn't match
+	client.HTTPClient = &badHTTPClient{}
+	err := applyInsecureTransport(client)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unexpected HTTP client type")
+}
+
+// badHTTPClient implements grab's HTTPClient interface but is not *http.Client.
+type badHTTPClient struct{}
+
+func (b *badHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return http.DefaultClient.Do(req) //nolint:gosec // G704 - test-only mock, not real SSRF
+}
+
 // recordingProgress captures Update and Finish calls for assertion.
 type recordingProgress struct {
 	updates  []int64
