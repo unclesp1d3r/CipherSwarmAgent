@@ -24,7 +24,10 @@ func TestValidateExecutablePath_RelativePath(t *testing.T) {
 }
 
 func TestValidateExecutablePath_NonExistent(t *testing.T) {
-	err := ValidateExecutablePath("/nonexistent/path/to/binary")
+	// Use an absolute path that works on all platforms.
+	// On Windows, /nonexistent is not absolute (needs drive letter).
+	nonexistent := filepath.Join(t.TempDir(), "nonexistent", "binary")
+	err := ValidateExecutablePath(nonexistent)
 	require.ErrorIs(t, err, ErrPathNotFound)
 }
 
@@ -45,7 +48,8 @@ func TestValidateArchivePaths_ValidPaths(t *testing.T) {
 
 func TestValidateArchivePaths_SrcNotFound(t *testing.T) {
 	dir := t.TempDir()
-	err := ValidateArchivePaths("/nonexistent/archive.7z", dir)
+	nonexistent := filepath.Join(dir, "nonexistent", "archive.7z")
+	err := ValidateArchivePaths(nonexistent, dir)
 	require.ErrorIs(t, err, ErrPathNotFound)
 }
 
@@ -60,7 +64,8 @@ func TestValidateArchivePaths_DstNotFound(t *testing.T) {
 	srcFile := filepath.Join(dir, "test.7z")
 	require.NoError(t, os.WriteFile(srcFile, []byte("fake archive"), 0o600))
 
-	err := ValidateArchivePaths(srcFile, "/nonexistent/destination")
+	nonexistentDst := filepath.Join(dir, "nonexistent", "destination")
+	err := ValidateArchivePaths(srcFile, nonexistentDst)
 	require.ErrorIs(t, err, ErrPathNotFound)
 }
 
