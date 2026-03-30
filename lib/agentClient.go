@@ -39,12 +39,19 @@ func init() {
 	configuration.Store(agentConfiguration{})
 }
 
-// GetConfiguration returns an immutable snapshot of the current agent configuration.
+// GetConfiguration returns a shallow copy of the current agent configuration.
+// Value-type fields are safe to use without synchronization. Pointer fields
+// (RecommendedTimeouts, RecommendedRetry, RecommendedCircuitBreaker) are shared
+// with the stored value — callers must not mutate through them.
 // Safe for concurrent use from any goroutine.
 //
 //nolint:revive // unexported-return: agentConfiguration is internal; callers are all within lib/ and lib/agent/
 func GetConfiguration() agentConfiguration {
-	cfg, _ := configuration.Load().(agentConfiguration) //nolint:errcheck // type assertion always succeeds — init() seeds the correct type
+	cfg, ok := configuration.Load().(agentConfiguration)
+	if !ok {
+		agentstate.Logger.Error("configuration type assertion failed, returning zero-value config")
+	}
+
 	return cfg
 }
 
@@ -150,7 +157,7 @@ func GetAgentConfiguration(ctx context.Context) error {
 	}
 
 	SetConfiguration(agentConfig)
-	agentstate.Logger.Debug("Agent configuration", "config", GetConfiguration())
+	agentstate.Logger.Debug("Agent configuration", "config", agentConfig)
 
 	return nil
 }

@@ -109,6 +109,10 @@ func handleStdOutLine(ctx context.Context, stdoutLine string, task *api.Task) {
 	}
 
 	lineBytes := []byte(stdoutLine)
+	if !json.Valid(lineBytes) {
+		return // Not JSON — already classified by session.handleStdout
+	}
+
 	var update hashcat.Status
 	if err := json.Unmarshal(lineBytes, &update); err != nil {
 		agentstate.Logger.Error("Failed to parse status update", "error", err)

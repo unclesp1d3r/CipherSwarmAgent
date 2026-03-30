@@ -46,6 +46,8 @@ func saveBenchmarkCache(results []display.BenchmarkResult) error {
 
 	if err := tmpFile.Close(); err != nil {
 		_ = os.Remove(tmpPath)
+		agentstate.Logger.Warn("Failed to close temp cache file",
+			"error", err, "path", tmpPath)
 		return fmt.Errorf("failed to close temp cache file: %w", err)
 	}
 

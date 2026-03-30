@@ -29,7 +29,11 @@ func ValidateExecutablePath(path string) error {
 
 	info, err := os.Stat(path)
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrPathNotFound, path)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%w: %s", ErrPathNotFound, path)
+		}
+
+		return fmt.Errorf("stat executable %s: %w", path, err)
 	}
 
 	if info.IsDir() {
@@ -44,7 +48,11 @@ func ValidateExecutablePath(path string) error {
 func ValidateArchivePaths(srcFile, destDir string) error {
 	srcInfo, err := os.Stat(srcFile)
 	if err != nil {
-		return fmt.Errorf("archive %w: %s", ErrPathNotFound, srcFile)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("archive %w: %s", ErrPathNotFound, srcFile)
+		}
+
+		return fmt.Errorf("stat archive %s: %w", srcFile, err)
 	}
 
 	if srcInfo.IsDir() {
@@ -53,7 +61,11 @@ func ValidateArchivePaths(srcFile, destDir string) error {
 
 	destInfo, err := os.Stat(destDir)
 	if err != nil {
-		return fmt.Errorf("destination %w: %s", ErrPathNotFound, destDir)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("destination %w: %s", ErrPathNotFound, destDir)
+		}
+
+		return fmt.Errorf("stat destination %s: %w", destDir, err)
 	}
 
 	if !destInfo.IsDir() {

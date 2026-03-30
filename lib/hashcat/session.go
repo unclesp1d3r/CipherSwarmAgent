@@ -440,7 +440,7 @@ func (sess *Session) Kill() error {
 // Errors are logged but don't halt the cleanup.
 func (sess *Session) Cleanup() {
 	if err := sess.Kill(); err != nil {
-		agentstate.Logger.Debug("Kill during cleanup", "error", err)
+		agentstate.Logger.Warn("Failed to kill hashcat process during cleanup", "error", err)
 	}
 	sess.wg.Wait() // Wait for all I/O goroutines to exit before removing files
 

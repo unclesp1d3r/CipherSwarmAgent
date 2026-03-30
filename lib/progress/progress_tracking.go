@@ -76,8 +76,9 @@ func (cpb *progressBar) StartTracking(filename string, totalSize int64) Download
 
 // downloadProgress tracks a single download's progress bar.
 type downloadProgress struct {
-	bar   *pb.ProgressBar
-	owner *progressBar
+	bar      *pb.ProgressBar
+	owner    *progressBar
+	finished sync.Once
 }
 
 // Update sets the current byte count on the progress bar.
@@ -86,14 +87,17 @@ func (dp *downloadProgress) Update(bytesComplete int64) {
 }
 
 // Finish marks the bar as complete and tears down the pool when all bars are done.
+// Idempotent — safe to call multiple times.
 func (dp *downloadProgress) Finish() {
-	dp.owner.lock.Lock()
-	defer dp.owner.lock.Unlock()
+	dp.finished.Do(func() {
+		dp.owner.lock.Lock()
+		defer dp.owner.lock.Unlock()
 
-	dp.bar.Finish()
-	dp.owner.pbs--
-	if dp.owner.pbs <= 0 {
-		_ = dp.owner.pool.Stop() //nolint:errcheck // Progress bar stop failure not critical
-		dp.owner.pool = nil
-	}
+		dp.bar.Finish()
+		dp.owner.pbs--
+		if dp.owner.pbs <= 0 {
+			_ = dp.owner.pool.Stop() //nolint:errcheck // Progress bar stop failure not critical
+			dp.owner.pool = nil
+		}
+	})
 }
