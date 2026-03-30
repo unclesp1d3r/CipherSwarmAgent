@@ -148,6 +148,8 @@ cipherswarm-agent
 
 undefined/
 
+*/*.local.*
+
 # AI assistant artifacts
 .claude.local.md
 compound-engineering.local.md
