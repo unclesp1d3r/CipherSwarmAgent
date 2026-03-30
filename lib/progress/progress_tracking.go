@@ -4,12 +4,10 @@ package progress
 // Progress tracking for downloads using a polling-based model.
 
 import (
-	"io"
 	"path/filepath"
 	"sync"
 
 	"github.com/cheggaaa/pb/v3"
-	"github.com/hashicorp/go-getter"
 )
 
 // Tracker creates download progress handles for tracking file downloads.
@@ -23,12 +21,8 @@ type DownloadProgress interface {
 	Finish()
 }
 
-// Compile-time assertion: *progressBar must satisfy go-getter's ProgressTracker
-// so that DefaultProgressBar remains usable with getter.WithProgress.
-var _ getter.ProgressTracker = (*progressBar)(nil)
-
 // DefaultProgressBar is the default instance of a cheggaaa progress bar.
-// It implements both progress.Tracker and go-getter's ProgressTracker.
+// It implements progress.Tracker for download progress display.
 var DefaultProgressBar = &progressBar{} //nolint:gochecknoglobals // Default progress bar instance
 
 // progressBar wraps a github.com/cheggaaa/pb.Pool
@@ -102,45 +96,4 @@ func (dp *downloadProgress) Finish() {
 		_ = dp.owner.pool.Stop() //nolint:errcheck // Progress bar stop failure not critical
 		dp.owner.pool = nil
 	}
-}
-
-// TrackProgress implements go-getter's ProgressTracker interface by wrapping
-// the download stream with a progress-tracking reader. The returned ReadCloser
-// updates the progress bar as bytes are read and finishes the bar on Close.
-func (cpb *progressBar) TrackProgress(
-	src string, currentSize, totalSize int64, stream io.ReadCloser,
-) io.ReadCloser {
-	dp := cpb.StartTracking(src, totalSize)
-	if currentSize > 0 {
-		dp.Update(currentSize)
-	}
-
-	return &trackingReader{
-		ReadCloser: stream,
-		dp:         dp,
-		current:    currentSize,
-	}
-}
-
-// trackingReader wraps an io.ReadCloser to update download progress on each Read.
-type trackingReader struct {
-	io.ReadCloser
-
-	dp      DownloadProgress
-	current int64
-}
-
-func (tr *trackingReader) Read(p []byte) (int, error) {
-	n, err := tr.ReadCloser.Read(p)
-	tr.current += int64(n)
-	tr.dp.Update(tr.current)
-
-	return n, err
-}
-
-func (tr *trackingReader) Close() error {
-	err := tr.ReadCloser.Close()
-	tr.dp.Finish()
-
-	return err
 }

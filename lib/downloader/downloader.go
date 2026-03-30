@@ -4,6 +4,7 @@ package downloader
 import (
 	"context"
 	"crypto/md5" //nolint:gosec // G501 - checksum verification // DevSkim: ignore DS126858
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -16,19 +17,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-getter"
+	"github.com/cavaliergopher/grab/v3"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
 )
 
 const (
-	defaultUmask = 0o022 // Default umask for file permissions
+	progressPollInterval = 200 * time.Millisecond // Polling interval for download progress updates
 )
 
-// Getter is an interface that abstracts the download operation of go-getter's Client.Get() method,
-// allowing for easier testing through mocks without requiring actual network downloads or the
-// hashicorp/go-getter dependency in tests.
+// Getter is an interface that abstracts the download operation, allowing for
+// easier testing through mocks without requiring actual network downloads.
 type Getter interface {
 	Get() error
 }
@@ -106,55 +106,130 @@ func FileExistsAndValid(filePath, checksum string) bool {
 	return false
 }
 
-// downloadAndVerifyFile downloads a file from the given URL and saves it to the specified path.
-// If a checksum is provided, it is appended to the URL for server-side verification,
-// and the downloaded file is verified locally after download. Uses retry logic for transient failures.
-func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum string) error {
-	if strings.TrimSpace(checksum) != "" {
-		var err error
+// grabDownloader wraps a single download attempt using grab.Client,
+// implementing the Getter interface to plug into downloadWithRetry.
+type grabDownloader struct {
+	client   *grab.Client
+	ctx      context.Context //nolint:containedctx // context is part of the download lifecycle
+	url      string
+	dst      string
+	checksum string
+	tracker  progress.Tracker
+}
 
-		fileURL, err = appendChecksumToURL(fileURL, checksum)
-		if err != nil {
-			return err
-		}
+// Get performs one complete download attempt with progress tracking.
+func (g *grabDownloader) Get() error {
+	req, err := grab.NewRequest(g.dst, g.url)
+	if err != nil {
+		return fmt.Errorf("creating download request: %w", err)
 	}
 
+	req = req.WithContext(g.ctx)
+
+	if g.checksum != "" {
+		checksumBytes, decErr := hex.DecodeString(g.checksum)
+		if decErr != nil {
+			return fmt.Errorf("decoding checksum: %w", decErr)
+		}
+		//nolint:gosec // G401 - MD5 used for file integrity check, not security
+		req.SetChecksum(md5.New(), checksumBytes, true) // DevSkim: ignore DS126858
+	}
+
+	resp := g.client.Do(req)
+	dp := g.tracker.StartTracking(g.url, resp.Size())
+
+	ticker := time.NewTicker(progressPollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			dp.Update(resp.BytesComplete())
+
+			if resp.IsComplete() {
+				dp.Update(resp.BytesComplete())
+				dp.Finish()
+
+				if err := resp.Err(); err != nil {
+					return fmt.Errorf("downloading %s: %w", g.url, err)
+				}
+
+				return nil
+			}
+		case <-g.ctx.Done():
+			// Wait for Grab to finalize the transfer (close body, flush writer)
+			// before returning. resp.Err() blocks until resp.Done is closed.
+			err := resp.Err()
+			dp.Update(resp.BytesComplete())
+			dp.Finish()
+
+			if err != nil {
+				return fmt.Errorf("downloading %s: %w", g.url, err)
+			}
+
+			return g.ctx.Err()
+		}
+	}
+}
+
+// downloadAndVerifyFile downloads a file from the given URL and saves it to the specified path.
+// Uses grab/v3 for the actual download with native checksum verification.
+// Uses retry logic for transient failures.
+func downloadAndVerifyFile(ctx context.Context, fileURL, filePath, checksum string) error {
 	insecure := agentstate.State.InsecureDownloads
 	if insecure {
 		agentstate.Logger.Warn("TLS certificate verification disabled for download",
 			"url", fileURL, "dst", filePath)
 	}
 
-	client := &getter.Client{
-		Ctx:      ctx,
-		Dst:      filePath,
-		Src:      fileURL,
-		Pwd:      agentstate.State.CrackersPath,
-		Insecure: insecure,
-		Mode:     getter.ClientModeFile,
+	grabClient := grab.NewClient()
+	if insecure {
+		if err := applyInsecureTransport(grabClient); err != nil {
+			return fmt.Errorf("insecure download mode configured but cannot be applied: %w", err)
+		}
 	}
 
-	if err := client.Configure(
-		getter.WithProgress(progress.DefaultProgressBar),
-		getter.WithUmask(os.FileMode(defaultUmask)),
-	); err != nil {
-		agentstate.Logger.Warn(
-			"Download client configuration failed; file permissions may be incorrect (umask not set to 0o022)",
-			"error",
-			err,
-		)
+	dl := &grabDownloader{
+		client:   grabClient,
+		ctx:      ctx,
+		url:      fileURL,
+		dst:      filePath,
+		checksum: strings.TrimSpace(checksum),
+		tracker:  progress.DefaultProgressBar,
 	}
 
 	maxRetries := agentstate.State.DownloadMaxRetries
 	baseDelay := agentstate.State.DownloadRetryDelay
 
-	if err := downloadWithRetry(ctx, client, maxRetries, baseDelay); err != nil {
+	if err := downloadWithRetry(ctx, dl, maxRetries, baseDelay); err != nil {
 		return err
 	}
 
 	if strings.TrimSpace(checksum) != "" && !FileExistsAndValid(filePath, checksum) {
 		return errors.New("downloaded file checksum does not match")
 	}
+
+	return nil
+}
+
+// applyInsecureTransport disables TLS certificate verification on the grab client's
+// HTTP transport. Returns an error if the transport chain cannot be unwrapped, ensuring
+// the caller never silently falls back to secure TLS when insecure mode was requested.
+func applyInsecureTransport(grabClient *grab.Client) error {
+	httpClient, ok := grabClient.HTTPClient.(*http.Client)
+	if !ok {
+		return fmt.Errorf("unexpected HTTP client type %T", grabClient.HTTPClient)
+	}
+
+	transport, ok := httpClient.Transport.(*http.Transport)
+	if !ok {
+		return fmt.Errorf("unexpected transport type %T", httpClient.Transport)
+	}
+
+	cloned := transport.Clone()
+	//nolint:gosec // G402 - user-configured insecure download mode
+	cloned.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	httpClient.Transport = cloned
 
 	return nil
 }
@@ -209,21 +284,6 @@ func downloadWithRetry(ctx context.Context, client Getter, maxRetries int, baseD
 	agentstate.Logger.Error("All download attempts failed", "attempts", maxRetries, "error", lastErr)
 
 	return lastErr
-}
-
-// appendChecksumToURL appends a checksum to the URL query string.
-// It returns the modified URL or an error if the URL is invalid.
-func appendChecksumToURL(rawURL, checksum string) (string, error) {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return "", err
-	}
-
-	q := u.Query()
-	q.Set("checksum", "md5:"+checksum) // DevSkim: ignore DS126858
-	u.RawQuery = q.Encode()
-
-	return u.String(), nil
 }
 
 // DownloadHashList downloads the hash list for a given attack.
