@@ -42,6 +42,10 @@ type AttacksClient interface {
 }
 
 // AgentsClient defines the interface for agent-related API operations.
+// It groups all agent-identity operations (heartbeat, metadata, benchmarks, errors,
+// shutdown) because they share the same agent_id path parameter and auth scope.
+// Splitting into finer-grained interfaces would add overhead without practical
+// testability gain at this codebase size.
 type AgentsClient interface {
 	// SendHeartbeat sends a heartbeat to the server with the current activity state.
 	SendHeartbeat(ctx context.Context, id int64, activity string) (*SendHeartbeatResponse, error)

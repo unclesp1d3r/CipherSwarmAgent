@@ -15,8 +15,6 @@ import (
 
 // getDevices initializes a test Hashcat session and runs a test task, returning the names of available OpenCL devices.
 // An error is logged and returned if the session creation or test task execution fails.
-//
-//nolint:contextcheck // NewHashcatSession does not accept context
 func getDevices(ctx context.Context) ([]string, error) {
 	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackModeMask,
@@ -26,7 +24,7 @@ func getDevices(ctx context.Context) ([]string, error) {
 		OpenCLDevices:  "1,2,3",
 	}
 
-	sess, err := hashcat.NewHashcatSession("test", jobParams)
+	sess, err := hashcat.NewHashcatSession(ctx, "test", jobParams)
 	if err != nil {
 		return nil, cserrors.LogAndSendError(ctx, "Failed to create test session", err, api.SeverityMajor, nil)
 	}

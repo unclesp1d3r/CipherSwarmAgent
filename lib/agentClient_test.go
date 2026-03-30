@@ -209,7 +209,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
-				require.Equal(t, tt.useNativeHashcat, Configuration.Config.UseNativeHashcat)
+				require.Equal(t, tt.useNativeHashcat, GetConfiguration().Config.UseNativeHashcat)
 			} else {
 				require.Error(t, err)
 				testhelpers.AssertErrorType(t, err, tt.expectedError)

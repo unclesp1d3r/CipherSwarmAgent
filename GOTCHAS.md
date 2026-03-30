@@ -36,6 +36,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 - `gocritic` `importShadow` fires when a parameter name matches an imported package name (e.g., `config` parameter shadowing `lib/config` import). Rename the parameter.
 
+- `revive` stutter rule applies to exported type names (interfaces, structs), not just constants — e.g., `progress.ProgressTracker` stutters, rename to `progress.Tracker`.
+
 - `errcheck` flags discarded errors (`val, _ := fn()`) — even when intentional. Either handle the error explicitly or log at Debug level. `//nolint:errcheck` is acceptable but must include a reason per `gocritic` `whyNoLint`.
 
 ## golines & nolint Comments
@@ -72,6 +74,12 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 - `SetDefaultConfigValues` runs before config files/env vars are loaded. Never derive defaults from other viper keys (e.g., `viper.GetString("data_path")`) — they only return the registered default, not user overrides. Derive in `SetupSharedState` instead.
 - `bridgeDeprecatedFlags` must use `cmd.Root().PersistentFlags()` — `cmd.Flags()` only returns local (non-persistent) flags and all agent flags are persistent. Also skip bridging when `canonical.Changed` is true (user explicitly set the canonical flag).
+
+## Download (grab/v3)
+
+- `grab.Response.Err()` blocks until the transfer goroutine closes the response body and flushes the file. On context cancellation, always call `resp.Err()` before returning — early return without it causes resource leaks and races. See `TestGrabDownloader_CancellationWaitsForFinalization`.
+- `resp.Err()` finishes quickly after context cancellation — client-side finalization is independent of the server handler lifecycle. Blocking a server handler (handler gate) does NOT hold `resp.Err()`. To test cancellation ordering, gate `dp.Finish()` via a `finalizationTracker` instead — see `TestGrabDownloader_CancellationWaitsForFinalization`.
+- `grab.Response.Size()` returns -1 when the server doesn't send `Content-Length`. `progress.StartTracking` treats negative totalSize as unknown (0).
 
 ## Testing
 

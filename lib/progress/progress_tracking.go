@@ -1,21 +1,29 @@
 // Package progress provides utility functions for progress tracking and other common tasks.
 package progress
 
-// Source: https://raw.githubusercontent.com/hashicorp/go-getter/main/cmd/go-getter/progress_tracking.go
-// Progress tracking for downloads.
-// Borrowed from hashicorp/go-getter
+// Progress tracking for downloads using a polling-based model.
 
 import (
-	"io"
 	"path/filepath"
 	"sync"
 
 	"github.com/cheggaaa/pb/v3"
-	"github.com/hashicorp/go-getter"
 )
 
+// Tracker creates download progress handles for tracking file downloads.
+type Tracker interface {
+	StartTracking(filename string, totalSize int64) DownloadProgress
+}
+
+// DownloadProgress tracks the progress of a single download via polling updates.
+type DownloadProgress interface {
+	Update(bytesComplete int64)
+	Finish()
+}
+
 // DefaultProgressBar is the default instance of a cheggaaa progress bar.
-var DefaultProgressBar getter.ProgressTracker = &progressBar{} //nolint:gochecknoglobals // Default progress bar instance
+// It implements progress.Tracker for download progress display.
+var DefaultProgressBar = &progressBar{} //nolint:gochecknoglobals // Default progress bar instance
 
 // progressBar wraps a github.com/cheggaaa/pb.Pool
 // in order to display download progress for one or multiple
@@ -38,16 +46,19 @@ func progressBarConfig(bar *pb.ProgressBar, prefix string) {
 	bar.Set("prefix", prefix)
 }
 
-// TrackProgress instantiates a new progress bar that will
-// display the progress of stream until closed.
-// total can be 0.
-func (cpb *progressBar) TrackProgress(src string, currentSize, totalSize int64, stream io.ReadCloser) io.ReadCloser {
+// StartTracking creates a new progress bar for the given file download.
+// Any totalSize <= 0 is treated as unknown, matching grab.Response.Size()
+// semantics where -1 indicates the server did not provide a content length.
+func (cpb *progressBar) StartTracking(filename string, totalSize int64) DownloadProgress {
 	cpb.lock.Lock()
 	defer cpb.lock.Unlock()
 
+	if totalSize < 0 {
+		totalSize = 0
+	}
+
 	newPb := pb.New64(totalSize)
-	newPb.SetCurrent(currentSize)
-	progressBarConfig(newPb, filepath.Base(src))
+	progressBarConfig(newPb, filepath.Base(filename))
 
 	if cpb.pool == nil {
 		cpb.pool = pb.NewPool()
@@ -55,32 +66,38 @@ func (cpb *progressBar) TrackProgress(src string, currentSize, totalSize int64, 
 	}
 
 	cpb.pool.Add(newPb)
-	reader := newPb.NewProxyReader(stream)
-
 	cpb.pbs++
 
-	return &readCloser{
-		Reader: reader,
-		close: func() error {
-			cpb.lock.Lock()
-			defer cpb.lock.Unlock()
-
-			newPb.Finish()
-			cpb.pbs--
-			if cpb.pbs <= 0 {
-				_ = cpb.pool.Stop() //nolint:errcheck // Progress bar stop failure not critical
-				cpb.pool = nil
-			}
-
-			return nil
-		},
+	return &downloadProgress{
+		bar:   newPb,
+		owner: cpb,
 	}
 }
 
-type readCloser struct {
-	io.Reader
-
-	close func() error
+// downloadProgress tracks a single download's progress bar.
+type downloadProgress struct {
+	bar      *pb.ProgressBar
+	owner    *progressBar
+	finished sync.Once
 }
 
-func (c *readCloser) Close() error { return c.close() }
+// Update sets the current byte count on the progress bar.
+func (dp *downloadProgress) Update(bytesComplete int64) {
+	dp.bar.SetCurrent(bytesComplete)
+}
+
+// Finish marks the bar as complete and tears down the pool when all bars are done.
+// Idempotent — safe to call multiple times.
+func (dp *downloadProgress) Finish() {
+	dp.finished.Do(func() {
+		dp.owner.lock.Lock()
+		defer dp.owner.lock.Unlock()
+
+		dp.bar.Finish()
+		dp.owner.pbs--
+		if dp.owner.pbs <= 0 {
+			_ = dp.owner.pool.Stop() //nolint:errcheck // Progress bar stop failure not critical
+			dp.owner.pool = nil
+		}
+	})
+}

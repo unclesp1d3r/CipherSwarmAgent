@@ -3,13 +3,19 @@ package downloader
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/cavaliergopher/grab/v3"
 	"github.com/stretchr/testify/require"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
 )
 
 // TestFileExistsAndValid tests the FileExistsAndValid function.
@@ -81,52 +87,6 @@ func TestFileExistsAndValid(t *testing.T) {
 			filePath := tt.setupFile()
 			result := FileExistsAndValid(filePath, tt.checksum)
 			require.Equal(t, tt.expectedResult, result)
-		})
-	}
-}
-
-// TestAppendChecksumToURL tests the appendChecksumToURL function.
-func TestAppendChecksumToURL(t *testing.T) {
-	tests := []struct {
-		name        string
-		fileURL     string
-		checksum    string
-		expectedURL string
-		expectError bool
-	}{
-		{
-			name:        "valid URL without query params",
-			fileURL:     "https://example.com/file.txt",
-			checksum:    "abc123",
-			expectedURL: "https://example.com/file.txt?checksum=md5%3Aabc123", // URL-encoded :
-			expectError: false,
-		},
-		{
-			name:        "valid URL with existing query params",
-			fileURL:     "https://example.com/file.txt?param=value",
-			checksum:    "def456",
-			expectedURL: "https://example.com/file.txt?checksum=md5%3Adef456&param=value",
-			expectError: false,
-		},
-		{
-			name:        "invalid URL",
-			fileURL:     "://invalid-url",
-			checksum:    "abc123",
-			expectedURL: "",
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := appendChecksumToURL(tt.fileURL, tt.checksum)
-
-			if tt.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedURL, result)
-			}
 		})
 	}
 }
@@ -326,4 +286,347 @@ func TestDownloadWithRetry_ContextCancellation(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	require.ErrorIs(t, err, mock.returnError, "should preserve last download error through cancellation")
 	require.Less(t, elapsed, 1*time.Second, "should return promptly on cancellation, not wait for full retry delay")
+}
+
+func TestApplyInsecureTransport_Success(t *testing.T) {
+	client := grab.NewClient()
+	err := applyInsecureTransport(client)
+	require.NoError(t, err)
+
+	// Verify TLS config was applied
+	httpClient, ok := client.HTTPClient.(*http.Client)
+	require.True(t, ok)
+	transport, ok := httpClient.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, transport.TLSClientConfig)
+	require.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+}
+
+func TestApplyInsecureTransport_BadHTTPClient(t *testing.T) {
+	client := grab.NewClient()
+	client.HTTPClient = &badHTTPClient{}
+	err := applyInsecureTransport(client)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unexpected HTTP client type")
+}
+
+// badHTTPClient implements grab's HTTPClient interface but is not *http.Client.
+type badHTTPClient struct{}
+
+func (b *badHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return http.DefaultClient.Do(req) //nolint:gosec // G107 - test-only mock, not real SSRF
+}
+
+// recordingProgress captures Update and Finish calls for assertion.
+type recordingProgress struct {
+	updates  []int64
+	finished bool
+	mu       sync.Mutex
+}
+
+func (r *recordingProgress) Update(bytesComplete int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.updates = append(r.updates, bytesComplete)
+}
+
+func (r *recordingProgress) Finish() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.finished = true
+}
+
+// recordingTracker implements progress.Tracker, returning a recordingProgress.
+type recordingTracker struct {
+	dp *recordingProgress
+}
+
+func (rt *recordingTracker) StartTracking(_ string, _ int64) progress.DownloadProgress {
+	return rt.dp
+}
+
+// TestGrabDownloader_Get_HappyPath verifies that a successful download
+// writes the file to disk, calls dp.Finish(), and returns nil.
+func TestGrabDownloader_Get_HappyPath(t *testing.T) {
+	content := "hello, grab download test"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(content)))
+		if _, err := w.Write([]byte(content)); err != nil {
+			return
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	tmpDir := t.TempDir()
+	dst := filepath.Join(tmpDir, "downloaded.txt")
+
+	dp := &recordingProgress{}
+	dl := &grabDownloader{
+		client:  grab.NewClient(),
+		ctx:     context.Background(),
+		url:     srv.URL + "/file.txt",
+		dst:     dst,
+		tracker: &recordingTracker{dp: dp},
+	}
+
+	err := dl.Get()
+	require.NoError(t, err)
+
+	// Verify file was written
+	data, readErr := os.ReadFile(dst)
+	require.NoError(t, readErr)
+	require.Equal(t, content, string(data))
+
+	// Verify progress tracking
+	dp.mu.Lock()
+	defer dp.mu.Unlock()
+	require.True(t, dp.finished, "dp.Finish() should have been called")
+	require.NotEmpty(t, dp.updates, "dp.Update() should have been called at least once")
+}
+
+// TestGrabDownloader_Get_ChecksumMismatch verifies that a checksum mismatch
+// returns an error from grab's native verification.
+func TestGrabDownloader_Get_ChecksumMismatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte("actual content")); err != nil {
+			return
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	tmpDir := t.TempDir()
+	dst := filepath.Join(tmpDir, "bad-checksum.txt")
+
+	dp := &recordingProgress{}
+	dl := &grabDownloader{
+		client:   grab.NewClient(),
+		ctx:      context.Background(),
+		url:      srv.URL + "/file.txt",
+		dst:      dst,
+		checksum: "0000000000000000000000000000dead", // valid hex, wrong checksum
+		tracker:  &recordingTracker{dp: dp},
+	}
+
+	err := dl.Get()
+	require.Error(t, err, "checksum mismatch should return an error")
+
+	dp.mu.Lock()
+	defer dp.mu.Unlock()
+	require.True(t, dp.finished, "dp.Finish() should be called even on checksum failure")
+}
+
+// TestGrabDownloader_Get_InvalidChecksum verifies that an invalid hex checksum
+// returns an error before starting the download.
+func TestGrabDownloader_Get_InvalidChecksum(t *testing.T) {
+	dl := &grabDownloader{
+		client:   grab.NewClient(),
+		ctx:      context.Background(),
+		url:      "http://localhost/unused",
+		dst:      filepath.Join(t.TempDir(), "unused"),
+		checksum: "not-valid-hex",
+		tracker:  &recordingTracker{dp: &recordingProgress{}},
+	}
+
+	err := dl.Get()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "decoding checksum")
+}
+
+// finalizationProgress implements progress.DownloadProgress with a gate on
+// Finish() for synchronization testing. Update() is a no-op. Finish() signals
+// that it was entered (via finishStarted) and then blocks until finishGate
+// is closed, giving the test control over when Get() can complete.
+type finalizationProgress struct {
+	finishOnce    sync.Once
+	finishStarted chan struct{}
+	finishGate    chan struct{}
+}
+
+func (f *finalizationProgress) Update(_ int64) {}
+
+func (f *finalizationProgress) Finish() {
+	f.finishOnce.Do(func() {
+		close(f.finishStarted)
+	})
+	<-f.finishGate
+}
+
+// finalizationTracker implements progress.Tracker, returning a gated
+// finalizationProgress that allows tests to block Get() at the dp.Finish()
+// call site for deterministic ordering assertions.
+type finalizationTracker struct {
+	finishStarted chan struct{}
+	finishGate    chan struct{}
+}
+
+func (ft *finalizationTracker) StartTracking(_ string, _ int64) progress.DownloadProgress {
+	return &finalizationProgress{
+		finishStarted: ft.finishStarted,
+		finishGate:    ft.finishGate,
+	}
+}
+
+// TestGrabDownloader_CancellationWaitsForFinalization verifies that
+// grabDownloader.Get() waits for Grab's response to finalize before returning
+// when the context is cancelled during an active download.
+//
+// The old early-return implementation would return from Get() as soon as
+// ctx.Done() fired, without calling resp.Err() to wait for Grab's async
+// response lifecycle. This test proves that Get() blocks until Grab's
+// transfer goroutine finishes (closing the body, flushing the file) before
+// returning to the caller.
+//
+// The test uses a gated finalizationTracker whose dp.Finish() blocks until
+// the test releases a gate channel. Because the correct implementation calls
+// dp.Finish() before returning from Get(), the gate deterministically holds
+// Get() from completing. The old early-return implementation never calls
+// dp.Finish(), so it fails at Phase 1 (timeout waiting for dp.Finish entry).
+//
+// The test uses four phases:
+//  1. After cancel(), wait for dp.Finish() to be entered — proves Get()
+//     proceeded through resp.Err() to the finalization path.
+//  2. Assert Get() has NOT returned yet — dp.Finish() is blocked on the gate,
+//     so this is deterministic regardless of scheduler timing.
+//  3. Wait for the handler to observe the client disconnect — proves the HTTP
+//     transfer was genuinely active.
+//  4. Release the finish gate and handler gate, require Get() to return
+//     promptly with a cancellation-related error.
+//
+// An additional handler gate keeps the server blocked during finalization for
+// realism. The actual ordering proof relies on the finish gate, not the
+// handler gate, because Grab's client-side resp.Err() returns independently
+// of the server handler lifecycle.
+func TestGrabDownloader_CancellationWaitsForFinalization(t *testing.T) {
+	// Synchronization channels for ordering assertions.
+	requestStarted := make(chan struct{})        // closed when server receives the request
+	handlerDisconnectSeen := make(chan struct{}) // closed when handler detects client disconnect
+	handlerGate := make(chan struct{})           // test closes to release handler from finalization
+	handlerDone := make(chan struct{})           // closed after handler exits
+	getReturned := make(chan error, 1)           // receives Get()'s return value
+	finishStarted := make(chan struct{})         // closed when dp.Finish() is entered
+	finishGate := make(chan struct{})            // test closes to let dp.Finish() return
+
+	// Ensure gates are released on cleanup to prevent hangs if the test fails
+	// before reaching the explicit close() calls. t.Cleanup runs LIFO, so
+	// finishGate is released first, then handlerGate, then srv.Close().
+	t.Cleanup(func() {
+		select {
+		case <-finishGate:
+		default:
+			close(finishGate)
+		}
+	})
+	t.Cleanup(func() {
+		select {
+		case <-handlerGate:
+		default:
+			close(handlerGate)
+		}
+	})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(requestStarted)
+		w.Header().Set("Content-Length", "1048576") // 1MB
+		// Write a small chunk then block to simulate a slow download.
+		if _, writeErr := w.Write([]byte("partial data")); writeErr != nil {
+			return
+		}
+		// Flush to ensure the client receives data and Grab's transfer is active.
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		// Block until the client disconnects, proving Grab is still active.
+		<-r.Context().Done()
+		close(handlerDisconnectSeen)
+		// Block on the handler gate to simulate server-side finalization work.
+		<-handlerGate
+		close(handlerDone)
+	}))
+	t.Cleanup(srv.Close)
+
+	tmpDir := t.TempDir()
+	dst := filepath.Join(tmpDir, "testfile.bin")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	dl := &grabDownloader{
+		client: grab.NewClient(),
+		ctx:    ctx,
+		url:    srv.URL + "/testfile",
+		dst:    dst,
+		tracker: &finalizationTracker{
+			finishStarted: finishStarted,
+			finishGate:    finishGate,
+		},
+	}
+
+	// Run Get() in a goroutine so the test can observe ordering.
+	go func() {
+		getReturned <- dl.Get()
+	}()
+
+	// Wait for the server to receive the request before cancelling.
+	select {
+	case <-requestStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for server to receive the request")
+	}
+
+	// Cancel the context to trigger the cancellation path in Get().
+	cancel()
+
+	// Phase 1: Wait for dp.Finish() to be entered. The correct implementation
+	// calls resp.Err() (blocking until Grab finalizes), then dp.Update(), then
+	// dp.Finish(). The old early-return implementation returns directly from
+	// <-g.ctx.Done() without calling dp.Finish(), so this would timeout.
+	select {
+	case <-finishStarted:
+		// Good: Get() reached dp.Finish(), proving it went through resp.Err().
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for dp.Finish() — " +
+			"Get() likely returned without finalization (early-return bug)")
+	}
+
+	// Phase 2: dp.Finish() is blocked on finishGate, so Get() cannot have
+	// returned yet. This is deterministic — no scheduler timing can cause a
+	// false pass because the gate is held closed by the test.
+	select {
+	case err := <-getReturned:
+		t.Fatalf(
+			"Get() returned while dp.Finish() is blocked "+
+				"(error: %v); finalization was bypassed",
+			err,
+		)
+	default:
+		// Good: Get() is still blocked inside dp.Finish().
+	}
+
+	// Phase 3: Wait for the handler to observe the client disconnect. This
+	// proves the HTTP connection was genuinely active during the download
+	// and provides a deterministic synchronization point.
+	select {
+	case <-handlerDisconnectSeen:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for handler to observe client disconnect")
+	}
+
+	// Phase 4: Release the finish gate and handler gate, then require Get()
+	// to return promptly with a cancellation-related error.
+	close(finishGate)
+	close(handlerGate)
+
+	select {
+	case err := <-getReturned:
+		require.Error(t, err, "Get() should return a cancellation-related error")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for Get() to return after gates released")
+	}
+
+	// Confirm the handler completed.
+	select {
+	case <-handlerDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for handler to complete")
+	}
 }

@@ -46,10 +46,11 @@ type Session struct {
 	ctx                context.Context //nolint:containedctx // session lifecycle context for I/O goroutines
 	cancel             context.CancelFunc
 	cancelMu           sync.Mutex     // Protects cancel field from concurrent access
+	wg                 sync.WaitGroup // Tracks I/O goroutines for clean shutdown
 	CrackedHashes      chan Result    // Channel for successfully cracked hashes
 	StatusUpdates      chan Status    // Channel for periodic status updates
 	StderrMessages     chan ErrorInfo // Channel for classified error messages from hashcat
-	StdoutLines        chan string    // Channel for stdout lines from hashcat
+	StdoutLines        chan string    // StdoutLines receives non-JSON stdout lines. Never closed; consumers must select on ctx.Done().
 	DoneChan           chan error     // Channel signaling process completion
 	SkipStatusUpdates  bool           // Flag to disable status update parsing
 	RestoreFilePath    string         // Path to session restore file
@@ -62,14 +63,15 @@ type Session struct {
 // NewHashcatSession creates and initializes a new hashcat session.
 // It configures the hashcat command with the provided parameters, creates necessary
 // temporary files, and sets up channels for communication.
+// The parent context controls the session's lifecycle — cancelling it will stop the hashcat process.
 // Returns an error if binary lookup, file creation, or argument validation fails.
-func NewHashcatSession(id string, params Params) (*Session, error) {
+func NewHashcatSession(ctx context.Context, id string, params Params) (*Session, error) {
 	binaryPath, err := cracker.FindHashcatBinary()
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 
 	outFile, err := createOutFile(agentstate.State.OutPath, id, filePermissions)
 	if err != nil {
@@ -151,9 +153,12 @@ func (sess *Session) Start() error {
 		return err
 	}
 
-	go sess.handleTailerOutput(tailer)
-	go sess.handleStdout()
-	go sess.handleStderr()
+	sess.wg.Add(1)
+	go func() { defer sess.wg.Done(); sess.handleTailerOutput(tailer) }()
+	sess.wg.Add(1)
+	go func() { defer sess.wg.Done(); sess.handleStdout() }()
+	sess.wg.Add(1)
+	go func() { defer sess.wg.Done(); sess.handleStderr() }()
 
 	return nil
 }
@@ -428,12 +433,16 @@ func (sess *Session) Kill() error {
 	return err
 }
 
-// Cleanup cancels the session context and removes all session-related temporary
-// files: output file, charset files, hash file, restore file, session log/pid
-// files, and optionally the zaps directory. It is idempotent — already-removed
-// files are silently skipped. Errors are logged but don't halt the cleanup.
+// Cleanup kills the hashcat process, waits for all I/O goroutines to exit,
+// then removes all session-related temporary files: output file, charset files,
+// hash file, restore file, session log/pid files, and optionally the zaps
+// directory. It is idempotent — already-removed files are silently skipped.
+// Errors are logged but don't halt the cleanup.
 func (sess *Session) Cleanup() {
-	sess.Cancel()
+	if err := sess.Kill(); err != nil {
+		agentstate.Logger.Warn("Failed to kill hashcat process during cleanup", "error", err)
+	}
+	sess.wg.Wait() // Wait for all I/O goroutines to exit before removing files
 
 	agentstate.Logger.Info("Cleaning up session files")
 

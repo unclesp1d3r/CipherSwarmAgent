@@ -109,20 +109,23 @@ func handleStdOutLine(ctx context.Context, stdoutLine string, task *api.Task) {
 	}
 
 	lineBytes := []byte(stdoutLine)
-	if json.Valid(lineBytes) {
-		var update hashcat.Status
-		if err := json.Unmarshal(lineBytes, &update); err != nil {
-			agentstate.Logger.Error("Failed to parse status update", "error", err)
-			cserrors.SendAgentError(
-				ctx,
-				"Failed to parse hashcat status update: "+err.Error(),
-				task,
-				api.SeverityWarning,
-				cserrors.WithClassification("parse_error", true), // Retryable - transient or version mismatch
-			)
-		}
-		// Valid JSON status is processed via sess.StatusUpdates → handleStatusUpdate
+	if !json.Valid(lineBytes) {
+		return // Not JSON — already classified by session.handleStdout
 	}
+
+	// Only detect parse failures — valid statuses are already handled by
+	// session.handleStdout → StatusUpdates channel.
+	if err := json.Unmarshal(lineBytes, &hashcat.Status{}); err != nil {
+		agentstate.Logger.Error("Failed to parse status update", "error", err)
+		cserrors.SendAgentError(
+			ctx,
+			"Failed to parse hashcat status update: "+err.Error(),
+			task,
+			api.SeverityWarning,
+			cserrors.WithClassification("parse_error", true), // Retryable - transient or version mismatch
+		)
+	}
+	// Valid JSON status is processed via sess.StatusUpdates → handleStatusUpdate
 }
 
 // handleStdErrLine handles a pre-classified error from hashcat by displaying it

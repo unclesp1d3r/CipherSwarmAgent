@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/host"
@@ -22,8 +23,9 @@ const (
 )
 
 var (
-	// Configuration represents the configuration of the agent.
-	Configuration agentConfiguration //nolint:gochecknoglobals // Global agent configuration
+	// configuration stores the agent configuration atomically for safe concurrent access.
+	// Use GetConfiguration() and SetConfiguration() — never access directly.
+	configuration atomic.Value //nolint:gochecknoglobals // Global agent configuration
 
 	// setNativeHashcatPathFn allows stubbing setNativeHashcatPath for testing.
 	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
@@ -32,6 +34,31 @@ var (
 	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
 	getDevicesListFn = getDevicesList //nolint:gochecknoglobals // Used for testing
 )
+
+func init() {
+	configuration.Store(agentConfiguration{})
+}
+
+// GetConfiguration returns a shallow copy of the current agent configuration.
+// Value-type fields are safe to use without synchronization. Pointer fields
+// (RecommendedTimeouts, RecommendedRetry, RecommendedCircuitBreaker) are shared
+// with the stored value — callers must not mutate through them.
+// Safe for concurrent use from any goroutine.
+//
+//nolint:revive // unexported-return: agentConfiguration is internal; callers are all within lib/ and lib/agent/
+func GetConfiguration() agentConfiguration {
+	cfg, ok := configuration.Load().(agentConfiguration)
+	if !ok {
+		agentstate.Logger.Error("configuration type assertion failed, returning zero-value config")
+	}
+
+	return cfg
+}
+
+// SetConfiguration atomically replaces the entire agent configuration.
+func SetConfiguration(cfg agentConfiguration) {
+	configuration.Store(cfg)
+}
 
 // Define static errors.
 var (
@@ -129,8 +156,8 @@ func GetAgentConfiguration(ctx context.Context) error {
 		agentstate.Logger.Debug("Using server-provided Hashcat binary")
 	}
 
-	Configuration = agentConfig
-	agentstate.Logger.Debug("Agent configuration", "config", Configuration)
+	SetConfiguration(agentConfig)
+	agentstate.Logger.Debug("Agent configuration", "config", agentConfig)
 
 	return nil
 }

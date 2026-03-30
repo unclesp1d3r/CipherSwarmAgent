@@ -168,8 +168,7 @@ func (m *Manager) RunTask(ctx context.Context, task *api.Task, attack *api.Attac
 
 	jobParams := m.createJobParams(task, attack)
 
-	//nolint:contextcheck // NewHashcatSession does not accept context
-	sess, err := hashcat.NewHashcatSession(strconv.FormatInt(attack.Id, 10), jobParams)
+	sess, err := hashcat.NewHashcatSession(ctx, strconv.FormatInt(attack.Id, 10), jobParams)
 	if err != nil {
 		return cserrors.LogAndSendError(ctx, "Failed to create attack session", err, api.SeverityCritical, task)
 	}

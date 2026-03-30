@@ -64,9 +64,9 @@ The project follows standard, idiomatic Go practices (version 1.26+).
   - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
   - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
   - `display/`: User-facing output (status, progress, benchmark results).
-  - `downloader/`: File download with checksum verification.
+  - `downloader/`: File download with checksum verification. Downloads use `grab/v3` with a `Getter` interface for testability. `grabDownloader` implements `Getter`; `downloadWithRetry` handles exponential backoff against any `Getter`. `grab.Response.Err()` blocks until transfer finalizes — always call it before returning from cancellation paths.
   - `hashcat/`: Hashcat session management, parameters, and output parsing.
-  - `progress/`: Progress calculation utilities.
+  - `progress/`: Progress calculation utilities. Exposes `Tracker` interface (`StartTracking(filename, totalSize) → DownloadProgress`) and `DownloadProgress` interface (`Update(bytesComplete)`, `Finish()`). `DefaultProgressBar` wraps `cheggaaa/pb`.
   - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
   - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
   - `zap/`: Zap file monitoring for cracked hashes.
@@ -144,7 +144,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 ### Dependencies
 
-- `hashicorp/go-getter` pulls ~78 transitive deps (AWS SDK, GCS, gRPC). See #122 for replacement plan.
+- Downloads use `cavaliergopher/grab/v3`. `hashicorp/go-getter` was removed (#122) along with its ~78 transitive deps.
 
 ### Testing
 
