@@ -135,21 +135,22 @@ func StartAgent() {
 
 	// Initialize managers
 	client := agentstate.State.GetAPIClient()
+	cfg := lib.GetConfiguration()
 	benchmarkMgr = benchmark.NewManager(client.Agents())
-	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
-	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+	benchmarkMgr.BackendDevices = cfg.Config.BackendDevices
+	benchmarkMgr.OpenCLDevices = cfg.Config.OpenCLDevices
 
 	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
-	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
-	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+	taskMgr.BackendDevices = cfg.Config.BackendDevices
+	taskMgr.OpenCLDevices = cfg.Config.OpenCLDevices
 
 	// Run benchmarks when the server requests them OR when the user explicitly
 	// passed --force-benchmark. Without this check the CLI flag is silently
 	// ignored whenever the server reports valid benchmarks on file.
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	forceBenchmark := agentstate.State.GetForceBenchmarkRun()
-	if lib.Configuration.BenchmarksNeeded || forceBenchmark {
-		if forceBenchmark && !lib.Configuration.BenchmarksNeeded {
+	if cfg.BenchmarksNeeded || forceBenchmark {
+		if forceBenchmark && !cfg.BenchmarksNeeded {
 			agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
 		}
 		if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
@@ -237,7 +238,7 @@ func startHeartbeatLoop(ctx context.Context, cancel context.CancelFunc) {
 
 	for {
 		err := heartbeat(ctx, cancel)
-		baseInterval := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
+		baseInterval := time.Duration(lib.GetConfiguration().Config.AgentUpdateInterval) * time.Second
 
 		if err != nil {
 			consecutiveFailures++
@@ -306,7 +307,7 @@ func startAgentLoop(ctx context.Context) {
 			handleNewTask(ctx)
 		}
 
-		sleepTime := time.Duration(lib.Configuration.Config.AgentUpdateInterval) * time.Second
+		sleepTime := time.Duration(lib.GetConfiguration().Config.AgentUpdateInterval) * time.Second
 		display.Inactive(sleepTime)
 
 		if sleepWithContext(ctx, sleepTime) {
@@ -339,14 +340,15 @@ func handleReload(ctx context.Context) {
 
 	// Recreate managers with new API client sub-clients and update configs
 	reloadClient := agentstate.State.GetAPIClient()
+	reloadCfg := lib.GetConfiguration()
 	benchmarkMgr = benchmark.NewManager(reloadClient.Agents())
-	benchmarkMgr.BackendDevices = lib.Configuration.Config.BackendDevices
-	benchmarkMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+	benchmarkMgr.BackendDevices = reloadCfg.Config.BackendDevices
+	benchmarkMgr.OpenCLDevices = reloadCfg.Config.OpenCLDevices
 	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
-	taskMgr.BackendDevices = lib.Configuration.Config.BackendDevices
-	taskMgr.OpenCLDevices = lib.Configuration.Config.OpenCLDevices
+	taskMgr.BackendDevices = reloadCfg.Config.BackendDevices
+	taskMgr.OpenCLDevices = reloadCfg.Config.OpenCLDevices
 
-	if lib.Configuration.BenchmarksNeeded {
+	if reloadCfg.BenchmarksNeeded {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 		// Server-initiated reload must re-run benchmarks (not use stale cache).
 		// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
@@ -394,11 +396,11 @@ func handleNewTask(ctx context.Context) {
 	}
 
 	if newTask != nil {
-		_ = processTask(ctx, newTask) //nolint:errcheck // Ignore error, as it is already logged and we can continue
+		processTask(ctx, newTask)
 	}
 }
 
-func processTask(ctx context.Context, t *api.Task) error {
+func processTask(ctx context.Context, t *api.Task) {
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
 
 	display.NewTask(t)
@@ -418,11 +420,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 		taskMgr.AbandonTask(context.Background(), t)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
-		if err != nil {
-			return err
-		}
-
-		return errors.New("attack parameters are nil")
+		return
 	}
 
 	display.NewAttack(attack)
@@ -436,7 +434,8 @@ func processTask(ctx context.Context, t *api.Task) error {
 			// Task vanished before we could accept it — normal race condition.
 			// No server state transition needed; just clean up local files.
 			task.CleanupTaskFiles(attack.Id)
-			return err
+
+			return
 		}
 
 		//nolint:contextcheck // must-complete: prevents task starvation on server
@@ -444,7 +443,7 @@ func processTask(ctx context.Context, t *api.Task) error {
 		task.CleanupTaskFiles(attack.Id)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
-		return err
+		return
 	}
 
 	display.RunTaskAccepted(t)
@@ -460,25 +459,22 @@ func processTask(ctx context.Context, t *api.Task) error {
 		task.CleanupTaskFiles(attack.Id)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
-		return err
+		return
 	}
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityCracking)
 
-	err = taskMgr.RunTask(ctx, t, attack)
-	if err != nil {
+	if err := taskMgr.RunTask(ctx, t, attack); err != nil {
 		// Note: RunTask returns nil from runAttackTask (which handles its own
 		// cleanup via sess.Cleanup()). This fallback only triggers for
 		// NewHashcatSession failures.
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		task.CleanupTaskFiles(attack.Id)
 
-		return err
+		return
 	}
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
-
-	return nil
 }
 
 // heartbeat sends a heartbeat to the server and processes the response.
@@ -537,8 +533,12 @@ func fetchAgentConfig(ctx context.Context) error {
 		return fmt.Errorf("failed to get agent configuration from the CipherSwarm API: %w", err)
 	}
 
+	// This read-modify-write is safe because fetchAgentConfig is only called
+	// from the single agent-loop goroutine. If this changes, use a mutex or CAS.
 	if agentstate.State.AlwaysUseNativeHashcat {
-		lib.Configuration.Config.UseNativeHashcat = true
+		fetchedCfg := lib.GetConfiguration()
+		fetchedCfg.Config.UseNativeHashcat = true
+		lib.SetConfiguration(fetchedCfg)
 	}
 
 	return nil

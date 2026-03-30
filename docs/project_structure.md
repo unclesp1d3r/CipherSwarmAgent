@@ -97,6 +97,8 @@ The main business logic of the agent, organized by functional area:
   - `UpdateAgentMetadata()`: Send agent info to server
   - `SendHeartBeat()`: Periodic health check
   - `mapConfiguration()`: Map API response to internal config
+  - `GetConfiguration()`: Thread-safe access to current agent configuration (via `atomic.Value`)
+  - `SetConfiguration()`: Atomically replace agent configuration
 
 #### `lib/dataTypes.go`
 
@@ -173,7 +175,8 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Persistent benchmark cache at `{data_path}/benchmark_cache.json`
 - **Key Functions**:
-  - `saveBenchmarkCache()`, `loadBenchmarkCache()`: Cache persistence
+  - `saveBenchmarkCache()`: Atomic cache persistence using `os.CreateTemp` + `os.Rename` pattern for race-free writes
+  - `loadBenchmarkCache()`: Cache persistence
   - `TrySubmitCachedBenchmarks()`: Submit cached results on startup
 
 #### `lib/benchmark/parse.go`
@@ -195,13 +198,13 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Hashcat process lifecycle management
 - **Key Types**:
-  - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines. Includes `sessionName` field for tracking hashcat session name.
+  - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines. Includes `sessionName` field for tracking hashcat session name and `sync.WaitGroup` for tracking I/O goroutines during shutdown.
   - `Session.StderrMessages`: Channel type is `chan ErrorInfo` (changed from `chan string`). Consumers receive structured error information with classification and context instead of raw strings. Stdout lines are classified before being sent to this channel for error/warning lines.
 - **Key Functions**:
-  - `NewHashcatSession()`: Create configured session
-  - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines
+  - `NewHashcatSession(ctx context.Context, id string, params Params)`: Create configured session with parent context for proper cancellation propagation
+  - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines (all tracked in WaitGroup)
   - `Kill()`: Terminate process gracefully
-  - `Cleanup()`: Resource cleanup including temporary files (output files, charset files, hash files, restore files, zaps directory) and hashcat-created session files (.log and .pid files)
+  - `Cleanup()`: Kills the process, waits for all I/O goroutines to exit via WaitGroup, then performs resource cleanup including temporary files (output files, charset files, hash files, restore files, zaps directory) and hashcat-created session files (.log and .pid files)
 
 #### `lib/hashcat/params.go`
 
@@ -309,8 +312,21 @@ Platform-specific functionality for cross-platform support:
 - **`linux.go`**: Linux device detection
 - **`darwin.go`**: macOS (Intel + Apple Silicon) support
 - **`windows.go`**: Windows device detection
+- **`validate.go`**: Defense-in-depth path validation before `exec.CommandContext` calls
 
 **Common Functions**: `GetDevices()`, `GetHashcatVersion()`, `Extract7z()`, `GetDefaultHashcatBinaryName()`
+
+#### `lib/arch/validate.go`
+
+- **Purpose**: Cross-platform path validation for executable and archive paths
+- **Key Functions**:
+  - `ValidateExecutablePath(path)`: Verifies binary path is absolute, exists, and is not a directory
+  - `ValidateArchivePaths(srcFile, destDir)`: Validates source archive file and destination directory exist with correct types
+- **Key Errors**:
+  - `ErrRelativePath`: Path is not absolute
+  - `ErrPathNotFound`: Path does not exist on disk
+  - `ErrPathIsDirectory`: Path points to a directory when a file was expected
+  - `ErrPathNotDirectory`: Path is not a directory when one was expected
 
 ### 14. Supporting Packages
 
@@ -367,7 +383,7 @@ Global state with synchronized access:
 
 - **`agentstate.State`**: Runtime state with `atomic.Bool` and `sync.RWMutex` fields
 - **Getter/Setter Methods**: Never access synchronized fields directly
-- **Immutable Configuration**: `lib.Configuration` is set once at startup and on reload
+- **Configuration Management**: Agent configuration is accessed through `lib.GetConfiguration()` and `lib.SetConfiguration()`, which use `atomic.Value` for race-free concurrent access from multiple goroutines (e.g., heartbeat and main agent loop)
 
 ## Data Flow
 

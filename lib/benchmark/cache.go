@@ -6,13 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
-)
-
-const (
-	cacheFilePermissions = 0o600 // File permissions for benchmark cache
 )
 
 // saveBenchmarkCache marshals the benchmark results to JSON and writes them
@@ -32,17 +29,29 @@ func saveBenchmarkCache(results []display.BenchmarkResult) error {
 		return fmt.Errorf("failed to marshal benchmark cache: %w", err)
 	}
 
-	tmpPath := cachePath + ".tmp"
-	if err := os.WriteFile(tmpPath, data, cacheFilePermissions); err != nil {
+	tmpFile, err := os.CreateTemp(filepath.Dir(cachePath), ".benchmark-cache-*.tmp")
+	if err != nil {
+		agentstate.Logger.Warn("Failed to create temp cache file", "error", err)
+		return fmt.Errorf("failed to create temp cache file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 		agentstate.Logger.Warn("Failed to write benchmark cache temp file",
 			"error", err, "path", tmpPath)
 		return fmt.Errorf("failed to write benchmark cache: %w", err)
 	}
 
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to close temp cache file: %w", err)
+	}
+
 	if err := os.Rename(tmpPath, cachePath); err != nil {
 		agentstate.Logger.Warn("Failed to rename benchmark cache temp file",
 			"error", err, "tmp_path", tmpPath, "cache_path", cachePath)
-		// Clean up the temp file on rename failure
 		if removeErr := os.Remove(tmpPath); removeErr != nil && !os.IsNotExist(removeErr) {
 			agentstate.Logger.Warn("Failed to clean up temp cache file",
 				"error", removeErr, "path", tmpPath)

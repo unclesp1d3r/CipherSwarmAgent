@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/host"
@@ -22,8 +23,9 @@ const (
 )
 
 var (
-	// Configuration represents the configuration of the agent.
-	Configuration agentConfiguration //nolint:gochecknoglobals // Global agent configuration
+	// configuration stores the agent configuration atomically for safe concurrent access.
+	// Use GetConfiguration() and SetConfiguration() — never access directly.
+	configuration atomic.Value //nolint:gochecknoglobals // Global agent configuration
 
 	// setNativeHashcatPathFn allows stubbing setNativeHashcatPath for testing.
 	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
@@ -32,6 +34,24 @@ var (
 	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
 	getDevicesListFn = getDevicesList //nolint:gochecknoglobals // Used for testing
 )
+
+func init() {
+	configuration.Store(agentConfiguration{})
+}
+
+// GetConfiguration returns an immutable snapshot of the current agent configuration.
+// Safe for concurrent use from any goroutine.
+//
+//nolint:revive // unexported-return: agentConfiguration is internal; callers are all within lib/ and lib/agent/
+func GetConfiguration() agentConfiguration {
+	cfg, _ := configuration.Load().(agentConfiguration) //nolint:errcheck // type assertion always succeeds — init() seeds the correct type
+	return cfg
+}
+
+// SetConfiguration atomically replaces the entire agent configuration.
+func SetConfiguration(cfg agentConfiguration) {
+	configuration.Store(cfg)
+}
 
 // Define static errors.
 var (
@@ -129,8 +149,8 @@ func GetAgentConfiguration(ctx context.Context) error {
 		agentstate.Logger.Debug("Using server-provided Hashcat binary")
 	}
 
-	Configuration = agentConfig
-	agentstate.Logger.Debug("Agent configuration", "config", Configuration)
+	SetConfiguration(agentConfig)
+	agentstate.Logger.Debug("Agent configuration", "config", GetConfiguration())
 
 	return nil
 }

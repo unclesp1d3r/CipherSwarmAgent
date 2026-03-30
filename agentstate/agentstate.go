@@ -15,8 +15,14 @@ import (
 var State = agentState{} //nolint:gochecknoglobals // Global agent state
 
 // agentState represents the state and configuration settings of an agent in the CipherSwarm system.
-// Fields accessed across goroutines (heartbeat + agent loops) are synchronized via atomic.Bool
-// or sync.RWMutex. Use the getter/setter methods for those fields.
+//
+// Field safety invariants:
+//   - Fields set once in SetupSharedState() before goroutines start (DataPath, HashlistPath, FilePath,
+//     StatusTimer, etc.) are safe to read from any goroutine without synchronization.
+//   - Fields mutated by applyRecommendedSettings during reload (ConnectTimeout, ReadTimeout, etc.) are
+//     only consumed when rebuilding the API client in the same (agent-loop) goroutine.
+//   - Fields accessed across goroutines (heartbeat + agent loops) are synchronized via atomic.Bool
+//     or sync.RWMutex. Use the getter/setter methods for those fields.
 type agentState struct {
 	PidFile                             string        // PidFile is the path to the file containing the agent's process ID.
 	HashcatPidFile                      string        // HashcatPidFile is the path to the file containing the Hashcat process ID.
