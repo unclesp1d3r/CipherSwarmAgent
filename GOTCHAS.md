@@ -78,6 +78,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 ## Download (grab/v3)
 
 - `grab.Response.Err()` blocks until the transfer goroutine closes the response body and flushes the file. On context cancellation, always call `resp.Err()` before returning — early return without it causes resource leaks and races. See `TestGrabDownloader_CancellationWaitsForFinalization`.
+- `resp.Err()` finishes quickly after context cancellation — client-side finalization is independent of the server handler lifecycle. Blocking a server handler (handler gate) does NOT hold `resp.Err()`. To test cancellation ordering, gate `dp.Finish()` via a `finalizationTracker` instead — see `TestGrabDownloader_CancellationWaitsForFinalization`.
 - `grab.Response.Size()` returns -1 when the server doesn't send `Content-Length`. `progress.StartTracking` treats negative totalSize as unknown (0).
 
 ## Testing
