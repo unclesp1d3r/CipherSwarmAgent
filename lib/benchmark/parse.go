@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
@@ -12,7 +13,12 @@ import (
 
 const (
 	benchmarkFieldCount = 6 // Expected number of fields in benchmark output line
+	hashInfoMatchGroups = 2 // Expected number of match groups in hashInfoLineRe (full match + capture)
 )
+
+// hashInfoLineRe matches the leading numeric hash type ID in --hash-info --machine-readable output.
+// Lines look like: "0 | MD5 | Raw Hash" or "100 | SHA1 | Raw Hash".
+var hashInfoLineRe = regexp.MustCompile(`^\s*(\d+)\s*\|`) //nolint:gochecknoglobals // package-level compiled regex
 
 // handleBenchmarkStdOutLine processes a line of benchmark output, extracting relevant data and appending it to result.
 func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult) {
@@ -46,6 +52,18 @@ func drainStdout(sess *hashcat.Session, results *[]display.BenchmarkResult) {
 			return
 		}
 	}
+}
+
+// parseHashInfoLine extracts the hash type ID from a --hash-info --machine-readable
+// output line. Returns the hash type ID string and true if the line matches, or
+// ("", false) if the line is not a hash-info data line.
+func parseHashInfoLine(line string) (string, bool) {
+	matches := hashInfoLineRe.FindStringSubmatch(line)
+	if len(matches) < hashInfoMatchGroups {
+		return "", false
+	}
+
+	return strings.TrimSpace(matches[1]), true
 }
 
 // handleBenchmarkStdErrLine processes a classified error from the benchmark's stderr,

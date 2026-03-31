@@ -16,6 +16,12 @@ const (
 	attackModeHybridMD = 7 // Hybrid mask + dictionary attack mode
 	// AttackBenchmark is the attack mode for benchmarking.
 	AttackBenchmark = 9
+	// AttackHashInfo is the attack mode for capability detection via --hash-info --machine-readable.
+	// This value is an internal sentinel used only by the agent's toCmdArgs dispatch.
+	AttackHashInfo = 10
+	// AttackBenchmarkSingle is the attack mode for benchmarking a single hash type
+	// via --benchmark -m <type>. This is an internal sentinel for background benchmarking.
+	AttackBenchmarkSingle = 11
 )
 
 // statusGuess represents the state and statistics of the current guess in a password cracking attack.

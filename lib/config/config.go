@@ -224,6 +224,8 @@ func SetupSharedState() {
 		)
 	}
 	agentstate.State.AlwaysUseNativeHashcat = viper.GetBool("always_use_native_hashcat")
+	agentstate.State.DeferBenchmarks = viper.GetBool("defer_benchmarks")
+	agentstate.State.BenchmarkWhileIdle = viper.GetBool("benchmark_while_idle")
 
 	// Validate numeric/duration config fields — clamp to defaults with a warning.
 	agentstate.State.DownloadMaxRetries = viper.GetInt("download_max_retries")
@@ -351,4 +353,6 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("api_retry_max_delay", DefaultAPIRetryMaxDelay)
 	viper.SetDefault("circuit_breaker_failure_threshold", DefaultCircuitBreakerFailureThreshold)
 	viper.SetDefault("circuit_breaker_timeout", DefaultCircuitBreakerTimeout)
+	viper.SetDefault("defer_benchmarks", false)
+	viper.SetDefault("benchmark_while_idle", true)
 }

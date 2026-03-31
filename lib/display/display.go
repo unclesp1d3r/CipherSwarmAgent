@@ -20,12 +20,13 @@ const MinStatusFields = 2
 
 // BenchmarkResult represents the outcome of a benchmark session.
 type BenchmarkResult struct {
-	Device     string `json:"device,omitempty"`     // Device is the name of the device used for the benchmark.
-	HashType   string `json:"hash_type,omitempty"`  // HashType is the type of hash used for the benchmark.
-	RuntimeMs  string `json:"runtime,omitempty"`    // RuntimeMs is the runtime of the benchmark in milliseconds.
-	HashTimeMs string `json:"hash_time,omitempty"`  // HashTimeMs is the time taken to hash in milliseconds.
-	SpeedHs    string `json:"hash_speed,omitempty"` // SpeedHs is the hash speed in hashes per second.
-	Submitted  bool   `json:"submitted,omitempty"`  // Submitted indicates whether this result has been accepted by the server.
+	Device      string `json:"device,omitempty"`      // Device is the name of the device used for the benchmark.
+	HashType    string `json:"hash_type,omitempty"`   // HashType is the type of hash used for the benchmark.
+	RuntimeMs   string `json:"runtime,omitempty"`     // RuntimeMs is the runtime of the benchmark in milliseconds.
+	HashTimeMs  string `json:"hash_time,omitempty"`   // HashTimeMs is the time taken to hash in milliseconds.
+	SpeedHs     string `json:"hash_speed,omitempty"`  // SpeedHs is the hash speed in hashes per second.
+	Submitted   bool   `json:"submitted,omitempty"`   // Submitted indicates whether this result has been accepted by the server.
+	Placeholder bool   `json:"placeholder,omitempty"` // Placeholder indicates this is a capability-detection result, not a real benchmark.
 }
 
 // Startup logs an informational message indicating the start of the CipherSwarm Agent.

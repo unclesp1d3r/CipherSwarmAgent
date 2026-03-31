@@ -23,7 +23,7 @@ type TasksClient interface {
 	SetTaskAbandoned(ctx context.Context, id int64) (*SetTaskAbandonedResponse, error)
 
 	// SendStatus sends a status update for a running task.
-	SendStatus(ctx context.Context, id int64, status TaskStatus) (*SendStatusResponse, error)
+	SendStatus(ctx context.Context, id int64, status HashcatStatusUpdate) (*SendStatusResponse, error)
 
 	// SendCrack sends a cracked hash result.
 	SendCrack(ctx context.Context, id int64, result HashcatResult) (*SendCrackResponse, error)

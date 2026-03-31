@@ -3,7 +3,7 @@ package cserrors
 
 import (
 	"context"
-	"maps"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -111,20 +111,8 @@ func SendAgentError(
 		taskID = &task.Id
 	}
 
-	// Copy context first so reserved keys always take precedence.
-	// reservedKeyCount covers platform, version, category, retryable.
-	const reservedKeyCount = 4
-	otherMap := make(map[string]any, reservedKeyCount+len(cfg.context))
-	maps.Copy(otherMap, cfg.context)
-
-	// Reserved keys overwrite any collisions from context
-	otherMap["platform"] = agentstate.State.Platform
-	otherMap["version"] = agentstate.State.AgentVersion
-
-	if cfg.hasClassification {
-		otherMap["category"] = cfg.category
-		otherMap["retryable"] = cfg.retryable
-	}
+	// Build typed metadata with additional properties for extensibility.
+	other := buildErrorMetadataOther(cfg)
 
 	agentError := api.SubmitErrorAgentJSONRequestBody{
 		Message:  stdErrLine,
@@ -133,7 +121,7 @@ func SendAgentError(
 		TaskId:   taskID,
 		Metadata: &api.ErrorMetadata{
 			ErrorDate: time.Now(),
-			Other:     &otherMap,
+			Other:     other,
 		},
 	}
 
@@ -143,6 +131,79 @@ func SendAgentError(
 		agentError,
 	); err != nil {
 		handleSendError(ctx, err)
+	}
+}
+
+// buildErrorMetadataOther constructs a typed ErrorMetadata_Other from the error report config.
+// Well-known fields (category, retryable, error_type, affected_count, total_count, terminal)
+// are mapped to their typed struct fields. All remaining context entries plus reserved keys
+// (platform, version) go into AdditionalProperties.
+func buildErrorMetadataOther(cfg errorReportConfig) *api.ErrorMetadata_Other {
+	other := &api.ErrorMetadata_Other{
+		AdditionalProperties: make(map[string]interface{}),
+	}
+
+	// Copy context fields, routing known keys to typed fields.
+	for k, v := range cfg.context {
+		switch k {
+		case "error_type":
+			if s, ok := v.(string); ok {
+				other.ErrorType = &s
+			}
+		case "affected_count":
+			if n, ok := toIntPtr(v); ok {
+				other.AffectedCount = n
+			}
+		case "total_count":
+			if n, ok := toIntPtr(v); ok {
+				other.TotalCount = n
+			}
+		case "terminal":
+			if b, ok := v.(bool); ok {
+				other.Terminal = &b
+			}
+		default:
+			other.AdditionalProperties[k] = v
+		}
+	}
+
+	// Reserved keys always go to AdditionalProperties (they overwrite context collisions).
+	other.AdditionalProperties["platform"] = agentstate.State.Platform
+	other.AdditionalProperties["version"] = agentstate.State.AgentVersion
+
+	if cfg.hasClassification {
+		other.Category = &cfg.category
+		other.Retryable = &cfg.retryable
+	}
+
+	return other
+}
+
+// toIntPtr attempts to convert a value to *int. Handles int, int64, and float64 (from JSON).
+// Returns (nil, false) if the value overflows int range or is not a numeric type.
+func toIntPtr(v any) (*int, bool) {
+	switch n := v.(type) {
+	case int:
+		return &n, true
+	case int64:
+		if n > math.MaxInt || n < math.MinInt {
+			return nil, false
+		}
+
+		i := int(n)
+
+		return &i, true
+	case float64:
+		n64 := int64(n)
+		if n64 > math.MaxInt || n64 < math.MinInt {
+			return nil, false
+		}
+
+		i := int(n64)
+
+		return &i, true
+	default:
+		return nil, false
 	}
 }
 
