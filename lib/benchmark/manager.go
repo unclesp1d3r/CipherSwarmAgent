@@ -341,7 +341,7 @@ func (m *Manager) waitForIdle(ctx context.Context) bool {
 		timer := time.NewTimer(idleCheckInterval)
 		select {
 		case <-timer.C:
-			timer.Stop() // idiomatic cleanup per project convention
+			// Timer already fired; no cleanup needed.
 		case <-ctx.Done():
 			timer.Stop()
 			return true
@@ -482,17 +482,33 @@ func (m *Manager) updateCacheWithResults(
 		return
 	}
 
-	// Build lookup from new results by hash type.
-	newByHashType := make(map[string]display.BenchmarkResult, len(newResults))
+	// Build lookup from new results by hash type + device composite key.
+	type resultKey struct {
+		hashType string
+		device   string
+	}
+
+	newByKey := make(map[resultKey]display.BenchmarkResult, len(newResults))
 	for _, r := range newResults {
-		newByHashType[r.HashType] = r
+		newByKey[resultKey{hashType: r.HashType, device: r.Device}] = r
 	}
 
 	// Replace placeholder entries in the full cache.
+	matched := make(map[resultKey]bool, len(newByKey))
 	for i, cached := range fullCache {
-		if result, ok := newByHashType[cached.HashType]; ok && cached.Placeholder {
+		key := resultKey{hashType: cached.HashType, device: cached.Device}
+		if result, ok := newByKey[key]; ok && cached.Placeholder {
 			result.Placeholder = false
 			fullCache[i] = result
+			matched[key] = true
+		}
+	}
+
+	// Append new results whose hash type + device had no placeholder in the cache.
+	for key, result := range newByKey {
+		if !matched[key] {
+			result.Placeholder = false
+			fullCache = append(fullCache, result)
 		}
 	}
 
@@ -517,7 +533,8 @@ func (m *Manager) updateCacheWithResults(
 
 	// Mark submitted in cache and re-save.
 	for i, cached := range fullCache {
-		if _, ok := newByHashType[cached.HashType]; ok && !cached.Placeholder {
+		key := resultKey{hashType: cached.HashType, device: cached.Device}
+		if _, ok := newByKey[key]; ok && !cached.Placeholder {
 			fullCache[i].Submitted = true
 		}
 	}

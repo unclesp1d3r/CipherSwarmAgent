@@ -172,8 +172,6 @@ func StartAgent() {
 			if submitErr := benchmarkMgr.SubmitCapabilityResults(ctx, capResults); submitErr != nil {
 				agentstate.Logger.Fatal("Failed to submit capability detection results", "error", submitErr)
 			}
-
-			agentstate.State.SetBenchmarksSubmitted(true)
 		} else {
 			// Full benchmark path
 			if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
@@ -424,6 +422,12 @@ func handleNewTask(ctx context.Context) {
 		return
 	}
 
+	// Cancel background benchmarks while a task is running to avoid device contention.
+	if bgBenchCancel != nil {
+		bgBenchCancel()
+		bgBenchCancel = nil
+	}
+
 	newTask, err := taskMgr.GetNewTask(ctx)
 	if err != nil {
 		if errors.Is(err, task.ErrNoTaskAvailable) {
@@ -443,6 +447,14 @@ func handleNewTask(ctx context.Context) {
 
 	if newTask != nil {
 		processTask(ctx, newTask)
+	}
+
+	// Restart background benchmarks after task completes.
+	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
+		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called on next task/reload
+		bgCtx, bgCancel := context.WithCancel(ctx)
+		bgBenchCancel = bgCancel
+		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
 	}
 }
 

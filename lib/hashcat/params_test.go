@@ -498,6 +498,21 @@ func TestParams_ToCmdArgs_BenchmarkSingle(t *testing.T) {
 				"--backend-devices", "1",
 			},
 		},
+		{
+			name: "benchmark single with OpenCL devices",
+			params: Params{
+				AttackMode:    AttackBenchmarkSingle,
+				HashType:      1000,
+				OpenCLDevices: "1,2",
+			},
+			expectArgs: []string{
+				"--quiet",
+				"--machine-readable",
+				"--benchmark",
+				"-m", "1000",
+				"--opencl-device-types", "1,2",
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -403,7 +403,7 @@ func TestSubmitCapabilityResults_SubmissionFails_CacheSaved(t *testing.T) {
 
 func TestSaveBenchmarkCache_InvalidPath(t *testing.T) {
 	// Set cache path to a directory that doesn't exist
-	agentstate.State.BenchmarkCachePath = "/nonexistent/dir/cache.json"
+	agentstate.State.BenchmarkCachePath = filepath.Join(t.TempDir(), "missing", "cache.json")
 	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
 	err := saveBenchmarkCache([]display.BenchmarkResult{{HashType: "0", SpeedHs: "1"}})

@@ -3,6 +3,7 @@ package cserrors
 
 import (
 	"context"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -179,15 +180,27 @@ func buildErrorMetadataOther(cfg errorReportConfig) *api.ErrorMetadata_Other {
 }
 
 // toIntPtr attempts to convert a value to *int. Handles int, int64, and float64 (from JSON).
+// Returns (nil, false) if the value overflows int range or is not a numeric type.
 func toIntPtr(v any) (*int, bool) {
 	switch n := v.(type) {
 	case int:
 		return &n, true
 	case int64:
+		if n > math.MaxInt || n < math.MinInt {
+			return nil, false
+		}
+
 		i := int(n)
+
 		return &i, true
 	case float64:
-		i := int(n)
+		n64 := int64(n)
+		if n64 > math.MaxInt || n64 < math.MinInt {
+			return nil, false
+		}
+
+		i := int(n64)
+
 		return &i, true
 	default:
 		return nil, false
