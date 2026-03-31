@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
@@ -234,24 +235,33 @@ func TestUpdateCacheWithResults_SubmissionFails(t *testing.T) {
 }
 
 func TestUpdateCacheWithResults_NilCache(t *testing.T) {
-	cleanupState := testhelpers.SetupMinimalTestState(789)
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	t.Cleanup(cleanupState)
 
-	// No cache file exists — updateCacheWithResults should handle gracefully
+	// No cache file exists — updateCacheWithResults should attempt direct submission
 	tmpDir := t.TempDir()
 	agentstate.State.BenchmarkCachePath = filepath.Join(tmpDir, "benchmark_cache.json")
 
-	mgr := NewManager(nil)
+	httpmock.RegisterRegexpResponder("POST", bgBenchmarkSubmitPattern,
+		httpmock.NewStringResponder(http.StatusNoContent, ""))
+
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 	newResults := []display.BenchmarkResult{
 		{HashType: "0", Device: "1", SpeedHs: "50000", RuntimeMs: "100"},
 	}
 
-	// Should not panic
+	// Should not panic — attempts direct submission when cache is empty
 	mgr.updateCacheWithResults(context.Background(), newResults)
 }
 
 // --- Capability detection output processing test ---
 
+// TestCapabilityDetectionOutputProcessing validates the channel protocol used by
+// RunCapabilityDetection without calling the actual function (which requires a
+// real hashcat binary). This is a protocol-level test, not a full integration test.
 func TestCapabilityDetectionOutputProcessing(t *testing.T) {
 	cleanupState := testhelpers.SetupMinimalTestState(789)
 	t.Cleanup(cleanupState)
@@ -398,6 +408,48 @@ func TestSaveBenchmarkCache_InvalidPath(t *testing.T) {
 
 	err := saveBenchmarkCache([]display.BenchmarkResult{{HashType: "0", SpeedHs: "1"}})
 	require.Error(t, err)
+}
+
+// --- trySubmitFromCache tests ---
+
+func TestTrySubmitFromCache_CorruptCache(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	// Write corrupt JSON to cache
+	require.NoError(t, os.WriteFile(agentstate.State.BenchmarkCachePath, []byte("not json"), 0o600))
+
+	// trySubmitFromCache detects corrupt cache, then UpdateBenchmarks falls through
+	// to runBenchmarks which needs a real hashcat binary. Verify cache corruption
+	// is handled at the load level without panicking.
+	cached, err := loadBenchmarkCache()
+	require.Error(t, err)
+	assert.Nil(t, cached)
+	assert.ErrorIs(t, err, errCacheCorrupt)
+}
+
+func TestTrySubmitFromCache_AllSubmittedShortCircuit(t *testing.T) {
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	// Pre-populate cache with all-submitted results
+	submitted := []display.BenchmarkResult{
+		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "12345.67", Submitted: true},
+	}
+	err := saveBenchmarkCache(submitted)
+	require.NoError(t, err)
+
+	// No API mock — trySubmitFromCache should short-circuit without API calls
+	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
+	err = mgr.UpdateBenchmarks(context.Background())
+	require.NoError(t, err)
+	assert.True(t, agentstate.State.GetBenchmarksSubmitted())
 }
 
 // NOTE: TestUpdateBenchmarks_ForceBypassesCache requires refactoring

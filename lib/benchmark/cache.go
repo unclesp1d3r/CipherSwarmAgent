@@ -226,6 +226,8 @@ var priorityHashTypes = [...]string{"0", "100", "1000"}
 // loadPlaceholderResults loads cached benchmark results and returns only
 // placeholder entries, sorted by priority (common hash types first, then
 // ascending numeric order). Returns (nil, nil) when no placeholders exist.
+// This function acquires cacheMu internally via loadBenchmarkCache — do NOT
+// call while holding cacheMu or it will deadlock.
 func loadPlaceholderResults() ([]display.BenchmarkResult, error) {
 	cached, err := loadBenchmarkCache()
 	if err != nil {

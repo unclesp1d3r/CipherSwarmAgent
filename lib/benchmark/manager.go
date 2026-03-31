@@ -177,6 +177,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.Benchma
 	}
 
 	var results []display.BenchmarkResult
+	var sessionErr error // set by goroutine if hashcat process exits with error
 
 	waitChan := make(chan struct{})
 
@@ -243,6 +244,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.Benchma
 			drained:
 				if procErr != nil {
 					agentstate.Logger.Error("Capability detection session failed", "error", procErr)
+					sessionErr = procErr
 				}
 
 				sess.Cleanup()
@@ -255,7 +257,11 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.Benchma
 	<-waitChan
 
 	if ctx.Err() != nil {
-		return results, fmt.Errorf("capability detection cancelled: %w", ctx.Err())
+		return nil, fmt.Errorf("capability detection cancelled: %w", ctx.Err())
+	}
+
+	if sessionErr != nil && len(results) == 0 {
+		return nil, fmt.Errorf("capability detection process failed with no results: %w", sessionErr)
 	}
 
 	agentstate.Logger.Info("Capability detection complete", "hash_types", len(results))
@@ -274,8 +280,11 @@ const idleCheckInterval = 30 * time.Second
 func (m *Manager) RunBackgroundBenchmarks(ctx context.Context) {
 	placeholders, err := loadPlaceholderResults()
 	if err != nil {
-		agentstate.Logger.Warn("Failed to load placeholder results for background benchmarking",
+		agentstate.Logger.Error(
+			"Failed to load placeholder results for background benchmarking; "+
+				"real benchmarks will NOT run until agent restart",
 			"error", err)
+
 		return
 	}
 
@@ -418,7 +427,13 @@ func (m *Manager) collectSingleBenchmarkOutput(
 
 			if procErr != nil {
 				agentstate.Logger.Warn("Background benchmark session exited with error",
-					"error", procErr)
+					"error", procErr, "results_collected", len(results))
+
+				if len(results) == 0 {
+					sess.Cleanup()
+
+					return nil
+				}
 			}
 
 			sess.Cleanup()
@@ -443,13 +458,27 @@ func (m *Manager) updateCacheWithResults(
 	defer cacheMu.Unlock()
 
 	fullCache, err := loadBenchmarkCacheLocked()
-	if err != nil {
-		agentstate.Logger.Warn("Failed to reload benchmark cache for background update",
-			"error", err)
-		return
-	}
-	if fullCache == nil {
-		agentstate.Logger.Warn("Benchmark cache is empty during background update")
+	if err != nil || fullCache == nil {
+		if err != nil {
+			agentstate.Logger.Error(
+				"Failed to reload benchmark cache for background update; attempting direct submission",
+				"error", err)
+		} else {
+			agentstate.Logger.Warn("Benchmark cache is empty during background update; attempting direct submission")
+		}
+
+		// Still attempt to submit results so GPU work is not wasted.
+		realResults := make([]display.BenchmarkResult, 0, len(newResults))
+		for _, r := range newResults {
+			r.Placeholder = false
+			realResults = append(realResults, r)
+		}
+
+		if sendErr := m.sendBenchmarkResults(ctx, realResults); sendErr != nil {
+			agentstate.Logger.Error("Failed to submit benchmark results after cache failure",
+				"error", sendErr)
+		}
+
 		return
 	}
 

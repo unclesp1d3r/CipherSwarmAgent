@@ -164,6 +164,11 @@ func StartAgent() {
 				agentstate.Logger.Fatal("Capability detection failed", "error", capErr)
 			}
 
+			if len(capResults) == 0 {
+				agentstate.Logger.Fatal("Capability detection returned no hash types; " +
+					"check GPU drivers and hashcat installation")
+			}
+
 			if submitErr := benchmarkMgr.SubmitCapabilityResults(ctx, capResults); submitErr != nil {
 				agentstate.Logger.Fatal("Failed to submit capability detection results", "error", submitErr)
 			}
@@ -401,6 +406,15 @@ func handleReload(ctx context.Context) {
 		agentstate.Logger.Warn("Server reports valid benchmarks on file during reload, skipping benchmark re-run")
 		agentstate.State.SetBenchmarksSubmitted(true)
 	}
+
+	// Restart background benchmarking if deferred mode is active and placeholders may remain.
+	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
+		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called on next reload
+		bgCtx, bgCancel := context.WithCancel(ctx)
+		bgBenchCancel = bgCancel
+		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
+	}
+
 	agentstate.State.SetReload(false)
 }
 
