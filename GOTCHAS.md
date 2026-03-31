@@ -38,7 +38,11 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 - `revive` stutter rule applies to exported type names (interfaces, structs), not just constants — e.g., `progress.ProgressTracker` stutters, rename to `progress.Tracker`.
 
+- `revive` `redefines-builtin-id` flags local variables that shadow Go builtins (`real`, `imag`, `complex`, `new`, `make`, `len`, `cap`, etc.). Rename the variable — e.g., `real` → `result`.
+
 - `errcheck` flags discarded errors (`val, _ := fn()`) — even when intentional. Either handle the error explicitly or log at Debug level. `//nolint:errcheck` is acceptable but must include a reason per `gocritic` `whyNoLint`.
+
+- `mnd` (magic number detector) flags bare numeric literals in conditions and expressions (e.g., `len(matches) < 2`). Extract a named constant (e.g., `const hashInfoMatchGroups = 2`). Applies to non-obvious numbers; `0` and `1` are usually exempt.
 
 ## golines & nolint Comments
 

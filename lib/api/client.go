@@ -196,7 +196,7 @@ func (t *agentTasksClient) SetTaskAbandoned(
 func (t *agentTasksClient) SendStatus(
 	ctx context.Context,
 	id int64,
-	status TaskStatus,
+	status HashcatStatusUpdate,
 ) (*SendStatusResponse, error) {
 	resp, err := t.client.SendStatusWithResponse(ctx, id, status)
 	if err != nil {

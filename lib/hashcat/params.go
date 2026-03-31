@@ -80,7 +80,7 @@ func (params Params) Validate() error {
 		return validateMaskAttack(params)
 	case attackModeHybridDM, attackModeHybridMD:
 		return validateHybridAttack(params)
-	case AttackBenchmark:
+	case AttackBenchmark, AttackBenchmarkSingle, AttackHashInfo:
 		return nil
 	default:
 		return fmt.Errorf("%w: %d", ErrUnsupportedAttackMode, params.AttackMode)
@@ -167,6 +167,26 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	args := make([]string, 0, defaultArgsCapacity)
+	if params.AttackMode == AttackHashInfo {
+		args = append(args, "--hash-info", "--machine-readable")
+		args = appendDeviceFlags(args, params.BackendDevices, params.OpenCLDevices)
+
+		return args, nil
+	}
+
+	if params.AttackMode == AttackBenchmarkSingle {
+		args = append(
+			args,
+			"--quiet",
+			"--machine-readable",
+			"--benchmark",
+			"-m", strconv.FormatInt(params.HashType, 10),
+		)
+		args = appendDeviceFlags(args, params.BackendDevices, params.OpenCLDevices)
+
+		return args, nil
+	}
+
 	if params.AttackMode == AttackBenchmark {
 		args = append(
 			args,
@@ -176,14 +196,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		)
 
 		args = append(args, params.AdditionalArgs...)
-
-		if strings.TrimSpace(params.BackendDevices) != "" {
-			args = append(args, "--backend-devices", params.BackendDevices)
-		}
-
-		if strings.TrimSpace(params.OpenCLDevices) != "" {
-			args = append(args, "--opencl-device-types", params.OpenCLDevices)
-		}
+		args = appendDeviceFlags(args, params.BackendDevices, params.OpenCLDevices)
 
 		if params.EnableAdditionalHashTypes {
 			args = append(args, "--benchmark-all")
@@ -319,6 +332,20 @@ func (params Params) toRestoreArgs(session string) []string {
 		"--restore-file-path", params.RestoreFilePath,
 		"--restore",
 	}
+}
+
+// appendDeviceFlags appends backend device and OpenCL device type flags to the
+// argument slice when the corresponding values are non-empty.
+func appendDeviceFlags(args []string, backendDevices, openCLDevices string) []string {
+	if strings.TrimSpace(backendDevices) != "" {
+		args = append(args, "--backend-devices", backendDevices)
+	}
+
+	if strings.TrimSpace(openCLDevices) != "" {
+		args = append(args, "--opencl-device-types", openCLDevices)
+	}
+
+	return args
 }
 
 // safePath joins base and filename, then verifies the result stays within base.

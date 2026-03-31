@@ -163,6 +163,16 @@ func init() {
 	err = viper.BindPFlag("hashcat_path", RootCmd.PersistentFlags().Lookup("hashcat-path"))
 	cobra.CheckErr(err)
 
+	RootCmd.PersistentFlags().
+		Bool("defer-benchmarks", false, "Skip full benchmarks at startup; use quick capability detection instead")
+	err = viper.BindPFlag("defer_benchmarks", RootCmd.PersistentFlags().Lookup("defer-benchmarks"))
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		Bool("benchmark-while-idle", true, "Run background benchmarks during idle periods when defer-benchmarks is enabled")
+	err = viper.BindPFlag("benchmark_while_idle", RootCmd.PersistentFlags().Lookup("benchmark-while-idle"))
+	cobra.CheckErr(err)
+
 	// Register deprecated underscore aliases for backward compatibility.
 	registerDeprecatedAliases()
 

@@ -127,10 +127,11 @@ func NewHashcatSession(ctx context.Context, id string, params Params) (*Session,
 		StderrMessages:     make(chan ErrorInfo, channelBufferSize),
 		StdoutLines:        make(chan string, channelBufferSize),
 		DoneChan:           make(chan error),
-		SkipStatusUpdates:  params.AttackMode == AttackBenchmark,
-		RestoreFilePath:    params.RestoreFilePath,
-		sessionLogFile:     filepath.Join(sessDir, sessionName+".log"),
-		sessionPidFile:     filepath.Join(sessDir, sessionName+".pid"),
+		SkipStatusUpdates: params.AttackMode == AttackBenchmark || params.AttackMode == AttackBenchmarkSingle ||
+			params.AttackMode == AttackHashInfo,
+		RestoreFilePath: params.RestoreFilePath,
+		sessionLogFile:  filepath.Join(sessDir, sessionName+".log"),
+		sessionPidFile:  filepath.Join(sessDir, sessionName+".pid"),
 	}, nil
 }
 

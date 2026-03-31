@@ -406,6 +406,125 @@ func TestParams_ToCmdArgs_Benchmark(t *testing.T) {
 	}
 }
 
+func TestParams_ToCmdArgs_HashInfo(t *testing.T) {
+	cleanup := setupTestState(t)
+	defer cleanup()
+
+	tests := []struct {
+		name       string
+		params     Params
+		expectArgs []string
+	}{
+		{
+			name: "basic hash info",
+			params: Params{
+				AttackMode: AttackHashInfo,
+			},
+			expectArgs: []string{
+				"--hash-info",
+				"--machine-readable",
+			},
+		},
+		{
+			name: "hash info with backend devices",
+			params: Params{
+				AttackMode:     AttackHashInfo,
+				BackendDevices: "1,2",
+			},
+			expectArgs: []string{
+				"--hash-info",
+				"--machine-readable",
+				"--backend-devices", "1,2",
+			},
+		},
+		{
+			name: "hash info with OpenCL devices",
+			params: Params{
+				AttackMode:    AttackHashInfo,
+				OpenCLDevices: "1",
+			},
+			expectArgs: []string{
+				"--hash-info",
+				"--machine-readable",
+				"--opencl-device-types", "1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args, err := tt.params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectArgs, args)
+		})
+	}
+}
+
+func TestParams_ToCmdArgs_BenchmarkSingle(t *testing.T) {
+	cleanup := setupTestState(t)
+	defer cleanup()
+
+	tests := []struct {
+		name       string
+		params     Params
+		expectArgs []string
+	}{
+		{
+			name: "basic benchmark single",
+			params: Params{
+				AttackMode: AttackBenchmarkSingle,
+				HashType:   1000,
+			},
+			expectArgs: []string{
+				"--quiet",
+				"--machine-readable",
+				"--benchmark",
+				"-m", "1000",
+			},
+		},
+		{
+			name: "benchmark single with backend devices",
+			params: Params{
+				AttackMode:     AttackBenchmarkSingle,
+				HashType:       1000,
+				BackendDevices: "1",
+			},
+			expectArgs: []string{
+				"--quiet",
+				"--machine-readable",
+				"--benchmark",
+				"-m", "1000",
+				"--backend-devices", "1",
+			},
+		},
+		{
+			name: "benchmark single with OpenCL devices",
+			params: Params{
+				AttackMode:    AttackBenchmarkSingle,
+				HashType:      1000,
+				OpenCLDevices: "1,2",
+			},
+			expectArgs: []string{
+				"--quiet",
+				"--machine-readable",
+				"--benchmark",
+				"-m", "1000",
+				"--opencl-device-types", "1,2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args, err := tt.params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectArgs, args)
+		})
+	}
+}
+
 func TestParams_ToCmdArgs_Dictionary(t *testing.T) {
 	cleanup := setupTestState(t)
 	defer cleanup()

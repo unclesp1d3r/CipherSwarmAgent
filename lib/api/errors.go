@@ -135,9 +135,9 @@ func (e *SetTaskAbandonedError) Error() string {
 	return string(data)
 }
 
-// Severity is a type alias for the generated SubmitErrorAgentJSONBodySeverity.
+// Severity is a type alias for the generated SubmitErrorRequestSeverity.
 // This provides named constants for error severity levels.
-type Severity = SubmitErrorAgentJSONBodySeverity
+type Severity = SubmitErrorRequestSeverity
 
 // Severity levels for error reporting.
 const (
@@ -149,17 +149,20 @@ const (
 	SeverityFatal    Severity = Fatal
 )
 
-// SendHeartbeat200State constants for heartbeat response state values.
-// The generated code defines the type but not constants.
+// State is a type alias for the generated HeartbeatResponseState.
+// This provides short named constants for heartbeat state values.
+type State = HeartbeatResponseState
+
+// State constants for heartbeat response state values.
 const (
 	// StateActive indicates the agent is ready to accept tasks.
-	StateActive SendHeartbeat200State = "active"
+	StateActive State = "active"
 	// StateError indicates the agent has encountered an error.
-	StateError SendHeartbeat200State = "error"
+	StateError State = "error"
 	// StateOffline indicates the agent has not checked in recently.
-	StateOffline SendHeartbeat200State = "offline"
+	StateOffline State = "offline"
 	// StatePending indicates the agent needs to perform setup again.
-	StatePending SendHeartbeat200State = "pending"
+	StatePending State = "pending"
 	// StateStopped indicates the agent has been stopped by the user.
-	StateStopped SendHeartbeat200State = "stopped"
+	StateStopped State = "stopped"
 )
