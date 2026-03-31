@@ -66,6 +66,8 @@ type agentState struct {
 	CircuitBreakerFailureThreshold      int           // CircuitBreakerFailureThreshold is failures before circuit opens.
 	CircuitBreakerTimeout               time.Duration // CircuitBreakerTimeout is the duration before half-open retry.
 	AlwaysUseNativeHashcat              bool          // AlwaysUseNativeHashcat forces using the system's native Hashcat binary.
+	DeferBenchmarks                     bool          // DeferBenchmarks skips full benchmarks at startup; uses capability detection instead.
+	BenchmarkWhileIdle                  bool          // BenchmarkWhileIdle enables background benchmarking during idle periods.
 	Platform                            string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin"). Set once before goroutines start; safe to read from any goroutine.
 	AgentVersion                        string        // AgentVersion is the current version of the agent software. Set once in AuthenticateAgent before goroutines start; safe to read from any goroutine.
 

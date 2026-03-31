@@ -149,6 +149,418 @@ func createBenchmark(result display.BenchmarkResult) (api.HashcatBenchmark, erro
 	}, nil
 }
 
+// SubmitCapabilityResults caches and submits placeholder capability-detection results.
+// It is the deferred-benchmark equivalent of the full UpdateBenchmarks path.
+func (m *Manager) SubmitCapabilityResults(ctx context.Context, results []display.BenchmarkResult) error {
+	return m.cacheAndSubmitBenchmarks(ctx, results)
+}
+
+// RunCapabilityDetection runs hashcat --hash-info --machine-readable to discover
+// supported hash types without executing a full benchmark. It returns placeholder
+// BenchmarkResult entries (SpeedHs="1", Placeholder=true) for each discovered type.
+func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.BenchmarkResult, error) {
+	jobParams := hashcat.Params{
+		AttackMode:     hashcat.AttackHashInfo,
+		BackendDevices: m.BackendDevices,
+		OpenCLDevices:  m.OpenCLDevices,
+	}
+
+	sess, err := hashcat.NewHashcatSession(ctx, "capability-detect", jobParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create capability detection session: %w", err)
+	}
+
+	agentstate.Logger.Debug("Starting capability detection session", "cmdline", sess.CmdLine())
+
+	if startErr := sess.Start(); startErr != nil {
+		return nil, fmt.Errorf("failed to start capability detection session: %w", startErr)
+	}
+
+	var results []display.BenchmarkResult
+
+	waitChan := make(chan struct{})
+
+	go func() {
+		defer close(waitChan)
+
+		for {
+			select {
+			case <-ctx.Done():
+				agentstate.Logger.Warn("Context cancelled during capability detection, killing session")
+
+				if killErr := sess.Kill(); killErr != nil {
+					agentstate.Logger.Error("Failed to kill capability detection session", "error", killErr)
+				}
+
+				flushTimer := time.NewTimer(processFlushTimeout)
+				select {
+				case <-sess.DoneChan:
+				case <-flushTimer.C:
+				}
+				flushTimer.Stop()
+
+				sess.Cleanup()
+
+				return
+			case line := <-sess.StdoutLines:
+				hashTypeID, ok := parseHashInfoLine(line)
+				if ok {
+					results = append(results, display.BenchmarkResult{
+						HashType:    hashTypeID,
+						Device:      "1",
+						RuntimeMs:   "0",
+						HashTimeMs:  "0",
+						SpeedHs:     "1",
+						Placeholder: true,
+					})
+				}
+			case errInfo := <-sess.StderrMessages:
+				handleBenchmarkStdErrLine(ctx, errInfo)
+			case <-sess.StatusUpdates:
+				// --hash-info does not produce status updates; drain if any.
+			case <-sess.CrackedHashes:
+				// --hash-info does not crack hashes; drain if any.
+			case procErr := <-sess.DoneChan:
+				// Drain any remaining stdout lines.
+				for {
+					select {
+					case line := <-sess.StdoutLines:
+						hashTypeID, ok := parseHashInfoLine(line)
+						if ok {
+							results = append(results, display.BenchmarkResult{
+								HashType:    hashTypeID,
+								Device:      "1",
+								RuntimeMs:   "0",
+								HashTimeMs:  "0",
+								SpeedHs:     "1",
+								Placeholder: true,
+							})
+						}
+					default:
+						goto drained
+					}
+				}
+			drained:
+				if procErr != nil {
+					agentstate.Logger.Error("Capability detection session failed", "error", procErr)
+				}
+
+				sess.Cleanup()
+
+				return
+			}
+		}
+	}()
+
+	<-waitChan
+
+	if ctx.Err() != nil {
+		return results, fmt.Errorf("capability detection cancelled: %w", ctx.Err())
+	}
+
+	agentstate.Logger.Info("Capability detection complete", "hash_types", len(results))
+
+	return results, nil
+}
+
+// idleCheckInterval is the polling interval for checking if the agent is idle
+// before starting a background benchmark for the next hash type.
+const idleCheckInterval = 30 * time.Second
+
+// RunBackgroundBenchmarks replaces placeholder cache entries with real benchmark
+// results by running hashcat --benchmark -m <type> for each placeholder hash type.
+// It waits for the agent to be idle before each run and submits results
+// incrementally. The method is designed to run as a long-lived goroutine.
+func (m *Manager) RunBackgroundBenchmarks(ctx context.Context) {
+	placeholders, err := loadPlaceholderResults()
+	if err != nil {
+		agentstate.Logger.Warn("Failed to load placeholder results for background benchmarking",
+			"error", err)
+		return
+	}
+
+	if len(placeholders) == 0 {
+		agentstate.Logger.Debug("No placeholder benchmarks to run in background")
+		return
+	}
+
+	agentstate.Logger.Info("Starting background benchmarking",
+		"placeholder_count", len(placeholders))
+
+	for i, placeholder := range placeholders {
+		// Wait for idle before each benchmark run.
+		if cancelled := m.waitForIdle(ctx); cancelled {
+			agentstate.Logger.Info("Background benchmarking cancelled, partial results cached")
+			return
+		}
+
+		hashTypeInt, parseErr := strconv.ParseInt(placeholder.HashType, 10, 64)
+		if parseErr != nil {
+			agentstate.Logger.Warn("Skipping unparseable placeholder hash type",
+				"hash_type", placeholder.HashType, "error", parseErr)
+			continue
+		}
+
+		results := m.runSingleBenchmark(ctx, hashTypeInt, placeholder.HashType)
+		if results == nil {
+			// Session failed or context cancelled; runSingleBenchmark already logged.
+			if ctx.Err() != nil {
+				agentstate.Logger.Info("Background benchmarking cancelled, partial results cached")
+				return
+			}
+			continue
+		}
+
+		m.updateCacheWithResults(ctx, results)
+
+		agentstate.Logger.Info("Background benchmark progress",
+			"completed", i+1, "total", len(placeholders),
+			"hash_type", placeholder.HashType)
+	}
+
+	agentstate.Logger.Info("Background benchmarking complete")
+}
+
+// waitForIdle blocks until the agent's current activity is "waiting" or the
+// context is cancelled. Returns true if the context was cancelled.
+func (m *Manager) waitForIdle(ctx context.Context) bool {
+	for {
+		if agentstate.State.GetCurrentActivity() == agentstate.CurrentActivityWaiting {
+			return false
+		}
+
+		timer := time.NewTimer(idleCheckInterval)
+		select {
+		case <-timer.C:
+			timer.Stop() // idiomatic cleanup per project convention
+		case <-ctx.Done():
+			timer.Stop()
+			return true
+		}
+	}
+}
+
+// runSingleBenchmark runs a hashcat benchmark for a single hash type and
+// collects the results. Returns nil if the session failed to start or the
+// context was cancelled.
+func (m *Manager) runSingleBenchmark(
+	ctx context.Context,
+	hashType int64,
+	hashTypeStr string,
+) []display.BenchmarkResult {
+	sessionID := "bg-benchmark-" + hashTypeStr
+
+	jobParams := hashcat.Params{
+		AttackMode:     hashcat.AttackBenchmarkSingle,
+		HashType:       hashType,
+		BackendDevices: m.BackendDevices,
+		OpenCLDevices:  m.OpenCLDevices,
+	}
+
+	sess, err := hashcat.NewHashcatSession(ctx, sessionID, jobParams)
+	if err != nil {
+		agentstate.Logger.Warn("Failed to create background benchmark session",
+			"hash_type", hashTypeStr, "error", err)
+		return nil
+	}
+
+	if startErr := sess.Start(); startErr != nil {
+		agentstate.Logger.Warn("Failed to start background benchmark session",
+			"hash_type", hashTypeStr, "error", startErr)
+		return nil
+	}
+
+	return m.collectSingleBenchmarkOutput(ctx, sess)
+}
+
+// collectSingleBenchmarkOutput processes output from a single-type benchmark
+// session, collecting results and cleaning up when done.
+func (m *Manager) collectSingleBenchmarkOutput(
+	ctx context.Context,
+	sess *hashcat.Session,
+) []display.BenchmarkResult {
+	var results []display.BenchmarkResult
+
+	for {
+		select {
+		case <-ctx.Done():
+			agentstate.Logger.Warn("Context cancelled during background benchmark, killing session")
+			if killErr := sess.Kill(); killErr != nil {
+				agentstate.Logger.Error("Failed to kill background benchmark session",
+					"error", killErr)
+			}
+
+			flushTimer := time.NewTimer(processFlushTimeout)
+			select {
+			case <-sess.DoneChan:
+			case <-flushTimer.C:
+			}
+			flushTimer.Stop()
+
+			sess.Cleanup()
+			return nil
+
+		case line := <-sess.StdoutLines:
+			handleBenchmarkStdOutLine(line, &results)
+
+		case errInfo := <-sess.StderrMessages:
+			handleBenchmarkStdErrLine(ctx, errInfo)
+
+		case <-sess.StatusUpdates:
+			// Benchmark mode does not produce status updates; drain.
+
+		case <-sess.CrackedHashes:
+			// Benchmark mode does not crack hashes; drain.
+
+		case procErr := <-sess.DoneChan:
+			// Drain remaining stdout lines.
+			drainStdout(sess, &results)
+
+			if procErr != nil {
+				agentstate.Logger.Warn("Background benchmark session exited with error",
+					"error", procErr)
+			}
+
+			sess.Cleanup()
+			return results
+		}
+	}
+}
+
+// updateCacheWithResults reloads the full benchmark cache, replaces matching
+// placeholder entries with real results, saves the cache, and submits the
+// new results to the server. Holds cacheMu for the entire load-modify-save
+// sequence to prevent concurrent cache corruption.
+func (m *Manager) updateCacheWithResults(
+	ctx context.Context,
+	newResults []display.BenchmarkResult,
+) {
+	if len(newResults) == 0 {
+		return
+	}
+
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+
+	fullCache, err := loadBenchmarkCacheLocked()
+	if err != nil {
+		agentstate.Logger.Warn("Failed to reload benchmark cache for background update",
+			"error", err)
+		return
+	}
+	if fullCache == nil {
+		agentstate.Logger.Warn("Benchmark cache is empty during background update")
+		return
+	}
+
+	// Build lookup from new results by hash type.
+	newByHashType := make(map[string]display.BenchmarkResult, len(newResults))
+	for _, r := range newResults {
+		newByHashType[r.HashType] = r
+	}
+
+	// Replace placeholder entries in the full cache.
+	for i, cached := range fullCache {
+		if result, ok := newByHashType[cached.HashType]; ok && cached.Placeholder {
+			result.Placeholder = false
+			fullCache[i] = result
+		}
+	}
+
+	if saveErr := saveBenchmarkCacheLocked(fullCache); saveErr != nil {
+		agentstate.Logger.Warn("Failed to save benchmark cache after background update",
+			"error", saveErr)
+	}
+
+	// Submit only the new real results.
+	realResults := make([]display.BenchmarkResult, 0, len(newResults))
+	for _, r := range newResults {
+		r.Placeholder = false
+		realResults = append(realResults, r)
+	}
+
+	if sendErr := m.sendBenchmarkResults(ctx, realResults); sendErr != nil {
+		agentstate.Logger.Warn(
+			"Failed to submit background benchmark results, cached for retry",
+			"error", sendErr)
+		return
+	}
+
+	// Mark submitted in cache and re-save.
+	for i, cached := range fullCache {
+		if _, ok := newByHashType[cached.HashType]; ok && !cached.Placeholder {
+			fullCache[i].Submitted = true
+		}
+	}
+
+	if saveErr := saveBenchmarkCacheLocked(fullCache); saveErr != nil {
+		agentstate.Logger.Warn(
+			"Failed to persist benchmark cache after background submission",
+			"error", saveErr)
+	}
+}
+
+// trySubmitFromCache attempts to load and submit cached benchmark results
+// under cacheMu. Returns true if the caller should return nil (cache was
+// found and handled — whether submission succeeded or failed).
+func (m *Manager) trySubmitFromCache(ctx context.Context) bool {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+
+	cached, loadErr := loadBenchmarkCacheLocked()
+	if loadErr != nil {
+		if errors.Is(loadErr, errCacheCorrupt) {
+			agentstate.Logger.Warn("Benchmark cache was corrupt, will re-run benchmarks",
+				"error", loadErr)
+		} else {
+			agentstate.Logger.Error(
+				"Failed to read benchmark cache due to I/O error, will re-run benchmarks",
+				"error", loadErr)
+		}
+	}
+
+	if cached == nil {
+		return false
+	}
+
+	if allSubmitted(cached) {
+		agentstate.State.SetBenchmarksSubmitted(true)
+		agentstate.Logger.Info("All cached benchmarks already submitted, skipping re-run")
+
+		return true
+	}
+
+	pending := unsubmittedResults(cached)
+	agentstate.Logger.Info("Found cached benchmark results, submitting unsubmitted to server",
+		"total", len(cached), "pending", len(pending))
+
+	if err := m.sendBenchmarkResults(ctx, pending); err != nil {
+		agentstate.Logger.Warn(
+			"Failed to submit cached benchmarks; task processing paused until submission succeeds",
+			"error", err,
+		)
+
+		return true
+	}
+
+	// Mark all as submitted in-place — safe, single goroutine owns the slice.
+	for i := range cached {
+		cached[i].Submitted = true
+	}
+
+	if saveErr := saveBenchmarkCacheLocked(cached); saveErr != nil {
+		agentstate.Logger.Warn(
+			"Failed to persist benchmark cache after submission; benchmarks may re-submit on next restart",
+			"error", saveErr,
+		)
+	}
+
+	agentstate.State.SetBenchmarksSubmitted(true)
+	agentstate.Logger.Info("Cached benchmarks successfully submitted to server")
+
+	return true
+}
+
 // UpdateBenchmarks updates the benchmark metrics using Hashcat.
 // It first checks for cached results from a previous run. If a valid cache
 // exists (and the force-benchmark flag is not set), it attempts submission
@@ -164,53 +576,7 @@ func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 
 	// Try submitting from cache first (unless force re-run is requested)
 	if !agentstate.State.GetForceBenchmarkRun() {
-		cached, loadErr := loadBenchmarkCache()
-		if loadErr != nil {
-			if errors.Is(loadErr, errCacheCorrupt) {
-				agentstate.Logger.Warn("Benchmark cache was corrupt, will re-run benchmarks",
-					"error", loadErr)
-			} else {
-				agentstate.Logger.Error("Failed to read benchmark cache due to I/O error, will re-run benchmarks",
-					"error", loadErr)
-			}
-		}
-
-		if cached != nil {
-			if allSubmitted(cached) {
-				agentstate.State.SetBenchmarksSubmitted(true)
-				agentstate.Logger.Info("All cached benchmarks already submitted, skipping re-run")
-
-				return nil
-			}
-
-			pending := unsubmittedResults(cached)
-			agentstate.Logger.Info("Found cached benchmark results, submitting unsubmitted to server",
-				"total", len(cached), "pending", len(pending))
-
-			if err := m.sendBenchmarkResults(ctx, pending); err != nil {
-				agentstate.Logger.Warn(
-					"Failed to submit cached benchmarks; task processing paused until submission succeeds",
-					"error", err,
-				)
-
-				return nil
-			}
-
-			// Mark all as submitted in-place — safe, single goroutine owns the slice.
-			for i := range cached {
-				cached[i].Submitted = true
-			}
-
-			if saveErr := saveBenchmarkCache(cached); saveErr != nil {
-				agentstate.Logger.Warn(
-					"Failed to persist benchmark cache after submission; benchmarks may re-submit on next restart",
-					"error", saveErr,
-				)
-			}
-
-			agentstate.State.SetBenchmarksSubmitted(true)
-			agentstate.Logger.Info("Cached benchmarks successfully submitted to server")
-
+		if m.trySubmitFromCache(ctx) {
 			return nil
 		}
 	}

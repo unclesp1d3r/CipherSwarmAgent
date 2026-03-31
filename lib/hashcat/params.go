@@ -80,7 +80,7 @@ func (params Params) Validate() error {
 		return validateMaskAttack(params)
 	case attackModeHybridDM, attackModeHybridMD:
 		return validateHybridAttack(params)
-	case AttackBenchmark:
+	case AttackBenchmark, AttackBenchmarkSingle, AttackHashInfo:
 		return nil
 	default:
 		return fmt.Errorf("%w: %d", ErrUnsupportedAttackMode, params.AttackMode)
@@ -167,6 +167,40 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	args := make([]string, 0, defaultArgsCapacity)
+	if params.AttackMode == AttackHashInfo {
+		args = append(args, "--hash-info", "--machine-readable")
+
+		if strings.TrimSpace(params.BackendDevices) != "" {
+			args = append(args, "--backend-devices", params.BackendDevices)
+		}
+
+		if strings.TrimSpace(params.OpenCLDevices) != "" {
+			args = append(args, "--opencl-device-types", params.OpenCLDevices)
+		}
+
+		return args, nil
+	}
+
+	if params.AttackMode == AttackBenchmarkSingle {
+		args = append(
+			args,
+			"--quiet",
+			"--machine-readable",
+			"--benchmark",
+			"-m", strconv.FormatInt(params.HashType, 10),
+		)
+
+		if strings.TrimSpace(params.BackendDevices) != "" {
+			args = append(args, "--backend-devices", params.BackendDevices)
+		}
+
+		if strings.TrimSpace(params.OpenCLDevices) != "" {
+			args = append(args, "--opencl-device-types", params.OpenCLDevices)
+		}
+
+		return args, nil
+	}
+
 	if params.AttackMode == AttackBenchmark {
 		args = append(
 			args,

@@ -36,8 +36,9 @@ const (
 //
 //nolint:gochecknoglobals // Package-level managers, initialized in StartAgent
 var (
-	benchmarkMgr *benchmark.Manager
-	taskMgr      *task.Manager
+	benchmarkMgr  *benchmark.Manager
+	taskMgr       *task.Manager
+	bgBenchCancel context.CancelFunc
 )
 
 // StartAgent initializes and starts the CipherSwarm agent.
@@ -153,8 +154,26 @@ func StartAgent() {
 		if forceBenchmark && !cfg.BenchmarksNeeded {
 			agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
 		}
-		if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
-			agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
+
+		if agentstate.State.DeferBenchmarks && !forceBenchmark {
+			// Deferred path: run quick capability detection instead of full benchmarks
+			agentstate.Logger.Info("Deferred benchmarks enabled: running quick capability detection")
+
+			capResults, capErr := benchmarkMgr.RunCapabilityDetection(ctx)
+			if capErr != nil {
+				agentstate.Logger.Fatal("Capability detection failed", "error", capErr)
+			}
+
+			if submitErr := benchmarkMgr.SubmitCapabilityResults(ctx, capResults); submitErr != nil {
+				agentstate.Logger.Fatal("Failed to submit capability detection results", "error", submitErr)
+			}
+
+			agentstate.State.SetBenchmarksSubmitted(true)
+		} else {
+			// Full benchmark path
+			if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
+				agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
+			}
 		}
 	} else {
 		agentstate.Logger.Info("Server reports valid benchmarks on file, skipping benchmark run")
@@ -170,6 +189,13 @@ func StartAgent() {
 
 	// Start agent loop (heartbeat loop already started above)
 	go startAgentLoop(ctx)
+
+	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
+		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called in handleReload
+		bgCtx, bgCancel := context.WithCancel(ctx)
+		bgBenchCancel = bgCancel
+		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
+	}
 
 	// Wait for context cancellation (OS signal or heartbeat StateError)
 	<-ctx.Done()
@@ -336,6 +362,12 @@ func handleReload(ctx context.Context) {
 		agentstate.State.SetReload(false)
 
 		return
+	}
+
+	// Cancel any running background benchmark goroutine before replacing the manager.
+	if bgBenchCancel != nil {
+		bgBenchCancel()
+		bgBenchCancel = nil
 	}
 
 	// Recreate managers with new API client sub-clients and update configs
