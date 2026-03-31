@@ -22,7 +22,7 @@ type authenticateResponseBody struct {
 
 // heartbeatResponseBody represents the JSON response for heartbeat.
 type heartbeatResponseBody struct {
-	State api.SendHeartbeat200State `json:"state"`
+	State api.State `json:"state"`
 }
 
 // mustMarshal marshals v to JSON or panics in tests if it fails.
@@ -114,7 +114,7 @@ func MockConfigurationResponse(config TestAgentConfiguration) {
 // that returns the specified agent state.
 // Accepts agentID and uses a regex pattern to match the path with the numeric agent ID.
 // According to swagger.json, the endpoint is /api/v1/client/agents/{id}/heartbeat.
-func MockHeartbeatResponse(agentID int64, state api.SendHeartbeat200State) {
+func MockHeartbeatResponse(agentID int64, state api.State) {
 	stateResponse := heartbeatResponseBody{
 		State: state,
 	}

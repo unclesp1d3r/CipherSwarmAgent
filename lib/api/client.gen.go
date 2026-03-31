@@ -23,25 +23,25 @@ const (
 
 // Defines values for AgentState.
 const (
-	Active  AgentState = "active"
-	Error   AgentState = "error"
-	Offline AgentState = "offline"
-	Pending AgentState = "pending"
-	Stopped AgentState = "stopped"
+	AgentStateActive  AgentState = "active"
+	AgentStateError   AgentState = "error"
+	AgentStateOffline AgentState = "offline"
+	AgentStatePending AgentState = "pending"
+	AgentStateStopped AgentState = "stopped"
 )
 
 // Valid indicates whether the value is a known member of the AgentState enum.
 func (e AgentState) Valid() bool {
 	switch e {
-	case Active:
+	case AgentStateActive:
 		return true
-	case Error:
+	case AgentStateError:
 		return true
-	case Offline:
+	case AgentStateOffline:
 		return true
-	case Pending:
+	case AgentStatePending:
 		return true
-	case Stopped:
+	case AgentStateStopped:
 		return true
 	default:
 		return false
@@ -90,18 +90,45 @@ func (e DeviceStatusDeviceType) Valid() bool {
 	}
 }
 
-// Defines values for SubmitErrorAgentJSONBodySeverity.
+// Defines values for HeartbeatResponseState.
 const (
-	Critical SubmitErrorAgentJSONBodySeverity = "critical"
-	Fatal    SubmitErrorAgentJSONBodySeverity = "fatal"
-	Info     SubmitErrorAgentJSONBodySeverity = "info"
-	Major    SubmitErrorAgentJSONBodySeverity = "major"
-	Minor    SubmitErrorAgentJSONBodySeverity = "minor"
-	Warning  SubmitErrorAgentJSONBodySeverity = "warning"
+	HeartbeatResponseStateActive  HeartbeatResponseState = "active"
+	HeartbeatResponseStateError   HeartbeatResponseState = "error"
+	HeartbeatResponseStateOffline HeartbeatResponseState = "offline"
+	HeartbeatResponseStatePending HeartbeatResponseState = "pending"
+	HeartbeatResponseStateStopped HeartbeatResponseState = "stopped"
 )
 
-// Valid indicates whether the value is a known member of the SubmitErrorAgentJSONBodySeverity enum.
-func (e SubmitErrorAgentJSONBodySeverity) Valid() bool {
+// Valid indicates whether the value is a known member of the HeartbeatResponseState enum.
+func (e HeartbeatResponseState) Valid() bool {
+	switch e {
+	case HeartbeatResponseStateActive:
+		return true
+	case HeartbeatResponseStateError:
+		return true
+	case HeartbeatResponseStateOffline:
+		return true
+	case HeartbeatResponseStatePending:
+		return true
+	case HeartbeatResponseStateStopped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubmitErrorRequestSeverity.
+const (
+	Critical SubmitErrorRequestSeverity = "critical"
+	Fatal    SubmitErrorRequestSeverity = "fatal"
+	Info     SubmitErrorRequestSeverity = "info"
+	Major    SubmitErrorRequestSeverity = "major"
+	Minor    SubmitErrorRequestSeverity = "minor"
+	Warning  SubmitErrorRequestSeverity = "warning"
+)
+
+// Valid indicates whether the value is a known member of the SubmitErrorRequestSeverity enum.
+func (e SubmitErrorRequestSeverity) Valid() bool {
 	switch e {
 	case Critical:
 		return true
@@ -114,6 +141,39 @@ func (e SubmitErrorAgentJSONBodySeverity) Valid() bool {
 	case Minor:
 		return true
 	case Warning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TaskStatus.
+const (
+	Abandoned TaskStatus = "abandoned"
+	Completed TaskStatus = "completed"
+	Exhausted TaskStatus = "exhausted"
+	Failed    TaskStatus = "failed"
+	Paused    TaskStatus = "paused"
+	Pending   TaskStatus = "pending"
+	Running   TaskStatus = "running"
+)
+
+// Valid indicates whether the value is a known member of the TaskStatus enum.
+func (e TaskStatus) Valid() bool {
+	switch e {
+	case Abandoned:
+		return true
+	case Completed:
+		return true
+	case Exhausted:
+		return true
+	case Failed:
+		return true
+	case Paused:
+		return true
+	case Pending:
+		return true
+	case Running:
 		return true
 	default:
 		return false
@@ -165,6 +225,12 @@ type Agent struct {
 
 // AgentState The state of the agent
 type AgentState string
+
+// AgentHeartbeatRequest Optional activity state update sent with an agent heartbeat
+type AgentHeartbeatRequest struct {
+	// Activity Current agent activity state. Known values: starting, benchmarking, updating, downloading, waiting, cracking, stopping. Future versions may support additional values.
+	Activity *string `json:"activity,omitempty"`
+}
 
 // Attack A hashcat attack configuration assigned to an agent
 type Attack struct {
@@ -268,6 +334,75 @@ type AttackResourceFile struct {
 	Id int64 `json:"id"`
 }
 
+// AuthenticationResponse The response to a successful agent authentication
+type AuthenticationResponse struct {
+	AgentId       int64 `json:"agent_id"`
+	Authenticated bool  `json:"authenticated"`
+}
+
+// BenchmarkReceipt Receipt returned after benchmark submission indicating how many entries were accepted
+type BenchmarkReceipt struct {
+	// FailedCount Number of benchmark entries rejected due to validation failures
+	FailedCount int `json:"failed_count"`
+
+	// Message Human-readable summary of the submission result
+	Message *string `json:"message,omitempty"`
+
+	// ProcessedCount Number of benchmark entries successfully stored
+	ProcessedCount int `json:"processed_count"`
+
+	// ReceivedCount Number of benchmark entries received in the request
+	ReceivedCount int `json:"received_count"`
+}
+
+// ConfigurationResponse Agent configuration including advanced settings and resilience parameters
+type ConfigurationResponse struct {
+	// ApiVersion The minimum accepted version of the API
+	ApiVersion int `json:"api_version"`
+
+	// BenchmarksNeeded Whether the agent needs to run benchmarks
+	BenchmarksNeeded bool `json:"benchmarks_needed"`
+
+	// Config Advanced hashcat and agent configuration options
+	Config AdvancedAgentConfiguration `json:"config"`
+
+	// RecommendedCircuitBreaker Recommended circuit breaker settings for agent connections
+	RecommendedCircuitBreaker struct {
+		// FailureThreshold Number of failures before circuit opens
+		FailureThreshold int `json:"failure_threshold"`
+
+		// Timeout Seconds before circuit half-opens for retry
+		Timeout int `json:"timeout"`
+	} `json:"recommended_circuit_breaker"`
+
+	// RecommendedRetry Recommended retry settings for agent HTTP requests
+	RecommendedRetry struct {
+		// InitialDelay Initial retry delay in seconds
+		InitialDelay int `json:"initial_delay"`
+
+		// MaxAttempts Maximum number of retry attempts
+		MaxAttempts int `json:"max_attempts"`
+
+		// MaxDelay Maximum retry delay in seconds
+		MaxDelay int `json:"max_delay"`
+	} `json:"recommended_retry"`
+
+	// RecommendedTimeouts Recommended timeout settings for agent HTTP connections
+	RecommendedTimeouts struct {
+		// ConnectTimeout TCP connect timeout in seconds
+		ConnectTimeout int `json:"connect_timeout"`
+
+		// ReadTimeout Read timeout in seconds
+		ReadTimeout int `json:"read_timeout"`
+
+		// RequestTimeout Overall request timeout in seconds
+		RequestTimeout int `json:"request_timeout"`
+
+		// WriteTimeout Write timeout in seconds
+		WriteTimeout int `json:"write_timeout"`
+	} `json:"recommended_timeouts"`
+}
+
 // DeviceStatus Status and performance metrics for a single GPU or CPU device
 type DeviceStatus struct {
 	// DeviceId The id of the device
@@ -297,8 +432,30 @@ type ErrorMetadata struct {
 	// ErrorDate The date of the error
 	ErrorDate time.Time `json:"error_date"`
 
-	// Other Other metadata
-	Other *map[string]interface{} `json:"other,omitempty"`
+	// Other Structured error context from the agent
+	Other *ErrorMetadata_Other `json:"other,omitempty"`
+}
+
+// ErrorMetadata_Other Structured error context from the agent
+type ErrorMetadata_Other struct {
+	// AffectedCount Number of hashes affected by the error
+	AffectedCount *int `json:"affected_count,omitempty"`
+
+	// Category Error category (e.g. hash_format, device, network)
+	Category *string `json:"category,omitempty"`
+
+	// ErrorType Machine-readable error type slug
+	ErrorType *string `json:"error_type,omitempty"`
+
+	// Retryable Whether the operation can be retried
+	Retryable *bool `json:"retryable,omitempty"`
+
+	// Terminal Whether the error is definitively unrecoverable
+	Terminal *bool `json:"terminal,omitempty"`
+
+	// TotalCount Total number of hashes in the hash list
+	TotalCount           *int                   `json:"total_count,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // HashcatBenchmark A single hashcat benchmark result for a specific hash type and device
@@ -358,29 +515,8 @@ type HashcatResult struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Task A unit of work assigned to an agent for a specific attack
-type Task struct {
-	// AttackId The id of the attack
-	AttackId int64 `json:"attack_id"`
-
-	// Id The id of the task
-	Id int64 `json:"id"`
-
-	// Limit The limit of the keyspace
-	Limit *int64 `json:"limit,omitempty"`
-
-	// Skip The offset of the keyspace
-	Skip *int64 `json:"skip,omitempty"`
-
-	// StartDate The time the task was started
-	StartDate time.Time `json:"start_date"`
-
-	// Status The status of the task
-	Status string `json:"status"`
-}
-
-// TaskStatus A hashcat status update submitted by an agent during task execution
-type TaskStatus struct {
+// HashcatStatusUpdate A hashcat status update submitted by an agent during task execution
+type HashcatStatusUpdate struct {
 	// DeviceStatuses The status of the devices used for the task
 	DeviceStatuses []DeviceStatus `json:"device_statuses"`
 
@@ -424,35 +560,32 @@ type TaskStatus struct {
 	TimeStart time.Time `json:"time_start"`
 }
 
-// UpdateAgentJSONBody defines parameters for UpdateAgent.
-type UpdateAgentJSONBody struct {
-	// ClientSignature The signature of the client
-	ClientSignature string   `json:"client_signature"`
-	Devices         []string `json:"devices"`
-
-	// HostName The hostname of the agent
-	HostName string `json:"host_name"`
-
-	// Id The id of the agent
-	Id int64 `json:"id"`
-
-	// OperatingSystem The operating system of the agent
-	OperatingSystem string `json:"operating_system"`
+// HeartbeatResponse The response to an agent heartbeat
+type HeartbeatResponse struct {
+	// State The state of the agent:
+	//                        * `pending` - The agent needs to perform the setup process again.
+	//                        * `active` - The agent is ready to accept tasks, all is good.
+	//                        * `error` - The agent has encountered an error and needs to be checked.
+	//                        * `stopped` - The agent has been stopped by the user.
+	//                        * `offline` - The agent has not checked in recently and is considered offline.
+	State HeartbeatResponseState `json:"state"`
 }
 
-// SendHeartbeatJSONBody defines parameters for SendHeartbeat.
-type SendHeartbeatJSONBody struct {
-	// Activity Current agent activity state. Known values: starting, benchmarking, updating, downloading, waiting, cracking, stopping. Future versions may support additional values.
-	Activity *string `json:"activity,omitempty"`
-}
+// HeartbeatResponseState The state of the agent:
+//   - `pending` - The agent needs to perform the setup process again.
+//   - `active` - The agent is ready to accept tasks, all is good.
+//   - `error` - The agent has encountered an error and needs to be checked.
+//   - `stopped` - The agent has been stopped by the user.
+//   - `offline` - The agent has not checked in recently and is considered offline.
+type HeartbeatResponseState string
 
-// SubmitBenchmarkJSONBody defines parameters for SubmitBenchmark.
-type SubmitBenchmarkJSONBody struct {
+// SubmitBenchmarkRequest Hashcat benchmark results submitted by an agent
+type SubmitBenchmarkRequest struct {
 	HashcatBenchmarks []HashcatBenchmark `json:"hashcat_benchmarks"`
 }
 
-// SubmitErrorAgentJSONBody defines parameters for SubmitErrorAgent.
-type SubmitErrorAgentJSONBody struct {
+// SubmitErrorRequest Error details reported by the agent
+type SubmitErrorRequest struct {
 	// AgentId The agent that caused the error
 	AgentId int64 `json:"agent_id"`
 
@@ -469,32 +602,233 @@ type SubmitErrorAgentJSONBody struct {
 	//                        * `major` - Major error, action required. The task should be investigated and possibly restarted.
 	//                        * `critical` - Critical error, action required. The task should be stopped and investigated.
 	//                         * `fatal` - Fatal error, action required. The agent cannot continue with the task and should not be reattempted.
-	Severity SubmitErrorAgentJSONBodySeverity `json:"severity"`
+	Severity SubmitErrorRequestSeverity `json:"severity"`
 
 	// TaskId The task that caused the error, if any
 	TaskId *int64 `json:"task_id,omitempty"`
 }
 
-// SubmitErrorAgentJSONBodySeverity defines parameters for SubmitErrorAgent.
-type SubmitErrorAgentJSONBodySeverity string
+// SubmitErrorRequestSeverity The severity of the error:
+//   - `info` - Informational message, no action required.
+//   - `warning` - Non-critical error, no action required. Anticipated, but not necessarily problematic.
+//   - `minor` - Minor error, no action required. Should be investigated, but the task can continue.
+//   - `major` - Major error, action required. The task should be investigated and possibly restarted.
+//   - `critical` - Critical error, action required. The task should be stopped and investigated.
+//   - `fatal` - Fatal error, action required. The agent cannot continue with the task and should not be reattempted.
+type SubmitErrorRequestSeverity string
+
+// Task A unit of work assigned to an agent for a specific attack
+type Task struct {
+	// AttackId The id of the attack
+	AttackId int64 `json:"attack_id"`
+
+	// Id The id of the task
+	Id int64 `json:"id"`
+
+	// Limit The limit of the keyspace
+	Limit *int64 `json:"limit,omitempty"`
+
+	// Skip The offset of the keyspace
+	Skip *int64 `json:"skip,omitempty"`
+
+	// StartDate The time the task was started
+	StartDate time.Time `json:"start_date"`
+
+	// Status The status of the task
+	Status TaskStatus `json:"status"`
+}
+
+// TaskStatus The status of the task
+type TaskStatus string
+
+// TaskAbandonError Error response when a task cannot be abandoned
+type TaskAbandonError struct {
+	Details *[]string `json:"details,omitempty"`
+	Error   *string   `json:"error,omitempty"`
+}
+
+// TaskAbandonResponse The response to a successful task abandon request
+type TaskAbandonResponse struct {
+	State   *string `json:"state,omitempty"`
+	Success *bool   `json:"success,omitempty"`
+}
+
+// UpdateAgentRequest Agent system information submitted on registration or update
+type UpdateAgentRequest struct {
+	// ClientSignature The signature of the client
+	ClientSignature string   `json:"client_signature"`
+	Devices         []string `json:"devices"`
+
+	// HostName The hostname of the agent
+	HostName string `json:"host_name"`
+
+	// Id The id of the agent
+	Id int64 `json:"id"`
+
+	// OperatingSystem The operating system of the agent
+	OperatingSystem string `json:"operating_system"`
+}
 
 // UpdateAgentJSONRequestBody defines body for UpdateAgent for application/json ContentType.
-type UpdateAgentJSONRequestBody UpdateAgentJSONBody
+type UpdateAgentJSONRequestBody = UpdateAgentRequest
 
 // SendHeartbeatJSONRequestBody defines body for SendHeartbeat for application/json ContentType.
-type SendHeartbeatJSONRequestBody SendHeartbeatJSONBody
+type SendHeartbeatJSONRequestBody = AgentHeartbeatRequest
 
 // SubmitBenchmarkJSONRequestBody defines body for SubmitBenchmark for application/json ContentType.
-type SubmitBenchmarkJSONRequestBody SubmitBenchmarkJSONBody
+type SubmitBenchmarkJSONRequestBody = SubmitBenchmarkRequest
 
 // SubmitErrorAgentJSONRequestBody defines body for SubmitErrorAgent for application/json ContentType.
-type SubmitErrorAgentJSONRequestBody SubmitErrorAgentJSONBody
+type SubmitErrorAgentJSONRequestBody = SubmitErrorRequest
 
 // SendCrackJSONRequestBody defines body for SendCrack for application/json ContentType.
 type SendCrackJSONRequestBody = HashcatResult
 
 // SendStatusJSONRequestBody defines body for SendStatus for application/json ContentType.
-type SendStatusJSONRequestBody = TaskStatus
+type SendStatusJSONRequestBody = HashcatStatusUpdate
+
+// Getter for additional properties for ErrorMetadata_Other. Returns the specified
+// element and whether it was found
+func (a ErrorMetadata_Other) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ErrorMetadata_Other
+func (a *ErrorMetadata_Other) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ErrorMetadata_Other to handle AdditionalProperties
+func (a *ErrorMetadata_Other) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["affected_count"]; found {
+		err = json.Unmarshal(raw, &a.AffectedCount)
+		if err != nil {
+			return fmt.Errorf("error reading 'affected_count': %w", err)
+		}
+		delete(object, "affected_count")
+	}
+
+	if raw, found := object["category"]; found {
+		err = json.Unmarshal(raw, &a.Category)
+		if err != nil {
+			return fmt.Errorf("error reading 'category': %w", err)
+		}
+		delete(object, "category")
+	}
+
+	if raw, found := object["error_type"]; found {
+		err = json.Unmarshal(raw, &a.ErrorType)
+		if err != nil {
+			return fmt.Errorf("error reading 'error_type': %w", err)
+		}
+		delete(object, "error_type")
+	}
+
+	if raw, found := object["retryable"]; found {
+		err = json.Unmarshal(raw, &a.Retryable)
+		if err != nil {
+			return fmt.Errorf("error reading 'retryable': %w", err)
+		}
+		delete(object, "retryable")
+	}
+
+	if raw, found := object["terminal"]; found {
+		err = json.Unmarshal(raw, &a.Terminal)
+		if err != nil {
+			return fmt.Errorf("error reading 'terminal': %w", err)
+		}
+		delete(object, "terminal")
+	}
+
+	if raw, found := object["total_count"]; found {
+		err = json.Unmarshal(raw, &a.TotalCount)
+		if err != nil {
+			return fmt.Errorf("error reading 'total_count': %w", err)
+		}
+		delete(object, "total_count")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ErrorMetadata_Other to handle AdditionalProperties
+func (a ErrorMetadata_Other) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.AffectedCount != nil {
+		object["affected_count"], err = json.Marshal(a.AffectedCount)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'affected_count': %w", err)
+		}
+	}
+
+	if a.Category != nil {
+		object["category"], err = json.Marshal(a.Category)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'category': %w", err)
+		}
+	}
+
+	if a.ErrorType != nil {
+		object["error_type"], err = json.Marshal(a.ErrorType)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'error_type': %w", err)
+		}
+	}
+
+	if a.Retryable != nil {
+		object["retryable"], err = json.Marshal(a.Retryable)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'retryable': %w", err)
+		}
+	}
+
+	if a.Terminal != nil {
+		object["terminal"], err = json.Marshal(a.Terminal)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'terminal': %w", err)
+		}
+	}
+
+	if a.TotalCount != nil {
+		object["total_count"], err = json.Marshal(a.TotalCount)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'total_count': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -1797,18 +2131,9 @@ func (r UpdateAgentResponse) StatusCode() int {
 type SendHeartbeatResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *struct {
-		// State The state of the agent:
-		//                        * `pending` - The agent needs to perform the setup process again.
-		//                        * `active` - The agent is ready to accept tasks, all is good.
-		//                        * `error` - The agent has encountered an error and needs to be checked.
-		//                        * `stopped` - The agent has been stopped by the user.
-		//                        * `offline` - The agent has not checked in recently and is considered offline.
-		State SendHeartbeat200State `json:"state"`
-	}
-	JSON401 *ErrorObject
+	JSON200      *HeartbeatResponse
+	JSON401      *ErrorObject
 }
-type SendHeartbeat200State string
 
 // Status returns HTTPResponse.Status
 func (r SendHeartbeatResponse) Status() string {
@@ -1851,6 +2176,7 @@ func (r SetAgentShutdownResponse) StatusCode() int {
 type SubmitBenchmarkResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *BenchmarkReceipt
 	JSON400      *ErrorObject
 	JSON401      *ErrorObject
 	JSON422      *ErrorObject
@@ -1921,6 +2247,8 @@ func (r GetAttackResponse) StatusCode() int {
 type GetHashListResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON401      *ErrorObject
+	JSON404      *ErrorObject
 }
 
 // Status returns HTTPResponse.Status
@@ -1942,11 +2270,8 @@ func (r GetHashListResponse) StatusCode() int {
 type AuthenticateResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *struct {
-		AgentId       int64 `json:"agent_id"`
-		Authenticated bool  `json:"authenticated"`
-	}
-	JSON401 *ErrorObject
+	JSON200      *AuthenticationResponse
+	JSON401      *ErrorObject
 }
 
 // Status returns HTTPResponse.Status
@@ -1968,53 +2293,8 @@ func (r AuthenticateResponse) StatusCode() int {
 type GetConfigurationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *struct {
-		// ApiVersion The minimum accepted version of the API
-		ApiVersion int `json:"api_version"`
-
-		// BenchmarksNeeded Whether the agent needs to run benchmarks
-		BenchmarksNeeded bool `json:"benchmarks_needed"`
-
-		// Config Advanced hashcat and agent configuration options
-		Config AdvancedAgentConfiguration `json:"config"`
-
-		// RecommendedCircuitBreaker Recommended circuit breaker settings for agent connections
-		RecommendedCircuitBreaker struct {
-			// FailureThreshold Number of failures before circuit opens
-			FailureThreshold int `json:"failure_threshold"`
-
-			// Timeout Seconds before circuit half-opens for retry
-			Timeout int `json:"timeout"`
-		} `json:"recommended_circuit_breaker"`
-
-		// RecommendedRetry Recommended retry settings for agent HTTP requests
-		RecommendedRetry struct {
-			// InitialDelay Initial retry delay in seconds
-			InitialDelay int `json:"initial_delay"`
-
-			// MaxAttempts Maximum number of retry attempts
-			MaxAttempts int `json:"max_attempts"`
-
-			// MaxDelay Maximum retry delay in seconds
-			MaxDelay int `json:"max_delay"`
-		} `json:"recommended_retry"`
-
-		// RecommendedTimeouts Recommended timeout settings for agent HTTP connections
-		RecommendedTimeouts struct {
-			// ConnectTimeout TCP connect timeout in seconds
-			ConnectTimeout int `json:"connect_timeout"`
-
-			// ReadTimeout Read timeout in seconds
-			ReadTimeout int `json:"read_timeout"`
-
-			// RequestTimeout Overall request timeout in seconds
-			RequestTimeout int `json:"request_timeout"`
-
-			// WriteTimeout Write timeout in seconds
-			WriteTimeout int `json:"write_timeout"`
-		} `json:"recommended_timeouts"`
-	}
-	JSON401 *ErrorObject
+	JSON200      *ConfigurationResponse
+	JSON401      *ErrorObject
 }
 
 // Status returns HTTPResponse.Status
@@ -2130,16 +2410,10 @@ func (r GetTaskResponse) StatusCode() int {
 type SetTaskAbandonedResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *struct {
-		State   *string `json:"state,omitempty"`
-		Success *bool   `json:"success,omitempty"`
-	}
-	JSON401 *ErrorObject
-	JSON404 *ErrorObject
-	JSON422 *struct {
-		Details *[]string `json:"details,omitempty"`
-		Error   *string   `json:"error,omitempty"`
-	}
+	JSON200      *TaskAbandonResponse
+	JSON401      *ErrorObject
+	JSON404      *ErrorObject
+	JSON422      *TaskAbandonError
 }
 
 // Status returns HTTPResponse.Status
@@ -2161,6 +2435,7 @@ func (r SetTaskAbandonedResponse) StatusCode() int {
 type SetTaskAcceptedResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON401      *ErrorObject
 	JSON404      *ErrorObject
 	JSON422      *ErrorObject
 }
@@ -2207,6 +2482,9 @@ func (r SetTaskExhaustedResponse) StatusCode() int {
 type GetTaskZapsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON401      *ErrorObject
+	JSON404      *ErrorObject
+	JSON422      *ErrorObject
 }
 
 // Status returns HTTPResponse.Status
@@ -2228,6 +2506,7 @@ func (r GetTaskZapsResponse) StatusCode() int {
 type SendCrackResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON401      *ErrorObject
 	JSON404      *ErrorObject
 }
 
@@ -2570,15 +2849,7 @@ func ParseSendHeartbeatResponse(rsp *http.Response) (*SendHeartbeatResponse, err
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// State The state of the agent:
-			//                        * `pending` - The agent needs to perform the setup process again.
-			//                        * `active` - The agent is ready to accept tasks, all is good.
-			//                        * `error` - The agent has encountered an error and needs to be checked.
-			//                        * `stopped` - The agent has been stopped by the user.
-			//                        * `offline` - The agent has not checked in recently and is considered offline.
-			State SendHeartbeat200State `json:"state"`
-		}
+		var dest HeartbeatResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2636,6 +2907,13 @@ func ParseSubmitBenchmarkResponse(rsp *http.Response) (*SubmitBenchmarkResponse,
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BenchmarkReceipt
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest ErrorObject
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2741,6 +3019,23 @@ func ParseGetHashListResponse(rsp *http.Response) (*GetHashListResponse, error) 
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -2759,10 +3054,7 @@ func ParseAuthenticateResponse(rsp *http.Response) (*AuthenticateResponse, error
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			AgentId       int64 `json:"agent_id"`
-			Authenticated bool  `json:"authenticated"`
-		}
+		var dest AuthenticationResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2795,52 +3087,7 @@ func ParseGetConfigurationResponse(rsp *http.Response) (*GetConfigurationRespons
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// ApiVersion The minimum accepted version of the API
-			ApiVersion int `json:"api_version"`
-
-			// BenchmarksNeeded Whether the agent needs to run benchmarks
-			BenchmarksNeeded bool `json:"benchmarks_needed"`
-
-			// Config Advanced hashcat and agent configuration options
-			Config AdvancedAgentConfiguration `json:"config"`
-
-			// RecommendedCircuitBreaker Recommended circuit breaker settings for agent connections
-			RecommendedCircuitBreaker struct {
-				// FailureThreshold Number of failures before circuit opens
-				FailureThreshold int `json:"failure_threshold"`
-
-				// Timeout Seconds before circuit half-opens for retry
-				Timeout int `json:"timeout"`
-			} `json:"recommended_circuit_breaker"`
-
-			// RecommendedRetry Recommended retry settings for agent HTTP requests
-			RecommendedRetry struct {
-				// InitialDelay Initial retry delay in seconds
-				InitialDelay int `json:"initial_delay"`
-
-				// MaxAttempts Maximum number of retry attempts
-				MaxAttempts int `json:"max_attempts"`
-
-				// MaxDelay Maximum retry delay in seconds
-				MaxDelay int `json:"max_delay"`
-			} `json:"recommended_retry"`
-
-			// RecommendedTimeouts Recommended timeout settings for agent HTTP connections
-			RecommendedTimeouts struct {
-				// ConnectTimeout TCP connect timeout in seconds
-				ConnectTimeout int `json:"connect_timeout"`
-
-				// ReadTimeout Read timeout in seconds
-				ReadTimeout int `json:"read_timeout"`
-
-				// RequestTimeout Overall request timeout in seconds
-				RequestTimeout int `json:"request_timeout"`
-
-				// WriteTimeout Write timeout in seconds
-				WriteTimeout int `json:"write_timeout"`
-			} `json:"recommended_timeouts"`
-		}
+		var dest ConfigurationResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3003,10 +3250,7 @@ func ParseSetTaskAbandonedResponse(rsp *http.Response) (*SetTaskAbandonedRespons
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			State   *string `json:"state,omitempty"`
-			Success *bool   `json:"success,omitempty"`
-		}
+		var dest TaskAbandonResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3027,10 +3271,7 @@ func ParseSetTaskAbandonedResponse(rsp *http.Response) (*SetTaskAbandonedRespons
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest struct {
-			Details *[]string `json:"details,omitempty"`
-			Error   *string   `json:"error,omitempty"`
-		}
+		var dest TaskAbandonError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3055,6 +3296,13 @@ func ParseSetTaskAcceptedResponse(rsp *http.Response) (*SetTaskAcceptedResponse,
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorObject
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -3120,6 +3368,30 @@ func ParseGetTaskZapsResponse(rsp *http.Response) (*GetTaskZapsResponse, error) 
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -3137,6 +3409,13 @@ func ParseSendCrackResponse(rsp *http.Response) (*SendCrackResponse, error) {
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorObject
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

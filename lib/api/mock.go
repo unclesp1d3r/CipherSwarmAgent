@@ -66,7 +66,7 @@ type MockTasksClient struct {
 	SetTaskAcceptedFunc  func(ctx context.Context, id int64) (*SetTaskAcceptedResponse, error)
 	SetTaskExhaustedFunc func(ctx context.Context, id int64) (*SetTaskExhaustedResponse, error)
 	SetTaskAbandonedFunc func(ctx context.Context, id int64) (*SetTaskAbandonedResponse, error)
-	SendStatusFunc       func(ctx context.Context, id int64, status TaskStatus) (*SendStatusResponse, error)
+	SendStatusFunc       func(ctx context.Context, id int64, status HashcatStatusUpdate) (*SendStatusResponse, error)
 	SendCrackFunc        func(ctx context.Context, id int64, result HashcatResult) (*SendCrackResponse, error)
 	GetTaskZapsFunc      func(ctx context.Context, id int64) (*GetTaskZapsResponse, error)
 }
@@ -117,7 +117,7 @@ func (m *MockTasksClient) SetTaskAbandoned(
 func (m *MockTasksClient) SendStatus(
 	ctx context.Context,
 	id int64,
-	status TaskStatus,
+	status HashcatStatusUpdate,
 ) (*SendStatusResponse, error) {
 	if m.SendStatusFunc != nil {
 		return m.SendStatusFunc(ctx, id, status)

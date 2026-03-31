@@ -291,7 +291,7 @@ func TestSendHeartBeat(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupMock     func(agentID int64)
-		expectedState *api.SendHeartbeat200State
+		expectedState *api.State
 		expectedError bool
 	}{
 		{
@@ -307,7 +307,7 @@ func TestSendHeartBeat(t *testing.T) {
 			setupMock: func(agentID int64) {
 				testhelpers.MockHeartbeatResponse(agentID, api.StatePending)
 			},
-			expectedState: func() *api.SendHeartbeat200State {
+			expectedState: func() *api.State {
 				s := api.StatePending
 				return &s
 			}(),
@@ -318,7 +318,7 @@ func TestSendHeartBeat(t *testing.T) {
 			setupMock: func(agentID int64) {
 				testhelpers.MockHeartbeatResponse(agentID, api.StateStopped)
 			},
-			expectedState: func() *api.SendHeartbeat200State {
+			expectedState: func() *api.State {
 				s := api.StateStopped
 				return &s
 			}(),
@@ -329,7 +329,7 @@ func TestSendHeartBeat(t *testing.T) {
 			setupMock: func(agentID int64) {
 				testhelpers.MockHeartbeatResponse(agentID, api.StateError)
 			},
-			expectedState: func() *api.SendHeartbeat200State {
+			expectedState: func() *api.State {
 				s := api.StateError
 				return &s
 			}(),
@@ -373,11 +373,9 @@ func TestSendHeartBeat(t *testing.T) {
 // TestHandleStateResponse tests the handleStateResponse function.
 func TestHandleStateResponse(t *testing.T) {
 	tests := []struct {
-		name     string
-		response *struct {
-			State api.SendHeartbeat200State `json:"state"`
-		}
-		expectedState *api.SendHeartbeat200State
+		name          string
+		response      *api.HeartbeatResponse
+		expectedState *api.State
 	}{
 		{
 			name:          "nil response",
@@ -386,36 +384,30 @@ func TestHandleStateResponse(t *testing.T) {
 		},
 		{
 			name: "StatePending",
-			response: &struct {
-				State api.SendHeartbeat200State `json:"state"`
-			}{
+			response: &api.HeartbeatResponse{
 				State: api.StatePending,
 			},
-			expectedState: func() *api.SendHeartbeat200State {
+			expectedState: func() *api.State {
 				s := api.StatePending
 				return &s
 			}(),
 		},
 		{
 			name: "StateStopped",
-			response: &struct {
-				State api.SendHeartbeat200State `json:"state"`
-			}{
+			response: &api.HeartbeatResponse{
 				State: api.StateStopped,
 			},
-			expectedState: func() *api.SendHeartbeat200State {
+			expectedState: func() *api.State {
 				s := api.StateStopped
 				return &s
 			}(),
 		},
 		{
 			name: "StateError",
-			response: &struct {
-				State api.SendHeartbeat200State `json:"state"`
-			}{
+			response: &api.HeartbeatResponse{
 				State: api.StateError,
 			},
-			expectedState: func() *api.SendHeartbeat200State {
+			expectedState: func() *api.State {
 				s := api.StateError
 				return &s
 			}(),
