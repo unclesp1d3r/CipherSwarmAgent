@@ -96,6 +96,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - httpmock URL patterns must match the generated client paths (check `client.gen.go`), not the Go method names. E.g., `SetTaskAbandoned` hits `/tasks/{id}/abandon`, not `/tasks/{id}/set_abandoned`.
 - `httpmock.ResponderFromResponse` with manually constructed `*http.Response` triggers `bodyclose` lint. Use `httpmock.NewJsonResponderOrPanic` for JSON mocks instead.
 - `os.Symlink` requires elevated privileges (or Developer Mode) on Windows. Tests using symlinks must skip on Windows: `if runtime.GOOS == "windows" { t.Skip("os.Symlink requires elevated privileges on Windows") }`.
+- `os.Chmod(0o000)` does not prevent reading when running as root/elevated privileges. Tests relying on permission denial must also skip when elevated: attempt `os.Open` on the restricted file; if it succeeds, `t.Skip("running with elevated privileges")`.
 - `os.DirEntry.Type()` can return 0 (unknown) on some filesystems/platforms, causing `IsRegular()` to return false for real files. When filtering directory entries, fall back to `entry.Info()` (calls `os.Lstat`) when type is unknown. See `isRegularFile()` in `lib/hashcat/session_dir.go`.
 
 ## Tooling
