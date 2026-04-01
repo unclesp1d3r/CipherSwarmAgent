@@ -170,7 +170,18 @@ func (m *Manager) RunTask(ctx context.Context, task *api.Task, attack *api.Attac
 
 	sess, err := hashcat.NewHashcatSession(ctx, strconv.FormatInt(attack.Id, 10), jobParams)
 	if err != nil {
-		return cserrors.LogAndSendError(ctx, "Failed to create attack session", err, api.SeverityCritical, task)
+		if errors.Is(err, hashcat.ErrHashFileNotReadable) || errors.Is(err, hashcat.ErrHashFileEmpty) {
+			agentstate.ErrorLogger.Error("Hash file validation failed", "error", err)
+			cserrors.SendAgentError(
+				ctx, "Hash file validation failed", task, api.SeverityCritical,
+				cserrors.WithClassification("file_access", false),
+				cserrors.WithContext(map[string]any{"error_type": "hash_file_validation"}),
+			)
+		} else {
+			return cserrors.LogAndSendError(ctx, "Failed to create attack session", err, api.SeverityCritical, task)
+		}
+
+		return err
 	}
 
 	m.runAttackTask(ctx, sess, task)
