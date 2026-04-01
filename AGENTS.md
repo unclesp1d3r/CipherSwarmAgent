@@ -46,6 +46,7 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - **Colon-aware parsing:** Many hash types contain colons (MD5:salt, PBKDF2 `sha256:20000:salt`, Kerberos `krb5asrep$23$user@REALM$hash`). Any regex parsing colon-delimited hashcat output (especially machine-readable `<file>:<line>:<hash>:<error>`) must use non-greedy captures for the file path (`(.+?)`) or anchor on the known numeric line field — greedy `(.+)` will consume hash colons into the file capture group.
 - **Structured error metadata:** `cserrors.WithContext(map[string]any)` merges extracted fields into the API error metadata `other` map. Always pair with `WithClassification` when sending classified errors.
 - **Metadata key precedence:** In `SendAgentError`, context fields are copied first, then reserved keys (`platform`, `version`, `category`, `retryable`) are set — so reserved keys always win over context collisions.
+- **Error-specific classification in RunTask:** `NewHashcatSession` failures are branched: hash file errors (`ErrHashFileNotReadable`, `ErrHashFileEmpty`) get `WithClassification("file_access", false)` + `WithContext`; all other failures use `LogAndSendError` without classification. Follow this pattern when adding new classified error paths.
 
 ## Go
 
@@ -158,6 +159,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - When adding or removing `agentstate.State` fields, grep all test helpers and reset functions — including `saveAndRestoreState` in `agent_test.go`, `ResetTestState`, `SetupTestState`, and `SetupMinimalTestState` in `testhelpers/state_helper.go`.
 - For cross-platform subprocess tests, use the Go test helper process pattern (`TestHelperProcess` + `os.Args[0]` + env vars) instead of OS-specific binaries like `sleep` or `true`.
 - Use `hashcat.NewTestSession(skipStatusUpdates)` (in `lib/hashcat/session_test_helpers.go`) to create mock sessions — never construct `hashcat.Session` struct literals directly from `testhelpers`, as it bypasses constructor invariants.
+- `toCmdArgs()` tests in `params_test.go` must pass real file paths for all validated parameters. Use `createTestHashFile(t)` for hash files and `createTestFile(t, dir, name, content)` for wordlists/rules/masks. Dummy paths like `/tmp/hashes.txt` will fail validation.
 - Status fixture slices (`RecoveredHashes`, `RecoveredSalts`, `Progress`) must have ≥2 elements (`display.MinStatusFields`). Single-element slices cause silent drops in `handleStatusUpdate` and `display.JobStatus`.
 - Run `go test -race ./...` to detect data races.
 
