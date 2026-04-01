@@ -151,14 +151,6 @@ func init() {
 	cobra.CheckErr(err)
 
 	RootCmd.PersistentFlags().
-		Bool("use-legacy-device-technique", false, "Use legacy device identification method (not recommended)")
-	err = viper.BindPFlag(
-		"use_legacy_device_technique",
-		RootCmd.PersistentFlags().Lookup("use-legacy-device-technique"),
-	)
-	cobra.CheckErr(err)
-
-	RootCmd.PersistentFlags().
 		String("hashcat-path", "", "Path to custom hashcat binary (overrides automatic detection)")
 	err = viper.BindPFlag("hashcat_path", RootCmd.PersistentFlags().Lookup("hashcat-path"))
 	cobra.CheckErr(err)
