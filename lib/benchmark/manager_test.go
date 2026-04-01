@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
@@ -134,7 +135,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		expectedError bool
 	}{
 		{
-			name: "successful benchmark submission",
+			name: "successful benchmark submission with receipt",
 			results: []display.BenchmarkResult{
 				{
 					HashType:  "0",
@@ -151,9 +152,45 @@ func TestSendBenchmarkResults(t *testing.T) {
 			},
 			setupMock: func(_ int64) {
 				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+					httpmock.NewJsonResponderOrPanic(http.StatusOK, api.BenchmarkReceipt{
+						ReceivedCount:  2,
+						ProcessedCount: 2,
+						FailedCount:    0,
+					}))
+			},
+			expectedError: false,
+		},
+		{
+			name: "successful benchmark submission with 204 legacy",
+			results: []display.BenchmarkResult{
+				{
+					HashType:  "0",
+					RuntimeMs: "100",
+					SpeedHs:   "12345.67",
+					Device:    "1",
+				},
+			},
+			setupMock: func(_ int64) {
+				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 					httpmock.NewStringResponder(http.StatusNoContent, ""))
 			},
 			expectedError: false,
+		},
+		{
+			name: "200 with nil receipt body returns error",
+			results: []display.BenchmarkResult{
+				{
+					HashType:  "0",
+					RuntimeMs: "100",
+					SpeedHs:   "12345.67",
+					Device:    "1",
+				},
+			},
+			setupMock: func(_ int64) {
+				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+					httpmock.NewStringResponder(http.StatusOK, "not json"))
+			},
+			expectedError: true,
 		},
 		{
 			name:    "empty benchmark results",
@@ -174,7 +211,6 @@ func TestSendBenchmarkResults(t *testing.T) {
 				},
 			},
 			setupMock: func(_ int64) {
-				// Use 400 Bad Request to test client error handling
 				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
 					httpmock.NewStringResponder(http.StatusBadRequest, "Bad Request"))
 			},
@@ -204,9 +240,53 @@ func TestSendBenchmarkResults(t *testing.T) {
 			},
 			setupMock: func(_ int64) {
 				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
-					httpmock.NewStringResponder(http.StatusNoContent, ""))
+					httpmock.NewJsonResponderOrPanic(http.StatusOK, api.BenchmarkReceipt{
+						ReceivedCount:  2,
+						ProcessedCount: 2,
+						FailedCount:    0,
+					}))
 			},
 			expectedError: false, // Invalid entries are skipped, not causing error
+		},
+		{
+			name: "200 with negative counts in receipt returns error",
+			results: []display.BenchmarkResult{
+				{
+					HashType:  "0",
+					RuntimeMs: "100",
+					SpeedHs:   "12345.67",
+					Device:    "1",
+				},
+			},
+			setupMock: func(_ int64) {
+				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+					httpmock.NewJsonResponderOrPanic(http.StatusOK, api.BenchmarkReceipt{
+						ReceivedCount:  -1,
+						ProcessedCount: 0,
+						FailedCount:    0,
+					}))
+			},
+			expectedError: true,
+		},
+		{
+			name: "200 with all-failed receipt returns error",
+			results: []display.BenchmarkResult{
+				{
+					HashType:  "0",
+					RuntimeMs: "100",
+					SpeedHs:   "12345.67",
+					Device:    "1",
+				},
+			},
+			setupMock: func(_ int64) {
+				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+					httpmock.NewJsonResponderOrPanic(http.StatusOK, api.BenchmarkReceipt{
+						ReceivedCount:  1,
+						ProcessedCount: 0,
+						FailedCount:    1,
+					}))
+			},
+			expectedError: true,
 		},
 	}
 

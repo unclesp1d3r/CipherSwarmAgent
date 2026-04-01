@@ -110,11 +110,23 @@ func (m *Manager) sendBenchmarkResults(ctx context.Context, benchmarkResults []d
 		return err
 	}
 
-	if res.StatusCode() == http.StatusNoContent {
-		return nil
-	}
+	switch res.StatusCode() {
+	case http.StatusOK:
+		if res.JSON200 == nil {
+			return fmt.Errorf(
+				"%w: server returned 200 without valid receipt body",
+				errBadResponse,
+			)
+		}
 
-	return fmt.Errorf("%w: %s", errBadResponse, res.Status())
+		return validateReceipt(len(benchmarks), res.JSON200)
+	case http.StatusNoContent:
+		agentstate.Logger.Debug("Server returned 204 (legacy, no receipt)")
+
+		return nil
+	default:
+		return fmt.Errorf("%w: %s", errBadResponse, res.Status())
+	}
 }
 
 // createBenchmark converts a display.BenchmarkResult to an api.HashcatBenchmark struct.
