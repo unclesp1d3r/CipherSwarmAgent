@@ -14,8 +14,36 @@ import (
 )
 
 const (
-	benchmarkFieldCount = 6 // Expected number of fields in benchmark output line
-	hashInfoMatchGroups = 2 // Expected number of match groups in hashInfoLineRe (full match + capture)
+	// benchmarkMatchGroups is the expected number of match groups from benchmarkLineRe
+	// (full match + 6 capture groups).
+	benchmarkMatchGroups = 7
+	hashInfoMatchGroups  = 2 // Expected number of match groups in hashInfoLineRe (full match + capture)
+)
+
+// Submatch indices for benchmarkLineRe capture groups.
+const (
+	bmGroupDevice   = 1
+	bmGroupHashType = 2
+	// bmGroupHashName = 3 — hash name is captured but not stored (display-only in hashcat).
+	bmGroupRuntime  = 4
+	bmGroupHashTime = 5
+	bmGroupSpeed    = 6
+)
+
+// benchmarkLineRe parses hashcat --machine-readable --benchmark output.
+// Format: device_id:hash_type:hash_name:runtime_ms:hash_time_ms:speed_hs
+//
+// Non-greedy (.+?) for hash_name: backtracking against trailing \d+ groups
+// correctly handles hypothetical colon-containing names. In practice,
+// benchmark hash names are simple labels (MD5, NTLM, etc.) and never
+// contain colons (verified from hashcat source terminal.c:~3880).
+//
+// The speed group uses a structured float pattern that rejects nonsense
+// like "e.e.e+++" while accepting integers, decimals, and scientific notation.
+//
+//nolint:gochecknoglobals // package-level compiled regex
+var benchmarkLineRe = regexp.MustCompile(
+	`^(\d+):(\d+):(.+?):(\d+):(\d+):([0-9]+(?:\.[0-9]*)?(?:[eE][+-]?\d+)?)$`,
 )
 
 // hashInfoLineRe matches the leading numeric hash type ID in --hash-info --machine-readable output.
@@ -23,28 +51,27 @@ const (
 var hashInfoLineRe = regexp.MustCompile(`^\s*(\d+)\s*\|`) //nolint:gochecknoglobals // package-level compiled regex
 
 // handleBenchmarkStdOutLine processes a line of benchmark output, extracting relevant data and appending it to result.
-// When dm is non-nil, it enriches the log with the human-readable device name looked up from the DeviceManager.
+// When dm is non-nil, it enriches the result with the human-readable device name looked up from the DeviceManager.
 func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult, dm *devices.DeviceManager) {
-	fields := strings.Split(line, ":")
-	if len(fields) != benchmarkFieldCount {
+	matches := benchmarkLineRe.FindStringSubmatch(line)
+	if len(matches) != benchmarkMatchGroups {
 		agentstate.Logger.Debug("Unknown benchmark line", "line", line)
 
 		return
 	}
 
 	result := display.BenchmarkResult{
-		Device:     fields[0],
-		HashType:   fields[1],
-		RuntimeMs:  fields[3],
-		HashTimeMs: fields[4],
-		SpeedHs:    fields[5],
+		Device:     matches[bmGroupDevice],
+		HashType:   matches[bmGroupHashType],
+		RuntimeMs:  matches[bmGroupRuntime],
+		HashTimeMs: matches[bmGroupHashTime],
+		SpeedHs:    matches[bmGroupSpeed],
 	}
 
 	if dm != nil {
-		if id, err := strconv.Atoi(fields[0]); err == nil {
+		if id, err := strconv.Atoi(matches[bmGroupDevice]); err == nil {
 			if dev, found := dm.GetDevice(id); found {
-				agentstate.Logger.Debug("Benchmark result device",
-					"device_id", id, "device_name", dev.Name, "hash_type", result.HashType)
+				result.DeviceName = dev.Name
 			}
 		}
 	}

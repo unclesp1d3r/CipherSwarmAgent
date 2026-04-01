@@ -20,7 +20,8 @@ const MinStatusFields = 2
 
 // BenchmarkResult represents the outcome of a benchmark session.
 type BenchmarkResult struct {
-	Device      string `json:"device,omitempty"`      // Device is the name of the device used for the benchmark.
+	Device      string `json:"device,omitempty"`      // Device is the numeric device ID used for the benchmark.
+	DeviceName  string `json:"device_name,omitempty"` // DeviceName is the human-readable device name (display-only, not sent to API).
 	HashType    string `json:"hash_type,omitempty"`   // HashType is the type of hash used for the benchmark.
 	RuntimeMs   string `json:"runtime,omitempty"`     // RuntimeMs is the runtime of the benchmark in milliseconds.
 	HashTimeMs  string `json:"hash_time,omitempty"`   // HashTimeMs is the time taken to hash in milliseconds.
@@ -66,8 +67,18 @@ func ShuttingDown() {
 // Benchmark logs the provided benchmark result using the shared Logger.
 // The log includes the device, hash type, runtime in milliseconds, and speed in hashes per second.
 func Benchmark(result BenchmarkResult) {
-	agentstate.Logger.Info("Benchmark result", "device", result.Device,
-		"hash_type", result.HashType, "runtime_ms", result.RuntimeMs, "speed_hs", result.SpeedHs)
+	keyvals := []any{
+		"device", result.Device,
+		"hash_type", result.HashType,
+		"runtime_ms", result.RuntimeMs,
+		"speed_hs", result.SpeedHs,
+	}
+
+	if result.DeviceName != "" {
+		keyvals = append(keyvals, "device_name", result.DeviceName)
+	}
+
+	agentstate.Logger.Info("Benchmark result", keyvals...)
 }
 
 // BenchmarkError logs a debug-level message detailing a line of standard error output from a benchmark process.
