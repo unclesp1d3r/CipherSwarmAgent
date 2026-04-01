@@ -126,6 +126,68 @@ const metalDevice = `Metal Info:
     Name...........: Apple M2 Pro
 `
 
+// openCLWithCapabilities includes all capability fields found in OpenCL output.
+const openCLWithCapabilities = `OpenCL Info:
+============
+
+OpenCL Platform ID #1
+  Vendor..: NVIDIA Corporation
+  Name....: NVIDIA CUDA
+  Version.: OpenCL 3.0 CUDA 12.4.0
+
+  Backend Device ID #1
+    Type...........: GPU
+    Vendor.ID......: 32
+    Vendor.........: NVIDIA Corporation
+    Name...........: NVIDIA GeForce RTX 3090
+    Version........: OpenCL 3.0
+    Processor(s)...: 82
+    Clock..........: 1695
+    Memory.Total...: 24268 MB (limited to 6067 MB allocatable in one block)
+    Memory.Free....: 23512 MB
+    OpenCL.Version.: OpenCL C 3.0
+    Driver.Version.: 535.129.03
+`
+
+// cudaWithCapabilities includes CUDA-specific capability fields.
+const cudaWithCapabilities = `CUDA Info:
+==========
+
+  Backend Device ID #1
+    Name...........: NVIDIA GeForce RTX 4090
+    Processor(s)...: 128
+    Clock..........: 2520
+    Memory.Total...: 24564 MB
+    Memory.Free....: 24100 MB
+`
+
+// metalWithCapabilities includes Metal-specific capability fields.
+const metalWithCapabilities = `Metal Info:
+===========
+
+  Backend Device ID #1
+    Type...........: GPU
+    Vendor.ID......: 2
+    Vendor.........: Apple
+    Name...........: Apple M4
+    Processor(s)...: 8
+    Clock..........: N/A
+    Memory.Total...: 10922 MB (limited to 4096 MB allocatable in one block)
+    Memory.Free....: 5461 MB
+`
+
+// hipWithCapabilities includes HIP backend output.
+const hipWithCapabilities = `HIP Info:
+=========
+
+  Backend Device ID #1
+    Name...........: AMD Radeon RX 5700 XT
+    Processor(s)...: 20
+    Clock..........: 2100
+    Memory.Total...: 8176 MB
+    Memory.Free....: 8176 MB
+`
+
 func TestEnumerateDevices_Scenario(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -628,3 +690,76 @@ func TestValidatedDevices_BackendDevicesFlag(t *testing.T) {
 }
 
 func noopWarn(_ any, _ ...any) {}
+
+// --- Capability parsing tests ---
+
+func TestParseDeviceOutput_OpenCLCapabilities(t *testing.T) {
+	t.Parallel()
+
+	devs := parseDeviceOutput(openCLWithCapabilities)
+	require.Len(t, devs, 1)
+
+	d := devs[0]
+	require.Equal(t, "82", d.Capabilities[CapProcessors])
+	require.Equal(t, "1695", d.Capabilities[CapClock])
+	require.Equal(t, "24268 MB (limited to 6067 MB allocatable in one block)", d.Capabilities[CapMemoryTotal])
+	require.Equal(t, "23512 MB", d.Capabilities[CapMemoryFree])
+	require.Equal(t, "OpenCL 3.0", d.Capabilities[CapVersion])
+	require.Equal(t, "535.129.03", d.Capabilities[CapDriverVersion])
+	require.Equal(t, "OpenCL C 3.0", d.Capabilities[CapOpenCLVersion])
+}
+
+func TestParseDeviceOutput_CUDACapabilities(t *testing.T) {
+	t.Parallel()
+
+	devs := parseDeviceOutput(cudaWithCapabilities)
+	require.Len(t, devs, 1)
+
+	d := devs[0]
+	require.Equal(t, "CUDA", d.Backend)
+	require.Equal(t, "128", d.Capabilities[CapProcessors])
+	require.Equal(t, "2520", d.Capabilities[CapClock])
+	require.Equal(t, "24564 MB", d.Capabilities[CapMemoryTotal])
+	require.Equal(t, "24100 MB", d.Capabilities[CapMemoryFree])
+	// CUDA has no Version, Driver.Version, or OpenCL.Version
+	require.Empty(t, d.Capabilities[CapVersion])
+	require.Empty(t, d.Capabilities[CapDriverVersion])
+}
+
+func TestParseDeviceOutput_MetalCapabilities(t *testing.T) {
+	t.Parallel()
+
+	devs := parseDeviceOutput(metalWithCapabilities)
+	require.Len(t, devs, 1)
+
+	d := devs[0]
+	require.Equal(t, "Metal", d.Backend)
+	require.Equal(t, "8", d.Capabilities[CapProcessors])
+	require.Equal(t, "N/A", d.Capabilities[CapClock])
+	require.Equal(t, "10922 MB (limited to 4096 MB allocatable in one block)", d.Capabilities[CapMemoryTotal])
+	// Metal has no Driver.Version
+	require.Empty(t, d.Capabilities[CapDriverVersion])
+}
+
+func TestParseDeviceOutput_HIPCapabilities(t *testing.T) {
+	t.Parallel()
+
+	devs := parseDeviceOutput(hipWithCapabilities)
+	require.Len(t, devs, 1)
+
+	d := devs[0]
+	require.Equal(t, "HIP", d.Backend)
+	require.Equal(t, "AMD Radeon RX 5700 XT", d.Name)
+	require.Equal(t, "20", d.Capabilities[CapProcessors])
+	require.Equal(t, "2100", d.Capabilities[CapClock])
+	require.Equal(t, "8176 MB", d.Capabilities[CapMemoryTotal])
+}
+
+func TestParseDeviceOutput_CapabilitiesMapInitialized(t *testing.T) {
+	t.Parallel()
+
+	// Even the basic fixture without capability fields should have an initialized map.
+	devs := parseDeviceOutput(singleOpenCLGPU)
+	require.Len(t, devs, 1)
+	require.NotNil(t, devs[0].Capabilities, "Capabilities map should be initialized, not nil")
+}

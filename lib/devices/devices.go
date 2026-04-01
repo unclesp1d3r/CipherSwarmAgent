@@ -29,8 +29,8 @@ var (
 
 // Compile-time regex patterns for parsing hashcat -I output.
 var (
-	// backendAPIPattern matches section headers like "OpenCL Info:", "CUDA Info:", "Metal Info:".
-	backendAPIPattern = regexp.MustCompile(`^(OpenCL|CUDA|Metal)\s+Info:`)
+	// backendAPIPattern matches section headers like "OpenCL Info:", "CUDA Info:", "Metal Info:", "HIP Info:".
+	backendAPIPattern = regexp.MustCompile(`^(OpenCL|CUDA|Metal|HIP)\s+Info:`)
 	// backendHeaderPattern matches lines like "Backend Device ID #1" to detect device blocks.
 	backendHeaderPattern = regexp.MustCompile(`Backend Device ID #(\d+)`)
 	// deviceNamePattern matches "Name...: <value>" lines.
@@ -46,16 +46,37 @@ var (
 	// skippedLinePattern matches standalone "* Device #N: Skipped" or "Skipped" lines
 	// that hashcat emits for devices that failed initialization.
 	skippedLinePattern = regexp.MustCompile(`(?i)^\s*\*?\s*Device\s+#\d+:\s+Skipped`)
+
+	// Capability patterns for additional device properties from hashcat -I.
+	processorsPattern    = regexp.MustCompile(`^\s+Processor\(s\)\.+:\s+(.+)$`)
+	clockPattern         = regexp.MustCompile(`^\s+Clock\.+:\s+(.+)$`)
+	memoryTotalPattern   = regexp.MustCompile(`^\s+Memory\.Total\.+:\s+(.+)$`)
+	memoryFreePattern    = regexp.MustCompile(`^\s+Memory\.Free\.+:\s+(.+)$`)
+	versionFieldPattern  = regexp.MustCompile(`^\s+Version\.+:\s+(.+)$`)
+	driverVersionPattern = regexp.MustCompile(`^\s+Driver\.Version\.+:\s+(.+)$`)
+	openCLVersionPattern = regexp.MustCompile(`^\s+OpenCL\.Version\.+:\s+(.+)$`)
+)
+
+// Capability key constants for Device.Capabilities map entries.
+const (
+	CapProcessors    = "processors"
+	CapClock         = "clock"
+	CapMemoryTotal   = "memory_total"
+	CapMemoryFree    = "memory_free"
+	CapVersion       = "version"
+	CapDriverVersion = "driver_version"
+	CapOpenCLVersion = "opencl_version"
 )
 
 // Device represents a single compute device enumerated by hashcat.
 type Device struct {
-	ID          int
-	Name        string
-	Type        string // "CPU" or "GPU"
-	Backend     string // "OpenCL", "CUDA", or "Metal"
-	Vendor      string
-	IsAvailable bool
+	ID           int
+	Name         string
+	Type         string            // "CPU" or "GPU"
+	Backend      string            // "OpenCL", "CUDA", "Metal", or "HIP"
+	Vendor       string
+	IsAvailable  bool
+	Capabilities map[string]string // Optional capability fields parsed from hashcat -I output.
 }
 
 // CmdFactory creates an exec.Cmd for running hashcat with the given arguments.
@@ -150,9 +171,10 @@ func parseDeviceOutput(output string) []Device {
 			}
 
 			current = &Device{
-				ID:          id,
-				Backend:     currentBackend,
-				IsAvailable: true,
+				ID:           id,
+				Backend:      currentBackend,
+				IsAvailable:  true,
+				Capabilities: make(map[string]string),
 			}
 
 			continue
@@ -195,6 +217,9 @@ func parseDeviceOutput(output string) []Device {
 
 			continue
 		}
+
+		// Parse capability properties into the Capabilities map.
+		parseCapability(current, line)
 	}
 
 	// Flush last device.
@@ -203,6 +228,36 @@ func parseDeviceOutput(output string) []Device {
 	}
 
 	return devs
+}
+
+// capabilityPattern pairs a regex pattern with its Capabilities map key.
+type capabilityPattern struct {
+	pattern *regexp.Regexp
+	key     string
+}
+
+// capabilityPatterns is the ordered list of capability patterns to try.
+// Each match sets the corresponding key in Device.Capabilities.
+var capabilityPatterns = []capabilityPattern{
+	{processorsPattern, CapProcessors},
+	{clockPattern, CapClock},
+	{memoryTotalPattern, CapMemoryTotal},
+	{memoryFreePattern, CapMemoryFree},
+	{versionFieldPattern, CapVersion},
+	{driverVersionPattern, CapDriverVersion},
+	{openCLVersionPattern, CapOpenCLVersion},
+}
+
+// parseCapability attempts to match a line against all capability patterns
+// and stores the first match in the device's Capabilities map.
+func parseCapability(dev *Device, line string) {
+	for _, cp := range capabilityPatterns {
+		if matches := cp.pattern.FindStringSubmatch(line); len(matches) > 1 {
+			dev.Capabilities[cp.key] = strings.TrimSpace(matches[1])
+
+			return
+		}
+	}
 }
 
 // GetDevice returns the device with the given ID and whether it was found.
