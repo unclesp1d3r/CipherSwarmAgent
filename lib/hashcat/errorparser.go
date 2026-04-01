@@ -249,7 +249,7 @@ var errorPatterns = []errorPattern{
 		ErrorCategoryBackend,
 		api.SeverityFatal,
 		false,
-		extractDeviceWarningContext,
+		extractIntField("kernel_selftest_failed", "device_id"),
 	},
 	// Self-test hash parsing error (stderr)
 	{
@@ -275,15 +275,21 @@ var errorPatterns = []errorPattern{
 		staticContext("autotune_failure"),
 	},
 
-	// Kernel build/create failures (non-retryable)
+	// Kernel build failures (non-retryable)
 	{
-		regexp.MustCompile(
-			`\* Device #(\d+): Kernel (.+) (?:build|create) failed`,
-		),
+		regexp.MustCompile(`\* Device #(\d+): Kernel (.+) build failed`),
 		ErrorCategoryBackend,
 		api.SeverityCritical,
 		false,
 		extractKernelBuildContext,
+	},
+	// Kernel create failures (distinct error_type from build failures)
+	{
+		regexp.MustCompile(`\* Device #(\d+): Kernel (.+) create failed`),
+		ErrorCategoryBackend,
+		api.SeverityCritical,
+		false,
+		extractKernelCreateContext,
 	},
 	{
 		regexp.MustCompile(`clBuildProgram\(\): (CL_BUILD_PROGRAM_FAILURE)`),
@@ -688,6 +694,22 @@ func extractHashfileAccessContext(_ string, submatch []string) map[string]any {
 func extractKernelBuildContext(_ string, submatch []string) map[string]any {
 	ctx := map[string]any{
 		"error_type": "kernel_build_failed",
+	}
+
+	if deviceID, err := strconv.Atoi(submatch[1]); err == nil {
+		ctx["device_id"] = deviceID
+	}
+
+	ctx["kernel_path"] = submatch[2]
+
+	return ctx
+}
+
+// extractKernelCreateContext extracts device ID and kernel path from kernel create failures.
+// submatch: [full, deviceID, kernelPath]
+func extractKernelCreateContext(_ string, submatch []string) map[string]any {
+	ctx := map[string]any{
+		"error_type": "kernel_create_failed",
 	}
 
 	if deviceID, err := strconv.Atoi(submatch[1]); err == nil {

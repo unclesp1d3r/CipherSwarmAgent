@@ -46,7 +46,7 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - **Colon-aware parsing:** Many hash types contain colons (MD5:salt, PBKDF2 `sha256:20000:salt`, Kerberos `krb5asrep$23$user@REALM$hash`). Any regex parsing colon-delimited hashcat output (especially machine-readable `<file>:<line>:<hash>:<error>`) must use non-greedy captures for the file path (`(.+?)`) or anchor on the known numeric line field — greedy `(.+)` will consume hash colons into the file capture group.
 - **Structured error metadata:** `cserrors.WithContext(map[string]any)` merges extracted fields into the API error metadata `other` map. Always pair with `WithClassification` when sending classified errors.
 - **Metadata key precedence:** In `SendAgentError`, context fields are copied first, then reserved keys (`platform`, `version`, `category`, `retryable`) are set — so reserved keys always win over context collisions.
-- **Error-specific classification in RunTask:** `NewHashcatSession` failures are branched: hash file errors (`ErrHashFileNotReadable`, `ErrHashFileEmpty`) get `WithClassification("file_access", false)` + `WithContext`; all other failures use `LogAndSendError` without classification. Follow this pattern when adding new classified error paths.
+- **Error-specific classification in RunTask:** `NewHashcatSession` failures are branched: hash file errors (`ErrHashFileNotReadable`, `ErrHashFileEmpty`, `ErrHashFileWhitespaceOnly`) get `WithClassification("file_access", false)` + `WithContext`; all other failures use `LogAndSendError` without classification. Follow this pattern when adding new classified error paths.
 
 ## Go
 

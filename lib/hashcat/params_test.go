@@ -900,6 +900,13 @@ func TestParams_ToCmdArgs_HashFileUnreadable(t *testing.T) {
 	hashFile := filepath.Join(dir, "unreadable.hsh")
 	require.NoError(t, os.WriteFile(hashFile, []byte("5f4dcc3b5aa765d61d8327deb882cf99\n"), 0o000))
 
+	// Skip if running as root/elevated privileges where 0o000 doesn't prevent reading
+	f, openErr := os.Open(hashFile)
+	if openErr == nil {
+		require.NoError(t, f.Close())
+		t.Skip("running with elevated privileges; 0o000 permissions do not prevent reading")
+	}
+
 	params := Params{
 		AttackMode:       attackModeDictionary,
 		HashType:         0,

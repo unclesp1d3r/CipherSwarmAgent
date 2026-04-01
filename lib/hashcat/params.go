@@ -387,7 +387,8 @@ func safePath(base, filename string) (string, error) {
 const hashFileReadBufSize = 4096
 
 // validateHashFile opens the hash file to verify readability, checks it is non-empty,
-// and ensures it contains at least one non-whitespace byte in the first 4 KB.
+// and ensures it contains at least one non-whitespace byte. Reads in 4 KB chunks
+// until a non-whitespace byte is found or EOF is reached.
 func validateHashFile(hashFile string) error {
 	f, err := os.Open(hashFile)
 	if err != nil {
@@ -400,11 +401,18 @@ func validateHashFile(hashFile string) error {
 	defer f.Close()
 
 	buf := make([]byte, hashFileReadBufSize)
+	totalRead := 0
 
-	n, readErr := f.Read(buf)
-	if n == 0 {
+	for {
+		n, readErr := f.Read(buf)
+		totalRead += n
+
+		if n > 0 && containsNonWhitespace(buf[:n]) {
+			return nil
+		}
+
 		if readErr == io.EOF {
-			return fmt.Errorf("%w: %s", ErrHashFileEmpty, hashFile)
+			break
 		}
 
 		if readErr != nil {
@@ -412,11 +420,11 @@ func validateHashFile(hashFile string) error {
 		}
 	}
 
-	if !containsNonWhitespace(buf[:n]) {
-		return fmt.Errorf("%w: %s", ErrHashFileWhitespaceOnly, hashFile)
+	if totalRead == 0 {
+		return fmt.Errorf("%w: %s", ErrHashFileEmpty, hashFile)
 	}
 
-	return nil
+	return fmt.Errorf("%w: %s", ErrHashFileWhitespaceOnly, hashFile)
 }
 
 // containsNonWhitespace returns true if the byte slice contains at least one non-whitespace byte.

@@ -176,8 +176,9 @@ func (m *Manager) RunTask(ctx context.Context, task *api.Task, attack *api.Attac
 				ctx, "Hash file validation failed", task, api.SeverityCritical,
 				cserrors.WithClassification("file_access", false),
 				cserrors.WithContext(map[string]any{
-					"error_type": "hash_file_validation",
-					"detail":     detail,
+					"error_type":    "hash_file_validation",
+					"detail":        detail,
+					"error_message": err.Error(),
 				}),
 			)
 		} else {
