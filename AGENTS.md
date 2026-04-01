@@ -65,25 +65,25 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 
 - `cmd/`: Main application entry points using the Cobra framework.
 - `lib/`: Core agent logic, decomposed into focused sub-packages:
-  - `agent/`: Agent lifecycle — startup, heartbeat loop, task polling, shutdown.
-  - `api/`: API client layer — generated client (`client.gen.go`), wrapper (`client.go`), errors (`errors.go`), interfaces (`interfaces.go`), mocks (`mock.go`). Transport chain: `http.Transport` → `CircuitTransport` → `RetryTransport` → `http.Client`.
-  - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
-  - `arch/`: OS-specific abstractions (Linux, macOS, Windows). Platform identity comes from `host.InfoStat.OS` (in `UpdateAgentMetadata`), not from `arch` — don't add `GetPlatform()` functions here.
-  - `benchmark/`: Benchmark execution, caching, and submission.
-  - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
-  - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
-  - `devices/`: Hashcat-native device enumeration via `hashcat -I`. `DeviceManager` parses backend devices (OpenCL/CUDA/Metal), tracks availability, and validates device ID selections. `CmdFactory` type enables test injection. `ValidateAndFilterDevices` is the main integration point for task/session setup. Nil `DeviceManager` (enumeration failed) → `getDevicesList` returns empty slice, not an error — no test-session fallback exists.
-  - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
-  - `display/`: User-facing output (status, progress, benchmark results).
-  - `downloader/`: File download with checksum verification. Downloads use `grab/v3` with a `Getter` interface for testability. `grabDownloader` implements `Getter`; `downloadWithRetry` handles exponential backoff against any `Getter`. `grab.Response.Err()` blocks until transfer finalizes — always call it before returning from cancellation paths.
-  - `hashcat/`: Hashcat session management, parameters, and output parsing.
-  - `progress/`: Progress calculation utilities. Exposes `Tracker` interface (`StartTracking(filename, totalSize) → DownloadProgress`) and `DownloadProgress` interface (`Update(bytesComplete)`, `Finish()`). `DefaultProgressBar` wraps `cheggaaa/pb`.
-  - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
-  - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
-  - `zap/`: Zap file monitoring for cracked hashes.
+    - `agent/`: Agent lifecycle — startup, heartbeat loop, task polling, shutdown.
+    - `api/`: API client layer — generated client (`client.gen.go`), wrapper (`client.go`), errors (`errors.go`), interfaces (`interfaces.go`), mocks (`mock.go`). Transport chain: `http.Transport` → `CircuitTransport` → `RetryTransport` → `http.Client`.
+    - `apierrors/`: Generic API error handler (`Handler`) for log-or-send error handling.
+    - `arch/`: OS-specific abstractions (Linux, macOS, Windows): `GetHashcatVersion`, `Extract7z`, `GetDefaultHashcatBinaryName`, `GetAdditionalHashcatArgs`. Device detection lives in `devices/`, not here. Platform identity comes from `host.InfoStat.OS` (in `UpdateAgentMetadata`) — don't add `GetPlatform()` functions here.
+    - `benchmark/`: Benchmark execution, caching, and submission.
+    - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
+    - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
+    - `devices/`: Hashcat-native device enumeration via `hashcat -I`. `DeviceManager` parses backend devices (OpenCL/CUDA/Metal), tracks availability, and validates device ID selections. `CmdFactory` type enables test injection. `ValidateAndFilterDevices` is the main integration point for task/session setup. Nil `DeviceManager` (enumeration failed) → `getDevicesList` returns empty slice, not an error — no test-session fallback exists.
+    - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
+    - `display/`: User-facing output (status, progress, benchmark results).
+    - `downloader/`: File download with checksum verification. Downloads use `grab/v3` with a `Getter` interface for testability. `grabDownloader` implements `Getter`; `downloadWithRetry` handles exponential backoff against any `Getter`. `grab.Response.Err()` blocks until transfer finalizes — always call it before returning from cancellation paths.
+    - `hashcat/`: Hashcat session management, parameters, and output parsing.
+    - `progress/`: Progress calculation utilities. Exposes `Tracker` interface (`StartTracking(filename, totalSize) → DownloadProgress`) and `DownloadProgress` interface (`Update(bytesComplete)`, `Finish()`). `DefaultProgressBar` wraps `cheggaaa/pb`.
+    - `task/`: Task lifecycle — accept, run, status updates, crack submission, downloads.
+    - `testhelpers/`: Shared test fixtures, HTTP mocking, and state setup.
+    - `zap/`: Zap file monitoring for cracked hashes.
 - `agentstate/`: Global agent state, loggers, and synchronized fields.
 - `docs/`: Project documentation, including the OpenAPI specification.
-  - `docs/plans/`: Working design documents — NOT committed to git.
+    - `docs/plans/`: Working design documents — NOT committed to git.
 
 ### Formatting & Linting
 
