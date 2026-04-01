@@ -53,23 +53,33 @@ func TestValidateReceipt(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:      "zero received warns but succeeds",
+			name:      "zero received returns error",
 			sentCount: 10,
 			receipt: api.BenchmarkReceipt{
 				ReceivedCount:  0,
 				ProcessedCount: 0,
 				FailedCount:    0,
 			},
-			expectError: false,
+			expectError: true,
 		},
 		{
-			name:      "all failed",
+			name:      "all failed returns error",
 			sentCount: 5,
 			receipt: api.BenchmarkReceipt{
 				ReceivedCount:  5,
 				ProcessedCount: 0,
 				FailedCount:    5,
 				Message:        &msg,
+			},
+			expectError: true,
+		},
+		{
+			name:      "zero sent zero received succeeds",
+			sentCount: 0,
+			receipt: api.BenchmarkReceipt{
+				ReceivedCount:  0,
+				ProcessedCount: 0,
+				FailedCount:    0,
 			},
 			expectError: false,
 		},
