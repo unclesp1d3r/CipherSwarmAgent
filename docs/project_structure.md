@@ -67,10 +67,10 @@ func main() {
 
 - **Purpose**: Cobra CLI command definition and configuration
 - **Key Functions**:
-  - Command-line flag parsing and Viper binding
-  - Configuration initialization (`initConfig`)
-  - Agent lifecycle startup (`startAgent`)
-  - Signal handling for graceful shutdown
+    - Command-line flag parsing and Viper binding
+    - Configuration initialization (`initConfig`)
+    - Agent lifecycle startup (`startAgent`)
+    - Signal handling for graceful shutdown
 
 ### 3. Agent State (`agentstate/`)
 
@@ -78,11 +78,11 @@ func main() {
 
 - **Purpose**: Global application state and configuration
 - **Key Types**:
-  - `State`: Runtime state with synchronized fields (`atomic.Bool`, `sync.RWMutex`)
-  - `CurrentActivity`: Current agent activity enum
+    - `State`: Runtime state with synchronized fields (`atomic.Bool`, `sync.RWMutex`)
+    - `CurrentActivity`: Current agent activity enum
 - **Globals**:
-  - `State`: Shared agent state (access via getter/setter methods only)
-  - `Logger`: Application logger (`charmbracelet/log`)
+    - `State`: Shared agent state (access via getter/setter methods only)
+    - `Logger`: Application logger (`charmbracelet/log`)
 
 ### 4. Core Library (`lib/`)
 
@@ -92,32 +92,32 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Server communication and configuration mapping
 - **Key Functions**:
-  - `AuthenticateAgent()`: Server authentication
-  - `GetAgentConfiguration()`: Fetch and map server configuration
-  - `UpdateAgentMetadata()`: Send agent info to server
-  - `SendHeartBeat()`: Periodic health check
-  - `mapConfiguration()`: Map API response to internal config
-  - `GetConfiguration()`: Thread-safe access to current agent configuration (via `atomic.Value`)
-  - `SetConfiguration()`: Atomically replace agent configuration
+    - `AuthenticateAgent()`: Server authentication
+    - `GetAgentConfiguration()`: Fetch and map server configuration
+    - `UpdateAgentMetadata()`: Send agent info to server
+    - `SendHeartBeat()`: Periodic health check
+    - `mapConfiguration()`: Map API response to internal config
+    - `GetConfiguration()`: Thread-safe access to current agent configuration (via `atomic.Value`)
+    - `SetConfiguration()`: Atomically replace agent configuration
 
 #### `lib/dataTypes.go`
 
 - **Purpose**: Core data structures and type definitions
 - **Key Types**:
-  - `agentConfiguration`: Internal configuration structure
-  - Type conversion utilities
+    - `agentConfiguration`: Internal configuration structure
+    - Type conversion utilities
 
 #### `lib/errorUtils.go`
 
 - **Purpose**: Error handling helpers for API responses
 - **Key Functions**:
-  - Error type handlers for specific API operations (heartbeat, status, task, etc.)
+    - Error type handlers for specific API operations (heartbeat, status, task, etc.)
 
 #### `lib/crackerUtils.go`
 
 - **Purpose**: Hashcat binary path management
 - **Key Functions**:
-  - `setNativeHashcatPath()`: Configure native binary usage
+    - `setNativeHashcatPath()`: Configure native binary usage
 
 ### 5. Agent Lifecycle (`lib/agent/`)
 
@@ -125,8 +125,8 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Agent main loop and lifecycle management
 - **Key Functions**:
-  - `StartAgent()`: Main agent loop (heartbeat, task polling, benchmark gating). After creating the lock file, calls `hashcat.CleanupOrphanedSessionFiles()` to remove stale session files from previous ungraceful shutdowns before entering the main loop.
-  - `sleepWithContext()`: Context-aware sleep utility
+    - `StartAgent()`: Main agent loop (heartbeat, task polling, benchmark gating). After creating the lock file, calls `hashcat.CleanupOrphanedSessionFiles()` to remove stale session files from previous ungraceful shutdowns before entering the main loop.
+    - `sleepWithContext()`: Context-aware sleep utility
 
 ### 6. API Client Layer (`lib/api/`)
 
@@ -139,8 +139,8 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Hand-written API client wrapper
 - **Key Types**:
-  - `AgentClient`: Wraps `ClientWithResponses`, implements `APIClient` interface
-  - Sub-clients: `Tasks()`, `Attacks()`, `Agents()`, `Auth()`
+    - `AgentClient`: Wraps `ClientWithResponses`, implements `APIClient` interface
+    - Sub-clients: `Tasks()`, `Attacks()`, `Agents()`, `Auth()`
 
 #### `lib/api/interfaces.go`
 
@@ -166,18 +166,18 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Benchmark execution and incremental submission
 - **Key Types**:
-  - `Manager`: Orchestrates benchmark sessions with constructor injection
+    - `Manager`: Orchestrates benchmark sessions with constructor injection
 - **Key Functions**:
-  - `UpdateBenchmarks()`: Run full benchmark session
-  - `cacheAndSubmitBenchmarks()`: Combined cache + submit with early-return
+    - `UpdateBenchmarks()`: Run full benchmark session
+    - `cacheAndSubmitBenchmarks()`: Combined cache + submit with early-return
 
 #### `lib/benchmark/cache.go`
 
 - **Purpose**: Persistent benchmark cache at `{data_path}/benchmark_cache.json`
 - **Key Functions**:
-  - `saveBenchmarkCache()`: Atomic cache persistence using `os.CreateTemp` + `os.Rename` pattern for race-free writes
-  - `loadBenchmarkCache()`: Cache persistence
-  - `TrySubmitCachedBenchmarks()`: Submit cached results on startup
+    - `saveBenchmarkCache()`: Atomic cache persistence using `os.CreateTemp` + `os.Rename` pattern for race-free writes
+    - `loadBenchmarkCache()`: Cache persistence
+    - `TrySubmitCachedBenchmarks()`: Submit cached results on startup
 
 #### `lib/benchmark/parse.go`
 
@@ -189,8 +189,8 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Configuration defaults as exported constants
 - **Key Functions**:
-  - `SetDefaultConfigValues()`: Register viper defaults
-  - `SetupSharedState()`: Wire config into `agentstate.State`
+    - `SetDefaultConfigValues()`: Register viper defaults
+    - `SetupSharedState()`: Wire config into `agentstate.State`
 
 ### 10. Hashcat Integration (`lib/hashcat/`)
 
@@ -198,22 +198,22 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Hashcat process lifecycle management
 - **Key Types**:
-  - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines. Includes `sessionName` field for tracking hashcat session name and `sync.WaitGroup` for tracking I/O goroutines during shutdown.
-  - `Session.StderrMessages`: Channel type is `chan ErrorInfo` (changed from `chan string`). Consumers receive structured error information with classification and context instead of raw strings. Stdout lines are classified before being sent to this channel for error/warning lines.
+    - `Session`: Represents a running Hashcat instance with context-aware I/O goroutines. Includes `sessionName` field for tracking hashcat session name and `sync.WaitGroup` for tracking I/O goroutines during shutdown.
+    - `Session.StderrMessages`: Channel type is `chan ErrorInfo` (changed from `chan string`). Consumers receive structured error information with classification and context instead of raw strings. Stdout lines are classified before being sent to this channel for error/warning lines.
 - **Key Functions**:
-  - `NewHashcatSession(ctx context.Context, id string, params Params)`: Create configured session with parent context for proper cancellation propagation
-  - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines (all tracked in WaitGroup)
-  - `Kill()`: Terminate process gracefully
-  - `Cleanup()`: Kills the process, waits for all I/O goroutines to exit via WaitGroup, then performs resource cleanup including temporary files (output files, charset files, hash files, restore files, zaps directory) and hashcat-created session files (.log and .pid files)
+    - `NewHashcatSession(ctx context.Context, id string, params Params)`: Create configured session with parent context for proper cancellation propagation
+    - `Start()`: Launch Hashcat process with stdout/stderr/tailer goroutines (all tracked in WaitGroup)
+    - `Kill()`: Terminate process gracefully
+    - `Cleanup()`: Kills the process, waits for all I/O goroutines to exit via WaitGroup, then performs resource cleanup including temporary files (output files, charset files, hash files, restore files, zaps directory) and hashcat-created session files (.log and .pid files)
 
 #### `lib/hashcat/params.go`
 
 - **Purpose**: Hashcat parameter configuration and validation
 - **Key Types**:
-  - `Params`: Attack configuration structure
+    - `Params`: Attack configuration structure
 - **Key Functions**:
-  - `Validate()`: Parameter validation per attack mode
-  - `toCmdArgs()`: Command-line argument generation
+    - `Validate()`: Parameter validation per attack mode
+    - `toCmdArgs()`: Command-line argument generation
 
 #### `lib/hashcat/types.go`
 
@@ -223,39 +223,39 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Hashcat exit code interpretation
 - **Key Types**:
-  - `ExitCodeInfo`: Adds `Context map[string]any` field for structured metadata
+    - `ExitCodeInfo`: Adds `Context map[string]any` field for structured metadata
 - **Exit Codes**:
-  - **Corrected mappings** (codes -3 through -7 match hashcat 7.x `types.h`):
-    - `-3` (`ExitCodeRuntimeSkip`): All backend devices skipped at runtime
-    - `-4` (`ExitCodeMemoryHit`): Insufficient device memory
-    - `-5` (`ExitCodeKernelBuild`): Kernel compilation failed
-    - `-6` (`ExitCodeKernelCreate`): Kernel creation failed
-    - `-7` (`ExitCodeKernelAccel`): Autotune failed on all devices
-  - **New codes**:
-    - `5` (`ExitCodeAbortFinish`): Aborted after finish flag set (RC_FINAL_ABORT_FINISH)
-    - `-8` (`ExitCodeExtraSize`): Extra size backend issue (shell: 248)
-    - `-9` (`ExitCodeMixedWarnings`): Multiple backend issues (shell: 247)
-    - `-11` (`ExitCodeSelftestFail`): Kernel self-test failed (shell: 245)
+    - **Corrected mappings** (codes -3 through -7 match hashcat 7.x `types.h`):
+        - `-3` (`ExitCodeRuntimeSkip`): All backend devices skipped at runtime
+        - `-4` (`ExitCodeMemoryHit`): Insufficient device memory
+        - `-5` (`ExitCodeKernelBuild`): Kernel compilation failed
+        - `-6` (`ExitCodeKernelCreate`): Kernel creation failed
+        - `-7` (`ExitCodeKernelAccel`): Autotune failed on all devices
+    - **New codes**:
+        - `5` (`ExitCodeAbortFinish`): Aborted after finish flag set (RC_FINAL_ABORT_FINISH)
+        - `-8` (`ExitCodeExtraSize`): Extra size backend issue (shell: 248)
+        - `-9` (`ExitCodeMixedWarnings`): Multiple backend issues (shell: 247)
+        - `-11` (`ExitCodeSelftestFail`): Kernel self-test failed (shell: 245)
 
 #### `lib/hashcat/errorparser.go`
 
 - **Purpose**: Hashcat error message parsing and classification
 - **Key Types**:
-  - `ErrorInfo`: Adds `Context map[string]any` field containing extracted structured metadata. Fields include `error_type`, `hashfile`, `line_number`, `hash_preview`, `affected_count`, `total_count`, `device_id`, `backend_api`, `api_error`, `terminal`, and others.
-  - `contextExtractor`: Function type for extracting structured context from matched lines
-  - `errorPattern`: Pattern matcher with optional `extract` field for context extraction
+    - `ErrorInfo`: Adds `Context map[string]any` field containing extracted structured metadata. Fields include `error_type`, `hashfile`, `line_number`, `hash_preview`, `affected_count`, `total_count`, `device_id`, `backend_api`, `api_error`, `terminal`, and others.
+    - `contextExtractor`: Function type for extracting structured context from matched lines
+    - `errorPattern`: Pattern matcher with optional `extract` field for context extraction
 - **Key Functions**:
-  - `ClassifyStderr()`: Classifies error/warning lines from hashcat. Despite the name, processes both stdout and stderr lines, as hashcat emits hash parsing errors via stdout.
+    - `ClassifyStderr()`: Classifies error/warning lines from hashcat. Despite the name, processes both stdout and stderr lines, as hashcat emits hash parsing errors via stdout.
 
 #### `lib/hashcat/session_dir.go`
 
 - **Purpose**: Hashcat session directory resolution and orphaned file cleanup
 - **Constants**:
-  - `sessionPrefix` (`"attack-"`): Shared constant for agent-created session names, used across `session.go`, `params.go`, and cleanup functions
+    - `sessionPrefix` (`"attack-"`): Shared constant for agent-created session names, used across `session.go`, `params.go`, and cleanup functions
 - **Key Functions**:
-  - `hashcatSessionDir(binaryPath)`: Resolves platform-specific session directory (`~/.hashcat/sessions/` on Linux/macOS, binary directory on Windows)
-  - `CleanupOrphanedSessionFiles(binaryPath)`: Removes stale `attack-*.log` and `attack-*.pid` files from hashcat's session directory at agent startup. Skipped on Windows where the session directory equals the binary directory. Errors are logged but never propagate — cleanup failure cannot prevent agent startup.
-  - `cleanupOrphanedInDir(dir)`: Internal function that scans a directory for orphaned session files matching the `attack-*` pattern and removes only regular files (symlinks, directories, and `.restore` files are preserved)
+    - `hashcatSessionDir(binaryPath)`: Resolves platform-specific session directory (`~/.hashcat/sessions/` on Linux/macOS, binary directory on Windows)
+    - `CleanupOrphanedSessionFiles(binaryPath)`: Removes stale `attack-*.log` and `attack-*.pid` files from hashcat's session directory at agent startup. Skipped on Windows where the session directory equals the binary directory. Errors are logged but never propagate — cleanup failure cannot prevent agent startup.
+    - `cleanupOrphanedInDir(dir)`: Internal function that scans a directory for orphaned session files matching the `attack-*` pattern and removes only regular files (symlinks, directories, and `.restore` files are preserved)
 
 ### 11. Task Management (`lib/task/`)
 
@@ -263,13 +263,13 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Task acceptance and lifecycle
 - **Key Functions**:
-  - `AcceptTask()`, `AbandonTask()`, `MarkTaskExhausted()`
+    - `AcceptTask()`, `AbandonTask()`, `MarkTaskExhausted()`
 
 #### `lib/task/runner.go`
 
 - **Purpose**: Task execution with hashcat
 - **Key Functions**:
-  - `RunTask()`: Main task runner
+    - `RunTask()`: Main task runner
 
 #### `lib/task/status.go`
 
@@ -293,9 +293,9 @@ The main business logic of the agent, organized by functional area:
 
 - **Purpose**: Error reporting to server
 - **Key Functions**:
-  - `SendAgentError()`: Report errors with severity and metadata
-  - `LogAndSendError()`: Combined logging and server reporting
-  - `WithContext(ctx map[string]any)`: Adds structured context fields to error metadata. Fields are merged into the metadata map alongside classification and platform info.
+    - `SendAgentError()`: Report errors with severity and metadata
+    - `LogAndSendError()`: Combined logging and server reporting
+    - `WithContext(ctx map[string]any)`: Adds structured context fields to error metadata. Fields are merged into the metadata map alongside classification and platform info.
 
 **Example usage with context**:
 
@@ -314,19 +314,19 @@ Platform-specific functionality for cross-platform support:
 - **`windows.go`**: Windows device detection
 - **`validate.go`**: Defense-in-depth path validation before `exec.CommandContext` calls
 
-**Common Functions**: `GetDevices()`, `GetHashcatVersion()`, `Extract7z()`, `GetDefaultHashcatBinaryName()`
+**Common Functions**: `GetHashcatVersion()`, `Extract7z()`, `GetDefaultHashcatBinaryName()`, `GetAdditionalHashcatArgs()`
 
 #### `lib/arch/validate.go`
 
 - **Purpose**: Cross-platform path validation for executable and archive paths
 - **Key Functions**:
-  - `ValidateExecutablePath(path)`: Verifies binary path is absolute, exists, and is not a directory
-  - `ValidateArchivePaths(srcFile, destDir)`: Validates source archive file and destination directory exist with correct types
+    - `ValidateExecutablePath(path)`: Verifies binary path is absolute, exists, and is not a directory
+    - `ValidateArchivePaths(srcFile, destDir)`: Validates source archive file and destination directory exist with correct types
 - **Key Errors**:
-  - `ErrRelativePath`: Path is not absolute
-  - `ErrPathNotFound`: Path does not exist on disk
-  - `ErrPathIsDirectory`: Path points to a directory when a file was expected
-  - `ErrPathNotDirectory`: Path is not a directory when one was expected
+    - `ErrRelativePath`: Path is not absolute
+    - `ErrPathNotFound`: Path does not exist on disk
+    - `ErrPathIsDirectory`: Path points to a directory when a file was expected
+    - `ErrPathNotDirectory`: Path is not a directory when one was expected
 
 ### 14. Supporting Packages
 
