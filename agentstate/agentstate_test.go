@@ -34,7 +34,6 @@ func TestState_DefaultValues(t *testing.T) {
 	assert.False(t, State.RetainZapsOnCompletion)
 	assert.False(t, State.EnableAdditionalHashTypes)
 	assert.False(t, State.GetJobCheckingStopped())
-	assert.False(t, State.UseLegacyDeviceIdentificationMethod)
 	assert.False(t, State.GetBenchmarksSubmitted())
 }
 
@@ -159,7 +158,6 @@ func TestState_BooleanFlags(t *testing.T) {
 	origWriteZaps := State.WriteZapsToFile
 	origRetainZaps := State.RetainZapsOnCompletion
 	origEnableHash := State.EnableAdditionalHashTypes
-	origLegacy := State.UseLegacyDeviceIdentificationMethod
 
 	// Save synchronized fields via getters
 	origJobStopped := State.GetJobCheckingStopped()
@@ -172,7 +170,6 @@ func TestState_BooleanFlags(t *testing.T) {
 		State.WriteZapsToFile = origWriteZaps
 		State.RetainZapsOnCompletion = origRetainZaps
 		State.EnableAdditionalHashTypes = origEnableHash
-		State.UseLegacyDeviceIdentificationMethod = origLegacy
 		State.SetJobCheckingStopped(origJobStopped)
 		State.SetBenchmarksSubmitted(origBenchmarks)
 	}()
@@ -185,7 +182,6 @@ func TestState_BooleanFlags(t *testing.T) {
 	State.RetainZapsOnCompletion = true
 	State.EnableAdditionalHashTypes = true
 	State.SetJobCheckingStopped(true)
-	State.UseLegacyDeviceIdentificationMethod = true
 	State.SetBenchmarksSubmitted(true)
 
 	assert.True(t, State.Debug)
@@ -195,6 +191,5 @@ func TestState_BooleanFlags(t *testing.T) {
 	assert.True(t, State.RetainZapsOnCompletion)
 	assert.True(t, State.EnableAdditionalHashTypes)
 	assert.True(t, State.GetJobCheckingStopped())
-	assert.True(t, State.UseLegacyDeviceIdentificationMethod)
 	assert.True(t, State.GetBenchmarksSubmitted())
 }

@@ -24,52 +24,51 @@ var State = agentState{} //nolint:gochecknoglobals // Global agent state
 //   - Fields accessed across goroutines (heartbeat + agent loops) are synchronized via atomic.Bool
 //     or sync.RWMutex. Use the getter/setter methods for those fields.
 type agentState struct {
-	PidFile                             string        // PidFile is the path to the file containing the agent's process ID.
-	HashcatPidFile                      string        // HashcatPidFile is the path to the file containing the Hashcat process ID.
-	DataPath                            string        // DataPath is the path to the directory containing the agent's data files.
-	CrackersPath                        string        // CrackersPath is the path to the directory containing the agent's cracker binaries.
-	HashlistPath                        string        // HashlistPath is the path to the directory containing the agent's hashlists.
-	ZapsPath                            string        // ZapsPath is the path to the directory containing the agent's zaps.
-	PreprocessorsPath                   string        // PreprocessorsPath is the path to the directory containing the agent's preprocessors.
-	ToolsPath                           string        // ToolsPath is the path to the directory containing the agent's tools.
-	OutPath                             string        // OutPath is the path to the directory containing the agent's output files.
-	FilePath                            string        // FilePath is the path to the file containing various files for attacks.
-	RestoreFilePath                     string        // RestoreFilePath is the path to the file containing hashcat's restore data.
-	BenchmarkCachePath                  string        // BenchmarkCachePath is the path to the JSON file caching benchmark results.
-	Debug                               bool          // Debug specifies whether the agent is running in debug mode.
-	AgentID                             int64         // AgentID is the unique identifier of the agent.
-	URL                                 string        // URL is the URL of the CipherSwarm API.
-	APIToken                            string        // APIToken is the token used to authenticate with the CipherSwarm API.
-	AlwaysTrustFiles                    bool          // AlwaysTrustFiles specifies whether the agent should trust all files in the files directory and not check checksums.
-	ExtraDebugging                      bool          // ExtraDebugging specifies whether the agent should show extra debugging information. Set once at init; safe to read from any goroutine.
-	StatusTimer                         int           // StatusTimer is the interval in seconds between status updates.
-	WriteZapsToFile                     bool          // WriteZapsToFile specifies whether the agent should write zaps to a file.
-	RetainZapsOnCompletion              bool          // RetainZapsOnCompletion specifies whether the agent should retain zaps after a job is completed.
-	EnableAdditionalHashTypes           bool          // EnableAdditionalHashTypes specifies whether the agent should enable additional hash types.
-	HashcatPath                         string        // HashcatPath is the path to the Hashcat binary (empty for auto-detection).
-	UseLegacyDeviceIdentificationMethod bool          // UseLegacyDeviceIdentificationMethod specifies whether the agent should use the legacy device identification method.
-	apiClient                           api.APIClient // apiClient is the interface-based client for API operations (enables dependency injection).
-	apiClientMu                         sync.RWMutex  // apiClientMu protects apiClient during concurrent access.
-	InsecureDownloads                   bool          // InsecureDownloads skips TLS certificate verification for downloads.
-	DownloadMaxRetries                  int           // DownloadMaxRetries is the max number of download retry attempts.
-	DownloadRetryDelay                  time.Duration // DownloadRetryDelay is the base delay between download retries.
-	TaskTimeout                         time.Duration // TaskTimeout is the max time for a single task before forced termination.
-	MaxHeartbeatBackoff                 int           // MaxHeartbeatBackoff is the max multiplier for heartbeat backoff.
-	SleepOnFailure                      time.Duration // SleepOnFailure is how long to wait after a task failure before retrying.
-	ConnectTimeout                      time.Duration // ConnectTimeout is the TCP connect timeout for API requests.
-	ReadTimeout                         time.Duration // ReadTimeout is the read timeout for API responses.
-	WriteTimeout                        time.Duration // WriteTimeout is accepted from server config but not used in the transport chain (Go's http.Transport has no write timeout).
-	RequestTimeout                      time.Duration // RequestTimeout is the overall request timeout for API calls.
-	APIMaxRetries                       int           // APIMaxRetries is the max retry attempts for failed API requests.
-	APIRetryInitialDelay                time.Duration // APIRetryInitialDelay is the initial delay between API retries.
-	APIRetryMaxDelay                    time.Duration // APIRetryMaxDelay is the maximum delay between API retries.
-	CircuitBreakerFailureThreshold      int           // CircuitBreakerFailureThreshold is failures before circuit opens.
-	CircuitBreakerTimeout               time.Duration // CircuitBreakerTimeout is the duration before half-open retry.
-	AlwaysUseNativeHashcat              bool          // AlwaysUseNativeHashcat forces using the system's native Hashcat binary.
-	DeferBenchmarks                     bool          // DeferBenchmarks skips full benchmarks at startup; uses capability detection instead.
-	BenchmarkWhileIdle                  bool          // BenchmarkWhileIdle enables background benchmarking during idle periods.
-	Platform                            string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin"). Set once before goroutines start; safe to read from any goroutine.
-	AgentVersion                        string        // AgentVersion is the current version of the agent software. Set once in AuthenticateAgent before goroutines start; safe to read from any goroutine.
+	PidFile                        string        // PidFile is the path to the file containing the agent's process ID.
+	HashcatPidFile                 string        // HashcatPidFile is the path to the file containing the Hashcat process ID.
+	DataPath                       string        // DataPath is the path to the directory containing the agent's data files.
+	CrackersPath                   string        // CrackersPath is the path to the directory containing the agent's cracker binaries.
+	HashlistPath                   string        // HashlistPath is the path to the directory containing the agent's hashlists.
+	ZapsPath                       string        // ZapsPath is the path to the directory containing the agent's zaps.
+	PreprocessorsPath              string        // PreprocessorsPath is the path to the directory containing the agent's preprocessors.
+	ToolsPath                      string        // ToolsPath is the path to the directory containing the agent's tools.
+	OutPath                        string        // OutPath is the path to the directory containing the agent's output files.
+	FilePath                       string        // FilePath is the path to the file containing various files for attacks.
+	RestoreFilePath                string        // RestoreFilePath is the path to the file containing hashcat's restore data.
+	BenchmarkCachePath             string        // BenchmarkCachePath is the path to the JSON file caching benchmark results.
+	Debug                          bool          // Debug specifies whether the agent is running in debug mode.
+	AgentID                        int64         // AgentID is the unique identifier of the agent.
+	URL                            string        // URL is the URL of the CipherSwarm API.
+	APIToken                       string        // APIToken is the token used to authenticate with the CipherSwarm API.
+	AlwaysTrustFiles               bool          // AlwaysTrustFiles specifies whether the agent should trust all files in the files directory and not check checksums.
+	ExtraDebugging                 bool          // ExtraDebugging specifies whether the agent should show extra debugging information. Set once at init; safe to read from any goroutine.
+	StatusTimer                    int           // StatusTimer is the interval in seconds between status updates.
+	WriteZapsToFile                bool          // WriteZapsToFile specifies whether the agent should write zaps to a file.
+	RetainZapsOnCompletion         bool          // RetainZapsOnCompletion specifies whether the agent should retain zaps after a job is completed.
+	EnableAdditionalHashTypes      bool          // EnableAdditionalHashTypes specifies whether the agent should enable additional hash types.
+	HashcatPath                    string        // HashcatPath is the path to the Hashcat binary (empty for auto-detection).
+	apiClient                      api.APIClient // apiClient is the interface-based client for API operations (enables dependency injection).
+	apiClientMu                    sync.RWMutex  // apiClientMu protects apiClient during concurrent access.
+	InsecureDownloads              bool          // InsecureDownloads skips TLS certificate verification for downloads.
+	DownloadMaxRetries             int           // DownloadMaxRetries is the max number of download retry attempts.
+	DownloadRetryDelay             time.Duration // DownloadRetryDelay is the base delay between download retries.
+	TaskTimeout                    time.Duration // TaskTimeout is the max time for a single task before forced termination.
+	MaxHeartbeatBackoff            int           // MaxHeartbeatBackoff is the max multiplier for heartbeat backoff.
+	SleepOnFailure                 time.Duration // SleepOnFailure is how long to wait after a task failure before retrying.
+	ConnectTimeout                 time.Duration // ConnectTimeout is the TCP connect timeout for API requests.
+	ReadTimeout                    time.Duration // ReadTimeout is the read timeout for API responses.
+	WriteTimeout                   time.Duration // WriteTimeout is accepted from server config but not used in the transport chain (Go's http.Transport has no write timeout).
+	RequestTimeout                 time.Duration // RequestTimeout is the overall request timeout for API calls.
+	APIMaxRetries                  int           // APIMaxRetries is the max retry attempts for failed API requests.
+	APIRetryInitialDelay           time.Duration // APIRetryInitialDelay is the initial delay between API retries.
+	APIRetryMaxDelay               time.Duration // APIRetryMaxDelay is the maximum delay between API retries.
+	CircuitBreakerFailureThreshold int           // CircuitBreakerFailureThreshold is failures before circuit opens.
+	CircuitBreakerTimeout          time.Duration // CircuitBreakerTimeout is the duration before half-open retry.
+	AlwaysUseNativeHashcat         bool          // AlwaysUseNativeHashcat forces using the system's native Hashcat binary.
+	DeferBenchmarks                bool          // DeferBenchmarks skips full benchmarks at startup; uses capability detection instead.
+	BenchmarkWhileIdle             bool          // BenchmarkWhileIdle enables background benchmarking during idle periods.
+	Platform                       string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin"). Set once before goroutines start; safe to read from any goroutine.
+	AgentVersion                   string        // AgentVersion is the current version of the agent software. Set once in AuthenticateAgent before goroutines start; safe to read from any goroutine.
 
 	// Synchronized fields — use getter/setter methods; do not access directly.
 	reload              atomic.Bool
