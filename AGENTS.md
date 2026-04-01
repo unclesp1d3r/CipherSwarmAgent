@@ -46,6 +46,7 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - **Colon-aware parsing:** Many hash types contain colons (MD5:salt, PBKDF2 `sha256:20000:salt`, Kerberos `krb5asrep$23$user@REALM$hash`). Any regex parsing colon-delimited hashcat output (especially machine-readable `<file>:<line>:<hash>:<error>`) must use non-greedy captures for the file path (`(.+?)`) or anchor on the known numeric line field — greedy `(.+)` will consume hash colons into the file capture group.
 - **Structured error metadata:** `cserrors.WithContext(map[string]any)` merges extracted fields into the API error metadata `other` map. Always pair with `WithClassification` when sending classified errors.
 - **Metadata key precedence:** In `SendAgentError`, context fields are copied first, then reserved keys (`platform`, `version`, `category`, `retryable`) are set — so reserved keys always win over context collisions.
+- **Error-specific classification in RunTask:** `NewHashcatSession` failures are branched: hash file errors (`ErrHashFileNotReadable`, `ErrHashFileEmpty`, `ErrHashFileWhitespaceOnly`) get `WithClassification("file_access", false)` + `WithContext`; all other failures use `LogAndSendError` without classification. Follow this pattern when adding new classified error paths.
 
 ## Go
 
@@ -96,6 +97,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - In deferred cleanup, use `os.IsNotExist` to skip already-removed files. Include file paths in error messages.
 - For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding.
 - **Error reporting:** Use `SendAgentError(ctx, msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. `cserrors.LogAndSendError` delegates to `SendAgentError` (includes platform/version metadata). Always pass a non-nil error — it returns `err` directly. API submission is skipped only when `APIClient` is uninitialized.
+- **`LogAndSendError` return value:** `LogAndSendError` returns `err` — always capture or `return` it. Discarding the return value triggers `errcheck` lint failure.
+- **Classified vs. generic error reporting:** Use `SendAgentError` with `WithClassification`/`WithContext` only when the error matches a specific known category (e.g., hash-file validation → `file_access`). For unclassified or general failures, use `LogAndSendError` to avoid mislabeling errors with incorrect category/retryability metadata.
 
 ### Concurrency
 
@@ -156,6 +159,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - When adding or removing `agentstate.State` fields, grep all test helpers and reset functions — including `saveAndRestoreState` in `agent_test.go`, `ResetTestState`, `SetupTestState`, and `SetupMinimalTestState` in `testhelpers/state_helper.go`.
 - For cross-platform subprocess tests, use the Go test helper process pattern (`TestHelperProcess` + `os.Args[0]` + env vars) instead of OS-specific binaries like `sleep` or `true`.
 - Use `hashcat.NewTestSession(skipStatusUpdates)` (in `lib/hashcat/session_test_helpers.go`) to create mock sessions — never construct `hashcat.Session` struct literals directly from `testhelpers`, as it bypasses constructor invariants.
+- `toCmdArgs()` tests in `params_test.go` must pass real file paths for all validated parameters. Use `createTestHashFile(t)` for hash files and `createTestFile(t, dir, name, content)` for wordlists/rules/masks. Dummy paths like `/tmp/hashes.txt` will fail validation.
 - Status fixture slices (`RecoveredHashes`, `RecoveredSalts`, `Progress`) must have ≥2 elements (`display.MinStatusFields`). Single-element slices cause silent drops in `handleStatusUpdate` and `display.JobStatus`.
 - Run `go test -race ./...` to detect data races.
 

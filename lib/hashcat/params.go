@@ -4,8 +4,10 @@
 package hashcat
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -41,6 +43,12 @@ var (
 	ErrRuleListNotOpened = errors.New("provided rule list couldn't be opened on filesystem")
 	// ErrMaskListNotOpened indicates the specified mask list file cannot be accessed.
 	ErrMaskListNotOpened = errors.New("provided mask list couldn't be opened on filesystem")
+	// ErrHashFileNotReadable indicates the hash file is missing or inaccessible.
+	ErrHashFileNotReadable = errors.New("hash file couldn't be opened on filesystem")
+	// ErrHashFileEmpty indicates the hash file exists but contains zero bytes.
+	ErrHashFileEmpty = errors.New("hash file is empty")
+	// ErrHashFileWhitespaceOnly indicates the hash file contains only whitespace.
+	ErrHashFileWhitespaceOnly = errors.New("hash file contains only whitespace")
 )
 
 // Params represents the configuration parameters for a hashcat hash cracking attack.
@@ -283,6 +291,10 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		params.Mask = maskList
 	}
 
+	if err := validateHashFile(hashFile); err != nil {
+		return nil, err
+	}
+
 	args = append(args, hashFile)
 
 	switch params.AttackMode {
@@ -369,4 +381,53 @@ func safePath(base, filename string) (string, error) {
 	}
 
 	return absJoined, nil
+}
+
+// hashFileReadBufSize is the number of bytes read to check for non-whitespace content.
+const hashFileReadBufSize = 4096
+
+// validateHashFile opens the hash file to verify readability, checks it is non-empty,
+// and ensures it contains at least one non-whitespace byte. Reads in 4 KB chunks
+// until a non-whitespace byte is found or EOF is reached.
+func validateHashFile(hashFile string) error {
+	f, err := os.Open(hashFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%w: %s", ErrHashFileNotReadable, hashFile)
+		}
+
+		return fmt.Errorf("%w: %w", ErrHashFileNotReadable, err)
+	}
+	defer f.Close()
+
+	buf := make([]byte, hashFileReadBufSize)
+	totalRead := 0
+
+	for {
+		n, readErr := f.Read(buf)
+		totalRead += n
+
+		if n > 0 && containsNonWhitespace(buf[:n]) {
+			return nil
+		}
+
+		if readErr == io.EOF {
+			break
+		}
+
+		if readErr != nil {
+			return fmt.Errorf("%w: %w", ErrHashFileNotReadable, readErr)
+		}
+	}
+
+	if totalRead == 0 {
+		return fmt.Errorf("%w: %s", ErrHashFileEmpty, hashFile)
+	}
+
+	return fmt.Errorf("%w: %s", ErrHashFileWhitespaceOnly, hashFile)
+}
+
+// containsNonWhitespace returns true if the byte slice contains at least one non-whitespace byte.
+func containsNonWhitespace(data []byte) bool {
+	return len(bytes.TrimSpace(data)) > 0
 }

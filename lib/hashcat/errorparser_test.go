@@ -767,3 +767,391 @@ func TestErrorCategory_String(t *testing.T) {
 		})
 	}
 }
+
+// --- Tests for new Priority 1 patterns ---
+
+func TestClassifyStderr_HashCountErrors(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		{
+			"not enough hashes loaded",
+			"Not enough hashes loaded - minimum is 2 for this hash-mode.",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"too many hashes loaded",
+			"Too many hashes loaded - maximum is 1 for this hash-mode.",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+	})
+}
+
+func TestClassifyStderr_HashCountContext(t *testing.T) {
+	info := ClassifyStderr("Not enough hashes loaded - minimum is 2 for this hash-mode.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "hash_count_limit", info.Context["error_type"])
+	assert.Equal(t, 2, info.Context["hash_count_limit"])
+}
+
+func TestClassifyStderr_BackendPlatformErrors(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		{
+			"no OpenCL Metal HIP CUDA platform",
+			"ATTENTION! No OpenCL, Metal, HIP or CUDA compatible platform found.",
+			ErrorCategoryBackend,
+			api.SeverityFatal,
+			false,
+		},
+		{
+			"no OpenCL HIP CUDA platform (Linux)",
+			"ATTENTION! No OpenCL, HIP or CUDA compatible platform found.",
+			ErrorCategoryBackend,
+			api.SeverityFatal,
+			false,
+		},
+		{
+			"outdated NVIDIA NVRTC driver",
+			"Outdated NVIDIA NVRTC driver version '123' detected!",
+			ErrorCategoryBackend,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"outdated NVIDIA CUDA driver",
+			"Outdated NVIDIA CUDA driver version '456' detected!",
+			ErrorCategoryBackend,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"unstable OpenCL driver",
+			"* Device #1: Unstable OpenCL driver detected!",
+			ErrorCategoryBackend,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"TDR kernel runtime",
+			"Kernel minimum runtime larger than default TDR",
+			ErrorCategoryBackend,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"runtime library init failure",
+			"Failed to initialize the AMD main driver HIP runtime library.",
+			ErrorCategoryBackend,
+			api.SeverityWarning,
+			true,
+		},
+	})
+}
+
+func TestClassifyStderr_DeviceSelfTestErrors(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		{
+			"CUDA kernel self-test failed",
+			"* Device #1: ATTENTION! CUDA kernel self-test failed.",
+			ErrorCategoryBackend,
+			api.SeverityFatal,
+			false,
+		},
+		{
+			"OpenCL kernel self-test failed",
+			"* Device #2: ATTENTION! OpenCL kernel self-test failed.",
+			ErrorCategoryBackend,
+			api.SeverityFatal,
+			false,
+		},
+		{
+			"self-test hash parsing error",
+			"Self-test hash parsing error: Token length exception",
+			ErrorCategoryBackend,
+			api.SeverityCritical,
+			false,
+		},
+	})
+}
+
+func TestClassifyStderr_NewFileAccessErrors(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		{
+			"no usable dictionary",
+			"No usable dictionary file found.",
+			ErrorCategoryFileAccess,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"no valid rules left",
+			"No valid rules left.",
+			ErrorCategoryFileAccess,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"empty input file",
+			"/tmp/wordlist.txt: empty file.",
+			ErrorCategoryFileAccess,
+			api.SeverityCritical,
+			false,
+		},
+	})
+}
+
+func TestClassifyStderr_NewConfigurationErrors(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		{
+			"already running instance",
+			"Already an instance 'attack-12345' running on pid 42",
+			ErrorCategoryConfiguration,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"restore value exceeds keyspace",
+			"Restore value is greater than keyspace.",
+			ErrorCategoryConfiguration,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"incompatible restore file version",
+			"Incompatible restore-file version.",
+			ErrorCategoryRetryable,
+			api.SeverityMinor,
+			true,
+		},
+	})
+}
+
+func TestClassifyStderr_DeviceMemoryNew(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		{
+			"not enough allocatable device memory",
+			"* Device #1: Not enough allocatable device memory for this hashlist/ruleset.",
+			ErrorCategoryDevice,
+			api.SeverityFatal,
+			false,
+		},
+		{
+			"not enough allocatable memory for ruleset",
+			"Not enough allocatable memory (RAM) for this ruleset.",
+			ErrorCategoryDevice,
+			api.SeverityFatal,
+			false,
+		},
+	})
+}
+
+// --- Tests for new Priority 2 patterns ---
+
+func TestClassifyStderr_StdoutWarningsNew(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		{
+			"driver temperature threshold",
+			"Driver temperature threshold met on GPU #1. Expect reduced performance.",
+			ErrorCategoryDevice,
+			api.SeverityWarning,
+			true,
+		},
+		{
+			"runtime limit reached",
+			"Runtime limit reached, aborting",
+			ErrorCategoryInfo,
+			api.SeverityMinor,
+			true,
+		},
+		{
+			"failed to parse hashes using format",
+			"Failed to parse hashes using the 'plain' format.",
+			ErrorCategoryHashFormat,
+			api.SeverityWarning,
+			false,
+		},
+		{
+			"hashfile changed during runtime",
+			"Hashfile '/tmp/hashes.txt' on line 5: File changed during runtime. Skipping new data.",
+			ErrorCategoryHashFormat,
+			api.SeverityWarning,
+			false,
+		},
+		{
+			"kernel create failed",
+			"* Device #1: Kernel /usr/share/hashcat/OpenCL/m00000.cl create failed.",
+			ErrorCategoryBackend,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"cannot convert rule for device",
+			"Cannot convert rule for use on OpenCL device in file rules.rule on line 5: x",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			true,
+		},
+		{
+			"pure backend kernels selected",
+			"ATTENTION! Pure (unoptimized) backend kernels selected.",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+		{
+			"hash-mode auto-detect",
+			"Hash-mode was not specified with -m. Attempting to auto-detect hash mode.",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+		{
+			"BOM detected",
+			"wordlist.txt: Byte Order Mark (BOM) was detected",
+			ErrorCategoryInfo,
+			api.SeverityInfo,
+			false,
+		},
+	})
+}
+
+// --- Tests for generalized machine-readable pattern ---
+
+func TestClassifyStderr_MachineReadableGeneral(t *testing.T) {
+	runStderrTests(t, []stderrTestCase{
+		// Previously uncovered parser errors (PA_011-PA_047)
+		{
+			"machine-readable invalid hccapx file size",
+			"/tmp/hashes.hccapx:1:data:Invalid hccapx file size",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable invalid truecrypt filesize",
+			"/tmp/tc.img:1:data:Invalid truecrypt filesize",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable invalid veracrypt filesize",
+			"/tmp/vc.img:1:data:Invalid veracrypt filesize",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable invalid key size",
+			"/tmp/hashes.txt:1:data:Invalid key size",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable invalid block size",
+			"/tmp/hashes.txt:1:data:Invalid block size",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable IV length exception",
+			"/tmp/hashes.txt:1:data:IV length exception",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable CT length exception",
+			"/tmp/hashes.txt:1:data:CT length exception",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+		{
+			"machine-readable invalid or unsupported cipher",
+			"/tmp/hashes.txt:1:data:Invalid or unsupported cipher",
+			ErrorCategoryHashFormat,
+			api.SeverityCritical,
+			false,
+		},
+	})
+}
+
+func TestClassifyStderr_MachineReadableKerberos(t *testing.T) {
+	// Kerberos hashes like krb5asrep$23$user@REALM$hash contain colons
+	info := ClassifyStderr(
+		"/tmp/hashes.txt:1:krb5asrep$23$user@REALM$longhashdata:Signature unmatched",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "signature_unmatched", info.Context["error_type"])
+	assert.Equal(t, "/tmp/hashes.txt", info.Context["hashfile"])
+	assert.Equal(t, 1, info.Context["line_number"])
+}
+
+// --- Context extraction tests for new extractors ---
+
+func TestClassifyStderr_PidContext(t *testing.T) {
+	info := ClassifyStderr("Already an instance 'attack-12345' running on pid 42")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "already_running", info.Context["error_type"])
+	assert.Equal(t, 42, info.Context["pid"])
+}
+
+func TestClassifyStderr_NoDictionaryContext(t *testing.T) {
+	info := ClassifyStderr("No usable dictionary file found.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "no_dictionary", info.Context["error_type"])
+	assert.Equal(t, true, info.Context["terminal"])
+}
+
+func TestClassifyStderr_NoValidRulesContext(t *testing.T) {
+	info := ClassifyStderr("No valid rules left.")
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "no_valid_rules", info.Context["error_type"])
+	assert.Equal(t, true, info.Context["terminal"])
+}
+
+func TestClassifyStderr_NoBackendPlatformContext(t *testing.T) {
+	info := ClassifyStderr(
+		"ATTENTION! No OpenCL, Metal, HIP or CUDA compatible platform found.",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "no_backend_platform", info.Context["error_type"])
+	assert.Equal(t, true, info.Context["terminal"])
+	assert.Equal(t, ErrorCategoryBackend, info.Category)
+	assert.Equal(t, api.SeverityFatal, info.Severity)
+}
+
+func TestClassifyStderr_DriverTemperatureThresholdContext(t *testing.T) {
+	info := ClassifyStderr(
+		"Driver temperature threshold met on GPU #3. Expect reduced performance.",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "temperature_limit", info.Context["error_type"])
+	assert.Equal(t, 3, info.Context["device_id"])
+	assert.Equal(t, ErrorCategoryDevice, info.Category)
+	assert.True(t, info.Retryable)
+}
+
+func TestClassifyStderr_DeviceNotEnoughMemoryContext(t *testing.T) {
+	info := ClassifyStderr(
+		"* Device #2: Not enough allocatable device memory for this hashlist/ruleset.",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "device_memory", info.Context["error_type"])
+	assert.Equal(t, 2, info.Context["device_id"])
+	assert.Equal(t, ErrorCategoryDevice, info.Category)
+	assert.Equal(t, api.SeverityFatal, info.Severity)
+}
