@@ -170,12 +170,15 @@ func (m *Manager) RunTask(ctx context.Context, task *api.Task, attack *api.Attac
 
 	sess, err := hashcat.NewHashcatSession(ctx, strconv.FormatInt(attack.Id, 10), jobParams)
 	if err != nil {
-		if errors.Is(err, hashcat.ErrHashFileNotReadable) || errors.Is(err, hashcat.ErrHashFileEmpty) {
+		if detail := hashFileErrorDetail(err); detail != "" {
 			agentstate.ErrorLogger.Error("Hash file validation failed", "error", err)
 			cserrors.SendAgentError(
 				ctx, "Hash file validation failed", task, api.SeverityCritical,
 				cserrors.WithClassification("file_access", false),
-				cserrors.WithContext(map[string]any{"error_type": "hash_file_validation"}),
+				cserrors.WithContext(map[string]any{
+					"error_type": "hash_file_validation",
+					"detail":     detail,
+				}),
 			)
 		} else {
 			return cserrors.LogAndSendError(ctx, "Failed to create attack session", err, api.SeverityCritical, task)
@@ -229,4 +232,19 @@ func resourceNameOrBlank(resource *api.AttackResourceFile) string {
 	}
 
 	return resource.FileName
+}
+
+// hashFileErrorDetail returns a short detail string for hash file validation errors,
+// or empty string if the error is not a hash file validation error.
+func hashFileErrorDetail(err error) string {
+	switch {
+	case errors.Is(err, hashcat.ErrHashFileNotReadable):
+		return "not_readable"
+	case errors.Is(err, hashcat.ErrHashFileEmpty):
+		return "empty"
+	case errors.Is(err, hashcat.ErrHashFileWhitespaceOnly):
+		return "whitespace_only"
+	default:
+		return ""
+	}
 }

@@ -3,6 +3,7 @@ package hashcat
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -862,4 +863,50 @@ func TestParams_ToCmdArgs_MaskArgsError(t *testing.T) {
 	_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrTooManyCustomCharsets)
+}
+
+func TestParams_ToCmdArgs_HashFileWhitespaceOnly(t *testing.T) {
+	cleanup := setupTestState(t)
+	defer cleanup()
+
+	createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n")
+
+	dir := t.TempDir()
+	hashFile := filepath.Join(dir, "whitespace.hsh")
+	require.NoError(t, os.WriteFile(hashFile, []byte("  \n\t\n  \n"), 0o600))
+
+	params := Params{
+		AttackMode:       attackModeDictionary,
+		HashType:         0,
+		WordListFilename: "wordlist.txt",
+	}
+
+	_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+
+	assert.ErrorIs(t, err, ErrHashFileWhitespaceOnly)
+}
+
+func TestParams_ToCmdArgs_HashFileUnreadable(t *testing.T) {
+	if runtime.GOOS == windowsOS {
+		t.Skip("os.Chmod to 0o000 does not prevent reading on Windows")
+	}
+
+	cleanup := setupTestState(t)
+	defer cleanup()
+
+	createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n")
+
+	dir := t.TempDir()
+	hashFile := filepath.Join(dir, "unreadable.hsh")
+	require.NoError(t, os.WriteFile(hashFile, []byte("5f4dcc3b5aa765d61d8327deb882cf99\n"), 0o000))
+
+	params := Params{
+		AttackMode:       attackModeDictionary,
+		HashType:         0,
+		WordListFilename: "wordlist.txt",
+	}
+
+	_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+
+	assert.ErrorIs(t, err, ErrHashFileNotReadable)
 }

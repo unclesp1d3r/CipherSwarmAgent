@@ -123,6 +123,14 @@ var errorPatterns = []errorPattern{
 		false,
 		extractSingleHashContext,
 	},
+	// Hashfile changed during runtime (must be BEFORE generic v6.x Hashfile pattern)
+	{
+		regexp.MustCompile(`Hashfile '([^']+)' on line \d+.*File changed during runtime`),
+		ErrorCategoryHashFormat,
+		api.SeverityWarning,
+		false,
+		nil,
+	},
 	// v6.x format: "Hashfile '<file>' on line <N> (<hash>): <error>"
 	{
 		regexp.MustCompile(`^Hashfile '([^']+)' on line (\d+) \(([^)]*)\): (.+)`),
@@ -141,17 +149,16 @@ var errorPatterns = []errorPattern{
 	},
 
 	// Machine-readable per-hash errors: "<file>:<line>:<hash>:<parser_error>"
-	// Emitted when --machine-readable is active. The parser error is always the last
-	// colon-separated field and matches a known strparser() string.
+	// Emitted when --machine-readable is active. Covers all strparser() strings
+	// (PA_000-PA_047) including LUKS, hccapx, TrueCrypt/VeraCrypt, and CryptoAPI errors.
 	// Uses non-greedy (.+?) for the file path so hashes containing colons
 	// (e.g., MD5:salt, PBKDF2 sha256:20000:salt) don't consume into the file capture.
+	// The (\d+) anchor on line number prevents most false positives.
+	// Fourth group ([^:]+) matches the error text after the last colon, which is safe
+	// because no strparser() error string contains colons. This lets the third group
+	// (.+) greedily capture hash types with colons (e.g., sha256:20000:salt).
 	{
-		regexp.MustCompile(`^(.+?):(\d+):(.+):(Token length exception|Separator unmatched|` +
-			`Line-length exception|Salt-length exception|Hash-length exception|` +
-			`Hash-value exception|Salt-value exception|Salt-iteration count exception|` +
-			`Signature unmatched|Hash-file exception|Hash-encoding exception|` +
-			`Salt-encoding exception|Token encoding exception|` +
-			`Insufficient entropy exception)$`),
+		regexp.MustCompile(`^(.+?):(\d+):(.+):([^:]+)$`),
 		ErrorCategoryHashFormat,
 		api.SeverityCritical,
 		false,
@@ -212,7 +219,46 @@ var errorPatterns = []errorPattern{
 		false,
 		extractTerminalContext("no_hash_mode_match"),
 	},
+	// Hash count limits (stderr)
+	{
+		regexp.MustCompile(`Not enough hashes loaded - minimum is (\d+)`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+		extractHashCountContext,
+	},
+	{
+		regexp.MustCompile(`Too many hashes loaded - maximum is (\d+)`),
+		ErrorCategoryHashFormat,
+		api.SeverityCritical,
+		false,
+		extractHashCountContext,
+	},
+	// Failed to parse hashes using a specific format (stdout warning)
+	{
+		regexp.MustCompile(`Failed to parse hashes using the '(.+)' format`),
+		ErrorCategoryHashFormat,
+		api.SeverityWarning,
+		false,
+		staticContext("parse_format_failed"),
+	},
 
+	// Per-device self-test failures (must be BEFORE generic self-test abort)
+	{
+		regexp.MustCompile(`\* Device #(\d+): ATTENTION! .+ kernel self-test failed`),
+		ErrorCategoryBackend,
+		api.SeverityFatal,
+		false,
+		extractDeviceWarningContext,
+	},
+	// Self-test hash parsing error (stderr)
+	{
+		regexp.MustCompile(`Self-test hash parsing error: (.+)`),
+		ErrorCategoryBackend,
+		api.SeverityCritical,
+		false,
+		staticContext("selftest_parse_error"),
+	},
 	// Self-test / autotune abort (fatal, non-retryable)
 	{
 		regexp.MustCompile(`Aborting session due to kernel self-test failure`),
@@ -239,12 +285,60 @@ var errorPatterns = []errorPattern{
 		false,
 		extractKernelBuildContext,
 	},
+	// Kernel create failures (stdout warning, distinct from build failures)
+	{
+		regexp.MustCompile(`\* Device #(\d+): Kernel (.+) create failed`),
+		ErrorCategoryBackend,
+		api.SeverityCritical,
+		false,
+		extractKernelBuildContext,
+	},
 	{
 		regexp.MustCompile(`clBuildProgram\(\): (CL_BUILD_PROGRAM_FAILURE)`),
 		ErrorCategoryBackend,
 		api.SeverityCritical,
 		false,
 		extractBackendContextWithType("cl_build_program_failure", "OpenCL"),
+	},
+	// No backend platform found (stderr, fatal)
+	{
+		regexp.MustCompile(`ATTENTION! No (?:OpenCL|Metal|HIP|CUDA).+platform found`),
+		ErrorCategoryBackend,
+		api.SeverityFatal,
+		false,
+		extractTerminalContext("no_backend_platform"),
+	},
+	// Outdated NVIDIA driver (stderr)
+	{
+		regexp.MustCompile(`Outdated NVIDIA .+ driver version`),
+		ErrorCategoryBackend,
+		api.SeverityCritical,
+		false,
+		staticContext("outdated_nvidia_driver"),
+	},
+	// Unstable OpenCL driver (stderr)
+	{
+		regexp.MustCompile(`\* Device #(\d+): Unstable OpenCL driver detected`),
+		ErrorCategoryBackend,
+		api.SeverityCritical,
+		false,
+		extractDeviceWarningContext,
+	},
+	// TDR kernel runtime (stderr)
+	{
+		regexp.MustCompile(`Kernel minimum runtime larger than default TDR`),
+		ErrorCategoryBackend,
+		api.SeverityCritical,
+		false,
+		staticContext("tdr_exceeded"),
+	},
+	// Runtime library initialization failure (stdout warning)
+	{
+		regexp.MustCompile(`Failed to initialize .+ runtime library`),
+		ErrorCategoryBackend,
+		api.SeverityWarning,
+		true,
+		staticContext("runtime_init_failed"),
 	},
 
 	// Module / hash-mode errors (non-retryable)
@@ -271,8 +365,33 @@ var errorPatterns = []errorPattern{
 		true,
 		extractTemperatureContext,
 	},
+	// Driver temperature throttle (stdout warning, distinct from temperature abort)
+	{
+		regexp.MustCompile(`Driver temperature threshold met on GPU #(\d+)`),
+		ErrorCategoryDevice,
+		api.SeverityWarning,
+		true,
+		extractTemperatureContext,
+	},
 
-	// Device memory errors (non-retryable, fatal)
+	// Device memory errors — specific patterns first
+	// "Not enough allocatable device memory" (stderr)
+	{
+		regexp.MustCompile(`\* Device #(\d+): Not enough allocatable device memory`),
+		ErrorCategoryDevice,
+		api.SeverityFatal,
+		false,
+		extractDeviceMemoryContext,
+	},
+	// "Not enough allocatable memory (RAM) for this ruleset" (stderr)
+	{
+		regexp.MustCompile(`Not enough allocatable memory .+ for this ruleset`),
+		ErrorCategoryDevice,
+		api.SeverityFatal,
+		false,
+		extractTerminalContext("ruleset_memory"),
+	},
+	// General device memory errors (non-retryable, fatal)
 	// Using non-greedy .*? to prevent catastrophic backtracking on long lines
 	{
 		regexp.MustCompile(
@@ -303,6 +422,28 @@ var errorPatterns = []errorPattern{
 		api.SeverityCritical,
 		false,
 		nil,
+	},
+	{
+		regexp.MustCompile(`No usable dictionary file found`),
+		ErrorCategoryFileAccess,
+		api.SeverityCritical,
+		false,
+		extractTerminalContext("no_dictionary"),
+	},
+	{
+		regexp.MustCompile(`No valid rules left`),
+		ErrorCategoryFileAccess,
+		api.SeverityCritical,
+		false,
+		extractTerminalContext("no_valid_rules"),
+	},
+	// Empty input file — requires path separator to avoid false positives
+	{
+		regexp.MustCompile(`^.+: empty file\.$`),
+		ErrorCategoryFileAccess,
+		api.SeverityCritical,
+		false,
+		staticContext("empty_input_file"),
 	},
 
 	// Backend errors - memory (fatal)
@@ -370,12 +511,45 @@ var errorPatterns = []errorPattern{
 		staticContext("stdin_timeout"),
 	},
 
-	// Restore file issues (retryable)
+	// Session / restore issues
 	{regexp.MustCompile(`ERROR:.*Cannot read.*\.restore`), ErrorCategoryRetryable, api.SeverityMinor, true, nil},
+	{regexp.MustCompile(`Incompatible restore-file version`), ErrorCategoryRetryable, api.SeverityMinor, true, nil},
+	{
+		regexp.MustCompile(`Restore value is greater than keyspace`),
+		ErrorCategoryConfiguration,
+		api.SeverityCritical,
+		false,
+		staticContext("restore_exceeds_keyspace"),
+	},
+	// Already running instance (stderr)
+	{
+		regexp.MustCompile(`Already an instance .+ running on pid (\d+)`),
+		ErrorCategoryConfiguration,
+		api.SeverityCritical,
+		false,
+		extractPidContext,
+	},
 
 	// Info/warnings (retryable)
 	{regexp.MustCompile(`(?i)Skipping invalid or unsupported`), ErrorCategoryInfo, api.SeverityInfo, true, nil},
 	{regexp.MustCompile(`(?i)Approaching final keyspace`), ErrorCategoryInfo, api.SeverityInfo, true, nil},
+	{regexp.MustCompile(`Runtime limit reached, aborting`), ErrorCategoryInfo, api.SeverityMinor, true, nil},
+	{regexp.MustCompile(`Cannot convert rule for .+ device`), ErrorCategoryInfo, api.SeverityInfo, true, nil},
+	{
+		regexp.MustCompile(`ATTENTION! Pure .+ backend kernels selected`),
+		ErrorCategoryInfo,
+		api.SeverityInfo,
+		false,
+		nil,
+	},
+	{
+		regexp.MustCompile(`Hash-mode was not specified .+ auto-detect`),
+		ErrorCategoryInfo,
+		api.SeverityInfo,
+		false,
+		nil,
+	},
+	{regexp.MustCompile(`Byte Order Mark .+ detected`), ErrorCategoryInfo, api.SeverityInfo, false, nil},
 	{regexp.MustCompile(`^Warning:`), ErrorCategoryWarning, api.SeverityMinor, true, nil},
 }
 
@@ -542,6 +716,34 @@ func extractHashModeContext(_ string, submatch []string) map[string]any {
 
 	if hashMode, err := strconv.Atoi(submatch[1]); err == nil {
 		ctx["hash_mode"] = hashMode
+	}
+
+	return ctx
+}
+
+// extractHashCountContext extracts the hash count limit from "Not enough/Too many hashes" errors.
+// submatch: [full, limit]
+func extractHashCountContext(_ string, submatch []string) map[string]any {
+	ctx := map[string]any{
+		"error_type": "hash_count_limit",
+	}
+
+	if limit, err := strconv.Atoi(submatch[1]); err == nil {
+		ctx["hash_count_limit"] = limit
+	}
+
+	return ctx
+}
+
+// extractPidContext extracts a process ID from "Already an instance running" errors.
+// submatch: [full, pid]
+func extractPidContext(_ string, submatch []string) map[string]any {
+	ctx := map[string]any{
+		"error_type": "already_running",
+	}
+
+	if pid, err := strconv.Atoi(submatch[1]); err == nil {
+		ctx["pid"] = pid
 	}
 
 	return ctx
