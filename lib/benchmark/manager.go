@@ -31,10 +31,8 @@ var errBadResponse = errors.New("bad response from server")
 // Manager handles benchmark operations including running benchmarks,
 // submitting results, and managing the benchmark cache.
 type Manager struct {
-	agentsClient   api.AgentsClient
-	BackendDevices string
-	OpenCLDevices  string
-	DeviceManager  *devices.DeviceManager
+	agentsClient api.AgentsClient
+	DeviceConfig devices.DeviceConfig
 }
 
 // NewManager creates a new benchmark Manager with the given API client.
@@ -42,16 +40,10 @@ func NewManager(agentsClient api.AgentsClient) *Manager {
 	return &Manager{agentsClient: agentsClient}
 }
 
-// validateDevicesForSession validates configured device IDs against the current
-// DeviceManager, logging warnings for unknown or unavailable IDs. Returns
-// validated device selections for use in hashcat.Params.
-func (m *Manager) validateDevicesForSession() devices.ValidatedDevices {
-	return devices.ValidateAndFilterDevices(
-		m.DeviceManager,
-		m.BackendDevices,
-		m.OpenCLDevices,
-		agentstate.Logger.Warn,
-	)
+// deviceManager returns the DeviceManager from the config, or nil.
+// Used by benchmark output handlers for device name lookups.
+func (m *Manager) deviceManager() *devices.DeviceManager {
+	return m.DeviceConfig.DeviceManager()
 }
 
 // unsubmittedResults returns a new slice containing only benchmark results
@@ -185,15 +177,10 @@ func (m *Manager) SubmitCapabilityResults(ctx context.Context, results []display
 // supported hash types without executing a full benchmark. It returns placeholder
 // BenchmarkResult entries (SpeedHs="1", Placeholder=true) for each discovered type.
 func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.BenchmarkResult, error) {
-	validated := m.validateDevicesForSession()
-
 	jobParams := hashcat.Params{
-		AttackMode:                hashcat.AttackHashInfo,
-		BackendDevices:            m.BackendDevices,
-		OpenCLDevices:             m.OpenCLDevices,
-		ValidatedBackendDeviceIDs: validated.BackendDeviceIDs,
-		ValidatedOpenCLDevices:    validated.OpenCLDeviceTypes,
-		BackendDevicesValidated:   m.DeviceManager != nil,
+		AttackMode:     hashcat.AttackHashInfo,
+		BackendDevices: m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:  m.DeviceConfig.ResolvedOpenCLDevices(),
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, "capability-detect", jobParams)
@@ -389,16 +376,12 @@ func (m *Manager) runSingleBenchmark(
 	hashTypeStr string,
 ) []display.BenchmarkResult {
 	sessionID := "bg-benchmark-" + hashTypeStr
-	validated := m.validateDevicesForSession()
 
 	jobParams := hashcat.Params{
-		AttackMode:                hashcat.AttackBenchmarkSingle,
-		HashType:                  hashType,
-		BackendDevices:            m.BackendDevices,
-		OpenCLDevices:             m.OpenCLDevices,
-		ValidatedBackendDeviceIDs: validated.BackendDeviceIDs,
-		ValidatedOpenCLDevices:    validated.OpenCLDeviceTypes,
-		BackendDevicesValidated:   m.DeviceManager != nil,
+		AttackMode:     hashcat.AttackBenchmarkSingle,
+		HashType:       hashType,
+		BackendDevices: m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:  m.DeviceConfig.ResolvedOpenCLDevices(),
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, sessionID, jobParams)
@@ -445,7 +428,7 @@ func (m *Manager) collectSingleBenchmarkOutput(
 			return nil
 
 		case line := <-sess.StdoutLines:
-			handleBenchmarkStdOutLine(line, &results, m.DeviceManager)
+			handleBenchmarkStdOutLine(line, &results, m.deviceManager())
 
 		case errInfo := <-sess.StderrMessages:
 			handleBenchmarkStdErrLine(ctx, errInfo)
@@ -458,7 +441,7 @@ func (m *Manager) collectSingleBenchmarkOutput(
 
 		case procErr := <-sess.DoneChan:
 			// Drain remaining stdout lines.
-			drainStdout(sess, &results, m.DeviceManager)
+			drainStdout(sess, &results, m.deviceManager())
 
 			if procErr != nil {
 				agentstate.Logger.Warn("Background benchmark session exited with error",
@@ -746,16 +729,12 @@ func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults
 // if the session cannot be created or fails to produce results.
 func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult, error) {
 	additionalArgs := arch.GetAdditionalHashcatArgs()
-	validated := m.validateDevicesForSession()
 
 	jobParams := hashcat.Params{
 		AttackMode:                hashcat.AttackBenchmark,
 		AdditionalArgs:            additionalArgs,
-		BackendDevices:            m.BackendDevices,
-		OpenCLDevices:             m.OpenCLDevices,
-		ValidatedBackendDeviceIDs: validated.BackendDeviceIDs,
-		ValidatedOpenCLDevices:    validated.OpenCLDeviceTypes,
-		BackendDevicesValidated:   m.DeviceManager != nil,
+		BackendDevices:            m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:             m.DeviceConfig.ResolvedOpenCLDevices(),
 		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
 	}
 
@@ -840,7 +819,7 @@ func (m *Manager) finalizeBenchmarkSession(
 	submittedUpTo int,
 	procErr error,
 ) {
-	drainStdout(sess, results, m.DeviceManager)
+	drainStdout(sess, results, m.deviceManager())
 
 	if procErr != nil {
 		agentstate.Logger.Error("Benchmark session failed", "error", procErr)
@@ -907,7 +886,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 				// Best-effort drain: may miss lines still in flight between the
 				// OS pipe buffer and the channel.
-				drainStdout(sess, &benchmarkResults, m.DeviceManager)
+				drainStdout(sess, &benchmarkResults, m.deviceManager())
 
 				if len(benchmarkResults) > 0 {
 					if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
@@ -927,7 +906,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 				return
 			case stdOutLine := <-sess.StdoutLines:
-				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults, m.DeviceManager)
+				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults, m.deviceManager())
 				submittedUpTo = m.submitBatchIfReady(ctx, benchmarkResults, submittedUpTo)
 			case stdErrLine := <-sess.StderrMessages:
 				handleBenchmarkStdErrLine(ctx, stdErrLine)

@@ -24,11 +24,9 @@ import (
 
 // Manager orchestrates task lifecycle operations using injected API clients.
 type Manager struct {
-	tasksClient    api.TasksClient
-	attacksClient  api.AttacksClient
-	BackendDevices string
-	OpenCLDevices  string
-	DeviceManager  *devices.DeviceManager
+	tasksClient   api.TasksClient
+	attacksClient api.AttacksClient
+	DeviceConfig  devices.DeviceConfig
 }
 
 // NewManager creates a new task Manager with the given API clients.
@@ -197,10 +195,7 @@ func (m *Manager) RunTask(ctx context.Context, task *api.Task, attack *api.Attac
 }
 
 // createJobParams creates hashcat parameters from the given Task and Attack objects.
-// It validates device IDs against the current DeviceManager before building params.
 func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
-	validated := m.validateDevicesForSession()
-
 	return hashcat.Params{
 		AttackMode: int64(attack.AttackModeHashcat),
 		HashType:   int64(attack.HashMode),
@@ -218,36 +213,21 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 			lib.UnwrapOr(attack.CustomCharset3, ""),
 			lib.UnwrapOr(attack.CustomCharset4, ""),
 		},
-		WordListFilename:          resourceNameOrBlank(attack.WordList),
-		RuleListFilename:          resourceNameOrBlank(attack.RuleList),
-		MaskListFilename:          resourceNameOrBlank(attack.MaskList),
-		AdditionalArgs:            arch.GetAdditionalHashcatArgs(),
-		OptimizedKernels:          attack.Optimized,
-		SlowCandidates:            attack.SlowCandidateGenerators,
-		Skip:                      lib.UnwrapOr(task.Skip, 0),
-		Limit:                     lib.UnwrapOr(task.Limit, 0),
-		BackendDevices:            m.BackendDevices,
-		OpenCLDevices:             m.OpenCLDevices,
-		ValidatedBackendDeviceIDs: validated.BackendDeviceIDs,
-		ValidatedOpenCLDevices:    validated.OpenCLDeviceTypes,
-		BackendDevicesValidated:   m.DeviceManager != nil,
+		WordListFilename: resourceNameOrBlank(attack.WordList),
+		RuleListFilename: resourceNameOrBlank(attack.RuleList),
+		MaskListFilename: resourceNameOrBlank(attack.MaskList),
+		AdditionalArgs:   arch.GetAdditionalHashcatArgs(),
+		OptimizedKernels: attack.Optimized,
+		SlowCandidates:   attack.SlowCandidateGenerators,
+		Skip:             lib.UnwrapOr(task.Skip, 0),
+		Limit:            lib.UnwrapOr(task.Limit, 0),
+		BackendDevices:   m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:    m.DeviceConfig.ResolvedOpenCLDevices(),
 		RestoreFilePath: filepath.Join(
 			agentstate.State.RestoreFilePath,
 			strconv.FormatInt(attack.Id, 10)+".restore",
 		),
 	}
-}
-
-// validateDevicesForSession validates configured device IDs against the current
-// DeviceManager, logging warnings for unknown or unavailable IDs. Returns
-// validated device selections for use in hashcat.Params.
-func (m *Manager) validateDevicesForSession() devices.ValidatedDevices {
-	return devices.ValidateAndFilterDevices(
-		m.DeviceManager,
-		m.BackendDevices,
-		m.OpenCLDevices,
-		agentstate.Logger.Warn,
-	)
 }
 
 func resourceNameOrBlank(resource *api.AttackResourceFile) string {

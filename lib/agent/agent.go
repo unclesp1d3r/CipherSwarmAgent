@@ -148,17 +148,16 @@ func StartAgent() {
 	// Initialize managers
 	client := agentstate.State.GetAPIClient()
 	cfg := lib.GetConfiguration()
+	dc := devices.NewDeviceConfig(cfg.Config.BackendDevices, cfg.Config.OpenCLDevices, deviceMgr)
+
 	benchmarkMgr = benchmark.NewManager(client.Agents())
-	benchmarkMgr.BackendDevices = cfg.Config.BackendDevices
-	benchmarkMgr.OpenCLDevices = cfg.Config.OpenCLDevices
+	benchmarkMgr.DeviceConfig = dc
 
 	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
-	taskMgr.BackendDevices = cfg.Config.BackendDevices
-	taskMgr.OpenCLDevices = cfg.Config.OpenCLDevices
-	taskMgr.DeviceManager = deviceMgr // may be nil if enumeration failed
+	taskMgr.DeviceConfig = dc
 
-	benchmarkMgr.DeviceManager = deviceMgr // may be nil if enumeration failed
-	validateAndWarnDevices(deviceMgr, cfg.Config.BackendDevices, cfg.Config.OpenCLDevices)
+	// Log warnings for unrecognized device IDs at startup.
+	dc.Validate(agentstate.Logger.Warn)
 
 	// Run benchmarks when the server requests them OR when the user explicitly
 	// passed --force-benchmark. Without this check the CLI flag is silently
@@ -404,16 +403,18 @@ func handleReload(ctx context.Context) {
 	// Recreate managers with new API client sub-clients and update configs
 	reloadClient := agentstate.State.GetAPIClient()
 	reloadCfg := lib.GetConfiguration()
-	benchmarkMgr = benchmark.NewManager(reloadClient.Agents())
-	benchmarkMgr.BackendDevices = reloadCfg.Config.BackendDevices
-	benchmarkMgr.OpenCLDevices = reloadCfg.Config.OpenCLDevices
-	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
-	taskMgr.BackendDevices = reloadCfg.Config.BackendDevices
-	taskMgr.OpenCLDevices = reloadCfg.Config.OpenCLDevices
-	taskMgr.DeviceManager = deviceMgr // may be nil if enumeration failed
+	reloadDC := devices.NewDeviceConfig(
+		reloadCfg.Config.BackendDevices, reloadCfg.Config.OpenCLDevices, deviceMgr,
+	)
 
-	benchmarkMgr.DeviceManager = deviceMgr // may be nil if enumeration failed
-	validateAndWarnDevices(deviceMgr, reloadCfg.Config.BackendDevices, reloadCfg.Config.OpenCLDevices)
+	benchmarkMgr = benchmark.NewManager(reloadClient.Agents())
+	benchmarkMgr.DeviceConfig = reloadDC
+
+	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
+	taskMgr.DeviceConfig = reloadDC
+
+	// Log warnings for unrecognized device IDs after reload.
+	reloadDC.Validate(agentstate.Logger.Warn)
 
 	if reloadCfg.BenchmarksNeeded {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
@@ -634,24 +635,6 @@ func fetchAgentConfig(ctx context.Context) error {
 	return nil
 }
 
-// validateAndWarnDevices checks server-configured device IDs against the
-// enumerated device set and logs a warning for each unrecognized ID.
-// It is a no-op when dm is nil (enumeration failed — already warned upstream).
-func validateAndWarnDevices(dm *devices.DeviceManager, backendDevices, openCLDevices string) {
-	if dm == nil {
-		return
-	}
-
-	if _, err := devices.ValidateDeviceIDString(dm, backendDevices); err != nil {
-		agentstate.Logger.Warn("Server-configured device ID not found in enumerated devices",
-			"error", err, "config_field", "backend_devices")
-	}
-
-	if _, err := devices.ValidateDeviceIDString(dm, openCLDevices); err != nil {
-		agentstate.Logger.Warn("Server-configured device ID not found in enumerated devices",
-			"error", err, "config_field", "opencl_devices")
-	}
-}
 
 func initLogger() {
 	if agentstate.State.Debug {

@@ -71,12 +71,9 @@ type Params struct {
 	SlowCandidates            bool     `json:"slow_candidates"`              // Enable slow candidate generators (-S flag)
 	Skip                      int64    `json:"skip,omitempty"`               // Skip N candidates from start
 	Limit                     int64    `json:"limit,omitempty"`              // Stop after processing N candidates
-	BackendDevices            string   `json:"backend_devices,omitempty"`    // Backend devices to use (comma-separated, legacy)
-	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL device types (comma-separated, legacy)
-	ValidatedBackendDeviceIDs []int    `json:"-"`                            // Pre-validated backend device IDs (preferred over BackendDevices)
-	ValidatedOpenCLDevices    string   `json:"-"`                            // Validated OpenCL device types (preferred over OpenCLDevices)
-	BackendDevicesValidated   bool     `json:"-"`                            // True when device validation was performed (prevents fallback to raw BackendDevices)
-	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Enable all hash types in benchmark mode
+	BackendDevices            string `json:"backend_devices,omitempty"`    // Backend devices to use (pre-resolved by DeviceConfig)
+	OpenCLDevices             string `json:"opencl_devices,omitempty"`     // OpenCL device types (pre-resolved by DeviceConfig)
+	EnableAdditionalHashTypes bool   `json:"enable_additional_hash_types"` // Enable all hash types in benchmark mode
 	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to restore file for session resumption
 }
 
@@ -344,54 +341,17 @@ func (params Params) toRestoreArgs(session string) []string {
 }
 
 // appendDeviceFlags appends backend device and OpenCL device type flags to the
-// argument slice. It prefers validated device IDs over raw strings.
+// argument slice. Values are pre-resolved by DeviceConfig before reaching Params.
 func appendDeviceFlags(args []string, params Params) []string {
-	backendStr := resolveBackendDevicesFlag(params)
-	if backendStr != "" {
-		args = append(args, "--backend-devices", backendStr)
+	if strings.TrimSpace(params.BackendDevices) != "" {
+		args = append(args, "--backend-devices", params.BackendDevices)
 	}
 
-	openCLStr := resolveOpenCLDevicesFlag(params)
-	if openCLStr != "" {
-		args = append(args, "--opencl-device-types", openCLStr)
+	if strings.TrimSpace(params.OpenCLDevices) != "" {
+		args = append(args, "--opencl-device-types", params.OpenCLDevices)
 	}
 
 	return args
-}
-
-// resolveBackendDevicesFlag returns the backend devices flag value, preferring
-// validated IDs over the raw string. When BackendDevicesValidated is true,
-// the raw BackendDevices string is never used as a fallback — this prevents
-// invalid device IDs from reaching hashcat after validation filtered them out.
-func resolveBackendDevicesFlag(params Params) string {
-	if len(params.ValidatedBackendDeviceIDs) > 0 {
-		parts := make([]string, len(params.ValidatedBackendDeviceIDs))
-		for i, id := range params.ValidatedBackendDeviceIDs {
-			parts[i] = strconv.Itoa(id)
-		}
-
-		return strings.Join(parts, ",")
-	}
-
-	// If validation was performed but produced no valid IDs, do not fall back
-	// to the raw string — it contains only invalid IDs that would cause
-	// hashcat failures. Omitting --backend-devices lets hashcat use all
-	// available devices.
-	if params.BackendDevicesValidated {
-		return ""
-	}
-
-	return strings.TrimSpace(params.BackendDevices)
-}
-
-// resolveOpenCLDevicesFlag returns the OpenCL device types flag value, preferring
-// the validated string over the raw string.
-func resolveOpenCLDevicesFlag(params Params) string {
-	if params.ValidatedOpenCLDevices != "" {
-		return params.ValidatedOpenCLDevices
-	}
-
-	return strings.TrimSpace(params.OpenCLDevices)
 }
 
 // safePath joins base and filename, then verifies the result stays within base.
