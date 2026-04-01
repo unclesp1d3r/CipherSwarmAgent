@@ -1,9 +1,15 @@
 package devices
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 )
+
+// deviceIDListPattern validates that a string contains only comma-separated
+// integers (e.g., "1,2,3"). Used to reject arbitrary server strings in the
+// nil-DeviceManager fallback path.
+var deviceIDListPattern = regexp.MustCompile(`^\d+(?:\s*,\s*\d+)*$`)
 
 // DeviceConfig encapsulates device selection state for hashcat sessions.
 // It holds the server-provided or CLI-provided raw strings and an optional
@@ -48,8 +54,15 @@ func NewDeviceConfig(rawBackend, rawOpenCL string, dm *DeviceManager) DeviceConf
 //  3. Raw server string (if dm was nil — best-effort forwarding)
 func (dc DeviceConfig) ResolvedBackendDevices() string {
 	if !dc.validated {
-		// No DeviceManager — forward raw server string as-is.
-		return strings.TrimSpace(dc.rawBackendDevices)
+		// No DeviceManager — forward raw server string only if it looks like
+		// a valid comma-separated integer list. Reject arbitrary strings to
+		// prevent unexpected hashcat behavior from a misconfigured server.
+		trimmed := strings.TrimSpace(dc.rawBackendDevices)
+		if trimmed != "" && !deviceIDListPattern.MatchString(trimmed) {
+			return ""
+		}
+
+		return trimmed
 	}
 
 	if len(dc.enabledIDs) == 0 {
@@ -68,8 +81,15 @@ func (dc DeviceConfig) ResolvedBackendDevices() string {
 }
 
 // ResolvedOpenCLDevices returns the --opencl-device-types flag value.
+// Only forwards the raw string if it matches a valid comma-separated
+// integer pattern (e.g., "1,2,3" for CPU/GPU/accelerator types).
 func (dc DeviceConfig) ResolvedOpenCLDevices() string {
-	return strings.TrimSpace(dc.rawOpenCLDevices)
+	trimmed := strings.TrimSpace(dc.rawOpenCLDevices)
+	if trimmed != "" && !deviceIDListPattern.MatchString(trimmed) {
+		return ""
+	}
+
+	return trimmed
 }
 
 // Validate runs device ID validation against the DeviceManager and returns

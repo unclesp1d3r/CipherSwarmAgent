@@ -55,7 +55,7 @@ var hashInfoLineRe = regexp.MustCompile(`^\s*(\d+)\s*\|`) //nolint:gochecknoglob
 func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult, dm *devices.DeviceManager) {
 	matches := benchmarkLineRe.FindStringSubmatch(line)
 	if len(matches) != benchmarkMatchGroups {
-		agentstate.Logger.Debug("Unknown benchmark line", "line", line)
+		agentstate.Logger.Debug("Unknown benchmark line", "length", len(line))
 
 		return
 	}

@@ -58,12 +58,12 @@ func TestResolvedBackendDevices_NilDM_ForwardsRaw(t *testing.T) {
 	assert.Equal(t, "1,2", dc.ResolvedBackendDevices())
 }
 
-func TestResolvedBackendDevices_NilDM_ForwardsNonNumericRaw(t *testing.T) {
+func TestResolvedBackendDevices_NilDM_RejectsNonNumericRaw(t *testing.T) {
 	t.Parallel()
 
 	dc := NewDeviceConfig("OpenCL", "", nil)
-	// Non-numeric raw string forwarded as-is when dm is nil.
-	assert.Equal(t, "OpenCL", dc.ResolvedBackendDevices())
+	// Non-numeric raw string rejected — returns empty (hashcat auto-detects).
+	assert.Empty(t, dc.ResolvedBackendDevices())
 }
 
 func TestResolvedBackendDevices_NilDM_EmptyRaw(t *testing.T) {
@@ -141,6 +141,14 @@ func TestResolvedOpenCLDevices_TrimsWhitespace(t *testing.T) {
 
 	dc := NewDeviceConfig("", "  1,2  ", nil)
 	assert.Equal(t, "1,2", dc.ResolvedOpenCLDevices())
+}
+
+func TestResolvedOpenCLDevices_RejectsNonNumeric(t *testing.T) {
+	t.Parallel()
+
+	dc := NewDeviceConfig("", "GPU", nil)
+	// Non-numeric OpenCL device types rejected.
+	assert.Empty(t, dc.ResolvedOpenCLDevices())
 }
 
 func TestResolvedOpenCLDevices_Empty(t *testing.T) {
