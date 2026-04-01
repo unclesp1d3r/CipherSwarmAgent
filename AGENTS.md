@@ -96,6 +96,8 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - In deferred cleanup, use `os.IsNotExist` to skip already-removed files. Include file paths in error messages.
 - For data-critical files (cracked hashes, downloads), log `file.Close()` errors instead of discarding.
 - **Error reporting:** Use `SendAgentError(ctx, msg, task, severity, opts ...ErrorOption)` for all error reporting. Add metadata via `WithClassification(category, retryable)`. `cserrors.LogAndSendError` delegates to `SendAgentError` (includes platform/version metadata). Always pass a non-nil error — it returns `err` directly. API submission is skipped only when `APIClient` is uninitialized.
+- **`LogAndSendError` return value:** `LogAndSendError` returns `err` — always capture or `return` it. Discarding the return value triggers `errcheck` lint failure.
+- **Classified vs. generic error reporting:** Use `SendAgentError` with `WithClassification`/`WithContext` only when the error matches a specific known category (e.g., hash-file validation → `file_access`). For unclassified or general failures, use `LogAndSendError` to avoid mislabeling errors with incorrect category/retryability metadata.
 
 ### Concurrency
 
