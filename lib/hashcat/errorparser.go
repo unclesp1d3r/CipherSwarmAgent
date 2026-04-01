@@ -275,19 +275,11 @@ var errorPatterns = []errorPattern{
 		staticContext("autotune_failure"),
 	},
 
-	// Kernel build failures (non-retryable)
+	// Kernel build/create failures (non-retryable)
 	{
 		regexp.MustCompile(
-			`\* Device #(\d+): Kernel (.+) build failed`,
+			`\* Device #(\d+): Kernel (.+) (?:build|create) failed`,
 		),
-		ErrorCategoryBackend,
-		api.SeverityCritical,
-		false,
-		extractKernelBuildContext,
-	},
-	// Kernel create failures (stdout warning, distinct from build failures)
-	{
-		regexp.MustCompile(`\* Device #(\d+): Kernel (.+) create failed`),
 		ErrorCategoryBackend,
 		api.SeverityCritical,
 		false,
@@ -437,7 +429,7 @@ var errorPatterns = []errorPattern{
 		false,
 		extractTerminalContext("no_valid_rules"),
 	},
-	// Empty input file — requires path separator to avoid false positives
+	// Empty input file — anchored at both ends with trailing period to reduce false positives
 	{
 		regexp.MustCompile(`^.+: empty file\.$`),
 		ErrorCategoryFileAccess,
@@ -721,75 +713,31 @@ func extractHashModeContext(_ string, submatch []string) map[string]any {
 	return ctx
 }
 
-// extractHashCountContext extracts the hash count limit from "Not enough/Too many hashes" errors.
-// submatch: [full, limit]
-func extractHashCountContext(_ string, submatch []string) map[string]any {
-	ctx := map[string]any{
-		"error_type": "hash_count_limit",
-	}
+// extractIntField returns an extractor that sets a fixed error_type and parses submatch[1]
+// as an integer into the named context field. Used for patterns with a single numeric capture
+// group (device IDs, PIDs, hash count limits, etc.).
+func extractIntField(errorType, fieldName string) contextExtractor {
+	return func(_ string, submatch []string) map[string]any {
+		ctx := map[string]any{
+			"error_type": errorType,
+		}
 
-	if limit, err := strconv.Atoi(submatch[1]); err == nil {
-		ctx["hash_count_limit"] = limit
-	}
+		if val, err := strconv.Atoi(submatch[1]); err == nil {
+			ctx[fieldName] = val
+		}
 
-	return ctx
+		return ctx
+	}
 }
 
-// extractPidContext extracts a process ID from "Already an instance running" errors.
-// submatch: [full, pid]
-func extractPidContext(_ string, submatch []string) map[string]any {
-	ctx := map[string]any{
-		"error_type": "already_running",
-	}
-
-	if pid, err := strconv.Atoi(submatch[1]); err == nil {
-		ctx["pid"] = pid
-	}
-
-	return ctx
-}
-
-// extractTemperatureContext extracts GPU device ID from temperature abort.
-// submatch: [full, deviceID]
-func extractTemperatureContext(_ string, submatch []string) map[string]any {
-	ctx := map[string]any{
-		"error_type": "temperature_limit",
-	}
-
-	if deviceID, err := strconv.Atoi(submatch[1]); err == nil {
-		ctx["device_id"] = deviceID
-	}
-
-	return ctx
-}
-
-// extractDeviceMemoryContext extracts device ID from memory errors.
-// submatch: [full, deviceID, memoryErrorType]
-func extractDeviceMemoryContext(_ string, submatch []string) map[string]any {
-	ctx := map[string]any{
-		"error_type": "device_memory",
-	}
-
-	if deviceID, err := strconv.Atoi(submatch[1]); err == nil {
-		ctx["device_id"] = deviceID
-	}
-
-	return ctx
-}
-
-// extractDeviceWarningContext extracts device ID from device warnings.
-// submatch: [full, deviceID]
-func extractDeviceWarningContext(_ string, submatch []string) map[string]any {
-	ctx := map[string]any{
-		"error_type": "device_warning",
-	}
-
-	if deviceID, err := strconv.Atoi(submatch[1]); err == nil {
-		ctx["device_id"] = deviceID
-	}
-
-	return ctx
-}
+// Convenience aliases for extractIntField with well-known error types.
+var (
+	extractHashCountContext     = extractIntField("hash_count_limit", "hash_count_limit")
+	extractPidContext           = extractIntField("already_running", "pid")
+	extractTemperatureContext   = extractIntField("temperature_limit", "device_id")
+	extractDeviceMemoryContext  = extractIntField("device_memory", "device_id")
+	extractDeviceWarningContext = extractIntField("device_warning", "device_id")
+)
 
 // extractBackendContextWithType returns an extractor for backend errors with a known error type.
 // Used for patterns where the error type is fixed (e.g., CL_BUILD_PROGRAM_FAILURE, Metal API)
