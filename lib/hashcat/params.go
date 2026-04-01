@@ -41,6 +41,10 @@ var (
 	ErrRuleListNotOpened = errors.New("provided rule list couldn't be opened on filesystem")
 	// ErrMaskListNotOpened indicates the specified mask list file cannot be accessed.
 	ErrMaskListNotOpened = errors.New("provided mask list couldn't be opened on filesystem")
+	// ErrHashFileNotReadable indicates the hash file is missing or inaccessible.
+	ErrHashFileNotReadable = errors.New("hash file couldn't be opened on filesystem")
+	// ErrHashFileEmpty indicates the hash file exists but contains zero bytes.
+	ErrHashFileEmpty = errors.New("hash file is empty")
 )
 
 // Params represents the configuration parameters for a hashcat hash cracking attack.
@@ -281,6 +285,19 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		}
 
 		params.Mask = maskList
+	}
+
+	hashFileInfo, err := os.Stat(hashFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("%w: %s", ErrHashFileNotReadable, hashFile)
+		}
+
+		return nil, fmt.Errorf("%w: %w", ErrHashFileNotReadable, err)
+	}
+
+	if hashFileInfo.Size() == 0 {
+		return nil, fmt.Errorf("%w: %s", ErrHashFileEmpty, hashFile)
 	}
 
 	args = append(args, hashFile)

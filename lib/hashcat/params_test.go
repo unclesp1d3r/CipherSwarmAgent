@@ -51,6 +51,13 @@ func createTestFile(t *testing.T, dir, name, content string) string {
 	return path
 }
 
+// createTestHashFile creates a temporary hash file with sample content for testing.
+func createTestHashFile(t *testing.T) string {
+	t.Helper()
+
+	return createTestFile(t, t.TempDir(), "hashes.txt", "5f4dcc3b5aa765d61d8327deb882cf99\n")
+}
+
 func TestParams_Validate_DictionaryAttack(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -529,8 +536,9 @@ func TestParams_ToCmdArgs_Dictionary(t *testing.T) {
 	cleanup := setupTestState(t)
 	defer cleanup()
 
-	// Create test wordlist
+	// Create test wordlist and hash file
 	wordlist := createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n123456\n")
+	hashFile := createTestHashFile(t)
 
 	params := Params{
 		AttackMode:       attackModeDictionary,
@@ -538,7 +546,7 @@ func TestParams_ToCmdArgs_Dictionary(t *testing.T) {
 		WordListFilename: "wordlist.txt",
 	}
 
-	args, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "--quiet")
@@ -557,6 +565,7 @@ func TestParams_ToCmdArgs_DictionaryWithRules(t *testing.T) {
 	// Create test files
 	createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n")
 	createTestFile(t, agentstate.State.FilePath, "rules.rule", ":\n")
+	hashFile := createTestHashFile(t)
 
 	params := Params{
 		AttackMode:       attackModeDictionary,
@@ -565,7 +574,7 @@ func TestParams_ToCmdArgs_DictionaryWithRules(t *testing.T) {
 		RuleListFilename: "rules.rule",
 	}
 
-	args, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-r")
@@ -620,12 +629,78 @@ func TestParams_ToCmdArgs_MissingMasklist(t *testing.T) {
 	assert.ErrorIs(t, err, ErrMaskListNotOpened)
 }
 
+func TestParams_ToCmdArgs_HashFileValidation(t *testing.T) {
+	cleanup := setupTestState(t)
+	defer cleanup()
+
+	// Create a real wordlist so dictionary validation passes
+	createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n")
+
+	tests := []struct {
+		name        string
+		hashFile    string
+		setup       func(t *testing.T) string
+		expectError error
+	}{
+		{
+			name: "missing hash file",
+			setup: func(_ *testing.T) string {
+				return filepath.Join(t.TempDir(), "nonexistent.hsh")
+			},
+			expectError: ErrHashFileNotReadable,
+		},
+		{
+			name: "empty hash file",
+			setup: func(t *testing.T) string {
+				t.Helper()
+				dir := t.TempDir()
+				path := filepath.Join(dir, "empty.hsh")
+				require.NoError(t, os.WriteFile(path, []byte{}, 0o600))
+
+				return path
+			},
+			expectError: ErrHashFileEmpty,
+		},
+		{
+			name: "valid hash file",
+			setup: func(t *testing.T) string {
+				t.Helper()
+				dir := t.TempDir()
+
+				return createTestFile(t, dir, "hashes.hsh", "5f4dcc3b5aa765d61d8327deb882cf99\n")
+			},
+			expectError: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hashFile := tt.setup(t)
+
+			params := Params{
+				AttackMode:       attackModeDictionary,
+				HashType:         0,
+				WordListFilename: "wordlist.txt",
+			}
+
+			_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+
+			if tt.expectError == nil {
+				require.NoError(t, err)
+			} else {
+				assert.ErrorIs(t, err, tt.expectError)
+			}
+		})
+	}
+}
+
 func TestParams_ToCmdArgs_OptionalFlags(t *testing.T) {
 	cleanup := setupTestState(t)
 	defer cleanup()
 
-	// Create test wordlist
+	// Create test wordlist and hash file
 	createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n")
+	hashFile := createTestHashFile(t)
 
 	params := Params{
 		AttackMode:       attackModeDictionary,
@@ -641,7 +716,7 @@ func TestParams_ToCmdArgs_OptionalFlags(t *testing.T) {
 		AdditionalArgs:   []string{"--force"},
 	}
 
-	args, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-O")
@@ -679,13 +754,15 @@ func TestParams_ToCmdArgs_MaskAttack(t *testing.T) {
 	cleanup := setupTestState(t)
 	defer cleanup()
 
+	hashFile := createTestHashFile(t)
+
 	params := Params{
 		AttackMode: AttackModeMask,
 		HashType:   0,
 		Mask:       "?a?a?a?a",
 	}
 
-	args, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-a")
@@ -697,8 +774,9 @@ func TestParams_ToCmdArgs_MaskListAttack(t *testing.T) {
 	cleanup := setupTestState(t)
 	defer cleanup()
 
-	// Create test mask list
+	// Create test mask list and hash file
 	createTestFile(t, agentstate.State.FilePath, "masks.hcmask", "?l?l?l?l\n?d?d?d?d\n")
+	hashFile := createTestHashFile(t)
 
 	params := Params{
 		AttackMode:       AttackModeMask,
@@ -706,7 +784,7 @@ func TestParams_ToCmdArgs_MaskListAttack(t *testing.T) {
 		MaskListFilename: "masks.hcmask",
 	}
 
-	args, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	// Mask should be set to the mask list path
@@ -717,8 +795,9 @@ func TestParams_ToCmdArgs_HybridDMAttack(t *testing.T) {
 	cleanup := setupTestState(t)
 	defer cleanup()
 
-	// Create test wordlist
+	// Create test wordlist and hash file
 	createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n")
+	hashFile := createTestHashFile(t)
 
 	params := Params{
 		AttackMode:       attackModeHybridDM,
@@ -727,7 +806,7 @@ func TestParams_ToCmdArgs_HybridDMAttack(t *testing.T) {
 		Mask:             "?d?d?d",
 	}
 
-	args, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-a")
@@ -739,8 +818,9 @@ func TestParams_ToCmdArgs_HybridMDAttack(t *testing.T) {
 	cleanup := setupTestState(t)
 	defer cleanup()
 
-	// Create test wordlist
+	// Create test wordlist and hash file
 	createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n")
+	hashFile := createTestHashFile(t)
 
 	params := Params{
 		AttackMode:       attackModeHybridMD,
@@ -749,7 +829,7 @@ func TestParams_ToCmdArgs_HybridMDAttack(t *testing.T) {
 		Mask:             "?d?d?d",
 	}
 
-	args, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-a")
@@ -770,6 +850,8 @@ func TestParams_ToCmdArgs_MaskArgsError(t *testing.T) {
 	cleanup := setupTestState(t)
 	defer cleanup()
 
+	hashFile := createTestHashFile(t)
+
 	params := Params{
 		AttackMode:         AttackModeMask,
 		HashType:           0,
@@ -777,7 +859,7 @@ func TestParams_ToCmdArgs_MaskArgsError(t *testing.T) {
 		MaskCustomCharsets: []string{"a", "b", "c", "d", "e"}, // Too many
 	}
 
-	_, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrTooManyCustomCharsets)
 }
