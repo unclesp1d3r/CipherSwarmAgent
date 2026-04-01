@@ -8,57 +8,8 @@ package arch
 import (
 	"context"
 	"os/exec"
-	"regexp"
 	"strings"
-
-	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
-
-// vgaPattern matches VGA compatible controller lines in lspci output.
-var vgaPattern = regexp.MustCompile(`VGA compatible controller: (.+?) \(`)
-
-// GetDevices retrieves a list of GPU devices available on a Linux system.
-// It executes the "lspci" command to list all PCI devices and filters out
-// the ones that are VGA compatible controllers (typically GPUs).
-//
-// Parameters:
-//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
-//
-// Returns:
-//
-//	[]string: A slice of strings containing the names of the GPU devices.
-//	error: An error object if there was an issue executing the command or parsing the output.
-func GetDevices(ctx context.Context) ([]string, error) {
-	agentstate.Logger.Debug("Getting GPU devices")
-
-	out, err := exec.CommandContext(ctx, "lspci").Output()
-	if err != nil {
-		agentstate.Logger.Error("Error executing lspci command", "error", err)
-		return nil, err
-	}
-
-	commandResult := string(out)
-	matches := vgaPattern.FindAllStringSubmatch(commandResult, -1)
-
-	if matches == nil {
-		agentstate.Logger.Warn("No GPU devices found")
-		return nil, nil
-	}
-
-	devices := make([]string, 0, len(matches))
-	for _, match := range matches {
-		if len(match) > 1 {
-			devices = append(devices, strings.TrimSpace(match[1]))
-		}
-	}
-
-	if len(devices) == 0 {
-		agentstate.Logger.Error("No GPU devices found after parsing")
-		return nil, nil
-	}
-
-	return devices, nil
-}
 
 // GetHashcatVersion retrieves the version of Hashcat installed at the specified path.
 // It runs the Hashcat executable with the "--version" and "--quiet" flags and returns

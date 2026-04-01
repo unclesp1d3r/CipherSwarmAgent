@@ -213,9 +213,6 @@ func SetupSharedState() {
 	agentstate.State.HashcatPath = viper.GetString(
 		"hashcat_path",
 	) // Set the hashcat binary path in the shared state
-	agentstate.State.UseLegacyDeviceIdentificationMethod = viper.GetBool(
-		"use_legacy_device_technique",
-	) // Set the use legacy device identification method flag in the shared state
 	agentstate.State.SetForceBenchmarkRun(viper.GetBool("force_benchmark_run"))
 	agentstate.State.InsecureDownloads = viper.GetBool("insecure_downloads")
 	if agentstate.State.InsecureDownloads {
@@ -337,7 +334,6 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("write_zaps_to_file", false)
 	viper.SetDefault("retain_zaps_on_completion", false)
 	viper.SetDefault("enable_additional_hash_types", true)
-	viper.SetDefault("use_legacy_device_technique", false)
 	viper.SetDefault("task_timeout", DefaultTaskTimeout)
 	viper.SetDefault("download_max_retries", DefaultDownloadMaxRetries)
 	viper.SetDefault("download_retry_delay", DefaultDownloadRetryDelay)

@@ -7,6 +7,7 @@ package testhelpers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 
@@ -183,6 +184,49 @@ func MockUpdateAgentSuccess(agentID int64, agent api.Agent) {
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
+	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d$`, agentID))
+	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/agents/%d$`, agentID))
+	httpmock.RegisterRegexpResponder("POST", pattern1, responder)
+	httpmock.RegisterRegexpResponder("POST", pattern2, responder)
+	httpmock.RegisterRegexpResponder("PUT", pattern1, responder)
+	httpmock.RegisterRegexpResponder("PUT", pattern2, responder)
+	httpmock.RegisterRegexpResponder("PATCH", pattern1, responder)
+	httpmock.RegisterRegexpResponder("PATCH", pattern2, responder)
+}
+
+// MockUpdateAgentWithCapture registers mock responders for the update-agent endpoint that capture
+// the Devices field from the request body into capturedDevices, then return a successful response.
+// This allows tests to assert which device names were sent to the API.
+func MockUpdateAgentWithCapture(agentID int64, capturedDevices *[]string) {
+	responder := func(req *http.Request) (*http.Response, error) {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("reading request body: %w", err)
+		}
+
+		var payload api.UpdateAgentRequest
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return nil, fmt.Errorf("unmarshaling request body: %w", err)
+		}
+		*capturedDevices = payload.Devices
+
+		// Return the Agent directly (not wrapped) — oapi-codegen unmarshals
+		// the 200 body straight into api.Agent.
+		agent := api.Agent{
+			Id:              agentID,
+			HostName:        payload.HostName,
+			ClientSignature: payload.ClientSignature,
+			OperatingSystem: payload.OperatingSystem,
+			Devices:         payload.Devices,
+		}
+		jsonResponse := mustMarshal(agent)
+
+		resp := httpmock.NewStringResponse(http.StatusOK, string(jsonResponse))
+		resp.Header.Set("Content-Type", "application/json")
+
+		return resp, nil
+	}
+
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d$`, agentID))
 	pattern2 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/agents/%d$`, agentID))
 	httpmock.RegisterRegexpResponder("POST", pattern1, responder)

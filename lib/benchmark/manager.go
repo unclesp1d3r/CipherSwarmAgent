@@ -15,6 +15,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
@@ -33,11 +34,24 @@ type Manager struct {
 	agentsClient   api.AgentsClient
 	BackendDevices string
 	OpenCLDevices  string
+	DeviceManager  *devices.DeviceManager
 }
 
 // NewManager creates a new benchmark Manager with the given API client.
 func NewManager(agentsClient api.AgentsClient) *Manager {
 	return &Manager{agentsClient: agentsClient}
+}
+
+// validateDevicesForSession validates configured device IDs against the current
+// DeviceManager, logging warnings for unknown or unavailable IDs. Returns
+// validated device selections for use in hashcat.Params.
+func (m *Manager) validateDevicesForSession() devices.ValidatedDevices {
+	return devices.ValidateAndFilterDevices(
+		m.DeviceManager,
+		m.BackendDevices,
+		m.OpenCLDevices,
+		agentstate.Logger.Warn,
+	)
 }
 
 // unsubmittedResults returns a new slice containing only benchmark results
@@ -171,10 +185,15 @@ func (m *Manager) SubmitCapabilityResults(ctx context.Context, results []display
 // supported hash types without executing a full benchmark. It returns placeholder
 // BenchmarkResult entries (SpeedHs="1", Placeholder=true) for each discovered type.
 func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.BenchmarkResult, error) {
+	validated := m.validateDevicesForSession()
+
 	jobParams := hashcat.Params{
-		AttackMode:     hashcat.AttackHashInfo,
-		BackendDevices: m.BackendDevices,
-		OpenCLDevices:  m.OpenCLDevices,
+		AttackMode:                hashcat.AttackHashInfo,
+		BackendDevices:            m.BackendDevices,
+		OpenCLDevices:             m.OpenCLDevices,
+		ValidatedBackendDeviceIDs: validated.BackendDeviceIDs,
+		ValidatedOpenCLDevices:    validated.OpenCLDeviceTypes,
+		BackendDevicesValidated:   m.DeviceManager != nil,
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, "capability-detect", jobParams)
@@ -370,12 +389,16 @@ func (m *Manager) runSingleBenchmark(
 	hashTypeStr string,
 ) []display.BenchmarkResult {
 	sessionID := "bg-benchmark-" + hashTypeStr
+	validated := m.validateDevicesForSession()
 
 	jobParams := hashcat.Params{
-		AttackMode:     hashcat.AttackBenchmarkSingle,
-		HashType:       hashType,
-		BackendDevices: m.BackendDevices,
-		OpenCLDevices:  m.OpenCLDevices,
+		AttackMode:                hashcat.AttackBenchmarkSingle,
+		HashType:                  hashType,
+		BackendDevices:            m.BackendDevices,
+		OpenCLDevices:             m.OpenCLDevices,
+		ValidatedBackendDeviceIDs: validated.BackendDeviceIDs,
+		ValidatedOpenCLDevices:    validated.OpenCLDeviceTypes,
+		BackendDevicesValidated:   m.DeviceManager != nil,
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, sessionID, jobParams)
@@ -422,7 +445,7 @@ func (m *Manager) collectSingleBenchmarkOutput(
 			return nil
 
 		case line := <-sess.StdoutLines:
-			handleBenchmarkStdOutLine(line, &results)
+			handleBenchmarkStdOutLine(line, &results, m.DeviceManager)
 
 		case errInfo := <-sess.StderrMessages:
 			handleBenchmarkStdErrLine(ctx, errInfo)
@@ -435,7 +458,7 @@ func (m *Manager) collectSingleBenchmarkOutput(
 
 		case procErr := <-sess.DoneChan:
 			// Drain remaining stdout lines.
-			drainStdout(sess, &results)
+			drainStdout(sess, &results, m.DeviceManager)
 
 			if procErr != nil {
 				agentstate.Logger.Warn("Background benchmark session exited with error",
@@ -723,12 +746,16 @@ func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults
 // if the session cannot be created or fails to produce results.
 func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult, error) {
 	additionalArgs := arch.GetAdditionalHashcatArgs()
+	validated := m.validateDevicesForSession()
 
 	jobParams := hashcat.Params{
 		AttackMode:                hashcat.AttackBenchmark,
 		AdditionalArgs:            additionalArgs,
 		BackendDevices:            m.BackendDevices,
 		OpenCLDevices:             m.OpenCLDevices,
+		ValidatedBackendDeviceIDs: validated.BackendDeviceIDs,
+		ValidatedOpenCLDevices:    validated.OpenCLDeviceTypes,
+		BackendDevicesValidated:   m.DeviceManager != nil,
 		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
 	}
 
@@ -813,7 +840,7 @@ func (m *Manager) finalizeBenchmarkSession(
 	submittedUpTo int,
 	procErr error,
 ) {
-	drainStdout(sess, results)
+	drainStdout(sess, results, m.DeviceManager)
 
 	if procErr != nil {
 		agentstate.Logger.Error("Benchmark session failed", "error", procErr)
@@ -880,7 +907,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 				// Best-effort drain: may miss lines still in flight between the
 				// OS pipe buffer and the channel.
-				drainStdout(sess, &benchmarkResults)
+				drainStdout(sess, &benchmarkResults, m.DeviceManager)
 
 				if len(benchmarkResults) > 0 {
 					if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
@@ -900,7 +927,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 				return
 			case stdOutLine := <-sess.StdoutLines:
-				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults)
+				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults, m.DeviceManager)
 				submittedUpTo = m.submitBatchIfReady(ctx, benchmarkResults, submittedUpTo)
 			case stdErrLine := <-sess.StderrMessages:
 				handleBenchmarkStdErrLine(ctx, stdErrLine)

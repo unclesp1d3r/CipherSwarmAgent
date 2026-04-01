@@ -137,12 +137,6 @@ func TestSetDefaultConfigValues(t *testing.T) {
 				expected: true,
 				getter:   func(k string) any { return viper.GetBool(k) },
 			},
-			{
-				name:     "use_legacy_device_technique defaults to false",
-				key:      "use_legacy_device_technique",
-				expected: false,
-				getter:   func(k string) any { return viper.GetBool(k) },
-			},
 		}
 
 		for _, tt := range tests {

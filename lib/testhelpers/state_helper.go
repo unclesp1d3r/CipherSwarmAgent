@@ -103,7 +103,6 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.WriteZapsToFile = false
 		agentstate.State.RetainZapsOnCompletion = false
 		agentstate.State.EnableAdditionalHashTypes = false
-		agentstate.State.UseLegacyDeviceIdentificationMethod = false
 		agentstate.State.SetAPIClient(nil)
 		agentstate.State.SetForceBenchmarkRun(false)
 		agentstate.State.InsecureDownloads = false
@@ -159,7 +158,6 @@ func ResetTestState() {
 	agentstate.State.WriteZapsToFile = false
 	agentstate.State.RetainZapsOnCompletion = false
 	agentstate.State.EnableAdditionalHashTypes = false
-	agentstate.State.UseLegacyDeviceIdentificationMethod = false
 	agentstate.State.SetAPIClient(nil)
 	agentstate.State.SetForceBenchmarkRun(false)
 	agentstate.State.InsecureDownloads = false

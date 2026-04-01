@@ -20,6 +20,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/task"
@@ -38,6 +39,7 @@ const (
 var (
 	benchmarkMgr  *benchmark.Manager
 	taskMgr       *task.Manager
+	deviceMgr     *devices.DeviceManager
 	bgBenchCancel context.CancelFunc
 )
 
@@ -124,6 +126,15 @@ func StartAgent() {
 		agentstate.Logger.Fatal("Failed to rebuild API client with server settings", "error", err)
 	}
 
+	// Enumerate compute devices via hashcat -I before sending metadata.
+	// Warn-only on failure so the agent can still start (e.g., first-run before hashcat download).
+	deviceMgr = &devices.DeviceManager{}
+	if dmErr := deviceMgr.EnumerateDevices(ctx, agentstate.State.HashcatPath); dmErr != nil {
+		agentstate.Logger.Warn("Device enumeration failed, metadata will report no devices", "error", dmErr)
+		deviceMgr = nil
+	}
+	lib.SetDevicesListManager(deviceMgr)
+
 	err = lib.UpdateAgentMetadata(ctx)
 	if err != nil {
 		agentstate.Logger.Fatal("Failed to update agent metadata", "error", err)
@@ -144,6 +155,10 @@ func StartAgent() {
 	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
 	taskMgr.BackendDevices = cfg.Config.BackendDevices
 	taskMgr.OpenCLDevices = cfg.Config.OpenCLDevices
+	taskMgr.DeviceManager = deviceMgr // may be nil if enumeration failed
+
+	benchmarkMgr.DeviceManager = deviceMgr // may be nil if enumeration failed
+	validateAndWarnDevices(deviceMgr, cfg.Config.BackendDevices, cfg.Config.OpenCLDevices)
 
 	// Run benchmarks when the server requests them OR when the user explicitly
 	// passed --force-benchmark. Without this check the CLI flag is silently
@@ -373,6 +388,19 @@ func handleReload(ctx context.Context) {
 		bgBenchCancel = nil
 	}
 
+	// Re-enumerate devices in case hashcat was upgraded or drivers changed.
+	// Always create a fresh DeviceManager so stale device data is never reused.
+	deviceMgr = &devices.DeviceManager{}
+	if dmErr := deviceMgr.EnumerateDevices(ctx, agentstate.State.HashcatPath); dmErr != nil {
+		agentstate.Logger.Warn(
+			"Device re-enumeration failed during reload, managers will have no device data",
+			"error",
+			dmErr,
+		)
+		deviceMgr = nil
+	}
+	lib.SetDevicesListManager(deviceMgr)
+
 	// Recreate managers with new API client sub-clients and update configs
 	reloadClient := agentstate.State.GetAPIClient()
 	reloadCfg := lib.GetConfiguration()
@@ -382,6 +410,10 @@ func handleReload(ctx context.Context) {
 	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
 	taskMgr.BackendDevices = reloadCfg.Config.BackendDevices
 	taskMgr.OpenCLDevices = reloadCfg.Config.OpenCLDevices
+	taskMgr.DeviceManager = deviceMgr // may be nil if enumeration failed
+
+	benchmarkMgr.DeviceManager = deviceMgr // may be nil if enumeration failed
+	validateAndWarnDevices(deviceMgr, reloadCfg.Config.BackendDevices, reloadCfg.Config.OpenCLDevices)
 
 	if reloadCfg.BenchmarksNeeded {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
@@ -600,6 +632,25 @@ func fetchAgentConfig(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// validateAndWarnDevices checks server-configured device IDs against the
+// enumerated device set and logs a warning for each unrecognized ID.
+// It is a no-op when dm is nil (enumeration failed — already warned upstream).
+func validateAndWarnDevices(dm *devices.DeviceManager, backendDevices, openCLDevices string) {
+	if dm == nil {
+		return
+	}
+
+	if _, err := devices.ValidateDeviceIDString(dm, backendDevices); err != nil {
+		agentstate.Logger.Warn("Server-configured device ID not found in enumerated devices",
+			"error", err, "config_field", "backend_devices")
+	}
+
+	if _, err := devices.ValidateDeviceIDString(dm, openCLDevices); err != nil {
+		agentstate.Logger.Warn("Server-configured device ID not found in enumerated devices",
+			"error", err, "config_field", "opencl_devices")
+	}
 }
 
 func initLogger() {

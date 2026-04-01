@@ -17,6 +17,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
@@ -27,6 +28,7 @@ type Manager struct {
 	attacksClient  api.AttacksClient
 	BackendDevices string
 	OpenCLDevices  string
+	DeviceManager  *devices.DeviceManager
 }
 
 // NewManager creates a new task Manager with the given API clients.
@@ -195,7 +197,10 @@ func (m *Manager) RunTask(ctx context.Context, task *api.Task, attack *api.Attac
 }
 
 // createJobParams creates hashcat parameters from the given Task and Attack objects.
+// It validates device IDs against the current DeviceManager before building params.
 func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Params {
+	validated := m.validateDevicesForSession()
+
 	return hashcat.Params{
 		AttackMode: int64(attack.AttackModeHashcat),
 		HashType:   int64(attack.HashMode),
@@ -213,18 +218,36 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 			lib.UnwrapOr(attack.CustomCharset3, ""),
 			lib.UnwrapOr(attack.CustomCharset4, ""),
 		},
-		WordListFilename: resourceNameOrBlank(attack.WordList),
-		RuleListFilename: resourceNameOrBlank(attack.RuleList),
-		MaskListFilename: resourceNameOrBlank(attack.MaskList),
-		AdditionalArgs:   arch.GetAdditionalHashcatArgs(),
-		OptimizedKernels: attack.Optimized,
-		SlowCandidates:   attack.SlowCandidateGenerators,
-		Skip:             lib.UnwrapOr(task.Skip, 0),
-		Limit:            lib.UnwrapOr(task.Limit, 0),
-		BackendDevices:   m.BackendDevices,
-		OpenCLDevices:    m.OpenCLDevices,
-		RestoreFilePath:  filepath.Join(agentstate.State.RestoreFilePath, strconv.FormatInt(attack.Id, 10)+".restore"),
+		WordListFilename:          resourceNameOrBlank(attack.WordList),
+		RuleListFilename:          resourceNameOrBlank(attack.RuleList),
+		MaskListFilename:          resourceNameOrBlank(attack.MaskList),
+		AdditionalArgs:            arch.GetAdditionalHashcatArgs(),
+		OptimizedKernels:          attack.Optimized,
+		SlowCandidates:            attack.SlowCandidateGenerators,
+		Skip:                      lib.UnwrapOr(task.Skip, 0),
+		Limit:                     lib.UnwrapOr(task.Limit, 0),
+		BackendDevices:            m.BackendDevices,
+		OpenCLDevices:             m.OpenCLDevices,
+		ValidatedBackendDeviceIDs: validated.BackendDeviceIDs,
+		ValidatedOpenCLDevices:    validated.OpenCLDeviceTypes,
+		BackendDevicesValidated:   m.DeviceManager != nil,
+		RestoreFilePath: filepath.Join(
+			agentstate.State.RestoreFilePath,
+			strconv.FormatInt(attack.Id, 10)+".restore",
+		),
 	}
+}
+
+// validateDevicesForSession validates configured device IDs against the current
+// DeviceManager, logging warnings for unknown or unavailable IDs. Returns
+// validated device selections for use in hashcat.Params.
+func (m *Manager) validateDevicesForSession() devices.ValidatedDevices {
+	return devices.ValidateAndFilterDevices(
+		m.DeviceManager,
+		m.BackendDevices,
+		m.OpenCLDevices,
+		agentstate.Logger.Warn,
+	)
 }
 
 func resourceNameOrBlank(resource *api.AttackResourceFile) string {

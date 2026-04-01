@@ -9,46 +9,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
-
-	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
-
-// GetDevices retrieves a list of GPU devices available on a Windows system.
-// It uses WMI to query the Win32_VideoController class and extracts the names
-// of the GPU devices.
-//
-// Parameters:
-//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
-//
-// Returns:
-//
-//	[]string: A slice of strings containing the names of the GPU devices.
-//	error: An error object if there was an issue executing the command or parsing the output.
-func GetDevices(ctx context.Context) ([]string, error) {
-	agentstate.Logger.Debug("Getting GPU devices")
-	cmd := exec.CommandContext(ctx, "wmic", "path", "win32_videocontroller", "get", "name")
-	out, err := cmd.Output()
-	if err != nil {
-		agentstate.Logger.Error("Error executing wmic command", "error", err)
-		return nil, err
-	}
-
-	lines := strings.Split(string(out), "\n")
-	var devices []string
-	for _, line := range lines {
-		device := strings.TrimSpace(line)
-		if device != "" && device != "Name" {
-			devices = append(devices, device)
-		}
-	}
-
-	if len(devices) == 0 {
-		agentstate.Logger.Warn("No GPU devices found")
-		return nil, nil
-	}
-
-	return devices, nil
-}
 
 // GetHashcatVersion retrieves the version of Hashcat installed at the specified path.
 // It runs the Hashcat executable with the "--version" and "--quiet" flags and returns

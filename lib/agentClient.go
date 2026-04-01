@@ -12,9 +12,9 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	cserrors "github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 )
 
@@ -32,7 +32,9 @@ var (
 	setNativeHashcatPathFn = setNativeHashcatPath //nolint:gochecknoglobals // Used for testing
 	// getDevicesListFn allows stubbing getDevicesList for testing.
 	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
-	getDevicesListFn = getDevicesList //nolint:gochecknoglobals // Used for testing
+	getDevicesListFn = func(ctx context.Context) ([]string, error) { //nolint:gochecknoglobals // Used for testing
+		return getDevicesList(ctx, nil)
+	}
 )
 
 func init() {
@@ -260,7 +262,7 @@ func UpdateAgentMetadata(ctx context.Context) error {
 
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
-	devices, err := getDevicesListFn(ctx)
+	deviceNames, err := getDevicesListFn(ctx)
 	if err != nil {
 		return cserrors.LogAndSendError(ctx, "Error getting devices", err, api.SeverityCritical, nil)
 	}
@@ -271,7 +273,7 @@ func UpdateAgentMetadata(ctx context.Context) error {
 		HostName:        info.Hostname,
 		ClientSignature: clientSignature,
 		OperatingSystem: info.OS,
-		Devices:         devices,
+		Devices:         deviceNames,
 	}
 
 	// Debug logging for troubleshooting credentials issue
@@ -280,7 +282,7 @@ func UpdateAgentMetadata(ctx context.Context) error {
 		"hostname", info.Hostname,
 		"client_signature", clientSignature,
 		"os", info.OS,
-		"devices", devices,
+		"devices", deviceNames,
 		"api_url", agentstate.State.URL,
 		"has_token", agentstate.State.APIToken != "")
 
@@ -307,14 +309,31 @@ func UpdateAgentMetadata(ctx context.Context) error {
 	return nil
 }
 
-// getDevicesList retrieves a list of device names based on the configured device identification method.
-// It checks the global state to determine if the legacy method should be used, then calls the appropriate function.
-func getDevicesList(ctx context.Context) ([]string, error) {
-	if agentstate.State.UseLegacyDeviceIdentificationMethod {
-		return arch.GetDevices(ctx)
+// SetDevicesListManager wires the enumerated DeviceManager into getDevicesListFn.
+// Called by StartAgent and handleReload after device enumeration completes.
+func SetDevicesListManager(dm *devices.DeviceManager) {
+	getDevicesListFn = func(ctx context.Context) ([]string, error) {
+		return getDevicesList(ctx, dm)
+	}
+}
+
+// getDevicesList retrieves a list of device names from the pre-enumerated DeviceManager.
+// When dm is non-nil the device names come from the DeviceManager; when dm is nil (enumeration
+// failed or hashcat unavailable) an empty slice is returned so metadata submission succeeds with no devices.
+func getDevicesList(_ context.Context, dm *devices.DeviceManager) ([]string, error) {
+	if dm == nil {
+		agentstate.Logger.Debug("DeviceManager is nil, reporting empty device list")
+
+		return []string{}, nil
 	}
 
-	return getDevices(ctx)
+	all := dm.GetAllDevices()
+	names := make([]string, len(all))
+	for i, d := range all {
+		names[i] = d.Name
+	}
+
+	return names, nil
 }
 
 // SendHeartBeat sends a heartbeat signal to the server and processes the server's response.

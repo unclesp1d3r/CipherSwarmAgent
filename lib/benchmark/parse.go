@@ -3,10 +3,12 @@ package benchmark
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
@@ -21,7 +23,8 @@ const (
 var hashInfoLineRe = regexp.MustCompile(`^\s*(\d+)\s*\|`) //nolint:gochecknoglobals // package-level compiled regex
 
 // handleBenchmarkStdOutLine processes a line of benchmark output, extracting relevant data and appending it to result.
-func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult) {
+// When dm is non-nil, it enriches the log with the human-readable device name looked up from the DeviceManager.
+func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult, dm *devices.DeviceManager) {
 	fields := strings.Split(line, ":")
 	if len(fields) != benchmarkFieldCount {
 		agentstate.Logger.Debug("Unknown benchmark line", "line", line)
@@ -36,6 +39,16 @@ func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult) 
 		HashTimeMs: fields[4],
 		SpeedHs:    fields[5],
 	}
+
+	if dm != nil {
+		if id, err := strconv.Atoi(fields[0]); err == nil {
+			if dev, found := dm.GetDevice(id); found {
+				agentstate.Logger.Debug("Benchmark result device",
+					"device_id", id, "device_name", dev.Name, "hash_type", result.HashType)
+			}
+		}
+	}
+
 	display.Benchmark(result)
 	*results = append(*results, result)
 }
@@ -43,11 +56,11 @@ func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult) 
 // drainStdout reads and processes any remaining buffered lines from the
 // session's StdoutLines channel. This ensures no benchmark results are lost
 // when DoneChan fires before all buffered output has been consumed.
-func drainStdout(sess *hashcat.Session, results *[]display.BenchmarkResult) {
+func drainStdout(sess *hashcat.Session, results *[]display.BenchmarkResult, dm *devices.DeviceManager) {
 	for {
 		select {
 		case line := <-sess.StdoutLines:
-			handleBenchmarkStdOutLine(line, results)
+			handleBenchmarkStdOutLine(line, results, dm)
 		default:
 			return
 		}

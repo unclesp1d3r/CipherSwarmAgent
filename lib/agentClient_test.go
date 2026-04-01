@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
@@ -284,6 +285,65 @@ func TestUpdateAgentMetadata(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestUpdateAgentMetadata_WithDeviceManager verifies that SetDevicesListManager
+// wires a DeviceManager into getDevicesListFn so UpdateAgentMetadata sends the
+// enumerated device names to the API. Uses a real DeviceManager created via
+// devices.NewDeviceManagerForTest to exercise the full integration path.
+func TestUpdateAgentMetadata_WithDeviceManager(t *testing.T) {
+	t.Cleanup(testhelpers.SetupHTTPMock())
+	t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
+
+	// Save and restore the original getDevicesListFn.
+	original := getDevicesListFn
+	t.Cleanup(func() { getDevicesListFn = original })
+
+	// Create a real DeviceManager populated with test devices.
+	dm := devices.NewDeviceManagerForTest([]devices.Device{
+		{ID: 1, Name: "NVIDIA GeForce RTX 3090", Type: "GPU", Backend: "CUDA"},
+		{ID: 2, Name: "Intel Core i9-12900K", Type: "CPU", Backend: "OpenCL"},
+	})
+
+	// Wire the DeviceManager through the real SetDevicesListManager path.
+	SetDevicesListManager(dm)
+
+	// Capture the request body sent to the update-agent endpoint.
+	var capturedDevices []string
+	testhelpers.MockUpdateAgentWithCapture(123, &capturedDevices)
+
+	err := UpdateAgentMetadata(context.Background())
+	require.NoError(t, err)
+
+	// Assert the request contained the expected device names from the DeviceManager.
+	require.Equal(t, []string{"NVIDIA GeForce RTX 3090", "Intel Core i9-12900K"}, capturedDevices)
+}
+
+// TestGetDevicesList_WithDeviceManager verifies getDevicesList returns device
+// names from a DeviceManager when one is provided and the legacy flag is off.
+func TestGetDevicesList_WithDeviceManager(t *testing.T) {
+	t.Cleanup(testhelpers.SetupMinimalTestState(1))
+
+	// Use devices.NewDeviceManagerForTest to create a populated manager.
+	dm := devices.NewDeviceManagerForTest([]devices.Device{
+		{ID: 1, Name: "RTX 3090", Type: "GPU", Backend: "OpenCL"},
+		{ID: 2, Name: "Core i9", Type: "CPU", Backend: "OpenCL"},
+	})
+
+	names, err := getDevicesList(context.Background(), dm)
+	require.NoError(t, err)
+	require.Equal(t, []string{"RTX 3090", "Core i9"}, names)
+}
+
+// TestGetDevicesList_NilManagerReturnsEmpty verifies getDevicesList returns an
+// empty device list (not an error) when dm is nil and legacy is off. This ensures
+// that failed device enumeration does not prevent metadata submission.
+func TestGetDevicesList_NilManagerReturnsEmpty(t *testing.T) {
+	t.Cleanup(testhelpers.SetupMinimalTestState(1))
+
+	names, err := getDevicesList(context.Background(), nil)
+	require.NoError(t, err)
+	require.Empty(t, names)
 }
 
 // TestSendHeartBeat tests the SendHeartBeat function.
