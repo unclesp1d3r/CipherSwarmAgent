@@ -177,6 +177,8 @@ const metalWithCapabilities = `Metal Info:
 `
 
 // hipWithCapabilities includes HIP backend output.
+//
+//nolint:gosec // G101 - false positive, this is a test fixture not credentials
 const hipWithCapabilities = `HIP Info:
 =========
 

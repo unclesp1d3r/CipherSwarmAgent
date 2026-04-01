@@ -635,7 +635,6 @@ func fetchAgentConfig(ctx context.Context) error {
 	return nil
 }
 
-
 func initLogger() {
 	if agentstate.State.Debug {
 		agentstate.Logger.SetLevel(log.DebugLevel)

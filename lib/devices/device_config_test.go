@@ -36,8 +36,8 @@ func TestNewDeviceConfig_EmptyStrings(t *testing.T) {
 	dc := NewDeviceConfig("", "", nil)
 
 	assert.Empty(t, dc.enabledIDs)
-	assert.Equal(t, "", dc.RawBackendDevices())
-	assert.Equal(t, "", dc.RawOpenCLDevices())
+	assert.Empty(t, dc.RawBackendDevices())
+	assert.Empty(t, dc.RawOpenCLDevices())
 }
 
 func TestNewDeviceConfig_NonNumericBackend(t *testing.T) {
@@ -70,7 +70,7 @@ func TestResolvedBackendDevices_NilDM_EmptyRaw(t *testing.T) {
 	t.Parallel()
 
 	dc := NewDeviceConfig("", "", nil)
-	assert.Equal(t, "", dc.ResolvedBackendDevices())
+	assert.Empty(t, dc.ResolvedBackendDevices())
 }
 
 func TestResolvedBackendDevices_NilDM_TrimsWhitespace(t *testing.T) {
@@ -106,7 +106,7 @@ func TestResolvedBackendDevices_WithDM_AllInvalid(t *testing.T) {
 	dc := NewDeviceConfig("98,99", "", dm)
 
 	// All invalid — empty string (hashcat auto-detects).
-	assert.Equal(t, "", dc.ResolvedBackendDevices())
+	assert.Empty(t, dc.ResolvedBackendDevices())
 }
 
 func TestResolvedBackendDevices_WithDM_EmptyRaw(t *testing.T) {
@@ -116,7 +116,7 @@ func TestResolvedBackendDevices_WithDM_EmptyRaw(t *testing.T) {
 	dc := NewDeviceConfig("", "", dm)
 
 	// No IDs configured — empty (hashcat uses all).
-	assert.Equal(t, "", dc.ResolvedBackendDevices())
+	assert.Empty(t, dc.ResolvedBackendDevices())
 }
 
 func TestResolvedBackendDevices_WithDM_NonNumericRaw(t *testing.T) {
@@ -126,7 +126,7 @@ func TestResolvedBackendDevices_WithDM_NonNumericRaw(t *testing.T) {
 	dc := NewDeviceConfig("OpenCL", "", dm)
 
 	// Non-numeric raw, enabledIDs empty, validated=true → empty.
-	assert.Equal(t, "", dc.ResolvedBackendDevices())
+	assert.Empty(t, dc.ResolvedBackendDevices())
 }
 
 func TestResolvedOpenCLDevices_ReturnsRaw(t *testing.T) {
@@ -147,7 +147,7 @@ func TestResolvedOpenCLDevices_Empty(t *testing.T) {
 	t.Parallel()
 
 	dc := NewDeviceConfig("", "", nil)
-	assert.Equal(t, "", dc.ResolvedOpenCLDevices())
+	assert.Empty(t, dc.ResolvedOpenCLDevices())
 }
 
 func TestValidate_NilDM(t *testing.T) {
@@ -157,7 +157,9 @@ func TestValidate_NilDM(t *testing.T) {
 
 	var warnings []string
 	logFn := func(msg any, _ ...any) {
-		warnings = append(warnings, msg.(string))
+		if s, ok := msg.(string); ok {
+			warnings = append(warnings, s)
+		}
 	}
 
 	result := dc.Validate(logFn)
@@ -175,7 +177,9 @@ func TestValidate_WithDM_ValidIDs(t *testing.T) {
 
 	var warnings []string
 	logFn := func(msg any, _ ...any) {
-		warnings = append(warnings, msg.(string))
+		if s, ok := msg.(string); ok {
+			warnings = append(warnings, s)
+		}
 	}
 
 	result := dc.Validate(logFn)
@@ -193,7 +197,9 @@ func TestValidate_WithDM_UnknownIDs(t *testing.T) {
 
 	var warnings []string
 	logFn := func(msg any, _ ...any) {
-		warnings = append(warnings, msg.(string))
+		if s, ok := msg.(string); ok {
+			warnings = append(warnings, s)
+		}
 	}
 
 	result := dc.Validate(logFn)
@@ -211,7 +217,9 @@ func TestValidate_WithDM_EmptyIDs(t *testing.T) {
 
 	var warnings []string
 	logFn := func(msg any, _ ...any) {
-		warnings = append(warnings, msg.(string))
+		if s, ok := msg.(string); ok {
+			warnings = append(warnings, s)
+		}
 	}
 
 	result := dc.Validate(logFn)

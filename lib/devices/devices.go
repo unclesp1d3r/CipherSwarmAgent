@@ -72,8 +72,8 @@ const (
 type Device struct {
 	ID           int
 	Name         string
-	Type         string            // "CPU" or "GPU"
-	Backend      string            // "OpenCL", "CUDA", "Metal", or "HIP"
+	Type         string // "CPU" or "GPU"
+	Backend      string // "OpenCL", "CUDA", "Metal", or "HIP"
 	Vendor       string
 	IsAvailable  bool
 	Capabilities map[string]string // Optional capability fields parsed from hashcat -I output.
