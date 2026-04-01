@@ -2,13 +2,14 @@
 title: "Benchmark receipt validation requires server-side API changes before agent implementation"
 category: integration-issues
 date: 2026-03-30
+resolved: 2026-03-31
 tags:
   - api-contract
   - cross-repo-dependency
   - benchmark
   - swagger
-  - blocked
-severity: low
+  - resolved
+severity: resolved
 components:
   - lib/benchmark/manager.go
   - lib/benchmark/cache.go
@@ -120,6 +121,30 @@ endpoints:
 4. **Track dependencies explicitly.** Every agent issue/PR depending on a
    server API change must reference the server issue by full URL and include a
    checklist item for server completion.
+
+## Resolution (2026-03-31)
+
+Server issue `CipherSwarm#823` was completed — the `submit_benchmark` endpoint
+now returns HTTP 200 with a `BenchmarkReceipt` JSON body containing
+`received_count`, `processed_count`, `failed_count`, and optional `message`.
+
+Agent-side implementation:
+
+1. **Regenerated client** — `docs/swagger.json` updated from server, `just generate`
+   produced `BenchmarkReceipt` type and `SubmitBenchmarkResponse.JSON200` field.
+2. **Created `lib/benchmark/receipt.go`** — `validateReceipt()` validates receipt
+   counts, logs warnings for mismatches and partial failures. Advisory-only to
+   avoid infinite retry loops (count mismatches are permanent for the same data).
+3. **Updated `sendBenchmarkResults()`** — switch on status code: 200 with receipt
+   validation (nil JSON200 returns `errBadResponse`), 204 for backward compat.
+4. **Added tests** — `receipt_test.go` (9 table-driven cases), updated
+   `manager_test.go` mocks from 204 to 200 with receipt JSON.
+
+Key design decisions:
+- Count mismatch is advisory (warn, not error) — prevents infinite retry loops
+  since the server may legitimately deduplicate entries.
+- Nil JSON200 on HTTP 200 returns error — protocol violation, not silently accepted.
+- Negative counts return `errBadResponse` — guards against malformed server responses.
 
 ## Cross-References
 
