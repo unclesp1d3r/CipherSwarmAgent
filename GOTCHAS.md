@@ -4,6 +4,8 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 ## Linting
 
+- `charmbracelet/log` methods take `func(msg any, keyvals ...any)` — not `func(msg string, ...)`. Functions that accept a log callback (e.g., `ValidateAndFilterDevices`) must use `any` for the message parameter.
+
 - `//go:fix inline` directives conflict with `gocheckcompilerdirectives` — avoid adding them.
 
 - `just ci-check` includes a `go fix -diff` dry-run whose output is informational only, not a failure.
@@ -28,7 +30,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 
 - `gosec G118` flags goroutines that use `context.Background()` or don't propagate the parent context. Use `//nolint:gosec // G118 - reason` as a standalone comment above `go func()`.
 
-- `gosec G204` does NOT fire on `exec.CommandContext` when the binary path comes from an internal function return — don't add `//nolint:gosec // G204` unless verified.
+- `gosec G204` does NOT fire on `exec.CommandContext` when the binary path comes from a function parameter or internal function return — don't add `//nolint:gosec // G204` unless verified with a clean lint run.
 
 - `gosec G304` does NOT fire on `os.Open` in test helper packages — don't add `//nolint:gosec // G304` unless verified with a clean lint run.
 
@@ -98,6 +100,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `os.Symlink` requires elevated privileges (or Developer Mode) on Windows. Tests using symlinks must skip on Windows: `if runtime.GOOS == "windows" { t.Skip("os.Symlink requires elevated privileges on Windows") }`.
 - `os.Chmod(0o000)` does not prevent reading when running as root/elevated privileges. Tests relying on permission denial must also skip when elevated: attempt `os.Open` on the restricted file; if it succeeds, `t.Skip("running with elevated privileges")`.
 - `os.DirEntry.Type()` can return 0 (unknown) on some filesystems/platforms, causing `IsRegular()` to return false for real files. When filtering directory entries, fall back to `entry.Info()` (calls `os.Lstat`) when type is unknown. See `isRegularFile()` in `lib/hashcat/session_dir.go`.
+- For subprocess tests needing `CmdFactory` injection (e.g., `lib/devices/`), use the `TestHelperProcess` + `os.Args[0]` + env vars pattern with a `CmdFactory` field on the struct under test. This avoids shell-script stubs and works cross-platform. See `helperCmdFactory` in `lib/devices/devices_test.go`.
 
 ## Tooling
 
@@ -105,6 +108,7 @@ Known pitfalls and edge cases. Referenced from AGENTS.md.
 - `mdformat` pre-commit hook auto-fixes markdown files on first run, causing `just ci-check` to fail. Re-run after the auto-fix passes.
 - `govulncheck` may fail with Go 1.26 if built against an older Go version. Rebuild with `go install golang.org/x/vuln/cmd/govulncheck@latest`.
 - IDE/editor post-save hooks (e.g., goimports, golines, LSP actions) may refactor code beyond the original edit (e.g., changing return types, removing unused sentinels). Check the file state after saves before making further dependent edits.
+- `.golangci.yml` `fix: true` auto-refactors string concatenation in loops to `strings.Builder`, but may leave dead variables (e.g., the original `result` string). Always review auto-fixed code for leftover artifacts.
 
 ## Releasing
 
