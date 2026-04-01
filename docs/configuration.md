@@ -72,7 +72,6 @@ write_zaps_to_file: false
 zap_path: /opt/cipherswarm/data/zaps
 retain_zaps_on_completion: false
 enable_additional_hash_types: true
-use_legacy_device_technique: false
 hashcat_path: ''  # Leave empty for auto-detection
 
 # Fault tolerance settings
@@ -383,13 +382,6 @@ These settings control HTTP transport behavior including connection timeouts, re
 - **Type**: Boolean
 - **Default**: `true`
 - **Description**: Enable support for additional hash types during benchmarking
-
-#### `use_legacy_device_technique` / `USE_LEGACY_DEVICE_TECHNIQUE`
-
-- **Flag**: `--use-legacy-device-technique`
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Use legacy method for device identification (not recommended)
 
 #### `always_trust_files` / `ALWAYS_TRUST_FILES`
 
