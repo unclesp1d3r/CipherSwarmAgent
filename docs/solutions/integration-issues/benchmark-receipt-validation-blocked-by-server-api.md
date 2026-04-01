@@ -11,6 +11,7 @@ tags:
   - resolved
 severity: resolved
 components:
+  - lib/benchmark/receipt.go
   - lib/benchmark/manager.go
   - lib/benchmark/cache.go
   - lib/api/interfaces.go
@@ -137,14 +138,19 @@ Agent-side implementation:
    avoid infinite retry loops (count mismatches are permanent for the same data).
 3. **Updated `sendBenchmarkResults()`** — switch on status code: 200 with receipt
    validation (nil JSON200 returns `errBadResponse`), 204 for backward compat.
-4. **Added tests** — `receipt_test.go` (9 table-driven cases), updated
-   `manager_test.go` mocks from 204 to 200 with receipt JSON.
+4. **Added tests** — `receipt_test.go` (10 table-driven cases), updated
+   `manager_test.go` mocks from 204 to 200 with receipt JSON (8 integration cases).
 
 Key design decisions:
 - Count mismatch is advisory (warn, not error) — prevents infinite retry loops
   since the server may legitimately deduplicate entries.
 - Nil JSON200 on HTTP 200 returns error — protocol violation, not silently accepted.
 - Negative counts return `errBadResponse` — guards against malformed server responses.
+- Zero received (`ReceivedCount=0, sentCount>0`) returns error — protocol failure,
+  not deduplication.
+- Total rejection (`FailedCount == ReceivedCount > 0`) returns error — server
+  explicitly rejected all entries; re-running benchmarks may produce different
+  data, so retry is appropriate.
 
 ## Cross-References
 
