@@ -148,9 +148,9 @@ Key design decisions:
 
 ## Cross-References
 
-- [AGENTS.md — Code Generation](../../AGENTS.md): `just generate` runs
+- [AGENTS.md — Code Generation](../../../AGENTS.md): `just generate` runs
   oapi-codegen against `docs/swagger.json`
-- [GOTCHAS.md — Code Generation](../../GOTCHAS.md): swagger.json rules,
+- [GOTCHAS.md — Code Generation](../../../GOTCHAS.md): swagger.json rules,
   oapi-codegen pitfalls
 - [docs/solutions/logic-errors/hashcat-session-file-cleanup-wrong-directory.md](../logic-errors/hashcat-session-file-cleanup-wrong-directory.md):
   Related solution document pattern

@@ -268,6 +268,26 @@ func TestSendBenchmarkResults(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		{
+			name: "200 with all-failed receipt returns error",
+			results: []display.BenchmarkResult{
+				{
+					HashType:  "0",
+					RuntimeMs: "100",
+					SpeedHs:   "12345.67",
+					Device:    "1",
+				},
+			},
+			setupMock: func(_ int64) {
+				httpmock.RegisterRegexpResponder("POST", benchmarkSubmitPattern,
+					httpmock.NewJsonResponderOrPanic(http.StatusOK, api.BenchmarkReceipt{
+						ReceivedCount:  1,
+						ProcessedCount: 0,
+						FailedCount:    1,
+					}))
+			},
+			expectedError: true,
+		},
 	}
 
 	for _, tt := range tests {
