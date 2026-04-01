@@ -39,7 +39,7 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - **stdout vs stderr:** Hashcat routes `event_log_warning` (hash parse errors) and `event_log_advice` (summary blocks) to **stdout**. Only `event_log_error` goes to stderr. `--status-json` does NOT produce JSON error objects — only affects periodic status output.
 - **Error parser patterns** (`lib/hashcat/errorparser.go`): `ClassifyStderr` classifies both stderr and stdout lines using `FindStringSubmatch` + optional `contextExtractor` functions that populate `ErrorInfo.Context map[string]any`. When adding new patterns, include an extractor to populate well-known keys (`error_type`, `device_id`, `hashfile`, `line_number`, `affected_count`, `total_count`, `terminal`, `backend_api`, `api_error`).
 - **Version-specific formats:** v6.x uses `Hashfile '<file>' on line N (<hash>): <error>`, v7.x changed to `Hash parsing error in hashfile: '<file>' on line N (<hash>): <error>`. Machine-readable mode (`--machine-readable`) uses `<file>:<line>:<hash>:<error>`. Patterns must handle both versions.
-- **Stdout→StderrMessages routing:** Non-JSON stdout lines are classified by `ClassifyStderr` in `handleStdout()` (`lib/hashcat/session.go`). Error/warning categories are forwarded as `ErrorInfo` (not raw strings) to the `StderrMessages` channel. Consumers: `lib/task/runner.go`, `lib/testManager.go`, `lib/benchmark/parse.go`. Info/success categories are logged locally only.
+- **Stdout→StderrMessages routing:** Non-JSON stdout lines are classified by `ClassifyStderr` in `handleStdout()` (`lib/hashcat/session.go`). Error/warning categories are forwarded as `ErrorInfo` (not raw strings) to the `StderrMessages` channel. Consumers: `lib/task/runner.go`, `lib/benchmark/parse.go`. Info/success categories are logged locally only.
 - **Exit codes** (`lib/hashcat/exitcode.go`): Constants and classifications are sourced from hashcat `types.h` — not observed behavior. `ExitCodeInfo` includes `Context map[string]any` with `exit_code_name`.
 - **Shell exit code normalization:** On Unix, hashcat's negative exit codes (e.g., -11) arrive as unsigned 8-bit (e.g., 245). `normalizeExitCode` in `lib/task/runner.go` converts 245-255 → -11 to -1 before `ClassifyExitCode`.
 - **No raw hashcat lines in logs:** `handleStderr` and `classifyAndForwardStdout` log classified metadata (`category`, `severity`) — never raw `line` content, which may contain hashes or file paths.
@@ -49,6 +49,13 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 - **Structured error metadata:** `cserrors.WithContext(map[string]any)` merges extracted fields into the API error metadata `other` map. Always pair with `WithClassification` when sending classified errors.
 - **Metadata key precedence:** In `SendAgentError`, context fields are copied first, then reserved keys (`platform`, `version`, `category`, `retryable`) are set — so reserved keys always win over context collisions.
 - **Error-specific classification in RunTask:** `NewHashcatSession` failures are branched: hash file errors (`ErrHashFileNotReadable`, `ErrHashFileEmpty`, `ErrHashFileWhitespaceOnly`) get `WithClassification("file_access", false)` + `WithContext`; all other failures use `LogAndSendError` without classification. Follow this pattern when adding new classified error paths.
+
+### Device Validation Flow
+
+- **Manager → DeviceManager wiring:** Both `benchmark.Manager` and `task.Manager` hold a `DeviceManager *devices.DeviceManager` field, set in `agent.StartAgent` and `handleReload` (may be nil if enumeration failed). Before creating `hashcat.Params`, each manager calls `validateDevicesForSession()` → `devices.ValidateAndFilterDevices()`, producing `ValidatedDevices` with filtered IDs. `hashcat.Params` has `ValidatedBackendDeviceIDs`, `ValidatedOpenCLDevices`, and `BackendDevicesValidated` fields that `appendDeviceFlags` prefers over raw strings.
+- **Benchmark device enrichment:** `handleBenchmarkStdOutLine` and `drainStdout` in `lib/benchmark/parse.go` accept a `*devices.DeviceManager` parameter for optional device-name logging. Pass `nil` when no device manager is available (e.g., in tests). The numeric `result.Device` string must never be replaced — it's used by `createBenchmark` for the API.
+- **handleReload device safety:** Always create a fresh `DeviceManager{}` — never reuse across re-enumeration. Set to `nil` on enumeration failure so managers don't use stale device data.
+- **Availability parsing:** `parseDeviceOutput` detects "Status...: Skipped" and standalone "* Device #N: Skipped" lines, setting `Device.IsAvailable = false`. `ValidateDeviceIDsDetailed` classifies IDs as valid/unknown/unavailable.
 
 ## Go
 
@@ -65,6 +72,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
   - `benchmark/`: Benchmark execution, caching, and submission.
   - `config/`: Configuration defaults as exported constants — referenced by `cmd/root.go`.
   - `cracker/`: Hashcat binary discovery, archive extraction, version detection.
+  - `devices/`: Hashcat-native device enumeration via `hashcat -I`. `DeviceManager` parses backend devices (OpenCL/CUDA/Metal), tracks availability, and validates device ID selections. `CmdFactory` type enables test injection. `ValidateAndFilterDevices` is the main integration point for task/session setup. Nil `DeviceManager` (enumeration failed) → `getDevicesList` returns empty slice, not an error — no test-session fallback exists.
   - `cserrors/`: Centralized error reporting — `SendAgentError`, `LogAndSendError`, `ErrorOption`.
   - `display/`: User-facing output (status, progress, benchmark results).
   - `downloader/`: File download with checksum verification. Downloads use `grab/v3` with a `Getter` interface for testability. `grabDownloader` implements `Getter`; `downloadWithRetry` handles exponential backoff against any `Getter`. `grab.Response.Err()` blocks until transfer finalizes — always call it before returning from cancellation paths.
@@ -126,6 +134,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 ### Logging & Configuration
 
 - Use structured logger (`charmbracelet/log`). Never log secrets.
+- **Logger method signature:** `charmbracelet/log` methods (`Warn`, `Info`, etc.) take `func(msg any, keyvals ...any)`. Functions accepting a log callback must match this signature — not `func(msg string, ...)`.
 - Use `spf13/viper` for config. Treat `viper.WriteConfig()` failures as non-fatal warnings.
 - **Config access:** Read from `agentstate.State` (wired in `SetupSharedState()`), not `viper.Get*()` directly.
 - Validate numeric/duration config fields in `SetupSharedState()` — clamp invalid values to defaults with a warning.
@@ -163,6 +172,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `hashcat.NewTestSession(skipStatusUpdates)` (in `lib/hashcat/session_test_helpers.go`) to create mock sessions — never construct `hashcat.Session` struct literals directly from `testhelpers`, as it bypasses constructor invariants.
 - `toCmdArgs()` tests in `params_test.go` must pass real file paths for all validated parameters. Use `createTestHashFile(t)` for hash files and `createTestFile(t, dir, name, content)` for wordlists/rules/masks. Dummy paths like `/tmp/hashes.txt` will fail validation.
 - Status fixture slices (`RecoveredHashes`, `RecoveredSalts`, `Progress`) must have ≥2 elements (`display.MinStatusFields`). Single-element slices cause silent drops in `handleStatusUpdate` and `display.JobStatus`.
+- `MockUpdateAgentWithCapture` captures the request body's `Devices` field for assertion. Response must be the `Agent` struct directly (not wrapped in `{"agent": ...}`) with `Content-Type: application/json` — oapi-codegen's `ParseUpdateAgentResponse` unmarshals into `api.Agent` directly.
 - Run `go test -race ./...` to detect data races.
 
 ## Git
