@@ -33,6 +33,15 @@
           "golang-pro"
         ]
       }
+    },
+    "mattpocock/skills": {
+      "version": "651eab033bdf8f7fd535c274f8cbe839075aba5e",
+      "source": "https://github.com/mattpocock/skills",
+      "include": {
+        "skills": [
+          "ubiquitous-language"
+        ]
+      }
     }
   }
 }
