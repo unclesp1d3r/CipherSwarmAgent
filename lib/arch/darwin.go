@@ -5,58 +5,9 @@ package arch
 
 import (
 	"context"
-	"errors"
 	"os/exec"
-	"regexp"
 	"strings"
 )
-
-var (
-	// ErrNoDisplayDevices is returned when no display devices are found.
-	ErrNoDisplayDevices = errors.New("no display devices found")
-	// ErrNoValidDeviceNames is returned when no valid display device names can be extracted.
-	ErrNoValidDeviceNames = errors.New("no valid display device names extracted")
-
-	// chipsetPattern matches the Chipset Model line in system_profiler output.
-	chipsetPattern = regexp.MustCompile(`Chipset Model: (.*)`)
-)
-
-// GetDevices retrieves a list of display device names on a macOS system.
-// It executes the "system_profiler" command to get display information and parses the output
-// to extract the chipset model names.
-//
-// Parameters:
-//   - ctx: A context for cancellation and deadlines. The command will be cancelled if ctx is cancelled.
-//
-// Returns:
-//   - []string: A slice containing the names of the display devices.
-//   - error: An error object if the command execution or parsing fails.
-func GetDevices(ctx context.Context) ([]string, error) {
-	out, err := exec.CommandContext(ctx, "system_profiler", "SPDisplaysDataType", "-detaillevel", "mini").Output()
-	if err != nil {
-		return nil, err
-	}
-
-	commandResult := string(out)
-	matches := chipsetPattern.FindAllStringSubmatch(commandResult, -1)
-	if matches == nil {
-		return nil, ErrNoDisplayDevices
-	}
-
-	newArray := make([]string, 0, len(matches))
-
-	for _, match := range matches {
-		if len(match) > 1 {
-			newArray = append(newArray, strings.TrimSpace(match[1]))
-		}
-	}
-
-	if len(newArray) == 0 {
-		return nil, ErrNoValidDeviceNames
-	}
-
-	return newArray, nil
-}
 
 // GetHashcatVersion retrieves the version of Hashcat installed at the specified path.
 // It runs the Hashcat executable with the "--version" and "--quiet" flags and returns the output as a string.

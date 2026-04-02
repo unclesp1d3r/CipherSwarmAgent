@@ -26,11 +26,29 @@
       }
     },
     "Jeffallan/claude-skills": {
-      "version": "3bf9a24b76a7c122f1fc05e83929fbc84e1c207a",
+      "version": "5b761018cebd430edcecbeeb46bdde6150d22c65",
       "source": "https://github.com/Jeffallan/claude-skills",
       "include": {
         "skills": [
           "golang-pro"
+        ]
+      }
+    },
+    "mattpocock/skills": {
+      "version": "651eab033bdf8f7fd535c274f8cbe839075aba5e",
+      "source": "https://github.com/mattpocock/skills",
+      "include": {
+        "skills": [
+          "edit-article",
+          "grill-me",
+          "improve-codebase-architecture",
+          "prd-to-issues",
+          "prd-to-plan",
+          "request-refactor-plan",
+          "tdd",
+          "triage-issue",
+          "ubiquitous-language",
+          "write-a-prd"
         ]
       }
     }

@@ -15,6 +15,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
@@ -30,14 +31,19 @@ var errBadResponse = errors.New("bad response from server")
 // Manager handles benchmark operations including running benchmarks,
 // submitting results, and managing the benchmark cache.
 type Manager struct {
-	agentsClient   api.AgentsClient
-	BackendDevices string
-	OpenCLDevices  string
+	agentsClient api.AgentsClient
+	DeviceConfig devices.DeviceConfig
 }
 
 // NewManager creates a new benchmark Manager with the given API client.
 func NewManager(agentsClient api.AgentsClient) *Manager {
 	return &Manager{agentsClient: agentsClient}
+}
+
+// deviceManager returns the DeviceManager from the config, or nil.
+// Used by benchmark output handlers for device name lookups.
+func (m *Manager) deviceManager() *devices.DeviceManager {
+	return m.DeviceConfig.DeviceManager()
 }
 
 // unsubmittedResults returns a new slice containing only benchmark results
@@ -173,8 +179,8 @@ func (m *Manager) SubmitCapabilityResults(ctx context.Context, results []display
 func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.BenchmarkResult, error) {
 	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackHashInfo,
-		BackendDevices: m.BackendDevices,
-		OpenCLDevices:  m.OpenCLDevices,
+		BackendDevices: m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:  m.DeviceConfig.ResolvedOpenCLDevices(),
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, "capability-detect", jobParams)
@@ -374,8 +380,8 @@ func (m *Manager) runSingleBenchmark(
 	jobParams := hashcat.Params{
 		AttackMode:     hashcat.AttackBenchmarkSingle,
 		HashType:       hashType,
-		BackendDevices: m.BackendDevices,
-		OpenCLDevices:  m.OpenCLDevices,
+		BackendDevices: m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:  m.DeviceConfig.ResolvedOpenCLDevices(),
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, sessionID, jobParams)
@@ -422,7 +428,7 @@ func (m *Manager) collectSingleBenchmarkOutput(
 			return nil
 
 		case line := <-sess.StdoutLines:
-			handleBenchmarkStdOutLine(line, &results)
+			handleBenchmarkStdOutLine(line, &results, m.deviceManager())
 
 		case errInfo := <-sess.StderrMessages:
 			handleBenchmarkStdErrLine(ctx, errInfo)
@@ -435,7 +441,7 @@ func (m *Manager) collectSingleBenchmarkOutput(
 
 		case procErr := <-sess.DoneChan:
 			// Drain remaining stdout lines.
-			drainStdout(sess, &results)
+			drainStdout(sess, &results, m.deviceManager())
 
 			if procErr != nil {
 				agentstate.Logger.Warn("Background benchmark session exited with error",
@@ -727,8 +733,8 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 	jobParams := hashcat.Params{
 		AttackMode:                hashcat.AttackBenchmark,
 		AdditionalArgs:            additionalArgs,
-		BackendDevices:            m.BackendDevices,
-		OpenCLDevices:             m.OpenCLDevices,
+		BackendDevices:            m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:             m.DeviceConfig.ResolvedOpenCLDevices(),
 		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
 	}
 
@@ -813,7 +819,7 @@ func (m *Manager) finalizeBenchmarkSession(
 	submittedUpTo int,
 	procErr error,
 ) {
-	drainStdout(sess, results)
+	drainStdout(sess, results, m.deviceManager())
 
 	if procErr != nil {
 		agentstate.Logger.Error("Benchmark session failed", "error", procErr)
@@ -880,7 +886,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 				// Best-effort drain: may miss lines still in flight between the
 				// OS pipe buffer and the channel.
-				drainStdout(sess, &benchmarkResults)
+				drainStdout(sess, &benchmarkResults, m.deviceManager())
 
 				if len(benchmarkResults) > 0 {
 					if saveErr := saveBenchmarkCache(benchmarkResults); saveErr != nil {
@@ -900,7 +906,7 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 
 				return
 			case stdOutLine := <-sess.StdoutLines:
-				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults)
+				handleBenchmarkStdOutLine(stdOutLine, &benchmarkResults, m.deviceManager())
 				submittedUpTo = m.submitBatchIfReady(ctx, benchmarkResults, submittedUpTo)
 			case stdErrLine := <-sess.StderrMessages:
 				handleBenchmarkStdErrLine(ctx, stdErrLine)

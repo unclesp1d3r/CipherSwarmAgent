@@ -314,7 +314,7 @@ Platform-specific functionality for cross-platform support:
 - **`windows.go`**: Windows device detection
 - **`validate.go`**: Defense-in-depth path validation before `exec.CommandContext` calls
 
-**Common Functions**: `GetDevices()`, `GetHashcatVersion()`, `Extract7z()`, `GetDefaultHashcatBinaryName()`
+**Common Functions**: `GetHashcatVersion()`, `Extract7z()`, `GetDefaultHashcatBinaryName()`, `GetAdditionalHashcatArgs()`
 
 #### `lib/arch/validate.go`
 

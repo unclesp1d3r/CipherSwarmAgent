@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
@@ -376,7 +377,7 @@ func TestHandleBenchmarkStdOutLine(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var results []display.BenchmarkResult
-			handleBenchmarkStdOutLine(tt.line, &results)
+			handleBenchmarkStdOutLine(tt.line, &results, nil)
 			assert.Len(t, results, tt.expectedCount)
 
 			if tt.expectAppend {
@@ -395,11 +396,30 @@ func TestHandleBenchmarkStdOutLine(t *testing.T) {
 func TestHandleBenchmarkStdOutLine_MultipleLines(t *testing.T) {
 	var results []display.BenchmarkResult
 
-	handleBenchmarkStdOutLine("1:0:md5:100:50:12345.67", &results)     // DevSkim: ignore DS126858
-	handleBenchmarkStdOutLine("2:100:sha1:200:100:54321.09", &results) // DevSkim: ignore DS126858
-	handleBenchmarkStdOutLine("invalid:line", &results)                // skipped
+	handleBenchmarkStdOutLine("1:0:md5:100:50:12345.67", &results, nil)     // DevSkim: ignore DS126858
+	handleBenchmarkStdOutLine("2:100:sha1:200:100:54321.09", &results, nil) // DevSkim: ignore DS126858
+	handleBenchmarkStdOutLine("invalid:line", &results, nil)                // skipped
 
 	assert.Len(t, results, 2)
+	assert.Equal(t, "1", results[0].Device)
+	assert.Equal(t, "2", results[1].Device)
+}
+
+// TestHandleBenchmarkStdOutLine_WithDeviceManager verifies that passing a DeviceManager
+// enriches logging without corrupting the numeric result.Device field.
+func TestHandleBenchmarkStdOutLine_WithDeviceManager(t *testing.T) {
+	dm := devices.NewDeviceManagerForTest([]devices.Device{
+		{ID: 1, Name: "NVIDIA GeForce RTX 3090", Type: "GPU", Backend: "OpenCL", Vendor: "NVIDIA", IsAvailable: true},
+		{ID: 2, Name: "Intel Core i9", Type: "CPU", Backend: "OpenCL", Vendor: "Intel", IsAvailable: true},
+	})
+
+	var results []display.BenchmarkResult
+
+	handleBenchmarkStdOutLine("1:0:md5:100:50:12345.67", &results, dm)     // DevSkim: ignore DS126858
+	handleBenchmarkStdOutLine("2:100:sha1:200:100:54321.09", &results, dm) // DevSkim: ignore DS126858
+
+	require.Len(t, results, 2)
+	// Device field must remain the raw numeric string — not replaced by device name.
 	assert.Equal(t, "1", results[0].Device)
 	assert.Equal(t, "2", results[1].Device)
 }
@@ -1060,7 +1080,7 @@ func TestDrainStdout_BufferedLines(t *testing.T) {
 	sess.StdoutLines <- "1:0:name:100:50:1000.0"
 	sess.StdoutLines <- "2:1:name:200:100:2000.0"
 
-	drainStdout(sess, &results)
+	drainStdout(sess, &results, nil)
 
 	assert.Len(t, results, 2)
 	assert.Equal(t, "1", results[0].Device)
@@ -1075,7 +1095,7 @@ func TestDrainStdout_EmptyChannel(t *testing.T) {
 
 	var results []display.BenchmarkResult
 
-	drainStdout(sess, &results)
+	drainStdout(sess, &results, nil)
 
 	assert.Empty(t, results)
 }

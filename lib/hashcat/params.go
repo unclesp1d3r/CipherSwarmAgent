@@ -71,8 +71,8 @@ type Params struct {
 	SlowCandidates            bool     `json:"slow_candidates"`              // Enable slow candidate generators (-S flag)
 	Skip                      int64    `json:"skip,omitempty"`               // Skip N candidates from start
 	Limit                     int64    `json:"limit,omitempty"`              // Stop after processing N candidates
-	BackendDevices            string   `json:"backend_devices,omitempty"`    // Backend devices to use (comma-separated)
-	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL device types (comma-separated)
+	BackendDevices            string   `json:"backend_devices,omitempty"`    // Backend devices to use (pre-resolved by DeviceConfig)
+	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL device types (pre-resolved by DeviceConfig)
 	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Enable all hash types in benchmark mode
 	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to restore file for session resumption
 }
@@ -177,7 +177,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	args := make([]string, 0, defaultArgsCapacity)
 	if params.AttackMode == AttackHashInfo {
 		args = append(args, "--hash-info", "--machine-readable")
-		args = appendDeviceFlags(args, params.BackendDevices, params.OpenCLDevices)
+		args = appendDeviceFlags(args, params)
 
 		return args, nil
 	}
@@ -190,7 +190,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 			"--benchmark",
 			"-m", strconv.FormatInt(params.HashType, 10),
 		)
-		args = appendDeviceFlags(args, params.BackendDevices, params.OpenCLDevices)
+		args = appendDeviceFlags(args, params)
 
 		return args, nil
 	}
@@ -204,7 +204,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		)
 
 		args = append(args, params.AdditionalArgs...)
-		args = appendDeviceFlags(args, params.BackendDevices, params.OpenCLDevices)
+		args = appendDeviceFlags(args, params)
 
 		if params.EnableAdditionalHashTypes {
 			args = append(args, "--benchmark-all")
@@ -325,13 +325,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		args = append(args, maskArgs...)
 	}
 
-	if strings.TrimSpace(params.BackendDevices) != "" {
-		args = append(args, "--backend-devices", params.BackendDevices)
-	}
-
-	if strings.TrimSpace(params.OpenCLDevices) != "" {
-		args = append(args, "--opencl-device-types", params.OpenCLDevices)
-	}
+	args = appendDeviceFlags(args, params)
 
 	return args, nil
 }
@@ -347,14 +341,14 @@ func (params Params) toRestoreArgs(session string) []string {
 }
 
 // appendDeviceFlags appends backend device and OpenCL device type flags to the
-// argument slice when the corresponding values are non-empty.
-func appendDeviceFlags(args []string, backendDevices, openCLDevices string) []string {
-	if strings.TrimSpace(backendDevices) != "" {
-		args = append(args, "--backend-devices", backendDevices)
+// argument slice. Values are pre-resolved by DeviceConfig before reaching Params.
+func appendDeviceFlags(args []string, params Params) []string {
+	if strings.TrimSpace(params.BackendDevices) != "" {
+		args = append(args, "--backend-devices", params.BackendDevices)
 	}
 
-	if strings.TrimSpace(openCLDevices) != "" {
-		args = append(args, "--opencl-device-types", openCLDevices)
+	if strings.TrimSpace(params.OpenCLDevices) != "" {
+		args = append(args, "--opencl-device-types", params.OpenCLDevices)
 	}
 
 	return args

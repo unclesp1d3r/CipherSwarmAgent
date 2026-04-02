@@ -17,16 +17,16 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 )
 
 // Manager orchestrates task lifecycle operations using injected API clients.
 type Manager struct {
-	tasksClient    api.TasksClient
-	attacksClient  api.AttacksClient
-	BackendDevices string
-	OpenCLDevices  string
+	tasksClient   api.TasksClient
+	attacksClient api.AttacksClient
+	DeviceConfig  devices.DeviceConfig
 }
 
 // NewManager creates a new task Manager with the given API clients.
@@ -221,9 +221,12 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 		SlowCandidates:   attack.SlowCandidateGenerators,
 		Skip:             lib.UnwrapOr(task.Skip, 0),
 		Limit:            lib.UnwrapOr(task.Limit, 0),
-		BackendDevices:   m.BackendDevices,
-		OpenCLDevices:    m.OpenCLDevices,
-		RestoreFilePath:  filepath.Join(agentstate.State.RestoreFilePath, strconv.FormatInt(attack.Id, 10)+".restore"),
+		BackendDevices:   m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:    m.DeviceConfig.ResolvedOpenCLDevices(),
+		RestoreFilePath: filepath.Join(
+			agentstate.State.RestoreFilePath,
+			strconv.FormatInt(attack.Id, 10)+".restore",
+		),
 	}
 }
 

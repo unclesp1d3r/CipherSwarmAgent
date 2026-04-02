@@ -20,6 +20,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cracker"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/task"
@@ -38,6 +39,7 @@ const (
 var (
 	benchmarkMgr  *benchmark.Manager
 	taskMgr       *task.Manager
+	deviceMgr     *devices.DeviceManager
 	bgBenchCancel context.CancelFunc
 )
 
@@ -124,6 +126,15 @@ func StartAgent() {
 		agentstate.Logger.Fatal("Failed to rebuild API client with server settings", "error", err)
 	}
 
+	// Enumerate compute devices via hashcat -I before sending metadata.
+	// Warn-only on failure so the agent can still start (e.g., first-run before hashcat download).
+	deviceMgr = &devices.DeviceManager{}
+	if dmErr := deviceMgr.EnumerateDevices(ctx, agentstate.State.HashcatPath); dmErr != nil {
+		agentstate.Logger.Warn("Device enumeration failed, metadata will report no devices", "error", dmErr)
+		deviceMgr = nil
+	}
+	lib.SetDevicesListManager(deviceMgr)
+
 	err = lib.UpdateAgentMetadata(ctx)
 	if err != nil {
 		agentstate.Logger.Fatal("Failed to update agent metadata", "error", err)
@@ -137,13 +148,16 @@ func StartAgent() {
 	// Initialize managers
 	client := agentstate.State.GetAPIClient()
 	cfg := lib.GetConfiguration()
+	dc := devices.NewDeviceConfig(cfg.Config.BackendDevices, cfg.Config.OpenCLDevices, deviceMgr)
+
 	benchmarkMgr = benchmark.NewManager(client.Agents())
-	benchmarkMgr.BackendDevices = cfg.Config.BackendDevices
-	benchmarkMgr.OpenCLDevices = cfg.Config.OpenCLDevices
+	benchmarkMgr.DeviceConfig = dc
 
 	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
-	taskMgr.BackendDevices = cfg.Config.BackendDevices
-	taskMgr.OpenCLDevices = cfg.Config.OpenCLDevices
+	taskMgr.DeviceConfig = dc
+
+	// Log warnings for unrecognized device IDs at startup.
+	dc.WarnInvalidDevices(agentstate.Logger.Warn)
 
 	// Run benchmarks when the server requests them OR when the user explicitly
 	// passed --force-benchmark. Without this check the CLI flag is silently
@@ -373,15 +387,34 @@ func handleReload(ctx context.Context) {
 		bgBenchCancel = nil
 	}
 
+	// Re-enumerate devices in case hashcat was upgraded or drivers changed.
+	// Always create a fresh DeviceManager so stale device data is never reused.
+	deviceMgr = &devices.DeviceManager{}
+	if dmErr := deviceMgr.EnumerateDevices(ctx, agentstate.State.HashcatPath); dmErr != nil {
+		agentstate.Logger.Warn(
+			"Device re-enumeration failed during reload, managers will have no device data",
+			"error",
+			dmErr,
+		)
+		deviceMgr = nil
+	}
+	lib.SetDevicesListManager(deviceMgr)
+
 	// Recreate managers with new API client sub-clients and update configs
 	reloadClient := agentstate.State.GetAPIClient()
 	reloadCfg := lib.GetConfiguration()
+	reloadDC := devices.NewDeviceConfig(
+		reloadCfg.Config.BackendDevices, reloadCfg.Config.OpenCLDevices, deviceMgr,
+	)
+
 	benchmarkMgr = benchmark.NewManager(reloadClient.Agents())
-	benchmarkMgr.BackendDevices = reloadCfg.Config.BackendDevices
-	benchmarkMgr.OpenCLDevices = reloadCfg.Config.OpenCLDevices
+	benchmarkMgr.DeviceConfig = reloadDC
+
 	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
-	taskMgr.BackendDevices = reloadCfg.Config.BackendDevices
-	taskMgr.OpenCLDevices = reloadCfg.Config.OpenCLDevices
+	taskMgr.DeviceConfig = reloadDC
+
+	// Log warnings for unrecognized device IDs after reload.
+	reloadDC.WarnInvalidDevices(agentstate.Logger.Warn)
 
 	if reloadCfg.BenchmarksNeeded {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
