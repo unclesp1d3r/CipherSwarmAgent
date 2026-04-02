@@ -518,6 +518,14 @@ func TestValidateDeviceIDString(t *testing.T) {
 	}
 }
 
+func TestValidateDeviceIDString_NilManager(t *testing.T) {
+	t.Parallel()
+
+	_, err := ValidateDeviceIDString(nil, "1,2")
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNoDevicesFound)
+}
+
 // --- Availability parsing tests ---
 
 const skippedDeviceStatus = `OpenCL Info:

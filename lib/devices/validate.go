@@ -11,7 +11,14 @@ import (
 // and nil on success, (nil, nil) when raw is empty, or a wrapped
 // ErrInvalidDeviceID when any ID is not in the enumerated set.
 // Non-numeric tokens produce a parse error.
+//
+// Deprecated: Use DeviceConfig.Validate() for production code. This function
+// is retained for standalone validation in tests.
 func ValidateDeviceIDString(dm *DeviceManager, raw string) ([]int, error) {
+	if dm == nil {
+		return nil, fmt.Errorf("%w: DeviceManager is nil", ErrNoDevicesFound)
+	}
+
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return nil, nil
@@ -105,6 +112,9 @@ func (vd ValidatedDevices) BackendDevicesFlag() string {
 // are known and available. Logs warnings for unknown and unavailable IDs via
 // the provided log function. Returns an empty ValidatedDevices (use all devices)
 // when dm is nil or rawBackendDevices is empty.
+//
+// Deprecated: Use DeviceConfig.Validate() for production code. This function
+// is retained for standalone validation in tests.
 func ValidateAndFilterDevices(
 	dm *DeviceManager,
 	rawBackendDevices string,

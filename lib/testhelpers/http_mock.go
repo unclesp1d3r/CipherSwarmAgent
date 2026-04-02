@@ -199,6 +199,8 @@ func MockUpdateAgentSuccess(agentID int64, agent api.Agent) {
 // This allows tests to assert which device names were sent to the API.
 func MockUpdateAgentWithCapture(agentID int64, capturedDevices *[]string) {
 	responder := func(req *http.Request) (*http.Response, error) {
+		defer req.Body.Close()
+
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
 			return nil, fmt.Errorf("reading request body: %w", err)
