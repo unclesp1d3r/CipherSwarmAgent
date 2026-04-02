@@ -263,11 +263,12 @@ func parseCapability(dev *Device, line string) {
 	}
 }
 
-// GetDevice returns the device with the given ID and whether it was found.
+// GetDevice returns a copy of the device with the given ID and whether it was found.
+// The returned Device has its own Capabilities map (not shared with internal state).
 func (dm *DeviceManager) GetDevice(id int) (*Device, bool) {
 	for i := range dm.devices {
 		if dm.devices[i].ID == id {
-			d := dm.devices[i]
+			d := copyDevice(dm.devices[i])
 
 			return &d, true
 		}
@@ -290,12 +291,29 @@ func (dm *DeviceManager) GetDevicesByType(deviceType string) []Device {
 	return result
 }
 
-// GetAllDevices returns a shallow copy of all enumerated devices.
+// GetAllDevices returns a deep copy of all enumerated devices.
+// Each returned Device has its own Capabilities map (not shared with internal state).
 func (dm *DeviceManager) GetAllDevices() []Device {
 	result := make([]Device, len(dm.devices))
-	copy(result, dm.devices)
+	for i, d := range dm.devices {
+		result[i] = copyDevice(d)
+	}
 
 	return result
+}
+
+// copyDevice returns a copy of the Device with a deep-copied Capabilities map.
+func copyDevice(d Device) Device {
+	if d.Capabilities != nil {
+		caps := make(map[string]string, len(d.Capabilities))
+		for k, v := range d.Capabilities {
+			caps[k] = v
+		}
+
+		d.Capabilities = caps
+	}
+
+	return d
 }
 
 // ValidateDeviceIDs checks that all provided IDs exist in the enumerated device set.

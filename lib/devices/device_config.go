@@ -18,13 +18,12 @@ var deviceIDListPattern = regexp.MustCompile(`^\d+(?:\s*,\s*\d+)*$`)
 // DeviceManager for validation. Constructed via NewDeviceConfig.
 //
 // DeviceConfig is a value type — safe to copy across goroutines.
-// The embedded DeviceManager pointer is read-only after creation.
+// The contained DeviceManager pointer is read-only after creation.
 type DeviceConfig struct {
 	rawBackendDevices string
 	rawOpenCLDevices  string
 	dm                *DeviceManager
 	enabledIDs        []int
-	validated         bool // true when dm was non-nil at construction time
 }
 
 // NewDeviceConfig creates a DeviceConfig from server/CLI strings and an
@@ -36,7 +35,6 @@ func NewDeviceConfig(rawBackend, rawOpenCL string, dm *DeviceManager) DeviceConf
 		rawBackendDevices: rawBackend,
 		rawOpenCLDevices:  rawOpenCL,
 		dm:                dm,
-		validated:         dm != nil,
 	}
 
 	// Parse raw backend string into IDs regardless of dm state.
@@ -52,13 +50,18 @@ func NewDeviceConfig(rawBackend, rawOpenCL string, dm *DeviceManager) DeviceConf
 	return dc
 }
 
-// ResolvedBackendDevices returns the --backend-devices flag value using
-// 3-tier resolution:
-//  1. Validated IDs (if dm was provided and IDs are valid)
-//  2. Empty string (if dm was provided but all IDs were invalid — let hashcat auto-detect)
-//  3. Raw server string (if dm was nil — best-effort forwarding)
+// ResolvedBackendDevices returns the --backend-devices flag value.
+//
+// When no DeviceManager is available (enumeration failed), the raw server
+// string is forwarded only if it matches a comma-separated integer pattern;
+// non-numeric strings are rejected (returns "").
+//
+// When a DeviceManager is available:
+//   - No IDs configured → "" (hashcat uses all devices)
+//   - All IDs invalid/unavailable → "" (hashcat auto-detects)
+//   - Some IDs valid → comma-separated valid IDs
 func (dc DeviceConfig) ResolvedBackendDevices() string {
-	if !dc.validated {
+	if dc.dm == nil {
 		// No DeviceManager — forward raw server string only if it looks like
 		// a valid comma-separated integer list. Reject arbitrary strings to
 		// prevent unexpected hashcat behavior from a misconfigured server.

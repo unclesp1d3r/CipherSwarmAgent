@@ -12,7 +12,6 @@ func TestNewDeviceConfig_NilDM(t *testing.T) {
 
 	dc := NewDeviceConfig("1,2", "1,2,3", nil)
 
-	assert.False(t, dc.validated)
 	assert.Nil(t, dc.DeviceManager())
 	assert.Equal(t, "1,2", dc.RawBackendDevices())
 	assert.Equal(t, "1,2,3", dc.RawOpenCLDevices())
@@ -25,7 +24,6 @@ func TestNewDeviceConfig_WithDM(t *testing.T) {
 	dm := newTestManager(sampleDevices())
 	dc := NewDeviceConfig("1,2", "1", dm)
 
-	assert.True(t, dc.validated)
 	require.NotNil(t, dc.DeviceManager())
 	assert.Equal(t, []int{1, 2}, dc.enabledIDs)
 }
@@ -127,6 +125,37 @@ func TestResolvedBackendDevices_WithDM_NonNumericRaw(t *testing.T) {
 
 	// Non-numeric raw, enabledIDs empty, validated=true → empty.
 	assert.Empty(t, dc.ResolvedBackendDevices())
+}
+
+func TestResolvedBackendDevices_WithDM_UnavailableFiltered(t *testing.T) {
+	t.Parallel()
+
+	dm := newTestManager(sampleDevicesWithUnavailable())
+	dc := NewDeviceConfig("1,2,3", "", dm)
+
+	// Device 2 is unavailable — only valid IDs 1 and 3 returned.
+	assert.Equal(t, "1,3", dc.ResolvedBackendDevices())
+}
+
+func TestValidate_WithDM_UnavailableIDs(t *testing.T) {
+	t.Parallel()
+
+	dm := newTestManager(sampleDevicesWithUnavailable())
+	dc := NewDeviceConfig("1,2,3", "1", dm)
+
+	var warnings []string
+	logFn := func(msg any, _ ...any) {
+		if s, ok := msg.(string); ok {
+			warnings = append(warnings, s)
+		}
+	}
+
+	result := dc.Validate(logFn)
+
+	// Device 2 is unavailable — excluded from valid IDs.
+	assert.Equal(t, []int{1, 3}, result.BackendDeviceIDs)
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "unavailable")
 }
 
 func TestResolvedOpenCLDevices_ReturnsRaw(t *testing.T) {
