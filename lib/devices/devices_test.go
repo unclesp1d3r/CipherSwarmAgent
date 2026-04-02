@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -190,6 +191,17 @@ const hipWithCapabilities = `HIP Info:
     Memory.Free....: 8176 MB
 `
 
+// nonExistentAbsPath returns a platform-appropriate absolute path that does
+// not exist. On Windows, Unix-style paths like "/nonexistent" are not absolute
+// (no drive letter), so we use a Windows-style path instead.
+func nonExistentAbsPath() string {
+	if runtime.GOOS == "windows" {
+		return `C:\nonexistent\path\hashcat.exe`
+	}
+
+	return "/nonexistent/path/hashcat"
+}
+
 func TestEnumerateDevices_Scenario(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -265,7 +277,7 @@ func TestEnumerateDevices_Scenario(t *testing.T) {
 		},
 		{
 			name:        "NonExistentBinary",
-			hashcatPath: "/nonexistent/path/hashcat",
+			hashcatPath: nonExistentAbsPath(),
 			wantErr:     arch.ErrPathNotFound,
 		},
 		{
