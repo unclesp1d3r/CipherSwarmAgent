@@ -71,9 +71,9 @@ type Params struct {
 	SlowCandidates            bool     `json:"slow_candidates"`              // Enable slow candidate generators (-S flag)
 	Skip                      int64    `json:"skip,omitempty"`               // Skip N candidates from start
 	Limit                     int64    `json:"limit,omitempty"`              // Stop after processing N candidates
-	BackendDevices            string `json:"backend_devices,omitempty"`    // Backend devices to use (pre-resolved by DeviceConfig)
-	OpenCLDevices             string `json:"opencl_devices,omitempty"`     // OpenCL device types (pre-resolved by DeviceConfig)
-	EnableAdditionalHashTypes bool   `json:"enable_additional_hash_types"` // Enable all hash types in benchmark mode
+	BackendDevices            string   `json:"backend_devices,omitempty"`    // Backend devices to use (pre-resolved by DeviceConfig)
+	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL device types (pre-resolved by DeviceConfig)
+	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Enable all hash types in benchmark mode
 	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to restore file for session resumption
 }
 

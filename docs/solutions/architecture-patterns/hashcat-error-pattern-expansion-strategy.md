@@ -1,11 +1,11 @@
 ---
-title: "Hashcat Error Pattern Expansion Strategy"
+title: Hashcat Error Pattern Expansion Strategy
 category: architecture-patterns
 date: 2026-04-01
 tags: [errorparser, regex, hashcat, classification, machine-readable, pre-execution-validation]
 module: lib/hashcat
-symptom: "Unclassified hashcat errors falling through to ErrorCategoryUnknown with SeverityMinor"
-root_cause: "Missing regex patterns for hashcat 7.x error messages; machine-readable pattern limited to 14 of 48 parser errors"
+symptom: Unclassified hashcat errors falling through to ErrorCategoryUnknown with SeverityMinor
+root_cause: Missing regex patterns for hashcat 7.x error messages; machine-readable pattern limited to 14 of 48 parser errors
 ---
 
 # Hashcat Error Pattern Expansion Strategy
@@ -27,6 +27,7 @@ Examined hashcat 7.x source files (`src/backend.c`, `src/hashes.c`, `src/selftes
 ### 2. Machine-readable generalization
 
 Replaced the fixed 14-string alternation with `^(.+?):(\d+):(.+):([^:]+)$`:
+
 - `(.+?)` — non-greedy file path (stops at first `:<digits>:`)
 - `(\d+)` — line number anchor
 - `(.+)` — **greedy** hash capture (must be greedy to capture colons in hash types like `sha256:20000:salt`)
@@ -57,6 +58,7 @@ Each pattern must have a semantically accurate `error_type`. Reusing extractors 
 ### 5. Pre-execution validation
 
 Replaced `os.Stat` with `os.Open` + read loop for hash file validation:
+
 - Catches permission errors that `os.Stat` misses
 - Reads until EOF (not just first 4KB) to detect whitespace-only files
 - Added `ErrHashFileWhitespaceOnly` sentinel with sub-classified error reporting
