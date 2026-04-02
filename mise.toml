@@ -17,7 +17,7 @@ just                                                          = "1.48.1"
 markdownlint-cli2                                             = "0.22.0"
 "pipx:mdformat"                                               = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-front-matters --with mdformat-footnote --with mdformat-simple-breaks --with mdformat-gfm-alerts --with mdformat-toc --with mdformat-wikilink --with mdformat-tables" }
 "pipx:mkdocs"                                                 = { version = "1.6.1", uvx_args = "--with mkdocs-material --with pymdown-extensions" }
-"pipx:pre-commit"                                             = "latest"
+"pipx:pre-commit"                                             = "4.5.1"
 python                                                        = "3.14.3"
 
 # Many of these settings are defaults, but we are explicit in case they change in the future and to make it clear to users what is enabled.
