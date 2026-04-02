@@ -39,7 +39,8 @@
       "source": "https://github.com/mattpocock/skills",
       "include": {
         "skills": [
-          "ubiquitous-language"
+          "ubiquitous-language",
+          "write-a-prd"
         ]
       }
     }
