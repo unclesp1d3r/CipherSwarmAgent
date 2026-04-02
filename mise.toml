@@ -3,8 +3,8 @@
 # cyclonedx-gomod: installed via go install in CI (mise shim causes trust issues in goreleaser subprocesses)
 
 [tools]
-act                                                           = "latest"
-bun                                                           = "latest"
+act                                                           = "0.2.87"
+bun                                                           = "1.3.11"
 cosign                                                        = "3.0.5"
 git-cliff                                                     = "2.12.0"
 "github:anchore/quill"                                        = "latest"
@@ -18,12 +18,12 @@ markdownlint-cli2                                             = "0.22.0"
 "pipx:mdformat"                                               = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-front-matters --with mdformat-footnote --with mdformat-simple-breaks --with mdformat-gfm-alerts --with mdformat-toc --with mdformat-wikilink --with mdformat-tables" }
 "pipx:mkdocs"                                                 = { version = "1.6.1", uvx_args = "--with mkdocs-material --with pymdown-extensions" }
 "pipx:pre-commit"                                             = "latest"
-python                                                        = "latest"
+python                                                        = "3.14.3"
 
 # Many of these settings are defaults, but we are explicit in case they change in the future and to make it clear to users what is enabled.
 [settings]
 activate_aggressive                 = true
-idiomatic_version_file_enable_tools = [ "python", "go", "bun" ]
+idiomatic_version_file_enable_tools = [ "go", "bun" ]
 env_cache                           = true
 exec_auto_install                   = true
 github_attestations                 = true
