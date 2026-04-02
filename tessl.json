@@ -39,6 +39,14 @@
       "source": "https://github.com/mattpocock/skills",
       "include": {
         "skills": [
+          "edit-article",
+          "grill-me",
+          "improve-codebase-architecture",
+          "prd-to-issues",
+          "prd-to-plan",
+          "request-refactor-plan",
+          "tdd",
+          "triage-issue",
           "ubiquitous-language",
           "write-a-prd"
         ]
