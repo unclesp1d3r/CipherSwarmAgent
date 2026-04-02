@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
 // deviceIDListPattern validates that a string contains only comma-separated
@@ -40,7 +42,10 @@ func NewDeviceConfig(rawBackend, rawOpenCL string, dm *DeviceManager) DeviceConf
 	// Parse raw backend string into IDs regardless of dm state.
 	// When dm is nil, these IDs are forwarded without validation.
 	ids, err := parseDeviceIDString(rawBackend)
-	if err == nil && len(ids) > 0 {
+	if err != nil {
+		agentstate.Logger.Warn("Failed to parse backend device IDs, using all devices",
+			"error", err, "raw_value", rawBackend)
+	} else if len(ids) > 0 {
 		dc.enabledIDs = ids
 	}
 
@@ -59,6 +64,9 @@ func (dc DeviceConfig) ResolvedBackendDevices() string {
 		// prevent unexpected hashcat behavior from a misconfigured server.
 		trimmed := strings.TrimSpace(dc.rawBackendDevices)
 		if trimmed != "" && !deviceIDListPattern.MatchString(trimmed) {
+			agentstate.Logger.Warn("Rejected non-numeric backend device string, using all devices",
+				"raw_value", trimmed)
+
 			return ""
 		}
 
@@ -86,6 +94,9 @@ func (dc DeviceConfig) ResolvedBackendDevices() string {
 func (dc DeviceConfig) ResolvedOpenCLDevices() string {
 	trimmed := strings.TrimSpace(dc.rawOpenCLDevices)
 	if trimmed != "" && !deviceIDListPattern.MatchString(trimmed) {
+		agentstate.Logger.Warn("Rejected non-numeric OpenCL device type string, using all types",
+			"raw_value", trimmed)
+
 		return ""
 	}
 
@@ -120,6 +131,28 @@ func (dc DeviceConfig) Validate(logWarnFn func(msg any, keyvals ...any)) Validat
 	result.BackendDeviceIDs = validation.ValidIDs
 
 	return result
+}
+
+// WarnInvalidDevices logs warnings for any configured device IDs that are
+// not present or available in the enumerated device set. This is a fire-and-forget
+// method intended for startup diagnostics — use Validate() when you need the
+// filtered result.
+func (dc DeviceConfig) WarnInvalidDevices(logWarnFn func(msg any, keyvals ...any)) {
+	if dc.dm == nil || len(dc.enabledIDs) == 0 {
+		return
+	}
+
+	validation := dc.dm.ValidateDeviceIDsDetailed(dc.enabledIDs)
+
+	for _, id := range validation.UnknownIDs {
+		logWarnFn("Backend device ID not found in enumerated devices, skipping",
+			"device_id", id)
+	}
+
+	for _, id := range validation.UnavailableIDs {
+		logWarnFn("Backend device ID is unavailable/skipped, excluding from session",
+			"device_id", id)
+	}
 }
 
 // DeviceManager returns the underlying DeviceManager, or nil if enumeration

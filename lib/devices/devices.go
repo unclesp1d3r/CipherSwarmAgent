@@ -167,6 +167,9 @@ func parseDeviceOutput(output string) []Device {
 
 			id, err := strconv.Atoi(matches[1])
 			if err != nil {
+				agentstate.Logger.Warn("Failed to parse device ID, skipping device block",
+					"raw_id", matches[1], "error", err)
+
 				continue
 			}
 

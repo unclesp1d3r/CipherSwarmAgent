@@ -157,7 +157,7 @@ func StartAgent() {
 	taskMgr.DeviceConfig = dc
 
 	// Log warnings for unrecognized device IDs at startup.
-	dc.Validate(agentstate.Logger.Warn)
+	dc.WarnInvalidDevices(agentstate.Logger.Warn)
 
 	// Run benchmarks when the server requests them OR when the user explicitly
 	// passed --force-benchmark. Without this check the CLI flag is silently
@@ -414,7 +414,7 @@ func handleReload(ctx context.Context) {
 	taskMgr.DeviceConfig = reloadDC
 
 	// Log warnings for unrecognized device IDs after reload.
-	reloadDC.Validate(agentstate.Logger.Warn)
+	reloadDC.WarnInvalidDevices(agentstate.Logger.Warn)
 
 	if reloadCfg.BenchmarksNeeded {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
