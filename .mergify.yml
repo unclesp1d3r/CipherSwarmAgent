@@ -2,7 +2,6 @@ queue_rules:
   # Dosubot: only needs lint to pass
   - name: dosubot
     merge_method: squash
-    autoqueue: true
     queue_conditions:
       - author = dosubot[bot]
       - base = main
@@ -13,7 +12,6 @@ queue_rules:
   # Dependabot workflow-only changes: only needs lint to pass
   - name: dependabot-workflows
     merge_method: squash
-    autoqueue: true
     queue_conditions:
       - author = dependabot[bot]
       - base = main
@@ -25,7 +23,6 @@ queue_rules:
   # Dependabot non-workflow changes: full merge protections required
   - name: dependabot
     merge_method: squash
-    autoqueue: true
     queue_conditions:
       - author = dependabot[bot]
       - base = main
@@ -40,7 +37,6 @@ queue_rules:
   # Maintainer: manually enqueued
   - name: maintainer
     merge_method: squash
-    autoqueue: false
     queue_conditions:
       - base = main
     merge_conditions:
@@ -53,7 +49,6 @@ queue_rules:
   # External contributors: manually enqueued
   - name: external
     merge_method: squash
-    autoqueue: false
     queue_conditions:
       - base = main
     merge_conditions:
@@ -102,9 +97,7 @@ merge_protections:
       - author != dependabot[bot]
       - author != dosubot[bot]
     success_conditions:
-      - "title ~=
-        ^(fix|feat|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\(.+\
-        \\))?:"
+      - "title ~= ^(fix|feat|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\(.+\\))?:"
 
   - name: Full CI must pass
     description: All CI checks must pass for non-bot PRs and dependabot non-workflow changes
@@ -142,3 +135,21 @@ merge_protections:
       - base = main
     success_conditions:
       - "#commits-behind <= 10"
+merge_protections_settings:
+# auto_merge_conditions reflects the queue_conditions of the queue rules that previously had autoqueue: true. The following queue rules were manual-only ('maintainer', 'external') and remain reachable via the `/queue` command. Review and adjust if needed.
+  auto_merge_conditions:
+    - or:
+        - and:
+            - author = dosubot[bot]
+            - base = main
+            - label != do-not-merge
+        - and:
+            - author = dependabot[bot]
+            - base = main
+            - label != do-not-merge
+            - "-files ~= ^(?!\\.github/workflows/)"
+        - and:
+            - author = dependabot[bot]
+            - base = main
+            - label != do-not-merge
+  reporting_method: check-runs
