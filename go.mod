@@ -17,7 +17,7 @@ require (
 require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/oapi-codegen/runtime v1.3.1
-	github.com/shirou/gopsutil/v4 v4.26.3
+	github.com/shirou/gopsutil/v4 v4.26.4
 	github.com/spf13/pflag v1.0.10
 )
 
