@@ -247,6 +247,44 @@ func TestCleanup_DoubleCallWithDescriptorsIdempotent(t *testing.T) {
 	})
 }
 
+// TestCreateCharsetFiles_DoesNotMutateInput verifies that createCharsetFiles returns
+// resolved temp paths without mutating the caller's slice, and writes the charset content.
+func TestCreateCharsetFiles_DoesNotMutateInput(t *testing.T) {
+	savedOutPath := agentstate.State.OutPath
+	agentstate.State.OutPath = t.TempDir()
+	t.Cleanup(func() { agentstate.State.OutPath = savedOutPath })
+
+	input := []string{"abc", "", "xyz"}
+	original := append([]string(nil), input...)
+
+	files, resolved, err := createCharsetFiles(input)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		for _, f := range files {
+			_ = f.Close()
+			_ = os.Remove(f.Name())
+		}
+	})
+
+	// Input slice contents must be unchanged.
+	require.Equal(t, original, input, "createCharsetFiles must not mutate the input slice")
+
+	// Non-empty entries resolve to temp paths; empty entry preserved by position.
+	require.Len(t, resolved, 3)
+	require.NotEqual(t, "abc", resolved[0], "non-empty charset should resolve to a temp path")
+	require.Empty(t, resolved[1], "empty charset entry should be preserved by position")
+	require.NotEqual(t, "xyz", resolved[2], "non-empty charset should resolve to a temp path")
+	require.Len(t, files, 2, "one file per non-empty charset")
+
+	// Files contain the original charset content.
+	content0, err := os.ReadFile(resolved[0])
+	require.NoError(t, err)
+	require.Equal(t, "abc", string(content0))
+	content2, err := os.ReadFile(resolved[2])
+	require.NoError(t, err)
+	require.Equal(t, "xyz", string(content2))
+}
+
 // testTimeout is the maximum time to wait for a goroutine to exit in cancellation tests.
 const testTimeout = 5 * time.Second
 
