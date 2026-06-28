@@ -3,6 +3,7 @@ package zap
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -254,4 +255,31 @@ invalidline
 			}
 		})
 	}
+}
+
+// TestHandleResponseStream_UsesInjectedZapsPath verifies that handleResponseStream
+// writes the zap file to the injected zapsPath argument rather than reading from
+// agentstate.State. This is the U9 injection-point test for lib/zap.
+func TestHandleResponseStream_UsesInjectedZapsPath(t *testing.T) {
+	zapsDir := t.TempDir()
+	task := testhelpers.NewTestTask(123, 456)
+
+	content := "5d41402abc4b2a76b9719d911017c592:hello\n"
+	reader := io.NopCloser(strings.NewReader(content))
+
+	var gotHash, gotPlaintext string
+	sendFunc := func(_ context.Context, _ time.Time, hash, plaintext string, _ *api.Task) {
+		gotHash = hash
+		gotPlaintext = plaintext
+	}
+
+	err := handleResponseStream(context.Background(), task, reader, sendFunc, zapsDir)
+	require.NoError(t, err)
+
+	zapFile := filepath.Join(zapsDir, "123.zap")
+	_, statErr := os.Stat(zapFile)
+	require.NoError(t, statErr, "zap file should be created at injected zapsPath")
+
+	assert.Equal(t, "5d41402abc4b2a76b9719d911017c592", gotHash)
+	assert.Equal(t, "hello", gotPlaintext)
 }

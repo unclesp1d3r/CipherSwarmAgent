@@ -114,13 +114,13 @@ func (m *Manager) handleSendStatusResponse(ctx context.Context, resp *api.SendSt
 		}
 	case http.StatusAccepted:
 		agentstate.Logger.Debug("Status update sent, but stale")
-		zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash)
+		zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash, m.Config.ZapsPath)
 	default:
 		if resp.StatusCode() >= http.StatusOK && resp.StatusCode() < http.StatusMultipleChoices {
 			agentstate.Logger.Warn("Unexpected success status code for status update",
 				"status_code", resp.StatusCode(), "task_id", task.Id)
 			// Defensively fetch zaps for any other 2xx success code to avoid losing cracked hashes
-			zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash)
+			zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash, m.Config.ZapsPath)
 		} else {
 			agentstate.Logger.Error("Failed to send status update",
 				"status_code", resp.StatusCode(), "task_id", task.Id)
@@ -157,7 +157,7 @@ func (m *Manager) sendCrackedHash(ctx context.Context, timestamp time.Time, hash
 	}
 
 	if agentstate.State.WriteZapsToFile {
-		hashFile := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
+		hashFile := filepath.Join(m.Config.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
 
 		file, err := os.OpenFile(
 			hashFile,

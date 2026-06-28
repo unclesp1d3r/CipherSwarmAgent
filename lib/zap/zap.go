@@ -23,11 +23,13 @@ const (
 
 // GetZaps fetches zap data for a given task, handles errors, and processes the response stream if available.
 // Logs an error if the task is nil, displays job progress, and retrieves zaps via the injected TasksClient.
+// zapsPath is the directory where zap files should be written.
 func GetZaps(
 	ctx context.Context,
 	tasksClient api.TasksClient,
 	task *api.Task,
 	sendCrackedHashFunc func(context.Context, time.Time, string, string, *api.Task),
+	zapsPath string,
 ) {
 	if task == nil {
 		agentstate.Logger.Error("Task is nil")
@@ -50,7 +52,7 @@ func GetZaps(
 		return
 	}
 
-	if err := handleResponseStream(ctx, task, responseStream, sendCrackedHashFunc); err != nil {
+	if err := handleResponseStream(ctx, task, responseStream, sendCrackedHashFunc, zapsPath); err != nil {
 		agentstate.Logger.Warn("Failed to process zap response stream; cracked hashes may be lost",
 			"task_id", task.Id, "error", err)
 	}
@@ -100,11 +102,13 @@ func createAndWriteZapFile(ctx context.Context, zapFilePath string, responseStre
 
 // handleResponseStream processes the response stream from a zap request.
 // It writes the stream to a zap file on disk and then processes its contents.
+// zapsPath is the directory where the zap file should be written.
 func handleResponseStream(
 	ctx context.Context,
 	task *api.Task,
 	responseStream io.ReadCloser,
 	sendCrackedHashFunc func(context.Context, time.Time, string, string, *api.Task),
+	zapsPath string,
 ) error {
 	defer func(responseStream io.ReadCloser) {
 		err := responseStream.Close()
@@ -113,7 +117,7 @@ func handleResponseStream(
 		}
 	}(responseStream)
 
-	zapFilePath := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d.zap", task.Id))
+	zapFilePath := filepath.Join(zapsPath, fmt.Sprintf("%d.zap", task.Id))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
 		// Log but continue — os.OpenFile in createAndWriteZapFile will truncate the file anyway.
 		//nolint:errcheck // LogAndSendError handles logging+sending internally

@@ -155,6 +155,15 @@ func StartAgent() {
 
 	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
 	taskMgr.DeviceConfig = dc
+	taskMgr.Config = task.Config{
+		HashlistPath:           agentstate.State.HashlistPath,
+		RestoreFilePath:        agentstate.State.RestoreFilePath,
+		FilePath:               agentstate.State.FilePath,
+		OutPath:                agentstate.State.OutPath,
+		ZapsPath:               agentstate.State.ZapsPath,
+		StatusTimer:            agentstate.State.StatusTimer,
+		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
+	}
 
 	// Log warnings for unrecognized device IDs at startup.
 	dc.WarnInvalidDevices(agentstate.Logger.Warn)
@@ -415,6 +424,15 @@ func handleReload(ctx context.Context) {
 
 	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
 	taskMgr.DeviceConfig = reloadDC
+	taskMgr.Config = task.Config{
+		HashlistPath:           agentstate.State.HashlistPath,
+		RestoreFilePath:        agentstate.State.RestoreFilePath,
+		FilePath:               agentstate.State.FilePath,
+		OutPath:                agentstate.State.OutPath,
+		ZapsPath:               agentstate.State.ZapsPath,
+		StatusTimer:            agentstate.State.StatusTimer,
+		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
+	}
 
 	// Log warnings for unrecognized device IDs after reload.
 	reloadDC.WarnInvalidDevices(agentstate.Logger.Warn)
@@ -527,14 +545,14 @@ func processTask(ctx context.Context, t *api.Task) {
 		if errors.Is(err, task.ErrTaskAcceptNotFound) {
 			// Task vanished before we could accept it — normal race condition.
 			// No server state transition needed; just clean up local files.
-			task.CleanupTaskFiles(attack.Id)
+			task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
 
 			return
 		}
 
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
-		task.CleanupTaskFiles(attack.Id)
+		task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return
@@ -544,13 +562,13 @@ func processTask(ctx context.Context, t *api.Task) {
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityDownloading)
 
-	if err := task.DownloadFiles(ctx, attack); err != nil {
+	if err := task.DownloadFiles(ctx, attack, taskMgr.Config.FilePath); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		cserrors.SendAgentError(ctx, err.Error(), t, api.SeverityFatal)
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
-		task.CleanupTaskFiles(attack.Id)
+		task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return
@@ -563,7 +581,7 @@ func processTask(ctx context.Context, t *api.Task) {
 		// cleanup via sess.Cleanup()). This fallback only triggers for
 		// NewHashcatSession failures.
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
-		task.CleanupTaskFiles(attack.Id)
+		task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
 
 		return
 	}

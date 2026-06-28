@@ -27,6 +27,8 @@ type Manager struct {
 	tasksClient   api.TasksClient
 	attacksClient api.AttacksClient
 	DeviceConfig  devices.DeviceConfig
+	// Config holds injected path and timer configuration for this Manager.
+	Config Config
 }
 
 // NewManager creates a new task Manager with the given API clients.
@@ -200,7 +202,7 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 		AttackMode: int64(attack.AttackModeHashcat),
 		HashType:   int64(attack.HashMode),
 		HashFile: filepath.Join(
-			agentstate.State.HashlistPath,
+			m.Config.HashlistPath,
 			strconv.FormatInt(attack.Id, 10)+".hsh",
 		),
 		Mask:             lib.UnwrapOr(attack.Mask, ""),
@@ -224,14 +226,14 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 		BackendDevices:   m.DeviceConfig.ResolvedBackendDevices(),
 		OpenCLDevices:    m.DeviceConfig.ResolvedOpenCLDevices(),
 		RestoreFilePath: filepath.Join(
-			agentstate.State.RestoreFilePath,
+			m.Config.RestoreFilePath,
 			strconv.FormatInt(attack.Id, 10)+".restore",
 		),
-		OutPath:                agentstate.State.OutPath,
-		ZapsPath:               agentstate.State.ZapsPath,
-		FilePath:               agentstate.State.FilePath,
-		StatusTimer:            agentstate.State.StatusTimer,
-		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
+		OutPath:                m.Config.OutPath,
+		ZapsPath:               m.Config.ZapsPath,
+		FilePath:               m.Config.FilePath,
+		StatusTimer:            m.Config.StatusTimer,
+		RetainZapsOnCompletion: m.Config.RetainZapsOnCompletion,
 	}
 }
 
