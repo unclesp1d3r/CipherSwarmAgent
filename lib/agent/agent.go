@@ -254,6 +254,9 @@ func calculateHeartbeatBackoff(
 	}
 	// Cap the multiplier to prevent overflow
 	multiplier := min(consecutiveFailures, maxBackoffMultiplier)
+	// Defensive shift cap: even if the config clamp were bypassed, the shift can
+	// never overflow time.Duration into a negative value.
+	multiplier = min(multiplier, config.MaxBackoffShift)
 	// Exponential backoff: baseInterval * 2^multiplier
 	return baseInterval * time.Duration(1<<multiplier)
 }

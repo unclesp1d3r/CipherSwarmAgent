@@ -33,6 +33,10 @@ const (
 	DefaultInsecureDownloads = false
 	// DefaultMaxHeartbeatBackoff is the max heartbeat backoff multiplier (caps at 64x).
 	DefaultMaxHeartbeatBackoff = 6
+	// MaxBackoffShift caps exponential-backoff shift exponents (1 << n) so a large
+	// retry count or backoff multiplier cannot overflow time.Duration into a
+	// negative value. 1<<20 (~1e6 * base) already dwarfs any sane backoff.
+	MaxBackoffShift = 20
 	// DefaultConnectTimeout is the TCP connect timeout for API requests.
 	DefaultConnectTimeout = 10 * time.Second
 	// DefaultReadTimeout is the read timeout for API responses.
@@ -230,6 +234,10 @@ func SetupSharedState() {
 		agentstate.Logger.Warn("download_max_retries must be >= 1, using default",
 			"configured", agentstate.State.DownloadMaxRetries, "default", DefaultDownloadMaxRetries)
 		agentstate.State.DownloadMaxRetries = DefaultDownloadMaxRetries
+	} else if agentstate.State.DownloadMaxRetries > MaxBackoffShift {
+		agentstate.Logger.Warn("download_max_retries exceeds safe ceiling, clamping",
+			"configured", agentstate.State.DownloadMaxRetries, "ceiling", MaxBackoffShift)
+		agentstate.State.DownloadMaxRetries = MaxBackoffShift
 	}
 
 	agentstate.State.DownloadRetryDelay = viper.GetDuration("download_retry_delay")
@@ -246,6 +254,10 @@ func SetupSharedState() {
 		agentstate.Logger.Warn("max_heartbeat_backoff must be >= 0, using default",
 			"configured", agentstate.State.MaxHeartbeatBackoff, "default", DefaultMaxHeartbeatBackoff)
 		agentstate.State.MaxHeartbeatBackoff = DefaultMaxHeartbeatBackoff
+	} else if agentstate.State.MaxHeartbeatBackoff > MaxBackoffShift {
+		agentstate.Logger.Warn("max_heartbeat_backoff exceeds safe ceiling, clamping",
+			"configured", agentstate.State.MaxHeartbeatBackoff, "ceiling", MaxBackoffShift)
+		agentstate.State.MaxHeartbeatBackoff = MaxBackoffShift
 	}
 
 	agentstate.State.SleepOnFailure = viper.GetDuration("sleep_on_failure")

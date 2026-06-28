@@ -20,6 +20,7 @@ import (
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
 )
 
@@ -258,8 +259,11 @@ func downloadWithRetry(ctx context.Context, client Getter, maxRetries int, baseD
 
 	for attempt := range maxRetries {
 		if attempt > 0 {
-			// Exponential backoff: baseDelay * 2^(attempt-1)
-			delay := baseDelay * time.Duration(1<<(attempt-1))
+			// Exponential backoff: baseDelay * 2^(attempt-1).
+			// Defensive shift cap: even if maxRetries were not clamped at config
+			// time, the shift can never overflow time.Duration into a negative value.
+			shift := min(attempt-1, config.MaxBackoffShift)
+			delay := baseDelay * time.Duration(1<<shift)
 			agentstate.Logger.Debug("Retrying download", "attempt", attempt+1, "delay", delay)
 
 			timer := time.NewTimer(delay)

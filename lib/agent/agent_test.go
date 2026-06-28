@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/task"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
@@ -437,6 +438,24 @@ func TestCalculateHeartbeatBackoff_DefaultConfig(t *testing.T) {
 		result := calculateHeartbeatBackoff(baseInterval, failures, maxBackoff)
 		assert.Equal(t, expected, result,
 			"failure %d: expected %v, got %v", failures, expected, result)
+	}
+}
+
+// TestCalculateHeartbeatBackoff_NoOverflowAtBoundary verifies the backoff stays
+// positive and monotonic even when the multiplier exceeds the safe shift cap.
+func TestCalculateHeartbeatBackoff_NoOverflowAtBoundary(t *testing.T) {
+	baseInterval := 1 * time.Second
+
+	var prev time.Duration
+	// Drive the multiplier at and beyond config.MaxBackoffShift via a huge
+	// maxBackoffMultiplier so the defensive cap is what bounds the shift.
+	for failures := config.MaxBackoffShift; failures <= config.MaxBackoffShift+5; failures++ {
+		result := calculateHeartbeatBackoff(baseInterval, failures, 1_000_000)
+		assert.Positive(t, result, "backoff must never be negative or zero (failures=%d)", failures)
+		if prev != 0 {
+			assert.GreaterOrEqual(t, result, prev, "backoff must be monotonic non-decreasing")
+		}
+		prev = result
 	}
 }
 
