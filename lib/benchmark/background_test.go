@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
@@ -148,7 +147,7 @@ func TestUpdateCacheWithResults_ReplacesPlaceholder(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	t.Cleanup(cleanupState)
 
-	initialCache := []display.BenchmarkResult{
+	initialCache := []Result{
 		{HashType: "0", Device: "1", SpeedHs: "1", RuntimeMs: "0", Placeholder: true},
 		{HashType: "100", Device: "1", SpeedHs: "1", RuntimeMs: "0", Placeholder: true},
 	}
@@ -159,7 +158,7 @@ func TestUpdateCacheWithResults_ReplacesPlaceholder(t *testing.T) {
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
 	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
-	newResults := []display.BenchmarkResult{
+	newResults := []Result{
 		{HashType: "0", Device: "1", SpeedHs: "50000", RuntimeMs: "100"},
 	}
 	mgr.updateCacheWithResults(context.Background(), newResults)
@@ -188,14 +187,14 @@ func TestUpdateCacheWithResults_EmptyResults(t *testing.T) {
 	tmpDir := t.TempDir()
 	agentstate.State.BenchmarkCachePath = filepath.Join(tmpDir, "benchmark_cache.json")
 
-	initialCache := []display.BenchmarkResult{
+	initialCache := []Result{
 		{HashType: "0", Device: "1", SpeedHs: "1", Placeholder: true},
 	}
 	err := saveBenchmarkCache(initialCache)
 	require.NoError(t, err)
 
 	mgr := NewManager(nil)
-	mgr.updateCacheWithResults(context.Background(), []display.BenchmarkResult{})
+	mgr.updateCacheWithResults(context.Background(), []Result{})
 
 	// Cache should be unchanged
 	cached, loadErr := loadBenchmarkCache()
@@ -211,7 +210,7 @@ func TestUpdateCacheWithResults_SubmissionFails(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	t.Cleanup(cleanupState)
 
-	initialCache := []display.BenchmarkResult{
+	initialCache := []Result{
 		{HashType: "0", Device: "1", SpeedHs: "1", RuntimeMs: "0", Placeholder: true},
 	}
 	err := saveBenchmarkCache(initialCache)
@@ -221,7 +220,7 @@ func TestUpdateCacheWithResults_SubmissionFails(t *testing.T) {
 		httpmock.NewStringResponder(http.StatusInternalServerError, "error"))
 
 	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
-	newResults := []display.BenchmarkResult{
+	newResults := []Result{
 		{HashType: "0", Device: "1", SpeedHs: "50000", RuntimeMs: "100"},
 	}
 	mgr.updateCacheWithResults(context.Background(), newResults)
@@ -249,7 +248,7 @@ func TestUpdateCacheWithResults_NilCache(t *testing.T) {
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
 	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
-	newResults := []display.BenchmarkResult{
+	newResults := []Result{
 		{HashType: "0", Device: "1", SpeedHs: "50000", RuntimeMs: "100"},
 	}
 
@@ -277,7 +276,7 @@ func TestCapabilityDetectionOutputProcessing(t *testing.T) {
 	}()
 
 	// Simulate the RunCapabilityDetection channel protocol
-	var results []display.BenchmarkResult
+	var results []Result
 	waitChan := make(chan struct{})
 
 	go func() {
@@ -287,7 +286,7 @@ func TestCapabilityDetectionOutputProcessing(t *testing.T) {
 			case line := <-sess.StdoutLines:
 				hashTypeID, ok := parseHashInfoLine(line)
 				if ok {
-					results = append(results, display.BenchmarkResult{
+					results = append(results, Result{
 						HashType:    hashTypeID,
 						Device:      "1",
 						RuntimeMs:   "0",
@@ -302,7 +301,7 @@ func TestCapabilityDetectionOutputProcessing(t *testing.T) {
 					case line := <-sess.StdoutLines:
 						hashTypeID, ok := parseHashInfoLine(line)
 						if ok {
-							results = append(results, display.BenchmarkResult{
+							results = append(results, Result{
 								HashType:    hashTypeID,
 								Device:      "1",
 								RuntimeMs:   "0",
@@ -362,7 +361,7 @@ func TestSubmitCapabilityResults_Success(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", bgBenchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
-	results := []display.BenchmarkResult{
+	results := []Result{
 		{HashType: "0", Device: "1", RuntimeMs: "0", SpeedHs: "1", Placeholder: true},
 		{HashType: "100", Device: "1", RuntimeMs: "0", SpeedHs: "1", Placeholder: true},
 	}
@@ -383,7 +382,7 @@ func TestSubmitCapabilityResults_SubmissionFails_CacheSaved(t *testing.T) {
 	httpmock.RegisterRegexpResponder("POST", bgBenchmarkSubmitPattern,
 		httpmock.NewStringResponder(http.StatusInternalServerError, "error"))
 
-	results := []display.BenchmarkResult{
+	results := []Result{
 		{HashType: "0", Device: "1", RuntimeMs: "0", SpeedHs: "1", Placeholder: true},
 	}
 
@@ -406,7 +405,7 @@ func TestSaveBenchmarkCache_InvalidPath(t *testing.T) {
 	agentstate.State.BenchmarkCachePath = filepath.Join(t.TempDir(), "missing", "cache.json")
 	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
-	err := saveBenchmarkCache([]display.BenchmarkResult{{HashType: "0", SpeedHs: "1"}})
+	err := saveBenchmarkCache([]Result{{HashType: "0", SpeedHs: "1"}})
 	require.Error(t, err)
 }
 
@@ -439,7 +438,7 @@ func TestTrySubmitFromCache_AllSubmittedShortCircuit(t *testing.T) {
 	t.Cleanup(cleanupState)
 
 	// Pre-populate cache with all-submitted results
-	submitted := []display.BenchmarkResult{
+	submitted := []Result{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "12345.67", Submitted: true},
 	}
 	err := saveBenchmarkCache(submitted)

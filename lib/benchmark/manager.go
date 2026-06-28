@@ -48,8 +48,8 @@ func (m *Manager) deviceManager() *devices.DeviceManager {
 
 // unsubmittedResults returns a new slice containing only benchmark results
 // that have not yet been submitted to the server.
-func unsubmittedResults(results []display.BenchmarkResult) []display.BenchmarkResult {
-	var unsubmitted []display.BenchmarkResult
+func unsubmittedResults(results []Result) []Result {
+	var unsubmitted []Result
 	for _, r := range results {
 		if !r.Submitted {
 			unsubmitted = append(unsubmitted, r)
@@ -61,7 +61,7 @@ func unsubmittedResults(results []display.BenchmarkResult) []display.BenchmarkRe
 
 // allSubmitted reports whether every result in the slice has been submitted.
 // Returns true for an empty or nil slice (nothing to submit = done).
-func allSubmitted(results []display.BenchmarkResult) bool {
+func allSubmitted(results []Result) bool {
 	for _, r := range results {
 		if !r.Submitted {
 			return false
@@ -74,18 +74,18 @@ func allSubmitted(results []display.BenchmarkResult) bool {
 // markSubmitted sets the Submitted flag to true for results in the given
 // slice at indices [startIdx, endIdx). This mutates the slice elements
 // in-place, which is safe within the owning goroutine.
-func markSubmitted(results []display.BenchmarkResult, startIdx, endIdx int) {
+func markSubmitted(results []Result, startIdx, endIdx int) {
 	for i := startIdx; i < endIdx && i < len(results); i++ {
 		results[i].Submitted = true
 	}
 }
 
 // sendBenchmarkResults sends the collected benchmark results to a server endpoint.
-// It converts each display.BenchmarkResult into a HashcatBenchmark and appends them to a slice.
+// It converts each Result into a HashcatBenchmark and appends them to a slice.
 // If the conversion fails for a result, it continues to the next result.
 // Creates a SubmitBenchmarkJSONRequestBody with the HashcatBenchmarks slice and submits it via the API client interface.
 // Returns an error if submission or the response received is not successful.
-func (m *Manager) sendBenchmarkResults(ctx context.Context, benchmarkResults []display.BenchmarkResult) error {
+func (m *Manager) sendBenchmarkResults(ctx context.Context, benchmarkResults []Result) error {
 	benchmarks := make([]api.HashcatBenchmark, 0, len(benchmarkResults))
 
 	for _, result := range benchmarkResults {
@@ -135,10 +135,10 @@ func (m *Manager) sendBenchmarkResults(ctx context.Context, benchmarkResults []d
 	}
 }
 
-// createBenchmark converts a display.BenchmarkResult to an api.HashcatBenchmark struct.
-// It handles the conversion of string fields in display.BenchmarkResult to appropriate types.
+// createBenchmark converts a Result to an api.HashcatBenchmark struct.
+// It handles the conversion of string fields in Result to appropriate types.
 // Returns a HashcatBenchmark instance and an error if any conversion fails.
-func createBenchmark(result display.BenchmarkResult) (api.HashcatBenchmark, error) {
+func createBenchmark(result Result) (api.HashcatBenchmark, error) {
 	hashType, err := strconv.Atoi(result.HashType)
 	if err != nil {
 		return api.HashcatBenchmark{}, fmt.Errorf("failed to convert HashType: %w", err)
@@ -169,14 +169,14 @@ func createBenchmark(result display.BenchmarkResult) (api.HashcatBenchmark, erro
 
 // SubmitCapabilityResults caches and submits placeholder capability-detection results.
 // It is the deferred-benchmark equivalent of the full UpdateBenchmarks path.
-func (m *Manager) SubmitCapabilityResults(ctx context.Context, results []display.BenchmarkResult) error {
+func (m *Manager) SubmitCapabilityResults(ctx context.Context, results []Result) error {
 	return m.cacheAndSubmitBenchmarks(ctx, results)
 }
 
 // RunCapabilityDetection runs hashcat --hash-info --machine-readable to discover
 // supported hash types without executing a full benchmark. It returns placeholder
-// BenchmarkResult entries (SpeedHs="1", Placeholder=true) for each discovered type.
-func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.BenchmarkResult, error) {
+// Result entries (SpeedHs="1", Placeholder=true) for each discovered type.
+func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]Result, error) {
 	jobParams := hashcat.Params{
 		AttackMode:             hashcat.AttackHashInfo,
 		BackendDevices:         m.DeviceConfig.ResolvedBackendDevices(),
@@ -197,7 +197,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.Benchma
 		return nil, fmt.Errorf("failed to start capability detection session: %w", startErr)
 	}
 
-	var results []display.BenchmarkResult
+	var results []Result
 	var sessionErr error // set by goroutine if hashcat process exits with error
 
 	waitChan := make(chan struct{})
@@ -227,7 +227,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.Benchma
 			case line := <-sess.StdoutLines:
 				hashTypeID, ok := parseHashInfoLine(line)
 				if ok {
-					results = append(results, display.BenchmarkResult{
+					results = append(results, Result{
 						HashType:    hashTypeID,
 						Device:      "1",
 						RuntimeMs:   "0",
@@ -249,7 +249,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.Benchma
 					case line := <-sess.StdoutLines:
 						hashTypeID, ok := parseHashInfoLine(line)
 						if ok {
-							results = append(results, display.BenchmarkResult{
+							results = append(results, Result{
 								HashType:    hashTypeID,
 								Device:      "1",
 								RuntimeMs:   "0",
@@ -377,7 +377,7 @@ func (m *Manager) runSingleBenchmark(
 	ctx context.Context,
 	hashType int64,
 	hashTypeStr string,
-) []display.BenchmarkResult {
+) []Result {
 	sessionID := "bg-benchmark-" + hashTypeStr
 
 	jobParams := hashcat.Params{
@@ -411,8 +411,8 @@ func (m *Manager) runSingleBenchmark(
 func (m *Manager) collectSingleBenchmarkOutput(
 	ctx context.Context,
 	sess *hashcat.Session,
-) []display.BenchmarkResult {
-	var results []display.BenchmarkResult
+) []Result {
+	var results []Result
 
 	for {
 		select {
@@ -472,7 +472,7 @@ func (m *Manager) collectSingleBenchmarkOutput(
 // sequence to prevent concurrent cache corruption.
 func (m *Manager) updateCacheWithResults(
 	ctx context.Context,
-	newResults []display.BenchmarkResult,
+	newResults []Result,
 ) {
 	if len(newResults) == 0 {
 		return
@@ -492,7 +492,7 @@ func (m *Manager) updateCacheWithResults(
 		}
 
 		// Still attempt to submit results so GPU work is not wasted.
-		realResults := make([]display.BenchmarkResult, 0, len(newResults))
+		realResults := make([]Result, 0, len(newResults))
 		for _, r := range newResults {
 			r.Placeholder = false
 			realResults = append(realResults, r)
@@ -512,7 +512,7 @@ func (m *Manager) updateCacheWithResults(
 		device   string
 	}
 
-	newByKey := make(map[resultKey]display.BenchmarkResult, len(newResults))
+	newByKey := make(map[resultKey]Result, len(newResults))
 	for _, r := range newResults {
 		newByKey[resultKey{hashType: r.HashType, device: r.Device}] = r
 	}
@@ -542,7 +542,7 @@ func (m *Manager) updateCacheWithResults(
 	}
 
 	// Submit only the new real results.
-	realResults := make([]display.BenchmarkResult, 0, len(newResults))
+	realResults := make([]Result, 0, len(newResults))
 	for _, r := range newResults {
 		r.Placeholder = false
 		realResults = append(realResults, r)
@@ -669,7 +669,7 @@ func (m *Manager) UpdateBenchmarks(ctx context.Context) error {
 // returns the submission error so the caller can fail fast. When the cache was
 // saved but submission fails, it returns nil to allow retry via
 // TrySubmitCachedBenchmarks.
-func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults []display.BenchmarkResult) error {
+func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults []Result) error {
 	if allSubmitted(benchmarkResults) {
 		agentstate.Logger.Info("All benchmarks already submitted incrementally, skipping bulk submission")
 
@@ -733,7 +733,7 @@ func (m *Manager) cacheAndSubmitBenchmarks(ctx context.Context, benchmarkResults
 // runBenchmarks creates and runs a hashcat benchmark session, returning the
 // parsed results. Returns an error (reported as SeverityMajor to the server)
 // if the session cannot be created or fails to produce results.
-func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult, error) {
+func (m *Manager) runBenchmarks(ctx context.Context) ([]Result, error) {
 	additionalArgs := arch.GetAdditionalHashcatArgs()
 
 	jobParams := hashcat.Params{
@@ -768,7 +768,7 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 		)
 	}
 
-	display.BenchmarksComplete(results)
+	logBenchmarksComplete(results)
 
 	return results, nil
 }
@@ -776,7 +776,7 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 // runBenchmarkTask starts a hashcat benchmark session and processes its output.
 // It returns a slice of benchmark results and the start error if the session
 // failed to launch.
-func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) ([]display.BenchmarkResult, error) {
+func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) ([]Result, error) {
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start benchmark session", "error", err)
@@ -793,7 +793,7 @@ func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) (
 // the updated submittedUpTo index.
 func (m *Manager) submitBatchIfReady(
 	ctx context.Context,
-	results []display.BenchmarkResult,
+	results []Result,
 	submittedUpTo int,
 ) int {
 	if len(results)-submittedUpTo < benchmarkBatchSize {
@@ -824,7 +824,7 @@ func (m *Manager) submitBatchIfReady(
 func (m *Manager) finalizeBenchmarkSession(
 	ctx context.Context,
 	sess *hashcat.Session,
-	results *[]display.BenchmarkResult,
+	results *[]Result,
 	submittedUpTo int,
 	procErr error,
 ) {
@@ -863,10 +863,10 @@ func (m *Manager) finalizeBenchmarkSession(
 // On context cancellation, BenchmarksSubmitted remains false; partial results
 // are cached to disk for retry via TrySubmitCachedBenchmarks on the next
 // agent loop iteration.
-func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Session) []display.BenchmarkResult {
+func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Session) []Result {
 	// benchmarkResults is exclusively owned by the goroutine below until
 	// waitChan is closed, at which point ownership transfers to the caller.
-	var benchmarkResults []display.BenchmarkResult
+	var benchmarkResults []Result
 
 	waitChan := make(chan struct{})
 
