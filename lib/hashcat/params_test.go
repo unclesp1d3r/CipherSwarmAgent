@@ -70,6 +70,73 @@ func createTestHashFile(t *testing.T) string {
 	return createTestFile(t, t.TempDir(), "hashes.txt", "5f4dcc3b5aa765d61d8327deb882cf99\n")
 }
 
+func TestResolveOptionalPath(t *testing.T) {
+	cleanup := setupTestState(t)
+	defer cleanup()
+
+	createTestFile(t, agentstate.State.FilePath, "wordlist.txt", "password\n")
+	createTestFile(t, agentstate.State.FilePath, "rules.rule", ":\n")
+	createTestFile(t, agentstate.State.FilePath, "masks.hcmask", "?a?a?a\n")
+
+	tests := []struct {
+		name        string
+		filename    string
+		sentinel    error
+		expectError error
+	}{
+		{
+			name:     "wordlist resolves to absolute path",
+			filename: "wordlist.txt",
+			sentinel: ErrWordlistNotOpened,
+		},
+		{
+			name:     "rulelist resolves to absolute path",
+			filename: "rules.rule",
+			sentinel: ErrRuleListNotOpened,
+		},
+		{
+			name:     "masklist resolves to absolute path",
+			filename: "masks.hcmask",
+			sentinel: ErrMaskListNotOpened,
+		},
+		{
+			name:        "missing wordlist returns sentinel",
+			filename:    "nonexistent.txt",
+			sentinel:    ErrWordlistNotOpened,
+			expectError: ErrWordlistNotOpened,
+		},
+		{
+			name:        "missing rulelist returns sentinel",
+			filename:    "nonexistent.rule",
+			sentinel:    ErrRuleListNotOpened,
+			expectError: ErrRuleListNotOpened,
+		},
+		{
+			name:        "missing masklist returns sentinel",
+			filename:    "nonexistent.hcmask",
+			sentinel:    ErrMaskListNotOpened,
+			expectError: ErrMaskListNotOpened,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolved, err := resolveOptionalPath(agentstate.State.FilePath, tt.filename, tt.sentinel)
+			if tt.expectError != nil {
+				require.ErrorIs(t, err, tt.expectError)
+				assert.Empty(t, resolved)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.NotEmpty(t, resolved)
+
+			_, statErr := os.Stat(resolved)
+			assert.NoError(t, statErr)
+		})
+	}
+}
+
 func TestParams_Validate_DictionaryAttack(t *testing.T) {
 	tests := []struct {
 		name        string

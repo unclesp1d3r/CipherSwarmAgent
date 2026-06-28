@@ -260,39 +260,27 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.WordListFilename) != "" {
-		wordList, err := safePath(params.FilePath, params.WordListFilename)
+		wordList, err := resolveOptionalPath(params.FilePath, params.WordListFilename, ErrWordlistNotOpened)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrWordlistNotOpened, err)
-		}
-
-		if _, err := os.Stat(wordList); os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrWordlistNotOpened, wordList)
+			return nil, err
 		}
 
 		params.WordListFilename = wordList
 	}
 
 	if strings.TrimSpace(params.RuleListFilename) != "" {
-		ruleList, err := safePath(params.FilePath, params.RuleListFilename)
+		ruleList, err := resolveOptionalPath(params.FilePath, params.RuleListFilename, ErrRuleListNotOpened)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrRuleListNotOpened, err)
-		}
-
-		if _, err := os.Stat(ruleList); os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrRuleListNotOpened, ruleList)
+			return nil, err
 		}
 
 		params.RuleListFilename = ruleList
 	}
 
 	if strings.TrimSpace(params.MaskListFilename) != "" {
-		maskList, err := safePath(params.FilePath, params.MaskListFilename)
+		maskList, err := resolveOptionalPath(params.FilePath, params.MaskListFilename, ErrMaskListNotOpened)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrMaskListNotOpened, err)
-		}
-
-		if _, err := os.Stat(maskList); os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrMaskListNotOpened, maskList)
+			return nil, err
 		}
 
 		params.Mask = maskList
@@ -382,6 +370,22 @@ func safePath(base, filename string) (string, error) {
 	}
 
 	return absJoined, nil
+}
+
+// resolveOptionalPath resolves a relative filename against base using safePath,
+// verifies the result exists on disk, and returns the absolute path.
+// If either check fails, sentinel is returned wrapped around the underlying error.
+func resolveOptionalPath(base, filename string, sentinel error) (string, error) {
+	resolved, err := safePath(base, filename)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", sentinel, err)
+	}
+
+	if _, err := os.Stat(resolved); os.IsNotExist(err) {
+		return "", fmt.Errorf("%w: %s", sentinel, resolved)
+	}
+
+	return resolved, nil
 }
 
 // hashFileReadBufSize is the number of bytes read to check for non-whitespace content.
