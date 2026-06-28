@@ -453,7 +453,18 @@ func (sess *Session) Cleanup() {
 		}
 	}
 
+	// closeFile closes an open file handle before its path is removed, so the
+	// descriptor is not leaked across repeated session create/cleanup cycles.
+	// Close errors are logged at Debug and never halt cleanup.
+	closeFile := func(f *os.File) {
+		if err := f.Close(); err != nil {
+			agentstate.Logger.Debug("couldn't close session file during cleanup",
+				"file", f.Name(), "error", err)
+		}
+	}
+
 	if sess.outFile != nil {
+		closeFile(sess.outFile)
 		removeFile(sess.outFile.Name())
 		sess.outFile = nil
 	}
@@ -466,9 +477,11 @@ func (sess *Session) Cleanup() {
 
 	for _, f := range sess.charsetFiles {
 		if f != nil {
+			closeFile(f)
 			removeFile(f.Name())
 		}
 	}
+	sess.charsetFiles = nil
 
 	removeFile(sess.hashFile)
 	sess.hashFile = ""

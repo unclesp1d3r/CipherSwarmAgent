@@ -179,6 +179,74 @@ func TestCleanup_DoubleCallIdempotent(t *testing.T) {
 	require.True(t, os.IsNotExist(err), ".log file should still be removed")
 }
 
+// TestCleanup_ClosesAndRemovesOutFile verifies that Cleanup closes the output
+// file descriptor (not just unlinks the path) so it is not leaked.
+func TestCleanup_ClosesAndRemovesOutFile(t *testing.T) {
+	setupSessionTestState(t)
+
+	outPath := filepath.Join(t.TempDir(), "session.hcout")
+	outFile, err := os.Create(outPath)
+	require.NoError(t, err)
+
+	sess := &Session{outFile: outFile}
+
+	sess.Cleanup()
+
+	// Closing an already-closed file returns os.ErrClosed — proves Cleanup closed it.
+	require.ErrorIs(t, outFile.Close(), os.ErrClosed, "outFile should be closed by Cleanup")
+	_, statErr := os.Stat(outPath)
+	require.True(t, os.IsNotExist(statErr), "outfile path should be removed after Cleanup")
+	require.Nil(t, sess.outFile, "outFile field should be cleared after Cleanup")
+}
+
+// TestCleanup_ClosesAndRemovesCharsetFiles verifies that Cleanup closes each
+// charset file descriptor and removes its path, and clears the slice.
+func TestCleanup_ClosesAndRemovesCharsetFiles(t *testing.T) {
+	setupSessionTestState(t)
+
+	tempDir := t.TempDir()
+	charsetFiles := make([]*os.File, 0, 2)
+	paths := make([]string, 0, 2)
+	for i := range 2 {
+		p := filepath.Join(tempDir, "charset"+string(rune('0'+i)))
+		f, err := os.Create(p)
+		require.NoError(t, err)
+		charsetFiles = append(charsetFiles, f)
+		paths = append(paths, p)
+	}
+
+	sess := &Session{charsetFiles: charsetFiles}
+
+	sess.Cleanup()
+
+	for i, f := range charsetFiles {
+		require.ErrorIs(t, f.Close(), os.ErrClosed, "charset file should be closed by Cleanup")
+		_, statErr := os.Stat(paths[i])
+		require.True(t, os.IsNotExist(statErr), "charset path should be removed after Cleanup")
+	}
+	require.Nil(t, sess.charsetFiles, "charsetFiles slice should be cleared after Cleanup")
+}
+
+// TestCleanup_DoubleCallWithDescriptorsIdempotent verifies that a second Cleanup
+// call after descriptors are already closed does not panic (supports the task
+// cancellation double-cleanup guard).
+func TestCleanup_DoubleCallWithDescriptorsIdempotent(t *testing.T) {
+	setupSessionTestState(t)
+
+	tempDir := t.TempDir()
+	outFile, err := os.Create(filepath.Join(tempDir, "session.hcout"))
+	require.NoError(t, err)
+	charsetFile, err := os.Create(filepath.Join(tempDir, "charset0"))
+	require.NoError(t, err)
+
+	sess := &Session{outFile: outFile, charsetFiles: []*os.File{charsetFile}}
+
+	require.NotPanics(t, func() {
+		sess.Cleanup()
+		sess.Cleanup() // second call must be a no-op
+	})
+}
+
 // testTimeout is the maximum time to wait for a goroutine to exit in cancellation tests.
 const testTimeout = 5 * time.Second
 
