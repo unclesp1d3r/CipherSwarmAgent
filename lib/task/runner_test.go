@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -475,5 +476,44 @@ func TestHandleDoneChan_ExitCodeHandling(t *testing.T) {
 			assert.Equal(t, tt.isSuccess, hashcat.IsSuccess(tt.exitCode),
 				"IsSuccess(%d) mismatch", tt.exitCode)
 		})
+	}
+}
+
+// TestRunEventLoop_ContextCancel verifies that cancelling the task context causes
+// the runEventLoop goroutine to exit promptly via the <-taskCtx.Done() branch,
+// covering the P1 goroutine-stall fix (404/410 → taskCancel → loop exit).
+func TestRunEventLoop_ContextCancel(t *testing.T) {
+	t.Cleanup(testhelpers.SetupHTTPMock())
+	t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
+
+	sess := hashcat.NewTestSession(false)
+	task := testhelpers.NewTestTask(456, 789)
+	mgr := newTestManager()
+
+	taskCtx, taskCancel := context.WithCancel(context.Background())
+	defer taskCancel()
+
+	taskTimer := time.NewTimer(24 * time.Hour) // long duration; must not fire during test
+	waitChan := make(chan struct{})
+
+	mgr.runEventLoop(
+		context.Background(),
+		taskCtx,
+		taskCancel,
+		sess,
+		task,
+		24*time.Hour,
+		taskTimer,
+		waitChan,
+	)
+
+	// Trigger the <-taskCtx.Done() branch — goroutine must Kill+Cleanup and close waitChan.
+	taskCancel()
+
+	select {
+	case <-waitChan:
+		// goroutine exited cleanly
+	case <-time.After(5 * time.Second):
+		t.Fatal("runEventLoop did not exit after context cancellation within 5 seconds")
 	}
 }

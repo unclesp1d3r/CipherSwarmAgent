@@ -58,15 +58,29 @@ func init() {
 	configuration.Store(agentConfiguration{})
 }
 
-// getConfiguration returns a shallow copy of the current agent configuration.
-// Value-type fields are safe to use without synchronization. Pointer fields
-// (RecommendedTimeouts, RecommendedRetry, RecommendedCircuitBreaker) are shared
-// with the stored value — callers must not mutate through them.
+// getConfiguration returns a fully independent copy of the current agent configuration.
+// Value-type fields are copied by value. Pointer fields (RecommendedTimeouts,
+// RecommendedRetry, RecommendedCircuitBreaker) are deep-copied so callers receive
+// an independent snapshot; nil is preserved (meaning the server did not provide that setting).
 // Safe for concurrent use from any goroutine.
 func getConfiguration() agentConfiguration {
 	cfg, ok := configuration.Load().(agentConfiguration)
 	if !ok {
 		agentstate.Logger.Error("configuration type assertion failed, returning zero-value config")
+	}
+
+	// Deep-copy pointer fields to prevent aliasing of the stored atomic value.
+	if cfg.RecommendedTimeouts != nil {
+		t := *cfg.RecommendedTimeouts
+		cfg.RecommendedTimeouts = &t
+	}
+	if cfg.RecommendedRetry != nil {
+		r := *cfg.RecommendedRetry
+		cfg.RecommendedRetry = &r
+	}
+	if cfg.RecommendedCircuitBreaker != nil {
+		cb := *cfg.RecommendedCircuitBreaker
+		cfg.RecommendedCircuitBreaker = &cb
 	}
 
 	return cfg

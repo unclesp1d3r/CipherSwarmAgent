@@ -19,12 +19,13 @@ import (
 // 1. Logs the start of the download process.
 // 2. Downloads the hash list associated with the attack.
 // 3. Iterates over resource files (word list, rule list, and mask list) and downloads each one.
-// filePath is the directory where resource files should be saved.
-// If any step encounters an error, the function returns that error.
-func DownloadFiles(ctx context.Context, attack *api.Attack, filePath string) error {
+// filePath is the directory where resource files should be saved; hashlistPath is
+// the directory for the downloaded hash list. If any step encounters an error, the
+// function returns that error.
+func DownloadFiles(ctx context.Context, attack *api.Attack, filePath, hashlistPath string) error {
 	display.DownloadFileStart(attack)
 
-	if err := downloader.DownloadHashList(ctx, attack); err != nil {
+	if err := downloader.DownloadHashList(ctx, attack, hashlistPath); err != nil {
 		return err
 	}
 

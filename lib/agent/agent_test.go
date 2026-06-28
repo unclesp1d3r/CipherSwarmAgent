@@ -825,3 +825,43 @@ func TestSleepWithContext_Cancelled(t *testing.T) {
 	assert.True(t, cancelled, "should return true when context is cancelled")
 	assert.Less(t, elapsed, 1*time.Second, "should return promptly on cancellation")
 }
+
+// TestHandleNewTask_IdleDoesNotStopBackgroundBenchmarks verifies that on
+// ErrNoTaskAvailable (the normal idle poll), handleNewTask leaves background
+// benchmarks running undisturbed. The API poll does not use the GPU, so there
+// is no reason to stop background benchmarks before it.
+func TestHandleNewTask_IdleDoesNotStopBackgroundBenchmarks(t *testing.T) {
+	cleanup := saveAndRestoreState(t)
+	defer cleanup()
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	// Respond to GET /api/v1/client/tasks/new with HTTP 204 → ErrNoTaskAvailable.
+	taskNewPattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
+	httpmock.RegisterRegexpResponder("GET", taskNewPattern,
+		httpmock.NewStringResponder(http.StatusNoContent, ""))
+
+	// Wire taskMgr to the mock API client.
+	testClient := agentstate.State.GetAPIClient()
+	taskMgr = task.NewManager(testClient.Tasks(), testClient.Attacks())
+
+	// Install a bg benchmark handle whose cancel MUST NOT be called on idle.
+	cancelCalled := false
+	done := make(chan struct{}) // left open — a nil-swap would betray the bug
+	bgBench.Store(&bgBenchHandle{
+		cancel: func() { cancelCalled = true },
+		done:   done,
+	})
+
+	agentstate.State.SetBenchmarksSubmitted(true)
+
+	handleNewTask(context.Background())
+
+	assert.False(t, cancelCalled, "idle poll must not cancel background benchmarks")
+	assert.NotNil(t, bgBench.Load(), "bg bench handle must remain after idle poll")
+}

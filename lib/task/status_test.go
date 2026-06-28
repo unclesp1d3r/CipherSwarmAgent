@@ -69,23 +69,26 @@ func TestConvertToTaskStatusGuessBasePercentage(t *testing.T) {
 // TestSendStatusUpdate tests the sendStatusUpdate method.
 func TestSendStatusUpdate(t *testing.T) {
 	tests := []struct {
-		name      string
-		setupMock func(taskID int64)
-		status    hashcat.Status
+		name         string
+		setupMock    func(taskID int64)
+		status       hashcat.Status
+		expectCancel bool
 	}{
 		{
 			name: "successful status update",
 			setupMock: func(taskID int64) {
 				testhelpers.MockSendStatusSuccess(taskID)
 			},
-			status: testhelpers.NewTestHashcatStatus("test-session"),
+			status:       testhelpers.NewTestHashcatStatus("test-session"),
+			expectCancel: false,
 		},
 		{
 			name: "stale status update",
 			setupMock: func(taskID int64) {
 				testhelpers.MockSendStatusStale(taskID)
 			},
-			status: testhelpers.NewTestHashcatStatus("test-session"),
+			status:       testhelpers.NewTestHashcatStatus("test-session"),
+			expectCancel: false,
 		},
 		{
 			name: "status update with zero time",
@@ -97,6 +100,43 @@ func TestSendStatusUpdate(t *testing.T) {
 				s.Time = time.Time{}
 				return s
 			}(),
+			expectCancel: false,
+		},
+		{
+			name: "task not found (404) invokes taskCancel",
+			setupMock: func(taskID int64) {
+				apiErr := testhelpers.NewAPIError(http.StatusNotFound, "task not found")
+				testhelpers.MockAPIError(
+					fmt.Sprintf(`^https?://[^/]+/api/v1/client/tasks/%d/submit_status$`, taskID),
+					http.StatusNotFound,
+					*apiErr,
+				)
+				testhelpers.MockAPIError(
+					fmt.Sprintf(`^https?://[^/]+/api/v1/tasks/%d/send_status$`, taskID),
+					http.StatusNotFound,
+					*apiErr,
+				)
+			},
+			status:       testhelpers.NewTestHashcatStatus("test-session"),
+			expectCancel: true,
+		},
+		{
+			name: "task gone (410) invokes taskCancel",
+			setupMock: func(taskID int64) {
+				apiErr := testhelpers.NewAPIError(http.StatusGone, "task gone")
+				testhelpers.MockAPIError(
+					fmt.Sprintf(`^https?://[^/]+/api/v1/client/tasks/%d/submit_status$`, taskID),
+					http.StatusGone,
+					*apiErr,
+				)
+				testhelpers.MockAPIError(
+					fmt.Sprintf(`^https?://[^/]+/api/v1/tasks/%d/send_status$`, taskID),
+					http.StatusGone,
+					*apiErr,
+				)
+			},
+			status:       testhelpers.NewTestHashcatStatus("test-session"),
+			expectCancel: true,
 		},
 	}
 
@@ -119,10 +159,20 @@ func TestSendStatusUpdate(t *testing.T) {
 			}
 			defer sess.Cleanup()
 
-			mgr := newTestManager()
-			mgr.sendStatusUpdate(context.Background(), tt.status, task, sess, func() {})
+			cancelCalled := false
+			taskCancel := func() { cancelCalled = true }
 
-			// Verify httpmock call count for send_status endpoint
+			mgr := newTestManager()
+			mgr.sendStatusUpdate(context.Background(), tt.status, task, sess, taskCancel)
+
+			// Verify taskCancel was called for 404/410 responses
+			if tt.expectCancel {
+				assert.True(t, cancelCalled, "taskCancel should be called for %s", tt.name)
+			} else {
+				assert.False(t, cancelCalled, "taskCancel should not be called for %s", tt.name)
+			}
+
+			// Verify httpmock call count for send_status endpoint (always called)
 			info := httpmock.GetCallCountInfo()
 			var callCount int
 			callCount += info["POST =~^https?://[^/]+/api/v1/tasks/456/send_status$"]

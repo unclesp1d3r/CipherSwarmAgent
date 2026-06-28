@@ -208,6 +208,11 @@ func SetupSharedState() {
 	agentstate.State.StatusTimer = viper.GetInt(
 		"status_timer",
 	) // Set the status timer in the shared state
+	if agentstate.State.StatusTimer < 1 {
+		agentstate.Logger.Warn("status_timer must be >= 1, using default",
+			"configured", agentstate.State.StatusTimer, "default", DefaultStatusTimer)
+		agentstate.State.StatusTimer = DefaultStatusTimer
+	}
 	agentstate.State.WriteZapsToFile = viper.GetBool(
 		"write_zaps_to_file",
 	) // Set the write zaps to file flag in the shared state

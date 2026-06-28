@@ -564,9 +564,8 @@ func handleNewTask(ctx context.Context) {
 		return
 	}
 
-	// Cancel background benchmarks while a task is running to avoid device contention.
-	canRestartBg := stopBackgroundBenchmarks()
-
+	// GetNewTask only polls the API — it does not use the GPU — so background
+	// benchmarks keep running undisturbed during the poll.
 	newTask, err := taskMgr.GetNewTask(ctx)
 	if err != nil {
 		if errors.Is(err, task.ErrNoTaskAvailable) {
@@ -584,9 +583,13 @@ func handleNewTask(ctx context.Context) {
 		return
 	}
 
-	if newTask != nil {
-		processTask(ctx, newTask)
+	if newTask == nil {
+		return
 	}
+
+	// A real task is about to run — stop background benchmarks now to avoid GPU contention.
+	canRestartBg := stopBackgroundBenchmarks()
+	processTask(ctx, newTask)
 
 	// Restart background benchmarks after the task completes, unless the prior
 	// goroutine did not stop cleanly above.
@@ -650,7 +653,7 @@ func processTask(ctx context.Context, t *api.Task) {
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityDownloading)
 
-	if err := task.DownloadFiles(ctx, attack, taskMgr.Config.FilePath); err != nil {
+	if err := task.DownloadFiles(ctx, attack, taskMgr.Config.FilePath, taskMgr.Config.HashlistPath); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		cserrors.SendAgentError(ctx, err.Error(), t, api.SeverityFatal)
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)

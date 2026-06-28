@@ -41,7 +41,24 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 	defer taskCancel()
 
 	waitChan := make(chan struct{})
+	m.runEventLoop(ctx, taskCtx, taskCancel, sess, task, taskTimeout, taskTimer, waitChan)
+	<-waitChan
+}
 
+// runEventLoop runs the select-driven event loop for a hashcat session in a goroutine.
+// It handles task context cancellation, session timeout, stdout/stderr output,
+// status updates, cracked hashes, and session completion. The goroutine closes
+// waitChan on exit so the caller can block until the loop finishes.
+func (m *Manager) runEventLoop(
+	ctx context.Context,
+	taskCtx context.Context,
+	taskCancel context.CancelFunc,
+	sess *hashcat.Session,
+	task *api.Task,
+	taskTimeout time.Duration,
+	taskTimer *time.Timer,
+	waitChan chan struct{},
+) {
 	//nolint:gosec // G118 - goroutine manages session lifecycle with ctx cancellation
 	go func() {
 		defer close(waitChan)
@@ -102,8 +119,6 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 			}
 		}
 	}()
-
-	<-waitChan
 }
 
 // handleStdOutLine handles a line of standard output from hashcat.
