@@ -165,36 +165,16 @@ func StartAgent() {
 	// Start heartbeat loop early so UI can see agent is connected
 	go startHeartbeatLoop(ctx, cancel)
 
-	// Initialize managers
-	client := agentstate.State.GetAPIClient()
-	cfg := lib.GetConfiguration()
-	dc := devices.NewDeviceConfig(cfg.Config.BackendDevices, cfg.Config.OpenCLDevices, deviceMgr)
-
-	benchmarkMgr = benchmark.NewManager(client.Agents())
-	benchmarkMgr.DeviceConfig = dc
-
-	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
-	taskMgr.DeviceConfig = dc
-	taskMgr.Config = task.Config{
-		HashlistPath:           agentstate.State.HashlistPath,
-		RestoreFilePath:        agentstate.State.RestoreFilePath,
-		FilePath:               agentstate.State.FilePath,
-		OutPath:                agentstate.State.OutPath,
-		ZapsPath:               agentstate.State.ZapsPath,
-		StatusTimer:            agentstate.State.StatusTimer,
-		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
-	}
-
-	// Log warnings for unrecognized device IDs at startup.
-	dc.WarnInvalidDevices(agentstate.Logger.Warn)
+	// Initialize managers (device config, path config, sub-clients).
+	benchmarksNeeded := initManagers()
 
 	// Run benchmarks when the server requests them OR when the user explicitly
 	// passed --force-benchmark. Without this check the CLI flag is silently
 	// ignored whenever the server reports valid benchmarks on file.
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	forceBenchmark := agentstate.State.GetForceBenchmarkRun()
-	if cfg.BenchmarksNeeded || forceBenchmark {
-		if forceBenchmark && !cfg.BenchmarksNeeded {
+	if benchmarksNeeded || forceBenchmark {
+		if forceBenchmark && !benchmarksNeeded {
 			agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
 		}
 
@@ -310,6 +290,37 @@ func stopBackgroundBenchmarks() bool {
 			"Background benchmark did not stop within timeout; skipping restart to avoid GPU overlap")
 		return false
 	}
+}
+
+// initManagers rebuilds the benchmark and task managers from the current API
+// client, server configuration, and the package-level deviceMgr — wiring
+// DeviceConfig and task.Config. Shared by StartAgent and handleReload. It reads
+// agentstate (the single legitimate reader) and returns whether the server says
+// benchmarks are needed.
+func initManagers() bool {
+	client := agentstate.State.GetAPIClient()
+	cfg := lib.GetConfiguration()
+	dc := devices.NewDeviceConfig(cfg.Config.BackendDevices, cfg.Config.OpenCLDevices, deviceMgr)
+
+	benchmarkMgr = benchmark.NewManager(client.Agents())
+	benchmarkMgr.DeviceConfig = dc
+
+	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
+	taskMgr.DeviceConfig = dc
+	taskMgr.Config = task.Config{
+		HashlistPath:           agentstate.State.HashlistPath,
+		RestoreFilePath:        agentstate.State.RestoreFilePath,
+		FilePath:               agentstate.State.FilePath,
+		OutPath:                agentstate.State.OutPath,
+		ZapsPath:               agentstate.State.ZapsPath,
+		StatusTimer:            agentstate.State.StatusTimer,
+		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
+	}
+
+	// Log warnings for unrecognized device IDs.
+	dc.WarnInvalidDevices(agentstate.Logger.Warn)
+
+	return cfg.BenchmarksNeeded
 }
 
 // calculateHeartbeatBackoff computes the exponential backoff duration for heartbeat retries.
@@ -480,32 +491,10 @@ func handleReload(ctx context.Context) {
 	}
 	lib.SetDevicesListManager(deviceMgr)
 
-	// Recreate managers with new API client sub-clients and update configs
-	reloadClient := agentstate.State.GetAPIClient()
-	reloadCfg := lib.GetConfiguration()
-	reloadDC := devices.NewDeviceConfig(
-		reloadCfg.Config.BackendDevices, reloadCfg.Config.OpenCLDevices, deviceMgr,
-	)
+	// Recreate managers with new API client sub-clients and updated configs.
+	benchmarksNeeded := initManagers()
 
-	benchmarkMgr = benchmark.NewManager(reloadClient.Agents())
-	benchmarkMgr.DeviceConfig = reloadDC
-
-	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
-	taskMgr.DeviceConfig = reloadDC
-	taskMgr.Config = task.Config{
-		HashlistPath:           agentstate.State.HashlistPath,
-		RestoreFilePath:        agentstate.State.RestoreFilePath,
-		FilePath:               agentstate.State.FilePath,
-		OutPath:                agentstate.State.OutPath,
-		ZapsPath:               agentstate.State.ZapsPath,
-		StatusTimer:            agentstate.State.StatusTimer,
-		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
-	}
-
-	// Log warnings for unrecognized device IDs after reload.
-	reloadDC.WarnInvalidDevices(agentstate.Logger.Warn)
-
-	if reloadCfg.BenchmarksNeeded {
+	if benchmarksNeeded {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 		// Server-initiated reload must re-run benchmarks (not use stale cache).
 		// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
