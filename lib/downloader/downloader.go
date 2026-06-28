@@ -395,7 +395,7 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 func fileMD5(filePath string) (string, error) { // DevSkim: ignore DS126858
 	f, err := os.Open(filePath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("opening file %q for checksum: %w", filePath, err)
 	}
 
 	defer func() {
@@ -407,7 +407,7 @@ func fileMD5(filePath string) (string, error) { // DevSkim: ignore DS126858
 
 	h := md5.New() //nolint:gosec // G401 - MD5 used for file integrity check, not security // DevSkim: ignore DS126858
 	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+		return "", fmt.Errorf("reading file %q for checksum: %w", filePath, err)
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil

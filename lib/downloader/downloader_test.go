@@ -269,6 +269,16 @@ func TestDownloadWithRetry_NoOverflowAtMaxShift(t *testing.T) {
 		"all attempts should run without an overflow-induced early exit")
 }
 
+// TestFileMD5_OpenErrorWrapped verifies fileMD5 wraps an open failure with context.
+func TestFileMD5_OpenErrorWrapped(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "no-such-file")
+
+	_, err := fileMD5(missing)
+	require.Error(t, err)
+	require.ErrorIs(t, err, os.ErrNotExist, "open failure should wrap the underlying cause")
+	require.Contains(t, err.Error(), "no-such-file", "wrapped error should include the path")
+}
+
 // TestDownloadWithRetryNegativeRetries verifies that negative maxRetries defaults to 1 attempt.
 func TestDownloadWithRetryNegativeRetries(t *testing.T) {
 	mock := &mockGetter{
