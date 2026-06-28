@@ -195,7 +195,6 @@ func StartAgent() {
 	config.SetupSharedState()
 	initLogger()
 
-	// R24: validate credentials from shared state (was an early viper.GetString read).
 	if err := validateAPICredentials(); err != nil {
 		agentstate.Logger.Fatal("Missing required API configuration", "error", err)
 	}
@@ -327,6 +326,12 @@ func initManagers() bool {
 
 	benchmarkMgr = benchmark.NewManager(client.Agents())
 	benchmarkMgr.DeviceConfig = dc
+	benchmarkMgr.Config = benchmark.Config{
+		OutPath:                   agentstate.State.OutPath,
+		ZapsPath:                  agentstate.State.ZapsPath,
+		RetainZapsOnCompletion:    agentstate.State.RetainZapsOnCompletion,
+		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
+	}
 
 	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
 	taskMgr.DeviceConfig = dc
@@ -608,6 +613,11 @@ func processTask(ctx context.Context, t *api.Task) {
 		return
 	}
 
+	// cleanupFiles removes this attack's local hashlist and restore files.
+	cleanupFiles := func() {
+		task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
+	}
+
 	display.NewAttack(attack)
 
 	err = taskMgr.AcceptTask(ctx, t)
@@ -618,14 +628,14 @@ func processTask(ctx context.Context, t *api.Task) {
 		if errors.Is(err, task.ErrTaskAcceptNotFound) {
 			// Task vanished before we could accept it — normal race condition.
 			// No server state transition needed; just clean up local files.
-			task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
+			cleanupFiles()
 
 			return
 		}
 
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
-		task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
+		cleanupFiles()
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return
@@ -641,7 +651,7 @@ func processTask(ctx context.Context, t *api.Task) {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
-		task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
+		cleanupFiles()
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return
@@ -654,7 +664,7 @@ func processTask(ctx context.Context, t *api.Task) {
 		// cleanup via sess.Cleanup()). This fallback only triggers for
 		// NewHashcatSession failures.
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
-		task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
+		cleanupFiles()
 
 		return
 	}

@@ -23,6 +23,8 @@ var errBadResponse = errors.New("bad response from server")
 type Manager struct {
 	agentsClient api.AgentsClient
 	DeviceConfig devices.DeviceConfig
+	// Config holds injected path and benchmark-mode configuration for this Manager.
+	Config Config
 }
 
 // NewManager creates a new benchmark Manager with the given API client.

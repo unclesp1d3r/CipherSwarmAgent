@@ -41,6 +41,19 @@ func killAndDrain(sess *hashcat.Session, logMsg string) {
 	flushTimer.Stop()
 }
 
+// newCapabilityResult builds a placeholder Result for a capability-detected hash
+// type (no real timings; SpeedHs="1", Placeholder=true).
+func newCapabilityResult(hashTypeID string) Result {
+	return Result{
+		HashType:    hashTypeID,
+		Device:      "1",
+		RuntimeMs:   "0",
+		HashTimeMs:  "0",
+		SpeedHs:     "1",
+		Placeholder: true,
+	}
+}
+
 // RunCapabilityDetection runs hashcat --hash-info --machine-readable to discover
 // supported hash types without executing a full benchmark. It returns placeholder
 // Result entries (SpeedHs="1", Placeholder=true) for each discovered type.
@@ -49,9 +62,9 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]Result, error) 
 		AttackMode:             hashcat.AttackHashInfo,
 		BackendDevices:         m.DeviceConfig.ResolvedBackendDevices(),
 		OpenCLDevices:          m.DeviceConfig.ResolvedOpenCLDevices(),
-		OutPath:                agentstate.State.OutPath,
-		ZapsPath:               agentstate.State.ZapsPath,
-		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
+		OutPath:                m.Config.OutPath,
+		ZapsPath:               m.Config.ZapsPath,
+		RetainZapsOnCompletion: m.Config.RetainZapsOnCompletion,
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, "capability-detect", jobParams)
@@ -85,14 +98,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]Result, error) 
 			case line := <-sess.StdoutLines:
 				hashTypeID, ok := parseHashInfoLine(line)
 				if ok {
-					results = append(results, Result{
-						HashType:    hashTypeID,
-						Device:      "1",
-						RuntimeMs:   "0",
-						HashTimeMs:  "0",
-						SpeedHs:     "1",
-						Placeholder: true,
-					})
+					results = append(results, newCapabilityResult(hashTypeID))
 				}
 			case errInfo := <-sess.StderrMessages:
 				handleBenchmarkStdErrLine(ctx, errInfo)
@@ -107,14 +113,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]Result, error) 
 					case line := <-sess.StdoutLines:
 						hashTypeID, ok := parseHashInfoLine(line)
 						if ok {
-							results = append(results, Result{
-								HashType:    hashTypeID,
-								Device:      "1",
-								RuntimeMs:   "0",
-								HashTimeMs:  "0",
-								SpeedHs:     "1",
-								Placeholder: true,
-							})
+							results = append(results, newCapabilityResult(hashTypeID))
 						}
 					default:
 						goto drained
@@ -163,9 +162,9 @@ func (m *Manager) runSingleBenchmark(
 		HashType:               hashType,
 		BackendDevices:         m.DeviceConfig.ResolvedBackendDevices(),
 		OpenCLDevices:          m.DeviceConfig.ResolvedOpenCLDevices(),
-		OutPath:                agentstate.State.OutPath,
-		ZapsPath:               agentstate.State.ZapsPath,
-		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
+		OutPath:                m.Config.OutPath,
+		ZapsPath:               m.Config.ZapsPath,
+		RetainZapsOnCompletion: m.Config.RetainZapsOnCompletion,
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, sessionID, jobParams)
@@ -244,10 +243,10 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]Result, error) {
 		AdditionalArgs:            additionalArgs,
 		BackendDevices:            m.DeviceConfig.ResolvedBackendDevices(),
 		OpenCLDevices:             m.DeviceConfig.ResolvedOpenCLDevices(),
-		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
-		OutPath:                   agentstate.State.OutPath,
-		ZapsPath:                  agentstate.State.ZapsPath,
-		RetainZapsOnCompletion:    agentstate.State.RetainZapsOnCompletion,
+		EnableAdditionalHashTypes: m.Config.EnableAdditionalHashTypes,
+		OutPath:                   m.Config.OutPath,
+		ZapsPath:                  m.Config.ZapsPath,
+		RetainZapsOnCompletion:    m.Config.RetainZapsOnCompletion,
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, "benchmark", jobParams)
