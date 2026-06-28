@@ -62,6 +62,9 @@ const (
 // misconfigured server from setting absurdly large timeouts (e.g., 24 hours).
 const MaxReasonableTimeout = 5 * time.Minute
 
+// AgentVersion is the current version of the agent software.
+const AgentVersion = "0.5.5"
+
 // MaxReasonableRetries caps server-recommended retry count to prevent excessive
 // retry storms from a misconfigured server.
 const MaxReasonableRetries = 10

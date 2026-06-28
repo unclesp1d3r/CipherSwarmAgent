@@ -13,7 +13,6 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
-	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/benchmark"
@@ -137,9 +136,9 @@ func setupDevicesAndMetadata(ctx context.Context) {
 		agentstate.Logger.Warn("Device enumeration failed, metadata will report no devices", "error", dmErr)
 		deviceMgr = nil
 	}
-	lib.SetMetadataProvider(deviceMgr)
+	SetMetadataProvider(deviceMgr)
 
-	if err := lib.UpdateAgentMetadata(ctx); err != nil {
+	if err := UpdateAgentMetadata(ctx); err != nil {
 		agentstate.Logger.Fatal("Failed to update agent metadata", "error", err)
 	}
 
@@ -213,7 +212,7 @@ func StartAgent() {
 	ctx, cancel := context.WithCancel(signalCtx)
 	defer cancel()
 
-	if err := lib.AuthenticateAgent(ctx); err != nil {
+	if err := AuthenticateAgent(ctx); err != nil {
 		agentstate.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
 	}
 	display.Authenticated()
@@ -249,7 +248,7 @@ func StartAgent() {
 	agentstate.Logger.Debug("Agent context cancelled, shutting down")
 	// Use context.Background() for shutdown messages — must complete even after cancellation.
 	cserrors.SendAgentError(context.Background(), "Received signal to terminate. Shutting down", nil, api.SeverityInfo)
-	lib.SendAgentShutdown(context.Background())
+	SendAgentShutdown(context.Background())
 	display.ShuttingDown()
 }
 
@@ -323,7 +322,7 @@ func stopBackgroundBenchmarks() bool {
 // benchmarks are needed.
 func initManagers() bool {
 	client := agentstate.State.GetAPIClient()
-	cfg := lib.GetConfiguration()
+	cfg := getConfiguration()
 	dc := devices.NewDeviceConfig(cfg.Config.BackendDevices, cfg.Config.OpenCLDevices, deviceMgr)
 
 	benchmarkMgr = benchmark.NewManager(client.Agents())
@@ -397,7 +396,7 @@ func startHeartbeatLoop(ctx context.Context, cancel context.CancelFunc) {
 
 	for {
 		err := heartbeat(ctx, cancel)
-		baseInterval := time.Duration(lib.GetConfiguration().Config.AgentUpdateInterval) * time.Second
+		baseInterval := time.Duration(getConfiguration().Config.AgentUpdateInterval) * time.Second
 
 		if err != nil {
 			consecutiveFailures++
@@ -466,7 +465,7 @@ func startAgentLoop(ctx context.Context) {
 			handleNewTask(ctx)
 		}
 
-		sleepTime := time.Duration(lib.GetConfiguration().Config.AgentUpdateInterval) * time.Second
+		sleepTime := time.Duration(getConfiguration().Config.AgentUpdateInterval) * time.Second
 		display.Inactive(sleepTime)
 
 		if sleepWithContext(ctx, sleepTime) {
@@ -513,7 +512,7 @@ func handleReload(ctx context.Context) {
 		)
 		deviceMgr = nil
 	}
-	lib.SetMetadataProvider(deviceMgr)
+	SetMetadataProvider(deviceMgr)
 
 	// Recreate managers with new API client sub-clients and updated configs.
 	benchmarksNeeded := initManagers()
@@ -671,7 +670,7 @@ func heartbeat(ctx context.Context, cancel context.CancelFunc) error {
 		agentstate.Logger.Debug("Sending heartbeat")
 	}
 
-	state, err := lib.SendHeartBeat(ctx)
+	state, err := SendHeartBeat(ctx)
 	if err != nil {
 		return err
 	}
@@ -714,7 +713,7 @@ func heartbeat(ctx context.Context, cancel context.CancelFunc) error {
 }
 
 func fetchAgentConfig(ctx context.Context) error {
-	err := lib.GetAgentConfiguration(ctx)
+	err := GetAgentConfiguration(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get agent configuration from the CipherSwarm API: %w", err)
 	}
@@ -722,9 +721,9 @@ func fetchAgentConfig(ctx context.Context) error {
 	// This read-modify-write is safe because fetchAgentConfig is only called
 	// from the single agent-loop goroutine. If this changes, use a mutex or CAS.
 	if agentstate.State.AlwaysUseNativeHashcat {
-		fetchedCfg := lib.GetConfiguration()
+		fetchedCfg := getConfiguration()
 		fetchedCfg.Config.UseNativeHashcat = true
-		lib.SetConfiguration(fetchedCfg)
+		SetConfiguration(fetchedCfg)
 	}
 
 	return nil

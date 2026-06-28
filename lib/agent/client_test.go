@@ -1,4 +1,4 @@
-package lib
+package agent
 
 import (
 	"context"
@@ -222,7 +222,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
-				require.Equal(t, tt.useNativeHashcat, GetConfiguration().Config.UseNativeHashcat)
+				require.Equal(t, tt.useNativeHashcat, getConfiguration().Config.UseNativeHashcat)
 			} else {
 				require.Error(t, err)
 				testhelpers.AssertErrorType(t, err, tt.expectedError)
@@ -693,44 +693,6 @@ func TestMapConfiguration_NilRecommendedSettings(t *testing.T) {
 	require.Nil(t, result.RecommendedTimeouts)
 	require.Nil(t, result.RecommendedRetry)
 	require.Nil(t, result.RecommendedCircuitBreaker)
-}
-
-// TestUnwrapOr tests the UnwrapOr generic utility function.
-func TestUnwrapOr(t *testing.T) {
-	t.Run("nil pointer returns default", func(t *testing.T) {
-		var p *string
-		require.Equal(t, "default", UnwrapOr(p, "default"))
-	})
-
-	t.Run("non-nil pointer returns value", func(t *testing.T) {
-		s := "hello"
-		require.Equal(t, "hello", UnwrapOr(&s, "default"))
-	})
-
-	t.Run("nil int pointer returns default", func(t *testing.T) {
-		var p *int
-		require.Equal(t, 42, UnwrapOr(p, 42))
-	})
-
-	t.Run("non-nil int pointer returns value", func(t *testing.T) {
-		v := 7
-		require.Equal(t, 7, UnwrapOr(&v, 42))
-	})
-
-	t.Run("nil bool pointer returns default", func(t *testing.T) {
-		var p *bool
-		require.True(t, UnwrapOr(p, true))
-	})
-
-	t.Run("non-nil bool pointer returns value", func(t *testing.T) {
-		v := false
-		require.False(t, UnwrapOr(&v, true))
-	})
-
-	t.Run("zero value pointer returns zero not default", func(t *testing.T) {
-		v := 0
-		require.Equal(t, 0, UnwrapOr(&v, 99))
-	})
 }
 
 // TestLogHeartbeatSent tests the logHeartbeatSent function.

@@ -1,5 +1,4 @@
-// Package lib provides core functionality for the CipherSwarm agent.
-package lib
+package agent
 
 import (
 	"context"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/internal/util"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	cserrors "github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
@@ -46,7 +46,7 @@ func (p realMetadataProvider) getDevicesList(ctx context.Context) ([]string, err
 
 var (
 	// configuration stores the agent configuration atomically for safe concurrent access.
-	// Use GetConfiguration() and SetConfiguration() — never access directly.
+	// Use getConfiguration() and SetConfiguration() — never access directly.
 	configuration atomic.Value //nolint:gochecknoglobals // Global agent configuration
 
 	// metadataProviderImpl is the active metadata provider, injected at startup and
@@ -58,14 +58,12 @@ func init() {
 	configuration.Store(agentConfiguration{})
 }
 
-// GetConfiguration returns a shallow copy of the current agent configuration.
+// getConfiguration returns a shallow copy of the current agent configuration.
 // Value-type fields are safe to use without synchronization. Pointer fields
 // (RecommendedTimeouts, RecommendedRetry, RecommendedCircuitBreaker) are shared
 // with the stored value — callers must not mutate through them.
 // Safe for concurrent use from any goroutine.
-//
-//nolint:revive // unexported-return: agentConfiguration is internal; callers are all within lib/ and lib/agent/
-func GetConfiguration() agentConfiguration {
+func getConfiguration() agentConfiguration {
 	cfg, ok := configuration.Load().(agentConfiguration)
 	if !ok {
 		agentstate.Logger.Error("configuration type assertion failed, returning zero-value config")
@@ -92,7 +90,7 @@ var (
 // an error is logged and returned.
 func AuthenticateAgent(ctx context.Context) error {
 	// Set agent version in shared state so cserrors.SendAgentError can include it in error reports.
-	agentstate.State.AgentVersion = AgentVersion
+	agentstate.State.AgentVersion = config.AgentVersion
 
 	response, err := agentstate.State.GetAPIClient().Auth().Authenticate(ctx)
 	if err != nil {
@@ -194,10 +192,10 @@ func mapConfiguration(
 		APIVersion:       int64(apiVersion),
 		BenchmarksNeeded: benchmarksNeeded,
 		Config: agentConfig{
-			UseNativeHashcat:    UnwrapOr(agentCfg.UseNativeHashcat, false),
-			AgentUpdateInterval: int64(UnwrapOr(agentCfg.AgentUpdateInterval, defaultAgentUpdateInterval)),
-			BackendDevices:      UnwrapOr(agentCfg.BackendDevice, ""),
-			OpenCLDevices:       UnwrapOr(agentCfg.OpenclDevices, ""),
+			UseNativeHashcat:    util.UnwrapOr(agentCfg.UseNativeHashcat, false),
+			AgentUpdateInterval: int64(util.UnwrapOr(agentCfg.AgentUpdateInterval, defaultAgentUpdateInterval)),
+			BackendDevices:      util.UnwrapOr(agentCfg.BackendDevice, ""),
+			OpenCLDevices:       util.UnwrapOr(agentCfg.OpenclDevices, ""),
 		},
 		RecommendedTimeouts:       timeouts,
 		RecommendedRetry:          retry,
@@ -259,15 +257,6 @@ func applyRecommendedSettings(cfg agentConfiguration) {
 	}
 }
 
-// UnwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
-func UnwrapOr[T any](ptr *T, defaultVal T) T {
-	if ptr != nil {
-		return *ptr
-	}
-
-	return defaultVal
-}
-
 // UpdateAgentMetadata updates the agent's metadata and sends it to the CipherSwarm API.
 // It retrieves host information, device list, constructs the agent update request body,
 // and sends the updated metadata to the API. Logs relevant information and handles any API errors.
@@ -277,7 +266,7 @@ func UpdateAgentMetadata(ctx context.Context) error {
 		return cserrors.LogAndSendError(ctx, "Error getting host info", err, api.SeverityCritical, nil)
 	}
 
-	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
+	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", config.AgentVersion, info.OS, info.KernelArch)
 
 	deviceNames, err := metadataProviderImpl.getDevicesList(ctx)
 	if err != nil {

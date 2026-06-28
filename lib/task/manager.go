@@ -12,7 +12,7 @@ import (
 	"strconv"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
-	"github.com/unclesp1d3r/cipherswarmagent/lib"
+	"github.com/unclesp1d3r/cipherswarmagent/internal/util"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/arch"
@@ -205,15 +205,15 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 			m.Config.HashlistPath,
 			strconv.FormatInt(attack.Id, 10)+".hsh",
 		),
-		Mask:             lib.UnwrapOr(attack.Mask, ""),
+		Mask:             util.UnwrapOr(attack.Mask, ""),
 		MaskIncrement:    attack.IncrementMode,
 		MaskIncrementMin: int64(attack.IncrementMinimum),
 		MaskIncrementMax: int64(attack.IncrementMaximum),
 		MaskCustomCharsets: []string{
-			lib.UnwrapOr(attack.CustomCharset1, ""),
-			lib.UnwrapOr(attack.CustomCharset2, ""),
-			lib.UnwrapOr(attack.CustomCharset3, ""),
-			lib.UnwrapOr(attack.CustomCharset4, ""),
+			util.UnwrapOr(attack.CustomCharset1, ""),
+			util.UnwrapOr(attack.CustomCharset2, ""),
+			util.UnwrapOr(attack.CustomCharset3, ""),
+			util.UnwrapOr(attack.CustomCharset4, ""),
 		},
 		WordListFilename: resourceNameOrBlank(attack.WordList),
 		RuleListFilename: resourceNameOrBlank(attack.RuleList),
@@ -221,8 +221,8 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 		AdditionalArgs:   arch.GetAdditionalHashcatArgs(),
 		OptimizedKernels: attack.Optimized,
 		SlowCandidates:   attack.SlowCandidateGenerators,
-		Skip:             lib.UnwrapOr(task.Skip, 0),
-		Limit:            lib.UnwrapOr(task.Limit, 0),
+		Skip:             util.UnwrapOr(task.Skip, 0),
+		Limit:            util.UnwrapOr(task.Limit, 0),
 		BackendDevices:   m.DeviceConfig.ResolvedBackendDevices(),
 		OpenCLDevices:    m.DeviceConfig.ResolvedOpenCLDevices(),
 		RestoreFilePath: filepath.Join(
