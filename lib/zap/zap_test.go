@@ -185,17 +185,16 @@ func TestProcessZapFile_OpenError(t *testing.T) {
 // TestRemoveExistingZapFile_WrapsError verifies removeExistingZapFile wraps a
 // non-not-exist removal failure with context.
 func TestRemoveExistingZapFile_WrapsError(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("running with elevated privileges; directory removal is not blocked")
-	}
-	// A path whose parent is a regular file cannot be removed and yields a non-IsNotExist error.
-	parent := filepath.Join(t.TempDir(), "regular-file")
-	require.NoError(t, os.WriteFile(parent, []byte("x"), 0o600))
-	target := filepath.Join(parent, "child.zap")
+	// os.Remove on a non-empty directory fails with a non-IsNotExist error on every
+	// platform (rmdir requires the directory to be empty, regardless of privileges),
+	// so removeExistingZapFile must return the wrapped error including the path.
+	target := filepath.Join(t.TempDir(), "nonempty.zap")
+	require.NoError(t, os.MkdirAll(target, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(target, "child"), []byte("x"), 0o600))
 
 	err := removeExistingZapFile(target)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "child.zap", "wrapped error should include the path")
+	assert.Contains(t, err.Error(), "nonempty.zap", "wrapped error should include the path")
 }
 
 // TestProcessZapFile tests the processZapFile function through a file.
