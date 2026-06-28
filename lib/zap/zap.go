@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	zapLineParts = 2     // Expected number of parts when splitting zap line by colon
-	zapFileMode  = 0o600 // Restrictive permissions for cracked hash data
+	zapPlaintextSeparator = ":"   // Default hash-list separator the server joins hash and plaintext with
+	zapFileMode           = 0o600 // Restrictive permissions for cracked hash data
 )
 
 // GetZaps fetches zap data for a given task, handles errors, and processes the response stream if available.
@@ -62,7 +62,7 @@ func removeExistingZapFile(zapFilePath string) error {
 	err := os.Remove(zapFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		agentstate.Logger.Debug("Error removing zap file", "path", zapFilePath, "error", err)
-		return err
+		return fmt.Errorf("removing existing zap file %q: %w", zapFilePath, err)
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func processZapFile(
 		zapFilePath,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("opening zap file %q: %w", zapFilePath, err)
 	}
 	defer func(file *os.File) {
 		err := file.Close()
@@ -162,13 +162,23 @@ func processZapFile(
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		parts := strings.SplitN(line, ":", zapLineParts)
-		if len(parts) != zapLineParts {
+		// The server serializes each cracked entry as `hash<sep>plaintext` using the
+		// hash list's separator (default ":"). Many hash types embed colons (NTLMv2,
+		// Kerberos krb5asrep, PBKDF2 sha256:rounds:salt), so split on the LAST
+		// separator: everything before it is the hash (internal colons preserved),
+		// everything after is the plaintext.
+		//
+		// Limitation (KTD3): a plaintext that itself contains a colon is
+		// misattributed. This is accepted because hash colons are systematic while
+		// plaintext colons are rare, and LastIndex is strictly better than splitting
+		// on the first colon, which truncated every colon-bearing hash.
+		idx := strings.LastIndex(line, zapPlaintextSeparator)
+		if idx < 0 {
 			continue
 		}
 
-		hash := parts[0]
-		plaintext := parts[1]
+		hash := line[:idx]
+		plaintext := line[idx+len(zapPlaintextSeparator):]
 		sendCrackedHashFunc(ctx, time.Now(), hash, plaintext, task)
 	}
 

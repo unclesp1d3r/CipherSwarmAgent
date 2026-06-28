@@ -101,6 +101,102 @@ func TestCreateAndWriteZapFile(t *testing.T) {
 	}
 }
 
+// TestProcessZapFile_ColonSafe verifies that colon-bearing hashes round-trip
+// intact (split on the last colon, not the first).
+func TestProcessZapFile_ColonSafe(t *testing.T) {
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name          string
+		line          string
+		wantHash      string
+		wantPlaintext string
+	}{
+		{
+			name:          "NTLMv2 hash with embedded colons",
+			line:          "admin::CORP:1122334455667788:1f3a8b:0101000000:Spring2024!",
+			wantHash:      "admin::CORP:1122334455667788:1f3a8b:0101000000",
+			wantPlaintext: "Spring2024!",
+		},
+		{
+			name:          "Kerberos krb5asrep with embedded colons",
+			line:          "$krb5asrep$23$user@REALM:abcdef0123456789:hunter2",
+			wantHash:      "$krb5asrep$23$user@REALM:abcdef0123456789",
+			wantPlaintext: "hunter2",
+		},
+		{
+			name:          "PBKDF2 sha256:rounds:salt:hash",
+			line:          "sha256:20000:c2FsdHNhbHQ:aGFzaGhhc2g:secret",
+			wantHash:      "sha256:20000:c2FsdHNhbHQ:aGFzaGhhc2g",
+			wantPlaintext: "secret",
+		},
+		{
+			name:          "plain MD5 with no embedded colon (regression)",
+			line:          "5d41402abc4b2a76b9719d911017c592:hello",
+			wantHash:      "5d41402abc4b2a76b9719d911017c592",
+			wantPlaintext: "hello",
+		},
+		{
+			// KTD3 documented limitation: a plaintext containing a colon is
+			// misattributed because the split is on the last colon. Pinned here so
+			// a future format/escaping change is greppable.
+			name:          "plaintext containing a colon (documented limitation)",
+			line:          "5d41402abc4b2a76b9719d911017c592:pa:ss",
+			wantHash:      "5d41402abc4b2a76b9719d911017c592:pa",
+			wantPlaintext: "ss",
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			zapFilePath := filepath.Join(tempDir, fmt.Sprintf("colon_%d.zap", i))
+			require.NoError(t, os.WriteFile(zapFilePath, []byte(tt.line), 0o600))
+
+			var gotHash, gotPlaintext string
+			calls := 0
+			mockSendFunc := func(_ context.Context, _ time.Time, hash, plaintext string, _ *api.Task) {
+				calls++
+				gotHash = hash
+				gotPlaintext = plaintext
+			}
+
+			task := testhelpers.NewTestTask(123, 456)
+			require.NoError(t, processZapFile(context.Background(), zapFilePath, task, mockSendFunc))
+
+			require.Equal(t, 1, calls, "exactly one cracked hash should be submitted")
+			assert.Equal(t, tt.wantHash, gotHash, "hash must not be truncated")
+			assert.Equal(t, tt.wantPlaintext, gotPlaintext)
+		})
+	}
+}
+
+// TestProcessZapFile_OpenError verifies that a failed open returns a wrapped error.
+func TestProcessZapFile_OpenError(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "does-not-exist.zap")
+	task := testhelpers.NewTestTask(123, 456)
+	noopSend := func(context.Context, time.Time, string, string, *api.Task) {}
+
+	err := processZapFile(context.Background(), missing, task, noopSend)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, os.ErrNotExist, "open failure should wrap the underlying cause")
+}
+
+// TestRemoveExistingZapFile_WrapsError verifies removeExistingZapFile wraps a
+// non-not-exist removal failure with context.
+func TestRemoveExistingZapFile_WrapsError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running with elevated privileges; directory removal is not blocked")
+	}
+	// A path whose parent is a regular file cannot be removed and yields a non-IsNotExist error.
+	parent := filepath.Join(t.TempDir(), "regular-file")
+	require.NoError(t, os.WriteFile(parent, []byte("x"), 0o600))
+	target := filepath.Join(parent, "child.zap")
+
+	err := removeExistingZapFile(target)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "child.zap", "wrapped error should include the path")
+}
+
 // TestProcessZapFile tests the processZapFile function through a file.
 func TestProcessZapFile(t *testing.T) {
 	tempDir := t.TempDir()
