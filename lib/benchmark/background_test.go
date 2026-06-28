@@ -25,27 +25,19 @@ var bgBenchmarkSubmitPattern = regexp.MustCompile(
 // --- waitForIdle tests ---
 
 func TestWaitForIdle_AlreadyIdle(t *testing.T) {
-	cleanupState := testhelpers.SetupMinimalTestState(789)
-	t.Cleanup(cleanupState)
-
-	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
-
 	mgr := NewManager(nil)
-	cancelled := mgr.waitForIdle(context.Background())
+	// Injected predicate reports idle immediately; no global activity state needed.
+	cancelled := mgr.waitForIdle(context.Background(), func() bool { return true })
 	assert.False(t, cancelled)
 }
 
 func TestWaitForIdle_ContextCancelled(t *testing.T) {
-	cleanupState := testhelpers.SetupMinimalTestState(789)
-	t.Cleanup(cleanupState)
-
-	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	mgr := NewManager(nil)
-	cancelled := mgr.waitForIdle(ctx)
+	// Never idle: the loop must exit via context cancellation.
+	cancelled := mgr.waitForIdle(ctx, func() bool { return false })
 	assert.True(t, cancelled)
 }
 

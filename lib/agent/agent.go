@@ -220,7 +220,7 @@ func StartAgent() {
 		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called in handleReload
 		bgCtx, bgCancel := context.WithCancel(ctx)
 		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
+		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
 	}
 
 	// Wait for context cancellation (OS signal or heartbeat StateError)
@@ -241,6 +241,13 @@ func cleanupLockFile(pidFile string) {
 				"path", pidFile, "error", err)
 		}
 	}
+}
+
+// agentIsIdle reports whether the agent is currently waiting (idle), reading the
+// shared activity state. It is injected into background benchmarking so lib/benchmark
+// does not read agentstate directly for activity.
+func agentIsIdle() bool {
+	return agentstate.State.GetCurrentActivity() == agentstate.CurrentActivityWaiting
 }
 
 // calculateHeartbeatBackoff computes the exponential backoff duration for heartbeat retries.
@@ -464,7 +471,7 @@ func handleReload(ctx context.Context) {
 		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called on next reload
 		bgCtx, bgCancel := context.WithCancel(ctx)
 		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
+		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
 	}
 
 	agentstate.State.SetReload(false)
@@ -508,7 +515,7 @@ func handleNewTask(ctx context.Context) {
 		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called on next task/reload
 		bgCtx, bgCancel := context.WithCancel(ctx)
 		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
+		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
 	}
 }
 

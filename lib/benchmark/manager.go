@@ -296,9 +296,10 @@ const idleCheckInterval = 30 * time.Second
 
 // RunBackgroundBenchmarks replaces placeholder cache entries with real benchmark
 // results by running hashcat --benchmark -m <type> for each placeholder hash type.
-// It waits for the agent to be idle before each run and submits results
-// incrementally. The method is designed to run as a long-lived goroutine.
-func (m *Manager) RunBackgroundBenchmarks(ctx context.Context) {
+// It waits for the agent to be idle (per the injected isIdle predicate) before each
+// run and submits results incrementally. The method is designed to run as a
+// long-lived goroutine.
+func (m *Manager) RunBackgroundBenchmarks(ctx context.Context, isIdle func() bool) {
 	placeholders, err := loadPlaceholderResults()
 	if err != nil {
 		agentstate.Logger.Error(
@@ -319,7 +320,7 @@ func (m *Manager) RunBackgroundBenchmarks(ctx context.Context) {
 
 	for i, placeholder := range placeholders {
 		// Wait for idle before each benchmark run.
-		if cancelled := m.waitForIdle(ctx); cancelled {
+		if cancelled := m.waitForIdle(ctx, isIdle); cancelled {
 			agentstate.Logger.Info("Background benchmarking cancelled, partial results cached")
 			return
 		}
@@ -351,11 +352,11 @@ func (m *Manager) RunBackgroundBenchmarks(ctx context.Context) {
 	agentstate.Logger.Info("Background benchmarking complete")
 }
 
-// waitForIdle blocks until the agent's current activity is "waiting" or the
-// context is cancelled. Returns true if the context was cancelled.
-func (m *Manager) waitForIdle(ctx context.Context) bool {
+// waitForIdle blocks until the injected isIdle predicate reports the agent is
+// idle, or the context is cancelled. Returns true if the context was cancelled.
+func (m *Manager) waitForIdle(ctx context.Context, isIdle func() bool) bool {
 	for {
-		if agentstate.State.GetCurrentActivity() == agentstate.CurrentActivityWaiting {
+		if isIdle() {
 			return false
 		}
 
