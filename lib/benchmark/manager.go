@@ -178,9 +178,12 @@ func (m *Manager) SubmitCapabilityResults(ctx context.Context, results []display
 // BenchmarkResult entries (SpeedHs="1", Placeholder=true) for each discovered type.
 func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]display.BenchmarkResult, error) {
 	jobParams := hashcat.Params{
-		AttackMode:     hashcat.AttackHashInfo,
-		BackendDevices: m.DeviceConfig.ResolvedBackendDevices(),
-		OpenCLDevices:  m.DeviceConfig.ResolvedOpenCLDevices(),
+		AttackMode:             hashcat.AttackHashInfo,
+		BackendDevices:         m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:          m.DeviceConfig.ResolvedOpenCLDevices(),
+		OutPath:                agentstate.State.OutPath,
+		ZapsPath:               agentstate.State.ZapsPath,
+		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, "capability-detect", jobParams)
@@ -378,10 +381,13 @@ func (m *Manager) runSingleBenchmark(
 	sessionID := "bg-benchmark-" + hashTypeStr
 
 	jobParams := hashcat.Params{
-		AttackMode:     hashcat.AttackBenchmarkSingle,
-		HashType:       hashType,
-		BackendDevices: m.DeviceConfig.ResolvedBackendDevices(),
-		OpenCLDevices:  m.DeviceConfig.ResolvedOpenCLDevices(),
+		AttackMode:             hashcat.AttackBenchmarkSingle,
+		HashType:               hashType,
+		BackendDevices:         m.DeviceConfig.ResolvedBackendDevices(),
+		OpenCLDevices:          m.DeviceConfig.ResolvedOpenCLDevices(),
+		OutPath:                agentstate.State.OutPath,
+		ZapsPath:               agentstate.State.ZapsPath,
+		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, sessionID, jobParams)
@@ -736,6 +742,9 @@ func (m *Manager) runBenchmarks(ctx context.Context) ([]display.BenchmarkResult,
 		BackendDevices:            m.DeviceConfig.ResolvedBackendDevices(),
 		OpenCLDevices:             m.DeviceConfig.ResolvedOpenCLDevices(),
 		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
+		OutPath:                   agentstate.State.OutPath,
+		ZapsPath:                  agentstate.State.ZapsPath,
+		RetainZapsOnCompletion:    agentstate.State.RetainZapsOnCompletion,
 	}
 
 	sess, err := hashcat.NewHashcatSession(ctx, "benchmark", jobParams)

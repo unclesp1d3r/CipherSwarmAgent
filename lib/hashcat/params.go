@@ -12,8 +12,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
 const (
@@ -75,6 +73,15 @@ type Params struct {
 	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL device types (pre-resolved by DeviceConfig)
 	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Enable all hash types in benchmark mode
 	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to restore file for session resumption
+
+	// Runtime configuration injected by the agent at session construction. These are
+	// NOT part of the server API contract (json:"-"); they replace direct agentstate
+	// reads in lib/hashcat so sessions are constructable and testable in isolation.
+	OutPath                string `json:"-"` // Directory for the output file and charset temp files
+	ZapsPath               string `json:"-"` // Directory for zaps (--outfile-check-dir); also cleaned up
+	FilePath               string `json:"-"` // Base directory for wordlist/rule/mask files
+	StatusTimer            int    `json:"-"` // Status/outfile-check timer in seconds
+	RetainZapsOnCompletion bool   `json:"-"` // Whether Cleanup keeps the zaps directory
 }
 
 // Validate verifies that the Params configuration is valid for the specified attack mode.
@@ -222,10 +229,10 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		"--outfile", outFile,
 		"--status",
 		"--status-json",
-		"--status-timer", strconv.FormatInt(int64(agentstate.State.StatusTimer), 10),
+		"--status-timer", strconv.FormatInt(int64(params.StatusTimer), 10),
 		"--potfile-disable",
-		"--outfile-check-timer", strconv.FormatInt(int64(agentstate.State.StatusTimer), 10),
-		"--outfile-check-dir", agentstate.State.ZapsPath,
+		"--outfile-check-timer", strconv.FormatInt(int64(params.StatusTimer), 10),
+		"--outfile-check-dir", params.ZapsPath,
 		"-a", strconv.FormatInt(params.AttackMode, 10),
 		"-m", strconv.FormatInt(params.HashType, 10),
 	)
@@ -253,7 +260,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.WordListFilename) != "" {
-		wordList, err := safePath(agentstate.State.FilePath, params.WordListFilename)
+		wordList, err := safePath(params.FilePath, params.WordListFilename)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrWordlistNotOpened, err)
 		}
@@ -266,7 +273,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.RuleListFilename) != "" {
-		ruleList, err := safePath(agentstate.State.FilePath, params.RuleListFilename)
+		ruleList, err := safePath(params.FilePath, params.RuleListFilename)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrRuleListNotOpened, err)
 		}
@@ -279,7 +286,7 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.MaskListFilename) != "" {
-		maskList, err := safePath(agentstate.State.FilePath, params.MaskListFilename)
+		maskList, err := safePath(params.FilePath, params.MaskListFilename)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrMaskListNotOpened, err)
 		}

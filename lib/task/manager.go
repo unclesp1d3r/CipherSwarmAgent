@@ -227,6 +227,11 @@ func (m *Manager) createJobParams(task *api.Task, attack *api.Attack) hashcat.Pa
 			agentstate.State.RestoreFilePath,
 			strconv.FormatInt(attack.Id, 10)+".restore",
 		),
+		OutPath:                agentstate.State.OutPath,
+		ZapsPath:               agentstate.State.ZapsPath,
+		FilePath:               agentstate.State.FilePath,
+		StatusTimer:            agentstate.State.StatusTimer,
+		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
 	}
 }
 

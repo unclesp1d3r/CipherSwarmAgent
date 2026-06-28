@@ -41,6 +41,17 @@ func setupTestState(t *testing.T) func() {
 	}
 }
 
+// withInjectedTestPaths copies the runtime path/config fields from agentstate
+// (configured by setupTestState) into params, mirroring how production managers
+// populate them now that toCmdArgs reads them from Params instead of agentstate.
+func withInjectedTestPaths(p Params) Params {
+	p.FilePath = agentstate.State.FilePath
+	p.ZapsPath = agentstate.State.ZapsPath
+	p.OutPath = agentstate.State.OutPath
+	p.StatusTimer = agentstate.State.StatusTimer
+	return p
+}
+
 // createTestFile creates a temporary file for testing.
 func createTestFile(t *testing.T, dir, name, content string) string {
 	t.Helper()
@@ -406,7 +417,7 @@ func TestParams_ToCmdArgs_Benchmark(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, err := tt.params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+			args, err := withInjectedTestPaths(tt.params).toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectArgs, args)
@@ -461,7 +472,7 @@ func TestParams_ToCmdArgs_HashInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, err := tt.params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+			args, err := withInjectedTestPaths(tt.params).toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectArgs, args)
@@ -525,7 +536,7 @@ func TestParams_ToCmdArgs_BenchmarkSingle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, err := tt.params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+			args, err := withInjectedTestPaths(tt.params).toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectArgs, args)
@@ -547,7 +558,7 @@ func TestParams_ToCmdArgs_Dictionary(t *testing.T) {
 		WordListFilename: "wordlist.txt",
 	}
 
-	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	args, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "--quiet")
@@ -575,7 +586,7 @@ func TestParams_ToCmdArgs_DictionaryWithRules(t *testing.T) {
 		RuleListFilename: "rules.rule",
 	}
 
-	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	args, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-r")
@@ -591,7 +602,7 @@ func TestParams_ToCmdArgs_MissingWordlist(t *testing.T) {
 		WordListFilename: "nonexistent.txt",
 	}
 
-	_, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	_, err := withInjectedTestPaths(params).toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrWordlistNotOpened)
 }
@@ -610,7 +621,7 @@ func TestParams_ToCmdArgs_MissingRulelist(t *testing.T) {
 		RuleListFilename: "nonexistent.rule",
 	}
 
-	_, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	_, err := withInjectedTestPaths(params).toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrRuleListNotOpened)
 }
@@ -625,7 +636,7 @@ func TestParams_ToCmdArgs_MissingMasklist(t *testing.T) {
 		MaskListFilename: "nonexistent.hcmask",
 	}
 
-	_, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	_, err := withInjectedTestPaths(params).toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrMaskListNotOpened)
 }
@@ -684,7 +695,7 @@ func TestParams_ToCmdArgs_HashFileValidation(t *testing.T) {
 				WordListFilename: "wordlist.txt",
 			}
 
-			_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+			_, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 			if tt.expectError == nil {
 				require.NoError(t, err)
@@ -717,7 +728,7 @@ func TestParams_ToCmdArgs_OptionalFlags(t *testing.T) {
 		AdditionalArgs:   []string{"--force"},
 	}
 
-	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	args, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-O")
@@ -763,7 +774,7 @@ func TestParams_ToCmdArgs_MaskAttack(t *testing.T) {
 		Mask:       "?a?a?a?a",
 	}
 
-	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	args, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-a")
@@ -785,7 +796,7 @@ func TestParams_ToCmdArgs_MaskListAttack(t *testing.T) {
 		MaskListFilename: "masks.hcmask",
 	}
 
-	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	args, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	// Mask should be set to the mask list path
@@ -807,7 +818,7 @@ func TestParams_ToCmdArgs_HybridDMAttack(t *testing.T) {
 		Mask:             "?d?d?d",
 	}
 
-	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	args, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-a")
@@ -830,7 +841,7 @@ func TestParams_ToCmdArgs_HybridMDAttack(t *testing.T) {
 		Mask:             "?d?d?d",
 	}
 
-	args, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	args, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	require.NoError(t, err)
 	assert.Contains(t, args, "-a")
@@ -842,7 +853,7 @@ func TestParams_ToCmdArgs_ValidationFails(t *testing.T) {
 		AttackMode: 99, // Invalid
 	}
 
-	_, err := params.toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
+	_, err := withInjectedTestPaths(params).toCmdArgs("test-session", "/tmp/hashes.txt", "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrUnsupportedAttackMode)
 }
@@ -860,7 +871,7 @@ func TestParams_ToCmdArgs_MaskArgsError(t *testing.T) {
 		MaskCustomCharsets: []string{"a", "b", "c", "d", "e"}, // Too many
 	}
 
-	_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	_, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrTooManyCustomCharsets)
 }
@@ -881,7 +892,7 @@ func TestParams_ToCmdArgs_HashFileWhitespaceOnly(t *testing.T) {
 		WordListFilename: "wordlist.txt",
 	}
 
-	_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	_, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrHashFileWhitespaceOnly)
 }
@@ -913,7 +924,7 @@ func TestParams_ToCmdArgs_HashFileUnreadable(t *testing.T) {
 		WordListFilename: "wordlist.txt",
 	}
 
-	_, err := params.toCmdArgs("test-session", hashFile, "/tmp/out.txt")
+	_, err := withInjectedTestPaths(params).toCmdArgs("test-session", hashFile, "/tmp/out.txt")
 
 	assert.ErrorIs(t, err, ErrHashFileNotReadable)
 }

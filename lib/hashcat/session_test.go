@@ -250,14 +250,12 @@ func TestCleanup_DoubleCallWithDescriptorsIdempotent(t *testing.T) {
 // TestCreateCharsetFiles_DoesNotMutateInput verifies that createCharsetFiles returns
 // resolved temp paths without mutating the caller's slice, and writes the charset content.
 func TestCreateCharsetFiles_DoesNotMutateInput(t *testing.T) {
-	savedOutPath := agentstate.State.OutPath
-	agentstate.State.OutPath = t.TempDir()
-	t.Cleanup(func() { agentstate.State.OutPath = savedOutPath })
+	outPath := t.TempDir()
 
 	input := []string{"abc", "", "xyz"}
 	original := append([]string(nil), input...)
 
-	files, resolved, err := createCharsetFiles(input)
+	files, resolved, err := createCharsetFiles(outPath, input)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		for _, f := range files {
