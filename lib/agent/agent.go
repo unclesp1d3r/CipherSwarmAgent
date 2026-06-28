@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
@@ -63,28 +62,36 @@ var (
 //nolint:gochecknoglobals // Synchronized background-benchmark lifecycle handle
 var bgBench atomic.Pointer[bgBenchHandle]
 
-// StartAgent initializes and starts the CipherSwarm agent.
-func StartAgent() {
-	// Ensure API URL and token are set
-	if viper.GetString("api_url") == "" {
-		agentstate.Logger.Fatal("API URL not set")
+// ErrAPIURLNotSet indicates the api_url configuration value is empty.
+var ErrAPIURLNotSet = errors.New("API URL not set")
+
+// ErrAPITokenNotSet indicates the api_token configuration value is empty.
+var ErrAPITokenNotSet = errors.New("API token not set")
+
+// validateAPICredentials checks that the API URL and token are present in shared
+// state. It is read AFTER SetupSharedState (not via an early viper.GetString) so the
+// values reflect the fully-loaded configuration. Returned as an error rather than a
+// fatal call so the check is testable without exiting the process.
+func validateAPICredentials() error {
+	if agentstate.State.URL == "" {
+		return ErrAPIURLNotSet
 	}
 
-	if viper.GetString("api_token") == "" {
-		agentstate.Logger.Fatal("API token not set")
+	if agentstate.State.APIToken == "" {
+		return ErrAPITokenNotSet
 	}
 
-	// Initialize shared state and logger
-	config.SetupSharedState()
-	initLogger()
+	return nil
+}
 
-	// Create a shared circuit breaker that survives client rebuilds
+// setupAPIClient builds the shared circuit breaker and API client transport chain
+// and stores the client in shared state. Fatal on construction failure.
+func setupAPIClient() {
 	circuitBreaker = api.NewCircuitBreaker(
 		agentstate.State.CircuitBreakerFailureThreshold,
 		agentstate.State.CircuitBreakerTimeout,
 	)
 
-	// Initialize API client with transport chain (timeouts, retry, circuit breaker)
 	apiClient, err := api.NewAgentClient(
 		agentstate.State.URL,
 		agentstate.State.APIToken,
@@ -94,15 +101,16 @@ func StartAgent() {
 		agentstate.Logger.Fatal("Failed to initialize API client", "error", err)
 	}
 	agentstate.State.SetAPIClient(apiClient)
+}
 
-	display.Startup()
-
-	// Check for an existing lock file to prevent multiple instances
+// prepareWorkspace guards against a second instance, creates data directories and
+// the lock file, and clears orphaned hashcat session files from previous runs.
+// The caller is responsible for deferring cleanupLockFile.
+func prepareWorkspace() {
 	if cracker.CheckForExistingClient(agentstate.State.PidFile) {
 		agentstate.Logger.Fatal("Aborting agent start, lock file found", "path", agentstate.State.PidFile)
 	}
 
-	// Create necessary data directories and lock file
 	if err := cracker.CreateDataDirs(); err != nil {
 		agentstate.Logger.Fatal("Error creating data directories", "error", err)
 	}
@@ -111,9 +119,6 @@ func StartAgent() {
 		agentstate.Logger.Fatal("Error creating lock file", "error", err)
 	}
 
-	defer cleanupLockFile(agentstate.State.PidFile)
-
-	// Clean up orphaned session files from previous agent runs.
 	// On POSIX, the session directory is resolved from $HOME, not the binary path,
 	// so cleanup works even when hashcat is not yet installed.
 	binaryPath, binaryErr := cracker.FindHashcatBinary()
@@ -121,33 +126,12 @@ func StartAgent() {
 		agentstate.Logger.Debug("hashcat binary not found, using empty path for session cleanup", "error", binaryErr)
 	}
 	hashcat.CleanupOrphanedSessionFiles(binaryPath)
+}
 
-	// Create context that cancels on OS signal (SIGINT, SIGTERM)
-	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Wrap with a manual cancel so heartbeat StateError can trigger shutdown
-	ctx, cancel := context.WithCancel(signalCtx)
-	defer cancel()
-
-	// Authenticate with the CipherSwarm API
-	if err := lib.AuthenticateAgent(ctx); err != nil {
-		agentstate.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
-	}
-
-	display.Authenticated()
-
-	// Fetch agent configuration, rebuild client with server-recommended settings, update metadata
-	if err := fetchAgentConfig(ctx); err != nil {
-		agentstate.Logger.Fatal("Failed to fetch agent configuration", "error", err)
-	}
-
-	if err := rebuildAPIClient(); err != nil {
-		agentstate.Logger.Fatal("Failed to rebuild API client with server settings", "error", err)
-	}
-
-	// Enumerate compute devices via hashcat -I before sending metadata.
-	// Warn-only on failure so the agent can still start (e.g., first-run before hashcat download).
+// setupDevicesAndMetadata enumerates compute devices and pushes agent metadata to
+// the server. Device enumeration is warn-only (first run may precede hashcat
+// install); metadata failure is fatal.
+func setupDevicesAndMetadata(ctx context.Context) {
 	deviceMgr = &devices.DeviceManager{}
 	if dmErr := deviceMgr.EnumerateDevices(ctx, agentstate.State.HashcatPath); dmErr != nil {
 		agentstate.Logger.Warn("Device enumeration failed, metadata will report no devices", "error", dmErr)
@@ -155,75 +139,115 @@ func StartAgent() {
 	}
 	lib.SetDevicesListManager(deviceMgr)
 
-	err = lib.UpdateAgentMetadata(ctx)
-	if err != nil {
+	if err := lib.UpdateAgentMetadata(ctx); err != nil {
 		agentstate.Logger.Fatal("Failed to update agent metadata", "error", err)
 	}
 
 	agentstate.Logger.Info("Sent agent metadata to the CipherSwarm API")
+}
 
-	// Start heartbeat loop early so UI can see agent is connected
-	go startHeartbeatLoop(ctx, cancel)
-
-	// Initialize managers (device config, path config, sub-clients).
-	benchmarksNeeded := initManagers()
-
-	// Run benchmarks when the server requests them OR when the user explicitly
-	// passed --force-benchmark. Without this check the CLI flag is silently
-	// ignored whenever the server reports valid benchmarks on file.
+// runBenchmarkPhase submits benchmarks at startup. When benchmarks are needed (or
+// forced) it runs either quick capability detection (deferred mode) or a full
+// benchmark; otherwise it marks benchmarks submitted from the server's valid cache.
+func runBenchmarkPhase(ctx context.Context, benchmarksNeeded bool) {
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	forceBenchmark := agentstate.State.GetForceBenchmarkRun()
-	if benchmarksNeeded || forceBenchmark {
-		if forceBenchmark && !benchmarksNeeded {
-			agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
-		}
 
-		if agentstate.State.DeferBenchmarks && !forceBenchmark {
-			// Deferred path: run quick capability detection instead of full benchmarks
-			agentstate.Logger.Info("Deferred benchmarks enabled: running quick capability detection")
-
-			capResults, capErr := benchmarkMgr.RunCapabilityDetection(ctx)
-			if capErr != nil {
-				agentstate.Logger.Fatal("Capability detection failed", "error", capErr)
-			}
-
-			if len(capResults) == 0 {
-				agentstate.Logger.Fatal("Capability detection returned no hash types; " +
-					"check GPU drivers and hashcat installation")
-			}
-
-			if submitErr := benchmarkMgr.SubmitCapabilityResults(ctx, capResults); submitErr != nil {
-				agentstate.Logger.Fatal("Failed to submit capability detection results", "error", submitErr)
-			}
-		} else {
-			// Full benchmark path
-			if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
-				agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
-			}
-		}
-	} else {
+	if !benchmarksNeeded && !forceBenchmark {
 		agentstate.Logger.Info("Server reports valid benchmarks on file, skipping benchmark run")
 		agentstate.State.SetBenchmarksSubmitted(true)
+
+		return
 	}
+
+	if forceBenchmark && !benchmarksNeeded {
+		agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
+	}
+
+	if agentstate.State.DeferBenchmarks && !forceBenchmark {
+		// Deferred path: run quick capability detection instead of full benchmarks.
+		agentstate.Logger.Info("Deferred benchmarks enabled: running quick capability detection")
+
+		capResults, capErr := benchmarkMgr.RunCapabilityDetection(ctx)
+		if capErr != nil {
+			agentstate.Logger.Fatal("Capability detection failed", "error", capErr)
+		}
+
+		if len(capResults) == 0 {
+			agentstate.Logger.Fatal("Capability detection returned no hash types; " +
+				"check GPU drivers and hashcat installation")
+		}
+
+		if submitErr := benchmarkMgr.SubmitCapabilityResults(ctx, capResults); submitErr != nil {
+			agentstate.Logger.Fatal("Failed to submit capability detection results", "error", submitErr)
+		}
+
+		return
+	}
+
+	// Full benchmark path.
+	if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
+		agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
+	}
+}
+
+// StartAgent initializes and starts the CipherSwarm agent.
+func StartAgent() {
+	config.SetupSharedState()
+	initLogger()
+
+	// R24: validate credentials from shared state (was an early viper.GetString read).
+	if err := validateAPICredentials(); err != nil {
+		agentstate.Logger.Fatal("Missing required API configuration", "error", err)
+	}
+
+	setupAPIClient()
+	display.Startup()
+
+	prepareWorkspace()
+	defer cleanupLockFile(agentstate.State.PidFile)
+
+	// Context that cancels on OS signal; manual cancel lets heartbeat StateError shut down.
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ctx, cancel := context.WithCancel(signalCtx)
+	defer cancel()
+
+	if err := lib.AuthenticateAgent(ctx); err != nil {
+		agentstate.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
+	}
+	display.Authenticated()
+
+	if err := fetchAgentConfig(ctx); err != nil {
+		agentstate.Logger.Fatal("Failed to fetch agent configuration", "error", err)
+	}
+	if err := rebuildAPIClient(); err != nil {
+		agentstate.Logger.Fatal("Failed to rebuild API client with server settings", "error", err)
+	}
+
+	setupDevicesAndMetadata(ctx)
+
+	// Start heartbeat loop early so the UI can see the agent is connected.
+	go startHeartbeatLoop(ctx, cancel)
+
+	benchmarksNeeded := initManagers()
+	runBenchmarkPhase(ctx, benchmarksNeeded)
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 
-	// Kill any dangling hashcat processes
 	if cracker.CheckForExistingClient(agentstate.State.HashcatPidFile) {
 		agentstate.Logger.Info("Killed dangling hashcat process")
 	}
 
-	// Launch background benchmarking BEFORE the agent loop so the bgBench handle is
-	// stored (atomically) before the loop goroutine can read it on reload/new-task.
+	// Launch background benchmarking BEFORE the loop so the bgBench handle is stored
+	// (atomically) before the loop goroutine can read it on reload/new-task.
 	startBackgroundBenchmarks(ctx)
-
-	// Start agent loop (heartbeat loop already started above)
 	go startAgentLoop(ctx)
 
-	// Wait for context cancellation (OS signal or heartbeat StateError)
+	// Wait for context cancellation (OS signal or heartbeat StateError), then shut down.
 	<-ctx.Done()
 	agentstate.Logger.Debug("Agent context cancelled, shutting down")
-	// Use context.Background() for shutdown messages — must complete even after cancellation
+	// Use context.Background() for shutdown messages — must complete even after cancellation.
 	cserrors.SendAgentError(context.Background(), "Received signal to terminate. Shutting down", nil, api.SeverityInfo)
 	lib.SendAgentShutdown(context.Background())
 	display.ShuttingDown()

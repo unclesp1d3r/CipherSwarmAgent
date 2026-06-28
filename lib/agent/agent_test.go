@@ -460,6 +460,42 @@ func TestCalculateHeartbeatBackoff_NoOverflowAtBoundary(t *testing.T) {
 	}
 }
 
+// TestValidateAPICredentials verifies the credential check reads shared state
+// (populated by SetupSharedState) and reports the right error per missing field.
+func TestValidateAPICredentials(t *testing.T) {
+	savedURL := agentstate.State.URL
+	savedToken := agentstate.State.APIToken
+	t.Cleanup(func() {
+		agentstate.State.URL = savedURL
+		agentstate.State.APIToken = savedToken
+	})
+
+	tests := []struct {
+		name    string
+		url     string
+		token   string
+		wantErr error
+	}{
+		{name: "both present", url: "https://api", token: "tok", wantErr: nil},
+		{name: "missing url", url: "", token: "tok", wantErr: ErrAPIURLNotSet},
+		{name: "missing token", url: "https://api", token: "", wantErr: ErrAPITokenNotSet},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agentstate.State.URL = tt.url
+			agentstate.State.APIToken = tt.token
+
+			err := validateAPICredentials()
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestStopBackgroundBenchmarks_NoHandle verifies stopping when nothing is running
 // is a safe no-op that permits a restart.
 func TestStopBackgroundBenchmarks_NoHandle(t *testing.T) {
