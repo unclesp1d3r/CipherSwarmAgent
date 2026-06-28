@@ -381,7 +381,10 @@ func resolveOptionalPath(base, filename string, sentinel error) (string, error) 
 		return "", fmt.Errorf("%w: %w", sentinel, err)
 	}
 
-	if _, err := os.Stat(resolved); os.IsNotExist(err) {
+	// Any stat failure (not just not-exist — e.g. permission denied) returns the
+	// sentinel so the caller sees a clear validation error instead of hashcat
+	// failing later on an unusable path.
+	if _, err := os.Stat(resolved); err != nil {
 		return "", fmt.Errorf("%w: %s", sentinel, resolved)
 	}
 

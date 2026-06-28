@@ -139,7 +139,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `spf13/viper` for config. Treat `viper.WriteConfig()` failures as non-fatal warnings.
 - **Config access:** Read from `agentstate.State` (wired in `SetupSharedState()`), not `viper.Get*()` directly.
 - Validate numeric/duration config fields in `SetupSharedState()` — clamp invalid values to defaults with a warning.
-- **Server-recommended config validation:** `applyRecommendedSettings` in `lib/agentClient.go` uses `config.ClampDuration`/`config.ClampInt` to cap server values. Never trust server-recommended values without clamping — treat them as external input.
+- **Server-recommended config validation:** `applyRecommendedSettings` in `lib/agent/client.go` uses `config.ClampDuration`/`config.ClampInt` to cap server values. Never trust server-recommended values without clamping — treat them as external input.
 
 ### Tooling
 

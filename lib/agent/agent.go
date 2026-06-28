@@ -42,10 +42,11 @@ type bgBenchHandle struct {
 	done   chan struct{}
 }
 
-// Package-level managers — written once in StartAgent, then accessed exclusively
-// from the agent-loop goroutine (startAgentLoop + handleReload). The single-goroutine
-// invariant means no mutex is required, but these must NOT be accessed from the
-// heartbeat goroutine or any other concurrent goroutine.
+// Package-level managers — initialized by initManagers() in StartAgent and rebuilt
+// on each handleReload. They are written and read from a single goroutine at a time
+// (StartAgent before the loop launches, then the agent-loop goroutine), so no mutex
+// is required, but they must NOT be accessed from the heartbeat goroutine or any
+// other concurrent goroutine.
 //
 //nolint:gochecknoglobals // Package-level managers, initialized in StartAgent
 var (

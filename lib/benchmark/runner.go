@@ -1,7 +1,7 @@
-// runner.go contains the hashcat session-execution functions for the benchmark
-// package: RunCapabilityDetection, runSingleBenchmark, collectSingleBenchmarkOutput,
-// runBenchmarks, runBenchmarkTask, processBenchmarkOutput, finalizeBenchmarkSession,
-// submitBatchIfReady, and the killAndDrain helper.
+// runner.go holds the hashcat session-execution half of the benchmark package
+// (capability detection and benchmark runs), split out of manager.go to keep both
+// files under the size ceiling; manager.go retains the public API, cache, and
+// submission logic.
 
 package benchmark
 
