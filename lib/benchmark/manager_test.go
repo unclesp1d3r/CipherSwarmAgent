@@ -1148,3 +1148,16 @@ func TestSubmitBatchIfReady_BelowBoundary(t *testing.T) {
 	assert.Equal(t, 0, newIdx, "should not have submitted below batch size")
 	assert.False(t, allSubmitted(results))
 }
+
+// TestKillAndDrain_NoDeadlock verifies that killAndDrain returns within the
+// flush grace period even when the session has no backing process (mock
+// session, proc=nil). DoneChan is never signaled so the timer branch fires.
+func TestKillAndDrain_NoDeadlock(t *testing.T) {
+	cleanupState := testhelpers.SetupMinimalTestState(789)
+	t.Cleanup(cleanupState)
+
+	sess := hashcat.NewTestSession(true)
+	// Must return within processFlushTimeout (100ms) + test overhead.
+	// Any deadlock here is a regression in the helper.
+	killAndDrain(sess, "test kill message")
+}

@@ -28,6 +28,23 @@ const processFlushTimeout = 100 * time.Millisecond // processFlushTimeout is the
 
 var errBadResponse = errors.New("bad response from server")
 
+// killAndDrain kills a hashcat session and waits briefly for the process to
+// flush remaining stdout before returning. Kill errors are logged at Error
+// level with logMsg. Cleanup must be called by the caller after any
+// site-specific work that must run before cleanup.
+func killAndDrain(sess *hashcat.Session, logMsg string) {
+	if err := sess.Kill(); err != nil {
+		agentstate.Logger.Error(logMsg, "error", err)
+	}
+
+	flushTimer := time.NewTimer(processFlushTimeout)
+	select {
+	case <-sess.DoneChan:
+	case <-flushTimer.C:
+	}
+	flushTimer.Stop()
+}
+
 // Manager handles benchmark operations including running benchmarks,
 // submitting results, and managing the benchmark cache.
 type Manager struct {
@@ -210,17 +227,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]Result, error) 
 			case <-ctx.Done():
 				agentstate.Logger.Warn("Context cancelled during capability detection, killing session")
 
-				if killErr := sess.Kill(); killErr != nil {
-					agentstate.Logger.Error("Failed to kill capability detection session", "error", killErr)
-				}
-
-				flushTimer := time.NewTimer(processFlushTimeout)
-				select {
-				case <-sess.DoneChan:
-				case <-flushTimer.C:
-				}
-				flushTimer.Stop()
-
+				killAndDrain(sess, "Failed to kill capability detection session")
 				sess.Cleanup()
 
 				return
@@ -419,18 +426,7 @@ func (m *Manager) collectSingleBenchmarkOutput(
 		select {
 		case <-ctx.Done():
 			agentstate.Logger.Warn("Context cancelled during background benchmark, killing session")
-			if killErr := sess.Kill(); killErr != nil {
-				agentstate.Logger.Error("Failed to kill background benchmark session",
-					"error", killErr)
-			}
-
-			flushTimer := time.NewTimer(processFlushTimeout)
-			select {
-			case <-sess.DoneChan:
-			case <-flushTimer.C:
-			}
-			flushTimer.Stop()
-
+			killAndDrain(sess, "Failed to kill background benchmark session")
 			sess.Cleanup()
 			return nil
 
@@ -881,18 +877,9 @@ func (m *Manager) processBenchmarkOutput(ctx context.Context, sess *hashcat.Sess
 			case <-ctx.Done():
 				agentstate.Logger.Warn("Context cancelled during benchmark, killing session")
 
-				if err := sess.Kill(); err != nil {
-					agentstate.Logger.Error("Failed to kill benchmark session on cancellation", "error", err)
-				}
-
 				// Wait briefly for the process to exit and flush remaining stdout.
 				// In tests with mock sessions (no process), this always hits the timeout.
-				flushTimer := time.NewTimer(processFlushTimeout)
-				select {
-				case <-sess.DoneChan:
-				case <-flushTimer.C:
-				}
-				flushTimer.Stop()
+				killAndDrain(sess, "Failed to kill benchmark session on cancellation")
 
 				// Best-effort drain: may miss lines still in flight between the
 				// OS pipe buffer and the channel.
