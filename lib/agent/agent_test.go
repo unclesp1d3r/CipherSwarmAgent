@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -457,6 +458,68 @@ func TestCalculateHeartbeatBackoff_NoOverflowAtBoundary(t *testing.T) {
 		}
 		prev = result
 	}
+}
+
+// TestStopBackgroundBenchmarks_NoHandle verifies stopping when nothing is running
+// is a safe no-op that permits a restart.
+func TestStopBackgroundBenchmarks_NoHandle(t *testing.T) {
+	bgBench.Store(nil)
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	assert.True(t, stopBackgroundBenchmarks(), "no running benchmark should permit restart")
+}
+
+// TestStopBackgroundBenchmarks_CleanStop verifies that when the goroutine signals
+// done promptly, stop cancels it and permits a restart.
+func TestStopBackgroundBenchmarks_CleanStop(t *testing.T) {
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	cancelCalled := false
+	done := make(chan struct{})
+	close(done) // goroutine already finished
+	bgBench.Store(&bgBenchHandle{cancel: func() { cancelCalled = true }, done: done})
+
+	assert.True(t, stopBackgroundBenchmarks(), "clean stop should permit restart")
+	assert.True(t, cancelCalled, "stop must cancel the benchmark goroutine")
+	assert.Nil(t, bgBench.Load(), "handle should be cleared after stop")
+}
+
+// TestStopBackgroundBenchmarks_TimeoutSkipsRestart verifies that when the old
+// goroutine does not signal done within the bound, stop returns false so the
+// caller skips the restart (avoiding overlapping GPU work).
+func TestStopBackgroundBenchmarks_TimeoutSkipsRestart(t *testing.T) {
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	cancelCalled := false
+	done := make(chan struct{}) // never closed → forces the timeout path
+	bgBench.Store(&bgBenchHandle{cancel: func() { cancelCalled = true }, done: done})
+
+	assert.False(t, stopBackgroundBenchmarks(), "timeout must signal the caller to skip restart")
+	assert.True(t, cancelCalled, "stop must still cancel the benchmark goroutine")
+}
+
+// TestBgBenchHandle_ConcurrentStoreSwap exercises the atomic handle under
+// concurrent store/swap to confirm it is race-clean (run with -race).
+func TestBgBenchHandle_ConcurrentStoreSwap(t *testing.T) {
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			done := make(chan struct{})
+			close(done)
+			bgBench.Store(&bgBenchHandle{cancel: func() {}, done: done})
+		}()
+		go func() {
+			defer wg.Done()
+			if h := bgBench.Swap(nil); h != nil {
+				h.cancel()
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 // TestCleanupLockFile_NonexistentFile verifies that cleaning up a nonexistent

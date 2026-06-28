@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -28,7 +29,20 @@ import (
 
 const (
 	maxBenchmarkRetries = 10 // Stop retrying cached benchmark submission after this many failures
+	// bgBenchStopTimeout bounds how long a reload/new-task waits for the previous
+	// background-benchmark goroutine to exit (its hashcat proc.Wait() teardown)
+	// before giving up. On expiry the restart is skipped to avoid two benchmark
+	// processes contending for the GPU.
+	bgBenchStopTimeout = 600 * time.Millisecond
 )
+
+// bgBenchHandle bundles a background-benchmark goroutine's cancel func with a
+// done channel that is closed when the goroutine returns. Stored atomically so
+// StartAgent (main goroutine) and the agent loop can coordinate without a race.
+type bgBenchHandle struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+}
 
 // Package-level managers — written once in StartAgent, then accessed exclusively
 // from the agent-loop goroutine (startAgentLoop + handleReload). The single-goroutine
@@ -37,11 +51,17 @@ const (
 //
 //nolint:gochecknoglobals // Package-level managers, initialized in StartAgent
 var (
-	benchmarkMgr  *benchmark.Manager
-	taskMgr       *task.Manager
-	deviceMgr     *devices.DeviceManager
-	bgBenchCancel context.CancelFunc
+	benchmarkMgr *benchmark.Manager
+	taskMgr      *task.Manager
+	deviceMgr    *devices.DeviceManager
 )
+
+// bgBench holds the current background-benchmark goroutine handle. Unlike the
+// managers above it is written from StartAgent before the loop starts and
+// swapped from the loop goroutine, so it is synchronized with atomic.Pointer.
+//
+//nolint:gochecknoglobals // Synchronized background-benchmark lifecycle handle
+var bgBench atomic.Pointer[bgBenchHandle]
 
 // StartAgent initializes and starts the CipherSwarm agent.
 func StartAgent() {
@@ -213,15 +233,12 @@ func StartAgent() {
 		agentstate.Logger.Info("Killed dangling hashcat process")
 	}
 
+	// Launch background benchmarking BEFORE the agent loop so the bgBench handle is
+	// stored (atomically) before the loop goroutine can read it on reload/new-task.
+	startBackgroundBenchmarks(ctx)
+
 	// Start agent loop (heartbeat loop already started above)
 	go startAgentLoop(ctx)
-
-	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
-		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called in handleReload
-		bgCtx, bgCancel := context.WithCancel(ctx)
-		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
-	}
 
 	// Wait for context cancellation (OS signal or heartbeat StateError)
 	<-ctx.Done()
@@ -248,6 +265,51 @@ func cleanupLockFile(pidFile string) {
 // does not read agentstate directly for activity.
 func agentIsIdle() bool {
 	return agentstate.State.GetCurrentActivity() == agentstate.CurrentActivityWaiting
+}
+
+// startBackgroundBenchmarks launches the background-benchmark goroutine when
+// deferred idle benchmarking is enabled, recording a handle (cancel + done) so a
+// later reload or new task can stop it deterministically. No-op when disabled.
+func startBackgroundBenchmarks(ctx context.Context) {
+	if !agentstate.State.DeferBenchmarks || !agentstate.State.BenchmarkWhileIdle {
+		return
+	}
+
+	//nolint:gosec // G118 - cancel stored in bgBench handle, invoked by stopBackgroundBenchmarks
+	bgCtx, bgCancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	bgBench.Store(&bgBenchHandle{cancel: bgCancel, done: done})
+
+	go func() {
+		defer close(done)
+		benchmarkMgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
+	}()
+}
+
+// stopBackgroundBenchmarks cancels the running background-benchmark goroutine (if
+// any) and waits, bounded by bgBenchStopTimeout, for it to exit. It returns true
+// when it is safe to start a new background benchmark. On timeout it returns false
+// so the caller skips the restart — the old goroutine may still hold a live hashcat
+// process, and overlapping two would contend for the GPU.
+func stopBackgroundBenchmarks() bool {
+	handle := bgBench.Swap(nil)
+	if handle == nil {
+		return true
+	}
+
+	handle.cancel()
+
+	timer := time.NewTimer(bgBenchStopTimeout)
+	defer timer.Stop()
+
+	select {
+	case <-handle.done:
+		return true
+	case <-timer.C:
+		agentstate.Logger.Warn(
+			"Background benchmark did not stop within timeout; skipping restart to avoid GPU overlap")
+		return false
+	}
 }
 
 // calculateHeartbeatBackoff computes the exponential backoff duration for heartbeat retries.
@@ -401,10 +463,9 @@ func handleReload(ctx context.Context) {
 	}
 
 	// Cancel any running background benchmark goroutine before replacing the manager.
-	if bgBenchCancel != nil {
-		bgBenchCancel()
-		bgBenchCancel = nil
-	}
+	// canRestartBg is false if the old goroutine did not stop in time, in which case
+	// the restart below is skipped to avoid overlapping GPU work.
+	canRestartBg := stopBackgroundBenchmarks()
 
 	// Re-enumerate devices in case hashcat was upgraded or drivers changed.
 	// Always create a fresh DeviceManager so stale device data is never reused.
@@ -466,12 +527,10 @@ func handleReload(ctx context.Context) {
 		agentstate.State.SetBenchmarksSubmitted(true)
 	}
 
-	// Restart background benchmarking if deferred mode is active and placeholders may remain.
-	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
-		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called on next reload
-		bgCtx, bgCancel := context.WithCancel(ctx)
-		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
+	// Restart background benchmarking if deferred mode is active and the prior
+	// goroutine stopped cleanly (canRestartBg). If it timed out, skip the restart.
+	if canRestartBg {
+		startBackgroundBenchmarks(ctx)
 	}
 
 	agentstate.State.SetReload(false)
@@ -484,10 +543,7 @@ func handleNewTask(ctx context.Context) {
 	}
 
 	// Cancel background benchmarks while a task is running to avoid device contention.
-	if bgBenchCancel != nil {
-		bgBenchCancel()
-		bgBenchCancel = nil
-	}
+	canRestartBg := stopBackgroundBenchmarks()
 
 	newTask, err := taskMgr.GetNewTask(ctx)
 	if err != nil {
@@ -510,12 +566,10 @@ func handleNewTask(ctx context.Context) {
 		processTask(ctx, newTask)
 	}
 
-	// Restart background benchmarks after task completes.
-	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
-		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called on next task/reload
-		bgCtx, bgCancel := context.WithCancel(ctx)
-		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
+	// Restart background benchmarks after the task completes, unless the prior
+	// goroutine did not stop cleanly above.
+	if canRestartBg {
+		startBackgroundBenchmarks(ctx)
 	}
 }
 
