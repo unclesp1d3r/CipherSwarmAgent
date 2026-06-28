@@ -137,7 +137,7 @@ func setupDevicesAndMetadata(ctx context.Context) {
 		agentstate.Logger.Warn("Device enumeration failed, metadata will report no devices", "error", dmErr)
 		deviceMgr = nil
 	}
-	lib.SetDevicesListManager(deviceMgr)
+	lib.SetMetadataProvider(deviceMgr)
 
 	if err := lib.UpdateAgentMetadata(ctx); err != nil {
 		agentstate.Logger.Fatal("Failed to update agent metadata", "error", err)
@@ -513,7 +513,7 @@ func handleReload(ctx context.Context) {
 		)
 		deviceMgr = nil
 	}
-	lib.SetDevicesListManager(deviceMgr)
+	lib.SetMetadataProvider(deviceMgr)
 
 	// Recreate managers with new API client sub-clients and updated configs.
 	benchmarksNeeded := initManagers()

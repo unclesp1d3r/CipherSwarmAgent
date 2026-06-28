@@ -22,19 +22,36 @@ const (
 	defaultAgentUpdateInterval = 300 // Default agent update interval in seconds
 )
 
+// metadataProvider supplies host metadata (hashcat binary path, device list) for
+// agent registration and metadata updates. It replaces the former mutable
+// package-level function-var test stubs with an injectable interface.
+type metadataProvider interface {
+	setNativeHashcatPath(ctx context.Context) error
+	getDevicesList(ctx context.Context) ([]string, error)
+}
+
+// realMetadataProvider is the production metadataProvider. dm may be nil when device
+// enumeration has not run or failed, in which case an empty device list is reported.
+type realMetadataProvider struct {
+	dm *devices.DeviceManager
+}
+
+func (p realMetadataProvider) setNativeHashcatPath(ctx context.Context) error {
+	return setNativeHashcatPath(ctx)
+}
+
+func (p realMetadataProvider) getDevicesList(ctx context.Context) ([]string, error) {
+	return getDevicesList(ctx, p.dm)
+}
+
 var (
 	// configuration stores the agent configuration atomically for safe concurrent access.
 	// Use GetConfiguration() and SetConfiguration() — never access directly.
 	configuration atomic.Value //nolint:gochecknoglobals // Global agent configuration
 
-	// setNativeHashcatPathFn allows stubbing setNativeHashcatPath for testing.
-	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
-	setNativeHashcatPathFn = setNativeHashcatPath //nolint:gochecknoglobals // Used for testing
-	// getDevicesListFn allows stubbing getDevicesList for testing.
-	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
-	getDevicesListFn = func(ctx context.Context) ([]string, error) { //nolint:gochecknoglobals // Used for testing
-		return getDevicesList(ctx, nil)
-	}
+	// metadataProviderImpl is the active metadata provider, injected at startup and
+	// reload via SetMetadataProvider. Tests substitute a double through the same seam.
+	metadataProviderImpl metadataProvider = realMetadataProvider{} //nolint:gochecknoglobals // injected provider
 )
 
 func init() {
@@ -151,7 +168,7 @@ func GetAgentConfiguration(ctx context.Context) error {
 	applyRecommendedSettings(agentConfig)
 
 	if agentConfig.Config.UseNativeHashcat {
-		if err := setNativeHashcatPathFn(ctx); err != nil {
+		if err := metadataProviderImpl.setNativeHashcatPath(ctx); err != nil {
 			return err
 		}
 	} else {
@@ -262,7 +279,7 @@ func UpdateAgentMetadata(ctx context.Context) error {
 
 	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
 
-	deviceNames, err := getDevicesListFn(ctx)
+	deviceNames, err := metadataProviderImpl.getDevicesList(ctx)
 	if err != nil {
 		return cserrors.LogAndSendError(ctx, "Error getting devices", err, api.SeverityCritical, nil)
 	}
@@ -309,12 +326,11 @@ func UpdateAgentMetadata(ctx context.Context) error {
 	return nil
 }
 
-// SetDevicesListManager wires the enumerated DeviceManager into getDevicesListFn.
-// Called by StartAgent and handleReload after device enumeration completes.
-func SetDevicesListManager(dm *devices.DeviceManager) {
-	getDevicesListFn = func(ctx context.Context) ([]string, error) {
-		return getDevicesList(ctx, dm)
-	}
+// SetMetadataProvider wires the enumerated DeviceManager into the metadata provider
+// used by UpdateAgentMetadata. Called by StartAgent and handleReload after device
+// enumeration completes.
+func SetMetadataProvider(dm *devices.DeviceManager) {
+	metadataProviderImpl = realMetadataProvider{dm: dm}
 }
 
 // getDevicesList retrieves a list of device names from the pre-enumerated DeviceManager.

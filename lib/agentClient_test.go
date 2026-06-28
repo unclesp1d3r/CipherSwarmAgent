@@ -17,15 +17,29 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
-// stubGetDevicesList replaces getDevicesListFn with a stub that returns mock devices.
-// Returns a cleanup function to restore the original function.
+// stubMetadataProvider is a test double for metadataProvider with configurable
+// behavior for each method.
+type stubMetadataProvider struct {
+	hashcatPathErr error
+	devices        []string
+	devicesErr     error
+}
+
+func (s stubMetadataProvider) setNativeHashcatPath(context.Context) error {
+	return s.hashcatPathErr
+}
+
+func (s stubMetadataProvider) getDevicesList(context.Context) ([]string, error) {
+	return s.devices, s.devicesErr
+}
+
+// stubGetDevicesList injects a metadata provider returning mock devices.
+// Returns a cleanup function to restore the original provider.
 func stubGetDevicesList() func() {
-	original := getDevicesListFn
-	getDevicesListFn = func(_ context.Context) ([]string, error) {
-		return []string{"CPU", "GPU0"}, nil
-	}
+	original := metadataProviderImpl
+	metadataProviderImpl = stubMetadataProvider{devices: []string{"CPU", "GPU0"}}
 	return func() {
-		getDevicesListFn = original
+		metadataProviderImpl = original
 	}
 }
 
@@ -131,14 +145,12 @@ func TestAuthenticateAgent(t *testing.T) {
 
 // TestGetAgentConfiguration tests the GetAgentConfiguration function.
 func TestGetAgentConfiguration(t *testing.T) {
-	// Stub setNativeHashcatPath to avoid actual file system operations
-	originalFn := setNativeHashcatPathFn
+	// Inject a no-op metadata provider to avoid actual file system operations.
+	originalProvider := metadataProviderImpl
 	t.Cleanup(func() {
-		setNativeHashcatPathFn = originalFn
+		metadataProviderImpl = originalProvider
 	})
-	setNativeHashcatPathFn = func(_ context.Context) error {
-		return nil // No-op for tests
-	}
+	metadataProviderImpl = stubMetadataProvider{}
 
 	tests := []struct {
 		name             string
@@ -287,17 +299,17 @@ func TestUpdateAgentMetadata(t *testing.T) {
 	}
 }
 
-// TestUpdateAgentMetadata_WithDeviceManager verifies that SetDevicesListManager
-// wires a DeviceManager into getDevicesListFn so UpdateAgentMetadata sends the
+// TestUpdateAgentMetadata_WithDeviceManager verifies that SetMetadataProvider
+// wires a DeviceManager into the metadata provider so UpdateAgentMetadata sends the
 // enumerated device names to the API. Uses a real DeviceManager created via
 // devices.NewDeviceManagerForTest to exercise the full integration path.
 func TestUpdateAgentMetadata_WithDeviceManager(t *testing.T) {
 	t.Cleanup(testhelpers.SetupHTTPMock())
 	t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
-	// Save and restore the original getDevicesListFn.
-	original := getDevicesListFn
-	t.Cleanup(func() { getDevicesListFn = original })
+	// Save and restore the original metadata provider.
+	original := metadataProviderImpl
+	t.Cleanup(func() { metadataProviderImpl = original })
 
 	// Create a real DeviceManager populated with test devices.
 	dm := devices.NewDeviceManagerForTest([]devices.Device{
@@ -305,8 +317,8 @@ func TestUpdateAgentMetadata_WithDeviceManager(t *testing.T) {
 		{ID: 2, Name: "Intel Core i9-12900K", Type: "CPU", Backend: "OpenCL"},
 	})
 
-	// Wire the DeviceManager through the real SetDevicesListManager path.
-	SetDevicesListManager(dm)
+	// Wire the DeviceManager through the real SetMetadataProvider path.
+	SetMetadataProvider(dm)
 
 	// Capture the request body sent to the update-agent endpoint.
 	var capturedDevices []string
