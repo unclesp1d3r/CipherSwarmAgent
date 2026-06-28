@@ -282,9 +282,13 @@ func startBackgroundBenchmarks(ctx context.Context) {
 	done := make(chan struct{})
 	bgBench.Store(&bgBenchHandle{cancel: bgCancel, done: done})
 
+	// Capture the manager in the agent-loop goroutine so the background goroutine
+	// does not read the package-level benchmarkMgr (which handleReload reassigns) —
+	// otherwise a reload during a still-running benchmark would race the read.
+	mgr := benchmarkMgr
 	go func() {
 		defer close(done)
-		benchmarkMgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
+		mgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
 	}()
 }
 

@@ -75,6 +75,7 @@ func (m *Manager) RunCapabilityDetection(ctx context.Context) ([]Result, error) 
 	agentstate.Logger.Debug("Starting capability detection session", "cmdline", sess.CmdLine())
 
 	if startErr := sess.Start(); startErr != nil {
+		sess.Cleanup() // release the outfile/charset temp files created by NewHashcatSession
 		return nil, fmt.Errorf("failed to start capability detection session: %w", startErr)
 	}
 
@@ -177,6 +178,7 @@ func (m *Manager) runSingleBenchmark(
 	if startErr := sess.Start(); startErr != nil {
 		agentstate.Logger.Warn("Failed to start background benchmark session",
 			"hash_type", hashTypeStr, "error", startErr)
+		sess.Cleanup() // release the outfile/charset temp files created by NewHashcatSession
 		return nil
 	}
 
@@ -282,6 +284,7 @@ func (m *Manager) runBenchmarkTask(ctx context.Context, sess *hashcat.Session) (
 	err := sess.Start()
 	if err != nil {
 		agentstate.Logger.Error("Failed to start benchmark session", "error", err)
+		sess.Cleanup() // release the outfile/charset temp files created by NewHashcatSession
 
 		return nil, fmt.Errorf("failed to start benchmark session: %w", err)
 	}
