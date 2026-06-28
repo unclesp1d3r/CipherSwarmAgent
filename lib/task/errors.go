@@ -25,15 +25,24 @@ func handleAPIError(ctx context.Context, message string, err error) {
 }
 
 // handleStatusUpdateError handles specific error types during a status update and logs or processes them accordingly.
-func handleStatusUpdateError(ctx context.Context, err error, task *api.Task, sess *hashcat.Session) {
+// On task-not-found (404) or task-gone (410), it cancels taskCtx via taskCancel so the event loop tears the
+// session down through its single Kill+Cleanup path, rather than killing the session inline (which left the
+// loop blocked until the 24h task timer).
+func handleStatusUpdateError(
+	ctx context.Context,
+	err error,
+	task *api.Task,
+	sess *hashcat.Session,
+	taskCancel context.CancelFunc,
+) {
 	// Check for special status codes that require specific handling
 	if apierrors.IsNotFoundError(err) {
-		handleTaskNotFound(ctx, task, sess)
+		handleTaskNotFound(ctx, task, sess, taskCancel)
 		return
 	}
 
 	if apierrors.IsGoneError(err) {
-		handleTaskGone(ctx, task, sess)
+		handleTaskGone(ctx, task, sess, taskCancel)
 		return
 	}
 
@@ -43,44 +52,22 @@ func handleStatusUpdateError(ctx context.Context, err error, task *api.Task, ses
 }
 
 // handleTaskNotFound handles the scenario where a task is not found in the system.
-// It logs an error message with the task ID, attempts to kill the session, and cleans up the session.
-func handleTaskNotFound(ctx context.Context, task *api.Task, sess *hashcat.Session) {
+// It logs the cancellation and signals taskCancel; the event loop owns Kill+Cleanup
+// via its <-taskCtx.Done() branch. The sess parameter is retained for symmetry and
+// future diagnostics.
+func handleTaskNotFound(_ context.Context, task *api.Task, _ *hashcat.Session, taskCancel context.CancelFunc) {
 	agentstate.Logger.Error("Task not found", "task_id", task.Id)
-	agentstate.Logger.Info("Killing task", "task_id", task.Id)
-	agentstate.Logger.Info(
-		"It is possible that multiple errors appear as the task takes some time to kill. This is expected.",
-	)
+	agentstate.Logger.Info("Cancelling task", "task_id", task.Id)
 
-	if err := sess.Kill(); err != nil {
-		//nolint:errcheck // Error already being handled
-		_ = cserrors.LogAndSendError(
-			ctx,
-			"Error killing task",
-			err,
-			api.SeverityCritical,
-			task,
-		)
-	}
-
-	sess.Cleanup()
+	taskCancel()
 }
 
-// handleTaskGone handles the termination of a task when it is no longer needed, ensuring the session is appropriately killed.
-func handleTaskGone(ctx context.Context, task *api.Task, sess *hashcat.Session) {
+// handleTaskGone handles the termination of a task when it is no longer needed,
+// signalling taskCancel so the event loop tears the session down on its own.
+func handleTaskGone(_ context.Context, task *api.Task, _ *hashcat.Session, taskCancel context.CancelFunc) {
 	agentstate.Logger.Info("Pausing task", "task_id", task.Id)
 
-	if err := sess.Kill(); err != nil {
-		//nolint:errcheck // Error already being handled
-		_ = cserrors.LogAndSendError(
-			ctx,
-			"Error pausing task",
-			err,
-			api.SeverityFatal,
-			task,
-		)
-	}
-
-	sess.Cleanup()
+	taskCancel()
 }
 
 // handleAcceptTaskError handles errors that occur when attempting to accept a task.

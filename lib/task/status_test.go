@@ -120,7 +120,7 @@ func TestSendStatusUpdate(t *testing.T) {
 			defer sess.Cleanup()
 
 			mgr := newTestManager()
-			mgr.sendStatusUpdate(context.Background(), tt.status, task, sess)
+			mgr.sendStatusUpdate(context.Background(), tt.status, task, sess, func() {})
 
 			// Verify httpmock call count for send_status endpoint
 			info := httpmock.GetCallCountInfo()

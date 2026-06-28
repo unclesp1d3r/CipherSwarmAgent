@@ -22,7 +22,13 @@ const (
 // sendStatusUpdate sends a status update to the server for a given task and session.
 // It ensures the update time is set, converts device statuses, and converts hashcat.Status to api.HashcatStatusUpdate.
 // Finally, it sends the status update to the server and handles the response.
-func (m *Manager) sendStatusUpdate(ctx context.Context, update hashcat.Status, task *api.Task, sess *hashcat.Session) {
+func (m *Manager) sendStatusUpdate(
+	ctx context.Context,
+	update hashcat.Status,
+	task *api.Task,
+	sess *hashcat.Session,
+	taskCancel context.CancelFunc,
+) {
 	// Ensure the update time is set
 	if update.Time.IsZero() {
 		update.Time = time.Now()
@@ -38,7 +44,7 @@ func (m *Manager) sendStatusUpdate(ctx context.Context, update hashcat.Status, t
 	// Send status update to the server
 	resp, err := m.tasksClient.SendStatus(ctx, task.Id, taskStatus)
 	if err != nil {
-		handleStatusUpdateError(ctx, err, task, sess)
+		handleStatusUpdateError(ctx, err, task, sess, taskCancel)
 		return
 	}
 

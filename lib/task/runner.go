@@ -32,6 +32,14 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 	taskTimeout := agentstate.State.TaskTimeout
 	taskTimer := time.NewTimer(taskTimeout)
 
+	// Per-task cancellation context. A server-side task cancellation (404/410 on
+	// a status update) cancels taskCtx, which makes the event loop exit via its
+	// <-taskCtx.Done() branch — the single owner of Kill+Cleanup. Without this,
+	// the 404/410 handler killed the session inline and the loop then blocked on
+	// channels that never deliver until the 24h task timer (the P1 stall).
+	taskCtx, taskCancel := context.WithCancel(ctx)
+	defer taskCancel()
+
 	waitChan := make(chan struct{})
 
 	//nolint:gosec // G118 - goroutine manages session lifecycle with ctx cancellation
@@ -41,8 +49,8 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 
 		for {
 			select {
-			case <-ctx.Done():
-				agentstate.Logger.Warn("Context cancelled, killing session")
+			case <-taskCtx.Done():
+				agentstate.Logger.Warn("Task context cancelled, killing session")
 
 				if err := sess.Kill(); err != nil {
 					agentstate.Logger.Error("Failed to kill session on context cancellation", "error", err)
@@ -84,7 +92,7 @@ func (m *Manager) runAttackTask(ctx context.Context, sess *hashcat.Session, task
 			case errInfo := <-sess.StderrMessages:
 				handleStdErrLine(ctx, errInfo, task)
 			case statusUpdate := <-sess.StatusUpdates:
-				m.handleStatusUpdate(ctx, statusUpdate, task, sess)
+				m.handleStatusUpdate(ctx, statusUpdate, task, sess, taskCancel)
 			case crackedHash := <-sess.CrackedHashes:
 				m.handleCrackedHash(ctx, crackedHash, task)
 			case err := <-sess.DoneChan:
@@ -148,6 +156,7 @@ func (m *Manager) handleStatusUpdate(
 	statusUpdate hashcat.Status,
 	task *api.Task,
 	sess *hashcat.Session,
+	taskCancel context.CancelFunc,
 ) {
 	if len(statusUpdate.Progress) < display.MinStatusFields {
 		agentstate.Logger.Warn("Status update has incomplete progress data",
@@ -162,7 +171,7 @@ func (m *Manager) handleStatusUpdate(
 	}
 
 	display.JobStatus(statusUpdate)
-	m.sendStatusUpdate(ctx, statusUpdate, task, sess)
+	m.sendStatusUpdate(ctx, statusUpdate, task, sess, taskCancel)
 }
 
 // handleCrackedHash processes a cracked hash by displaying it and then sending it to a task server.
