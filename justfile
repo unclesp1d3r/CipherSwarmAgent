@@ -280,7 +280,7 @@ release-check:
 
 # Build snapshot (no tag required)
 [group('release')]
-release-snapshot:
+release-snapshot: ci-check
     @{{ mise_exec }} goreleaser build --clean --snapshot
 
 # Build for current platform only
@@ -291,7 +291,7 @@ release-local:
 # Full release (requires git tag and GITHUB_TOKEN)
 [group('release')]
 [confirm("This will create a GitHub release. Continue?")]
-release: check test
+release: ci-check
     @{{ mise_exec }} goreleaser release --clean
 
 # ─────────────────────────────────────────────────────────────────────────────
