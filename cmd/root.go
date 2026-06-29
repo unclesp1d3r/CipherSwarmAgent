@@ -177,28 +177,36 @@ type deprecatedAlias struct {
 	flagType string
 }
 
+// Flag type identifiers used by deprecatedAlias.flagType.
+const (
+	flagTypeString   = "string"
+	flagTypeInt      = "int"
+	flagTypeBool     = "bool"
+	flagTypeDuration = "duration"
+)
+
 // deprecatedFlags lists all underscore-style flag aliases and their kebab-case replacements.
 //
 //nolint:gochecknoglobals // package-level lookup table for deprecated flag aliases
 var deprecatedFlags = []deprecatedAlias{
-	{"api_token", "api-token", "string"},
-	{"api_url", "api-url", "string"},
-	{"data_path", "data-path", "string"},
-	{"gpu_temp_threshold", "gpu-temp-threshold", "int"},
-	{"always_use_native_hashcat", "always-use-native-hashcat", "bool"},
-	{"sleep_on_failure", "sleep-on-failure", "duration"},
-	{"files_path", "files-path", "string"},
-	{"extra_debugging", "extra-debugging", "bool"},
-	{"status_timer", "status-timer", "int"},
-	{"heartbeat_interval", "heartbeat-interval", "duration"},
-	{"write_zaps_to_file", "write-zaps-to-file", "bool"},
-	{"zap_path", "zap-path", "string"},
-	{"retain_zaps_on_completion", "retain-zaps-on-completion", "bool"},
-	{"task_timeout", "task-timeout", "duration"},
-	{"download_max_retries", "download-max-retries", "int"},
-	{"download_retry_delay", "download-retry-delay", "duration"},
-	{"insecure_downloads", "insecure-downloads", "bool"},
-	{"max_heartbeat_backoff", "max-heartbeat-backoff", "int"},
+	{"api_token", "api-token", flagTypeString},
+	{"api_url", "api-url", flagTypeString},
+	{"data_path", "data-path", flagTypeString},
+	{"gpu_temp_threshold", "gpu-temp-threshold", flagTypeInt},
+	{"always_use_native_hashcat", "always-use-native-hashcat", flagTypeBool},
+	{"sleep_on_failure", "sleep-on-failure", flagTypeDuration},
+	{"files_path", "files-path", flagTypeString},
+	{"extra_debugging", "extra-debugging", flagTypeBool},
+	{"status_timer", "status-timer", flagTypeInt},
+	{"heartbeat_interval", "heartbeat-interval", flagTypeDuration},
+	{"write_zaps_to_file", "write-zaps-to-file", flagTypeBool},
+	{"zap_path", "zap-path", flagTypeString},
+	{"retain_zaps_on_completion", "retain-zaps-on-completion", flagTypeBool},
+	{"task_timeout", "task-timeout", flagTypeDuration},
+	{"download_max_retries", "download-max-retries", flagTypeInt},
+	{"download_retry_delay", "download-retry-delay", flagTypeDuration},
+	{"insecure_downloads", "insecure-downloads", flagTypeBool},
+	{"max_heartbeat_backoff", "max-heartbeat-backoff", flagTypeInt},
 }
 
 // registerDeprecatedAliases registers hidden, deprecated underscore-style flag aliases.
@@ -210,13 +218,13 @@ func registerDeprecatedAliases() {
 		// Zero-value defaults are safe: bridgeDeprecatedFlags only copies when
 		// old.Changed is true (user explicitly passed the flag on the CLI).
 		switch df.flagType {
-		case "string":
+		case flagTypeString:
 			flags.String(df.oldName, "", "")
-		case "bool":
+		case flagTypeBool:
 			flags.Bool(df.oldName, false, "")
-		case "int":
+		case flagTypeInt:
 			flags.Int(df.oldName, 0, "")
-		case "duration":
+		case flagTypeDuration:
 			flags.Duration(df.oldName, 0, "")
 		default:
 			panic("unknown flag type " + df.flagType + " for deprecated alias " + df.oldName)

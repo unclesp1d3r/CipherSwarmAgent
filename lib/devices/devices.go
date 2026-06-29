@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -306,9 +307,7 @@ func (dm *DeviceManager) GetAllDevices() []Device {
 func copyDevice(d Device) Device {
 	if d.Capabilities != nil {
 		caps := make(map[string]string, len(d.Capabilities))
-		for k, v := range d.Capabilities {
-			caps[k] = v
-		}
+		maps.Copy(caps, d.Capabilities)
 
 		d.Capabilities = caps
 	}

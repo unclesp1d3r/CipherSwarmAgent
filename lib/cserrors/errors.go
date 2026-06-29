@@ -140,7 +140,7 @@ func SendAgentError(
 // (platform, version) go into AdditionalProperties.
 func buildErrorMetadataOther(cfg errorReportConfig) *api.ErrorMetadata_Other {
 	other := &api.ErrorMetadata_Other{
-		AdditionalProperties: make(map[string]interface{}),
+		AdditionalProperties: make(map[string]any),
 	}
 
 	// Copy context fields, routing known keys to typed fields.

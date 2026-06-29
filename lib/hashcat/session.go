@@ -162,12 +162,9 @@ func (sess *Session) Start() error {
 		return err
 	}
 
-	sess.wg.Add(1)
-	go func() { defer sess.wg.Done(); sess.handleTailerOutput(tailer) }()
-	sess.wg.Add(1)
-	go func() { defer sess.wg.Done(); sess.handleStdout() }()
-	sess.wg.Add(1)
-	go func() { defer sess.wg.Done(); sess.handleStderr() }()
+	sess.wg.Go(func() { ; sess.handleTailerOutput(tailer) })
+	sess.wg.Go(func() { ; sess.handleStdout() })
+	sess.wg.Go(func() { ; sess.handleStderr() })
 
 	return nil
 }

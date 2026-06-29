@@ -15,6 +15,13 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 )
 
+// Reused literals for mock HTTP responses.
+const (
+	headerContentType   = "Content-Type"
+	mimeApplicationJSON = "application/json"
+	jsonFieldError      = "error"
+)
+
 // authenticateResponseBody represents the JSON response for authentication.
 type authenticateResponseBody struct {
 	Authenticated bool  `json:"authenticated"`
@@ -67,7 +74,7 @@ func MockAuthenticationSuccess(agentID int64) {
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Header:     http.Header{headerContentType: []string{mimeApplicationJSON}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
 	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/authenticate$`)
@@ -82,13 +89,13 @@ func MockAuthenticationSuccess(agentID int64) {
 func MockAuthenticationFailure(statusCode int, errorMessage string) {
 	errorResponse := map[string]any{
 		"authenticated": false,
-		"error":         errorMessage,
+		jsonFieldError:  errorMessage,
 	}
 	jsonResponse := mustMarshal(errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Header:     http.Header{headerContentType: []string{mimeApplicationJSON}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
 	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/authenticate$`)
@@ -104,7 +111,7 @@ func MockConfigurationResponse(config TestAgentConfiguration) {
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Header:     http.Header{headerContentType: []string{mimeApplicationJSON}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
 	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/configuration$`)
@@ -123,7 +130,7 @@ func MockHeartbeatResponse(agentID int64, state api.State) {
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Header:     http.Header{headerContentType: []string{mimeApplicationJSON}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
 	// Use regex to match the numeric agent ID in the path
@@ -140,15 +147,15 @@ func MockHeartbeatResponse(agentID int64, state api.State) {
 // Registers responders for multiple HTTP methods to handle different API call patterns.
 func MockAPIError(endpoint string, statusCode int, apiError api.APIError) {
 	errorResponse := map[string]any{
-		"error":   apiError.Message,
-		"code":    apiError.StatusCode,
-		"details": nil,
+		jsonFieldError: apiError.Message,
+		"code":         apiError.StatusCode,
+		"details":      nil,
 	}
 	jsonResponse := mustMarshal(errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Header:     http.Header{headerContentType: []string{mimeApplicationJSON}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
 	pattern := regexp.MustCompile(endpoint)
@@ -181,7 +188,7 @@ func MockUpdateAgentSuccess(agentID int64, agent api.Agent) {
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Header:     http.Header{headerContentType: []string{mimeApplicationJSON}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
 	pattern1 := regexp.MustCompile(fmt.Sprintf(`^https?://[^/]+/api/v1/client/agents/%d$`, agentID))
@@ -224,7 +231,7 @@ func MockUpdateAgentWithCapture(agentID int64, capturedDevices *[]string) {
 		jsonResponse := mustMarshal(agent)
 
 		resp := httpmock.NewStringResponse(http.StatusOK, string(jsonResponse))
-		resp.Header.Set("Content-Type", "application/json")
+		resp.Header.Set(headerContentType, mimeApplicationJSON)
 
 		return resp, nil
 	}
@@ -312,13 +319,13 @@ func GetSubmitErrorCallCount(agentID int64, baseURL string) int {
 // that returns an error response.
 func MockConfigurationError(statusCode int, errorMsg string) {
 	errorResponse := map[string]any{
-		"error": errorMsg,
+		jsonFieldError: errorMsg,
 	}
 	jsonResponse := mustMarshal(errorResponse)
 	responder := httpmock.ResponderFromResponse(&http.Response{
 		Status:     http.StatusText(statusCode),
 		StatusCode: statusCode,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Header:     http.Header{headerContentType: []string{mimeApplicationJSON}},
 		Body:       httpmock.NewRespBodyFromString(string(jsonResponse)),
 	})
 	pattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/configuration$`)

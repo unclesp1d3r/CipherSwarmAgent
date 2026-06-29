@@ -125,6 +125,9 @@ linters:
         underef:
           skipRecvDeref: false
 
+    goconst:
+      ignore-tests: true # Repeated literals in table-driven test fixtures are not magic constants
+
     gosec:
       excludes:
         - G117 # Struct field matches secret pattern - false positive on APIToken config field

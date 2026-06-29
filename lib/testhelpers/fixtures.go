@@ -26,6 +26,9 @@ const (
 	maskListID = 3
 )
 
+// deviceTypeCPU is the device-type/name literal reused across test fixtures.
+const deviceTypeCPU = "CPU"
+
 // TestAgentConfiguration represents the configuration response body for tests.
 // It mirrors the structure returned by the GetConfiguration API endpoint.
 type TestAgentConfiguration struct {
@@ -134,8 +137,8 @@ func NewTestHashcatStatus(sessionName string) hashcat.Status {
 		Devices: []hashcat.StatusDevice{
 			{
 				DeviceID:   0,
-				DeviceName: "CPU",
-				DeviceType: "CPU",
+				DeviceName: deviceTypeCPU,
+				DeviceType: deviceTypeCPU,
 				Speed:      defaultSpeed,
 				Util:       defaultUtil,
 				Temp:       defaultTemp,
@@ -180,7 +183,7 @@ func NewTestAgent(agentID int64, hostname string) api.Agent {
 		HostName:        hostname,
 		ClientSignature: "CipherSwarm Agent/test",
 		OperatingSystem: "linux",
-		Devices:         []string{"CPU", "GPU0"},
+		Devices:         []string{deviceTypeCPU, "GPU0"},
 	}
 }
 
@@ -195,5 +198,5 @@ func MockHostInfo() (*host.InfoStat, error) {
 
 // MockDevicesList returns a mock list of device names for testing device discovery.
 func MockDevicesList() []string {
-	return []string{"CPU", "GPU0", "GPU1"}
+	return []string{deviceTypeCPU, "GPU0", "GPU1"}
 }

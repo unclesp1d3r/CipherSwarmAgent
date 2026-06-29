@@ -35,11 +35,22 @@ const (
 	ErrorCategoryBackend
 )
 
+// Context map keys for structured error metadata. These are the well-known keys
+// documented in AGENTS.md that consumers rely on in ErrorInfo.Context.
+const (
+	ctxKeyErrorType    = "error_type"
+	ctxKeyHashfile     = "hashfile"
+	ctxKeyExitCodeName = "exit_code_name"
+
+	// statusUnknown is the status/name used for unrecognized categories and exit codes.
+	statusUnknown = "unknown"
+)
+
 // String returns the string representation of an ErrorCategory.
 func (c ErrorCategory) String() string {
 	switch c {
 	case ErrorCategoryUnknown:
-		return "unknown"
+		return statusUnknown
 	case ErrorCategorySuccess:
 		return "success"
 	case ErrorCategoryInfo:
@@ -59,7 +70,7 @@ func (c ErrorCategory) String() string {
 	case ErrorCategoryBackend:
 		return "backend"
 	default:
-		return "unknown"
+		return statusUnknown
 	}
 }
 
@@ -602,7 +613,7 @@ func ClassifyStderr(line string) ErrorInfo {
 // extractSummaryContext extracts from "* <error_type>: N/N hashes" lines.
 func extractSummaryContext(_ string, submatch []string) map[string]any {
 	ctx := map[string]any{
-		"error_type": normalizeErrorType(submatch[1]),
+		ctxKeyErrorType: normalizeErrorType(submatch[1]),
 	}
 
 	if affected, err := strconv.Atoi(submatch[2]); err == nil {
@@ -620,8 +631,8 @@ func extractSummaryContext(_ string, submatch []string) map[string]any {
 // submatch: [full, file, lineNum, hashPreview, errorType]
 func extractHashfileContext(_ string, submatch []string) map[string]any {
 	ctx := map[string]any{
-		"error_type": normalizeErrorType(submatch[4]),
-		"hashfile":   submatch[1],
+		ctxKeyErrorType: normalizeErrorType(submatch[4]),
+		ctxKeyHashfile:  submatch[1],
 	}
 
 	if lineNum, err := strconv.Atoi(submatch[2]); err == nil {
@@ -639,8 +650,8 @@ func extractHashfileContext(_ string, submatch []string) map[string]any {
 // submatch: [full, hash, errorType]
 func extractSingleHashContext(_ string, submatch []string) map[string]any {
 	return map[string]any{
-		"error_type":   normalizeErrorType(submatch[2]),
-		"hash_preview": truncateHash(submatch[1]),
+		ctxKeyErrorType: normalizeErrorType(submatch[2]),
+		"hash_preview":  truncateHash(submatch[1]),
 	}
 }
 
@@ -648,9 +659,9 @@ func extractSingleHashContext(_ string, submatch []string) map[string]any {
 // submatch: [full, file, lineNum, hash, errorType]
 func extractMachineReadableContext(_ string, submatch []string) map[string]any {
 	ctx := map[string]any{
-		"error_type":   normalizeErrorType(submatch[4]),
-		"hashfile":     submatch[1],
-		"hash_preview": truncateHash(submatch[3]),
+		ctxKeyErrorType: normalizeErrorType(submatch[4]),
+		ctxKeyHashfile:  submatch[1],
+		"hash_preview":  truncateHash(submatch[3]),
 	}
 
 	if lineNum, err := strconv.Atoi(submatch[2]); err == nil {
@@ -664,8 +675,8 @@ func extractMachineReadableContext(_ string, submatch []string) map[string]any {
 func extractTerminalContext(errorType string) contextExtractor {
 	return func(_ string, _ []string) map[string]any {
 		return map[string]any{
-			"error_type": errorType,
-			"terminal":   true,
+			ctxKeyErrorType: errorType,
+			"terminal":      true,
 		}
 	}
 }
@@ -674,7 +685,7 @@ func extractTerminalContext(errorType string) contextExtractor {
 func staticContext(errorType string) contextExtractor {
 	return func(_ string, _ []string) map[string]any {
 		return map[string]any{
-			"error_type": errorType,
+			ctxKeyErrorType: errorType,
 		}
 	}
 }
@@ -683,9 +694,9 @@ func staticContext(errorType string) contextExtractor {
 // submatch: [full, file, osError]
 func extractHashfileAccessContext(_ string, submatch []string) map[string]any {
 	return map[string]any{
-		"error_type": "hashfile_access_error",
-		"hashfile":   submatch[1],
-		"os_error":   submatch[2],
+		ctxKeyErrorType: "hashfile_access_error",
+		ctxKeyHashfile:  submatch[1],
+		"os_error":      submatch[2],
 	}
 }
 
@@ -694,7 +705,7 @@ func extractHashfileAccessContext(_ string, submatch []string) map[string]any {
 func extractKernelContext(errorType string) contextExtractor {
 	return func(_ string, submatch []string) map[string]any {
 		ctx := map[string]any{
-			"error_type": errorType,
+			ctxKeyErrorType: errorType,
 		}
 
 		if deviceID, err := strconv.Atoi(submatch[1]); err == nil {
@@ -717,7 +728,7 @@ var (
 // submatch: [full, hashMode]
 func extractHashModeContext(_ string, submatch []string) map[string]any {
 	ctx := map[string]any{
-		"error_type": "invalid_hash_mode",
+		ctxKeyErrorType: "invalid_hash_mode",
 	}
 
 	if hashMode, err := strconv.Atoi(submatch[1]); err == nil {
@@ -733,7 +744,7 @@ func extractHashModeContext(_ string, submatch []string) map[string]any {
 func extractIntField(errorType, fieldName string) contextExtractor {
 	return func(_ string, submatch []string) map[string]any {
 		ctx := map[string]any{
-			"error_type": errorType,
+			ctxKeyErrorType: errorType,
 		}
 
 		if val, err := strconv.Atoi(submatch[1]); err == nil {
@@ -759,8 +770,8 @@ var (
 func extractBackendContextWithType(errorType, backendAPI string) contextExtractor {
 	return func(_ string, submatch []string) map[string]any {
 		ctx := map[string]any{
-			"error_type":  errorType,
-			"backend_api": backendAPI,
+			ctxKeyErrorType: errorType,
+			"backend_api":   backendAPI,
 		}
 
 		if len(submatch) > 1 {
@@ -775,8 +786,8 @@ func extractBackendContextWithType(errorType, backendAPI string) contextExtracto
 func extractBackendAPIContext(backendAPI string) contextExtractor {
 	return func(_ string, submatch []string) map[string]any {
 		ctx := map[string]any{
-			"error_type":  "backend_api_error",
-			"backend_api": backendAPI,
+			ctxKeyErrorType: "backend_api_error",
+			"backend_api":   backendAPI,
 		}
 
 		if len(submatch) > 1 {

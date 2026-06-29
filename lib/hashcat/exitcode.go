@@ -61,7 +61,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "cracked",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "success"},
+			Context:   map[string]any{ctxKeyExitCodeName: "success"},
 		}
 	case ExitCodeExhausted:
 		return ExitCodeInfo{
@@ -70,7 +70,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "exhausted",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "exhausted"},
+			Context:   map[string]any{ctxKeyExitCodeName: "exhausted"},
 		}
 	case ExitCodeAborted:
 		return ExitCodeInfo{
@@ -79,7 +79,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: true,
 			Status:    "aborted",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "aborted"},
+			Context:   map[string]any{ctxKeyExitCodeName: "aborted"},
 		}
 	case ExitCodeCheckpoint:
 		return ExitCodeInfo{
@@ -88,7 +88,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: true,
 			Status:    "checkpoint",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "checkpoint"},
+			Context:   map[string]any{ctxKeyExitCodeName: "checkpoint"},
 		}
 	case ExitCodeRuntimeLimit:
 		return ExitCodeInfo{
@@ -97,7 +97,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: true,
 			Status:    "runtime_limit",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "runtime_limit"},
+			Context:   map[string]any{ctxKeyExitCodeName: "runtime_limit"},
 		}
 	case ExitCodeAbortFinish:
 		return ExitCodeInfo{
@@ -106,7 +106,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: true,
 			Status:    "abort_finish",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "abort_finish"},
+			Context:   map[string]any{ctxKeyExitCodeName: "abort_finish"},
 		}
 	case ExitCodeGeneralError:
 		return ExitCodeInfo{
@@ -115,7 +115,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "error",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "general_error"},
+			Context:   map[string]any{ctxKeyExitCodeName: "general_error"},
 		}
 	case ExitCodeRuntimeSkip:
 		return ExitCodeInfo{
@@ -124,7 +124,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "runtime_skip",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "runtime_skip"},
+			Context:   map[string]any{ctxKeyExitCodeName: "runtime_skip"},
 		}
 	case ExitCodeMemoryHit:
 		return ExitCodeInfo{
@@ -133,7 +133,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "memory_hit",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "memory_hit"},
+			Context:   map[string]any{ctxKeyExitCodeName: "memory_hit"},
 		}
 	case ExitCodeKernelBuild:
 		return ExitCodeInfo{
@@ -142,7 +142,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "kernel_build",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "kernel_build"},
+			Context:   map[string]any{ctxKeyExitCodeName: "kernel_build"},
 		}
 	case ExitCodeKernelCreate:
 		return ExitCodeInfo{
@@ -151,7 +151,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "kernel_create",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "kernel_create"},
+			Context:   map[string]any{ctxKeyExitCodeName: "kernel_create"},
 		}
 	case ExitCodeKernelAccel:
 		return ExitCodeInfo{
@@ -160,7 +160,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "kernel_accel",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "kernel_accel"},
+			Context:   map[string]any{ctxKeyExitCodeName: "kernel_accel"},
 		}
 	case ExitCodeExtraSize:
 		return ExitCodeInfo{
@@ -169,7 +169,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "extra_size",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "extra_size"},
+			Context:   map[string]any{ctxKeyExitCodeName: "extra_size"},
 		}
 	case ExitCodeMixedWarnings:
 		return ExitCodeInfo{
@@ -178,7 +178,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "mixed_warnings",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "mixed_warnings"},
+			Context:   map[string]any{ctxKeyExitCodeName: "mixed_warnings"},
 		}
 	case ExitCodeSelftestFail:
 		return ExitCodeInfo{
@@ -187,7 +187,7 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Retryable: false,
 			Status:    "selftest_fail",
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "selftest_fail"},
+			Context:   map[string]any{ctxKeyExitCodeName: "selftest_fail"},
 		}
 	default:
 		// Exit codes -2 and -10 are not defined in hashcat types.h;
@@ -196,9 +196,9 @@ func ClassifyExitCode(exitCode int) ExitCodeInfo {
 			Category:  ErrorCategoryUnknown,
 			Severity:  api.SeverityCritical,
 			Retryable: false,
-			Status:    "unknown",
+			Status:    statusUnknown,
 			ExitCode:  exitCode,
-			Context:   map[string]any{"exit_code_name": "unknown"},
+			Context:   map[string]any{ctxKeyExitCodeName: statusUnknown},
 		}
 	}
 }
