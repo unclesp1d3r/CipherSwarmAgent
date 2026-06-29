@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,9 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/task"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
+
+// agentTaskNewPattern matches the tasks/new API endpoint used in agent tests.
+var agentTaskNewPattern = regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
 
 // saveAndRestoreState saves the current agentstate fields and returns a cleanup function
 // that restores them. Uses per-field save/restore to avoid copying sync primitives.
@@ -440,6 +445,144 @@ func TestCalculateHeartbeatBackoff_DefaultConfig(t *testing.T) {
 	}
 }
 
+// TestCalculateHeartbeatBackoff_NoOverflowAtBoundary verifies the backoff stays
+// positive and monotonic even when the multiplier exceeds the safe shift cap.
+func TestCalculateHeartbeatBackoff_NoOverflowAtBoundary(t *testing.T) {
+	baseInterval := 1 * time.Second
+
+	var prev time.Duration
+	// Drive the multiplier at and beyond config.MaxBackoffShift via a huge
+	// maxBackoffMultiplier so the defensive cap is what bounds the shift.
+	for failures := config.MaxBackoffShift; failures <= config.MaxBackoffShift+5; failures++ {
+		result := calculateHeartbeatBackoff(baseInterval, failures, 1_000_000)
+		assert.Positive(t, result, "backoff must never be negative or zero (failures=%d)", failures)
+		if prev != 0 {
+			assert.GreaterOrEqual(t, result, prev, "backoff must be monotonic non-decreasing")
+		}
+		prev = result
+	}
+}
+
+// TestValidateAPICredentials verifies the credential check reads shared state
+// (populated by SetupSharedState) and reports the right error per missing field.
+func TestValidateAPICredentials(t *testing.T) {
+	savedURL := agentstate.State.URL
+	savedToken := agentstate.State.APIToken
+	t.Cleanup(func() {
+		agentstate.State.URL = savedURL
+		agentstate.State.APIToken = savedToken
+	})
+
+	tests := []struct {
+		name    string
+		url     string
+		token   string
+		wantErr error
+	}{
+		{name: "both present", url: "https://api", token: "tok", wantErr: nil},
+		{name: "missing url", url: "", token: "tok", wantErr: ErrAPIURLNotSet},
+		{name: "missing token", url: "https://api", token: "", wantErr: ErrAPITokenNotSet},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agentstate.State.URL = tt.url
+			agentstate.State.APIToken = tt.token
+
+			err := validateAPICredentials()
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestStopBackgroundBenchmarks_NoHandle verifies stopping when nothing is running
+// is a safe no-op that permits a restart.
+func TestStopBackgroundBenchmarks_NoHandle(t *testing.T) {
+	bgBench.Store(nil)
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	assert.True(t, stopBackgroundBenchmarks(), "no running benchmark should permit restart")
+}
+
+// TestStopBackgroundBenchmarks_CleanStop verifies that when the goroutine signals
+// done promptly, stop cancels it and permits a restart.
+func TestStopBackgroundBenchmarks_CleanStop(t *testing.T) {
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	cancelCalled := false
+	done := make(chan struct{})
+	close(done) // goroutine already finished
+	bgBench.Store(&bgBenchHandle{cancel: func() { cancelCalled = true }, done: done})
+
+	assert.True(t, stopBackgroundBenchmarks(), "clean stop should permit restart")
+	assert.True(t, cancelCalled, "stop must cancel the benchmark goroutine")
+	assert.Nil(t, bgBench.Load(), "handle should be cleared after stop")
+}
+
+// TestStopBackgroundBenchmarks_TimeoutSkipsRestart verifies that when the old
+// goroutine does not signal done within the bound, stop returns false so the
+// caller skips the restart (avoiding overlapping GPU work).
+func TestStopBackgroundBenchmarks_TimeoutSkipsRestart(t *testing.T) {
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	cancelCalled := false
+	done := make(chan struct{}) // never closed → forces the timeout path
+	bgBench.Store(&bgBenchHandle{cancel: func() { cancelCalled = true }, done: done})
+
+	assert.False(t, stopBackgroundBenchmarks(), "timeout must signal the caller to skip restart")
+	assert.True(t, cancelCalled, "stop must still cancel the benchmark goroutine")
+	// On timeout the handle is retained (not cleared) so a later stop rechecks it —
+	// this is what prevents a subsequent poll from starting a second, overlapping run.
+	assert.NotNil(t, bgBench.Load(), "a still-running goroutine's handle must be retained on timeout")
+}
+
+// TestStopBackgroundBenchmarks_ZombieSelfHeals verifies that after a stop times out
+// (handle retained), a later stop returns true and clears the slot once the goroutine
+// finally exits — so a restart only becomes possible after confirmed exit, never
+// overlapping the previous run.
+func TestStopBackgroundBenchmarks_ZombieSelfHeals(t *testing.T) {
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	done := make(chan struct{})
+	bgBench.Store(&bgBenchHandle{cancel: func() {}, done: done})
+
+	require.False(t, stopBackgroundBenchmarks(), "first stop times out and skips restart")
+	require.NotNil(t, bgBench.Load(), "handle retained while goroutine is alive")
+
+	close(done) // goroutine finally exits
+
+	require.True(t, stopBackgroundBenchmarks(), "second stop sees the closed done and permits restart")
+	require.Nil(t, bgBench.Load(), "handle cleared once exit is confirmed")
+}
+
+// TestBgBenchHandle_ConcurrentStoreSwap exercises the atomic handle under
+// concurrent store/swap to confirm it is race-clean (run with -race).
+func TestBgBenchHandle_ConcurrentStoreSwap(t *testing.T) {
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			done := make(chan struct{})
+			close(done)
+			bgBench.Store(&bgBenchHandle{cancel: func() {}, done: done})
+		}()
+		go func() {
+			defer wg.Done()
+			if h := bgBench.Swap(nil); h != nil {
+				h.cancel()
+			}
+		}()
+	}
+	wg.Wait()
+}
+
 // TestCleanupLockFile_NonexistentFile verifies that cleaning up a nonexistent
 // file does not panic or produce errors (idempotent operation).
 func TestCleanupLockFile_NonexistentFile(t *testing.T) {
@@ -706,4 +849,43 @@ func TestSleepWithContext_Cancelled(t *testing.T) {
 
 	assert.True(t, cancelled, "should return true when context is cancelled")
 	assert.Less(t, elapsed, 1*time.Second, "should return promptly on cancellation")
+}
+
+// TestHandleNewTask_IdleDoesNotStopBackgroundBenchmarks verifies that on
+// ErrNoTaskAvailable (the normal idle poll), handleNewTask leaves background
+// benchmarks running undisturbed. The API poll does not use the GPU, so there
+// is no reason to stop background benchmarks before it.
+func TestHandleNewTask_IdleDoesNotStopBackgroundBenchmarks(t *testing.T) {
+	cleanup := saveAndRestoreState(t)
+	t.Cleanup(cleanup)
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	cleanupHTTP := testhelpers.SetupHTTPMock()
+	t.Cleanup(cleanupHTTP)
+
+	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	// Respond to GET /api/v1/client/tasks/new with HTTP 204 → ErrNoTaskAvailable.
+	httpmock.RegisterRegexpResponder("GET", agentTaskNewPattern,
+		httpmock.NewStringResponder(http.StatusNoContent, ""))
+
+	// Wire taskMgr to the mock API client.
+	testClient := agentstate.State.GetAPIClient()
+	taskMgr = task.NewManager(testClient.Tasks(), testClient.Attacks())
+
+	// Install a bg benchmark handle whose cancel MUST NOT be called on idle.
+	cancelCalled := false
+	done := make(chan struct{}) // left open — a nil-swap would betray the bug
+	bgBench.Store(&bgBenchHandle{
+		cancel: func() { cancelCalled = true },
+		done:   done,
+	})
+
+	agentstate.State.SetBenchmarksSubmitted(true)
+
+	handleNewTask(context.Background())
+
+	assert.False(t, cancelCalled, "idle poll must not cancel background benchmarks")
+	assert.NotNil(t, bgBench.Load(), "bg bench handle must remain after idle poll")
 }

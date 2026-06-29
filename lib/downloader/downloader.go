@@ -20,6 +20,7 @@ import (
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
 )
 
@@ -258,8 +259,11 @@ func downloadWithRetry(ctx context.Context, client Getter, maxRetries int, baseD
 
 	for attempt := range maxRetries {
 		if attempt > 0 {
-			// Exponential backoff: baseDelay * 2^(attempt-1)
-			delay := baseDelay * time.Duration(1<<(attempt-1))
+			// Exponential backoff: baseDelay * 2^(attempt-1).
+			// Defensive shift cap: even if maxRetries were not clamped at config
+			// time, the shift can never overflow time.Duration into a negative value.
+			shift := min(attempt-1, config.MaxBackoffShift)
+			delay := baseDelay * time.Duration(1<<shift)
 			agentstate.Logger.Debug("Retrying download", "attempt", attempt+1, "delay", delay)
 
 			timer := time.NewTimer(delay)
@@ -299,12 +303,12 @@ func downloadWithRetry(ctx context.Context, client Getter, maxRetries int, baseD
 // The function makes an API call to fetch the hash list, checks the response status, and handles errors if the call fails.
 // If the response stream is not nil, it writes the hash list to the file and verifies the downloaded file is non-empty.
 // Logs relevant actions and errors encountered during the process and returns any errors that occur.
-func DownloadHashList(ctx context.Context, attack *api.Attack) error {
+func DownloadHashList(ctx context.Context, attack *api.Attack, hashlistDir string) error {
 	if attack == nil {
 		return errors.New("attack is nil")
 	}
 
-	hashlistPath := filepath.Join(agentstate.State.HashlistPath, fmt.Sprintf("%d.hsh", attack.Id))
+	hashlistPath := filepath.Join(hashlistDir, fmt.Sprintf("%d.hsh", attack.Id))
 	agentstate.Logger.Debug("Downloading hash list", "url", attack.HashListUrl, "path", hashlistPath)
 
 	if err := removeExistingFile(hashlistPath); err != nil {
@@ -391,7 +395,7 @@ func writeResponseToFile(responseStream io.Reader, filePath string) error {
 func fileMD5(filePath string) (string, error) { // DevSkim: ignore DS126858
 	f, err := os.Open(filePath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("opening file %q for checksum: %w", filePath, err)
 	}
 
 	defer func() {
@@ -403,7 +407,7 @@ func fileMD5(filePath string) (string, error) { // DevSkim: ignore DS126858
 
 	h := md5.New() //nolint:gosec // G401 - MD5 used for file integrity check, not security // DevSkim: ignore DS126858
 	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+		return "", fmt.Errorf("reading file %q for checksum: %w", filePath, err)
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil

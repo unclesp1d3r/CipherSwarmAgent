@@ -213,6 +213,7 @@ func TestSetupSharedState_ValidationClampsInvalidValues(t *testing.T) {
 	viper.Set("download_max_retries", 0)
 	viper.Set("task_timeout", 0)
 	viper.Set("max_heartbeat_backoff", -1)
+	viper.Set("status_timer", 0)
 
 	SetupSharedState()
 
@@ -223,6 +224,24 @@ func TestSetupSharedState_ValidationClampsInvalidValues(t *testing.T) {
 		"task_timeout should be clamped to default when <= 0")
 	assert.Equal(t, DefaultMaxHeartbeatBackoff, agentstate.State.MaxHeartbeatBackoff,
 		"max_heartbeat_backoff should be clamped to default when < 0")
+	assert.Equal(t, DefaultStatusTimer, agentstate.State.StatusTimer,
+		"status_timer should be clamped to default when < 1")
+}
+
+func TestSetupSharedState_ClampsOverflowingBackoffValues(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	// Values large enough to overflow a 2^n shift if left unclamped.
+	viper.Set("download_max_retries", 65)
+	viper.Set("max_heartbeat_backoff", 65)
+
+	SetupSharedState()
+
+	assert.Equal(t, 65, agentstate.State.DownloadMaxRetries,
+		"download_max_retries must not be clamped (retry count, not shift exponent)")
+	assert.Equal(t, MaxBackoffShift, agentstate.State.MaxHeartbeatBackoff,
+		"max_heartbeat_backoff should be clamped to the safe ceiling")
 }
 
 func TestSetupSharedState_ValidationAcceptsValidValues(t *testing.T) {

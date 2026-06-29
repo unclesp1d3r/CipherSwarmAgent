@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/agent"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 )
@@ -20,7 +19,7 @@ var (
 // RootCmd represents the base command for the CipherSwarm Agent CLI application.
 var RootCmd = &cobra.Command{ //nolint:gochecknoglobals // CLI root command
 	Use:     "cipherswarm-agent",
-	Version: lib.AgentVersion,
+	Version: config.AgentVersion,
 	Short:   "CipherSwarm Agent",
 	Long:    "CipherSwarm Agent is the agent for connecting to the CipherSwarm system.",
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {

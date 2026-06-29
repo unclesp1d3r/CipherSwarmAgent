@@ -66,8 +66,12 @@ setup: install
 
 # Update all dependencies
 [group('setup')]
-update-deps: _update-go _update-python _update-precommit
+update-deps: _update-mise _update-go _update-python _update-precommit
     @echo "✅ All dependencies updated"
+
+[private]
+_update-mise:
+    @mise upgrade --bump --local --before 7d
 
 [private]
 _update-go:

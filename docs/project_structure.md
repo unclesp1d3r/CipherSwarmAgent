@@ -11,8 +11,10 @@ The CipherSwarm Agent is built with Go 1.26+ and follows a modular architecture 
 ```text
 CipherSwarmAgent/
 ├── cmd/                    # CLI entrypoint and command registration
+├── internal/              # Internal-only packages (not importable by external modules)
+│   └── util/              # Small generic helpers (e.g., UnwrapOr) shared across the agent
 ├── lib/                    # Core agent logic and utilities
-│   ├── agent/             # Agent lifecycle (startup, heartbeat, shutdown)
+│   ├── agent/             # Agent lifecycle (startup, heartbeat, shutdown), client, and config mapping
 │   ├── api/               # API client layer (generated + hand-written)
 │   ├── apierrors/         # Generic API error handler
 │   ├── arch/              # OS-specific abstractions
@@ -88,45 +90,32 @@ func main() {
 
 The main business logic of the agent, organized by functional area:
 
-#### `lib/agentClient.go`
+#### `lib/agent/`
 
-- **Purpose**: Server communication and configuration mapping
-- **Key Functions**:
+The agent lifecycle, server communication, and configuration mapping. This package consolidated several files from the former root `lib/` package:
+
+- **`client.go`**: Server communication and configuration mapping
   - `AuthenticateAgent()`: Server authentication
   - `GetAgentConfiguration()`: Fetch and map server configuration
   - `UpdateAgentMetadata()`: Send agent info to server
   - `SendHeartBeat()`: Periodic health check
   - `mapConfiguration()`: Map API response to internal config
-  - `GetConfiguration()`: Thread-safe access to current agent configuration (via `atomic.Value`)
+  - `getConfiguration()`: Thread-safe access to current agent configuration (via `atomic.Value`, unexported)
   - `SetConfiguration()`: Atomically replace agent configuration
-
-#### `lib/dataTypes.go`
-
-- **Purpose**: Core data structures and type definitions
-- **Key Types**:
-  - `agentConfiguration`: Internal configuration structure
-  - Type conversion utilities
-
-#### `lib/errorUtils.go`
-
-- **Purpose**: Error handling helpers for API responses
-- **Key Functions**:
-  - Error type handlers for specific API operations (heartbeat, status, task, etc.)
-
-#### `lib/crackerUtils.go`
-
-- **Purpose**: Hashcat binary path management
-- **Key Functions**:
-  - `setNativeHashcatPath()`: Configure native binary usage
-
-### 5. Agent Lifecycle (`lib/agent/`)
-
-#### `lib/agent/agent.go`
-
-- **Purpose**: Agent main loop and lifecycle management
-- **Key Functions**:
+  - `SetMetadataProvider()`: Wire enumerated device manager for metadata updates
+- **`datatypes.go`**: Core data structures and type definitions (`agentConfiguration`, type conversion utilities)
+- **`errors.go`**: Error handling helpers for API responses
+- **`cracker_utils.go`**: Hashcat binary path management (`setNativeHashcatPath()`)
+- **`agent.go`**: Agent main loop and lifecycle management
   - `StartAgent()`: Main agent loop (heartbeat, task polling, benchmark gating). After creating the lock file, calls `hashcat.CleanupOrphanedSessionFiles()` to remove stale session files from previous ungraceful shutdowns before entering the main loop.
-  - `sleepWithContext()`: Context-aware sleep utility
+
+### 5. Internal Utilities (`internal/util/`)
+
+#### `internal/util/util.go`
+
+- **Purpose**: Small generic helpers shared across the agent
+- **Key Functions**:
+  - `UnwrapOr[T]()`: Returns the dereferenced pointer value, or a default if the pointer is nil (used for optional API response fields)
 
 ### 6. API Client Layer (`lib/api/`)
 
@@ -171,6 +160,16 @@ The main business logic of the agent, organized by functional area:
   - `UpdateBenchmarks()`: Run full benchmark session
   - `cacheAndSubmitBenchmarks()`: Combined cache + submit with early-return
 
+#### `lib/benchmark/runner.go`
+
+- **Purpose**: Benchmark runner logic (split from `manager.go` for maintainability)
+
+#### `lib/benchmark/result.go`
+
+- **Purpose**: Benchmark result data structure and logging
+- **Key Types**:
+  - `Result`: Represents the outcome of a benchmark session (device, hash type, runtime, speed, submission status)
+
 #### `lib/benchmark/cache.go`
 
 - **Purpose**: Persistent benchmark cache at `{data_path}/benchmark_cache.json`
@@ -188,6 +187,8 @@ The main business logic of the agent, organized by functional area:
 #### `lib/config/config.go`
 
 - **Purpose**: Configuration defaults as exported constants
+- **Key Constants**:
+  - `AgentVersion`: Current version of the agent software
 - **Key Functions**:
   - `SetDefaultConfigValues()`: Register viper defaults
   - `SetupSharedState()`: Wire config into `agentstate.State`
@@ -334,6 +335,8 @@ Platform-specific functionality for cross-platform support:
 
 #### `lib/display/` — User-facing output formatting
 
+**Note**: The `BenchmarkResult` type has been moved to `benchmark.Result` in the `lib/benchmark` package.
+
 #### `lib/downloader/` — File download with checksum verification and retries
 
 #### `lib/progress/` — Progress calculation utilities
@@ -383,7 +386,7 @@ Global state with synchronized access:
 
 - **`agentstate.State`**: Runtime state with `atomic.Bool` and `sync.RWMutex` fields
 - **Getter/Setter Methods**: Never access synchronized fields directly
-- **Configuration Management**: Agent configuration is accessed through `lib.GetConfiguration()` and `lib.SetConfiguration()`, which use `atomic.Value` for race-free concurrent access from multiple goroutines (e.g., heartbeat and main agent loop)
+- **Configuration Management**: Agent configuration is accessed through `agent.getConfiguration()` (unexported) and `agent.SetConfiguration()`, which use `atomic.Value` for race-free concurrent access from multiple goroutines (e.g., heartbeat and main agent loop)
 
 ## Data Flow
 

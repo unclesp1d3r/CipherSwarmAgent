@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 )
 
 var cacheMu sync.Mutex //nolint:gochecknoglobals // guards benchmark cache file access across goroutines
@@ -20,7 +19,7 @@ var cacheMu sync.Mutex //nolint:gochecknoglobals // guards benchmark cache file 
 // saveBenchmarkCache acquires cacheMu and saves the benchmark cache.
 // For load-modify-save sequences, use cacheMu directly to hold the lock
 // across the entire operation.
-func saveBenchmarkCache(results []display.BenchmarkResult) error {
+func saveBenchmarkCache(results []Result) error {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 
@@ -32,7 +31,7 @@ func saveBenchmarkCache(results []display.BenchmarkResult) error {
 // error on any failure; callers decide whether to treat it as fatal since
 // benchmarks can be re-run on next startup.
 // Requires: cacheMu must be held by the caller.
-func saveBenchmarkCacheLocked(results []display.BenchmarkResult) error {
+func saveBenchmarkCacheLocked(results []Result) error {
 	cachePath := agentstate.State.BenchmarkCachePath
 	if cachePath == "" {
 		agentstate.Logger.Warn("Benchmark cache path not configured, skipping cache save")
@@ -97,7 +96,7 @@ var errCacheCorrupt = errors.New("benchmark cache file is corrupt")
 // loadBenchmarkCache acquires cacheMu and loads the benchmark cache.
 // For load-modify-save sequences, use cacheMu directly to hold the lock
 // across the entire operation.
-func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
+func loadBenchmarkCache() ([]Result, error) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 
@@ -111,7 +110,7 @@ func loadBenchmarkCache() ([]display.BenchmarkResult, error) {
 // Returns a non-nil error for unexpected I/O failures (e.g., permission
 // denied).
 // Requires: cacheMu must be held by the caller.
-func loadBenchmarkCacheLocked() ([]display.BenchmarkResult, error) {
+func loadBenchmarkCacheLocked() ([]Result, error) {
 	cachePath := agentstate.State.BenchmarkCachePath
 	if cachePath == "" {
 		return nil, nil
@@ -131,7 +130,7 @@ func loadBenchmarkCacheLocked() ([]display.BenchmarkResult, error) {
 		return nil, fmt.Errorf("failed to read benchmark cache: %w", err)
 	}
 
-	var results []display.BenchmarkResult
+	var results []Result
 	if err := json.Unmarshal(data, &results); err != nil {
 		agentstate.Logger.Warn("Benchmark cache file is corrupt, removing and will re-run benchmarks",
 			"error", err, "path", cachePath)
@@ -228,7 +227,7 @@ var priorityHashTypes = [...]string{"0", "100", "1000"}
 // ascending numeric order). Returns (nil, nil) when no placeholders exist.
 // This function acquires cacheMu internally via loadBenchmarkCache — do NOT
 // call while holding cacheMu or it will deadlock.
-func loadPlaceholderResults() ([]display.BenchmarkResult, error) {
+func loadPlaceholderResults() ([]Result, error) {
 	cached, err := loadBenchmarkCache()
 	if err != nil {
 		return nil, err
@@ -238,7 +237,7 @@ func loadPlaceholderResults() ([]display.BenchmarkResult, error) {
 		return nil, nil
 	}
 
-	var placeholders []display.BenchmarkResult
+	var placeholders []Result
 	for _, r := range cached {
 		if r.Placeholder {
 			placeholders = append(placeholders, r)

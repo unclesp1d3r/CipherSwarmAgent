@@ -54,6 +54,8 @@ type Session struct {
 	DoneChan           chan error     // Channel signaling process completion
 	SkipStatusUpdates  bool           // Flag to disable status update parsing
 	RestoreFilePath    string         // Path to session restore file
+	zapsPath           string         // Injected zaps directory, removed on cleanup unless retained
+	retainZaps         bool           // Whether Cleanup keeps the zaps directory
 	sessionLogFile     string         // Absolute path to hashcat session .log file for cleanup
 	sessionPidFile     string         // Absolute path to hashcat session .pid file for cleanup
 	pStdout            io.ReadCloser  // Stdout pipe from hashcat process
@@ -73,20 +75,24 @@ func NewHashcatSession(ctx context.Context, id string, params Params) (*Session,
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	outFile, err := createOutFile(agentstate.State.OutPath, id, filePermissions)
+	outFile, err := createOutFile(params.OutPath, id, filePermissions)
 	if err != nil {
 		cancel()
 
 		return nil, fmt.Errorf("couldn't create output file: %w", err)
 	}
 
-	charsetFiles, err := createCharsetFiles(params.MaskCustomCharsets)
+	charsetFiles, resolvedCharsets, err := createCharsetFiles(params.OutPath, params.MaskCustomCharsets)
 	if err != nil {
 		cancel()
 		_ = outFile.Close()
 
 		return nil, err
 	}
+
+	// Use the resolved temp-file paths for arg construction without mutating the
+	// caller's slice. params is a value copy, so repointing this field is local.
+	params.MaskCustomCharsets = resolvedCharsets
 
 	args, err := params.toCmdArgs(id, params.HashFile, outFile.Name())
 	if err != nil {
@@ -130,6 +136,8 @@ func NewHashcatSession(ctx context.Context, id string, params Params) (*Session,
 		SkipStatusUpdates: params.AttackMode == AttackBenchmark || params.AttackMode == AttackBenchmarkSingle ||
 			params.AttackMode == AttackHashInfo,
 		RestoreFilePath: params.RestoreFilePath,
+		zapsPath:        params.ZapsPath,
+		retainZaps:      params.RetainZapsOnCompletion,
 		sessionLogFile:  filepath.Join(sessDir, sessionName+".log"),
 		sessionPidFile:  filepath.Join(sessDir, sessionName+".pid"),
 	}, nil
@@ -453,22 +461,35 @@ func (sess *Session) Cleanup() {
 		}
 	}
 
+	// closeFile closes an open file handle before its path is removed, so the
+	// descriptor is not leaked across repeated session create/cleanup cycles.
+	// Close errors are logged at Debug and never halt cleanup.
+	closeFile := func(f *os.File) {
+		if err := f.Close(); err != nil {
+			agentstate.Logger.Debug("couldn't close session file during cleanup",
+				"file", f.Name(), "error", err)
+		}
+	}
+
 	if sess.outFile != nil {
+		closeFile(sess.outFile)
 		removeFile(sess.outFile.Name())
 		sess.outFile = nil
 	}
 
-	if !agentstate.State.RetainZapsOnCompletion {
-		if err := os.RemoveAll(agentstate.State.ZapsPath); err != nil {
+	if !sess.retainZaps && sess.zapsPath != "" {
+		if err := os.RemoveAll(sess.zapsPath); err != nil {
 			agentstate.Logger.Error("couldn't remove zaps directory", "error", err)
 		}
 	}
 
 	for _, f := range sess.charsetFiles {
 		if f != nil {
+			closeFile(f)
 			removeFile(f.Name())
 		}
 	}
+	sess.charsetFiles = nil
 
 	removeFile(sess.hashFile)
 	sess.hashFile = ""
@@ -538,12 +559,15 @@ func createTempFile(dir, pattern string, perm os.FileMode) (*os.File, error) {
 }
 
 // createCharsetFiles creates temporary files for custom charsets used in mask attacks.
-// Each charset string is written to a separate temporary file.
-// Empty charset strings are skipped. Returns file handles or an error if creation fails.
-// NOTE: Intentionally mutates charsets[i] in-place, replacing charset strings with
-// the temp file paths so that toCmdArgs can reference them in --custom-charset flags.
-func createCharsetFiles(charsets []string) ([]*os.File, error) {
+// Each non-empty charset string is written to a separate temporary file.
+// The input slice is never mutated: the returned resolved slice is a copy where each
+// non-empty entry is replaced by its temp file path (empty entries are preserved by
+// position), so callers can reference them in --custom-charset flags. Returns the open
+// file handles, the resolved paths, or an error if creation fails.
+func createCharsetFiles(outPath string, charsets []string) ([]*os.File, []string, error) {
 	charsetFiles := make([]*os.File, 0, len(charsets))
+	resolved := make([]string, len(charsets))
+	copy(resolved, charsets)
 
 	closeAll := func() {
 		for _, f := range charsetFiles {
@@ -557,22 +581,22 @@ func createCharsetFiles(charsets []string) ([]*os.File, error) {
 			continue
 		}
 
-		charsetFile, err := createTempFile(agentstate.State.OutPath, "charset*", filePermissions)
+		charsetFile, err := createTempFile(outPath, "charset*", filePermissions)
 		if err != nil {
 			closeAll()
-			return nil, fmt.Errorf("couldn't create charset file: %w", err)
+			return nil, nil, fmt.Errorf("couldn't create charset file: %w", err)
 		}
 
 		if _, err := charsetFile.WriteString(charset); err != nil {
 			_ = charsetFile.Close()
 			_ = os.Remove(charsetFile.Name())
 			closeAll()
-			return nil, fmt.Errorf("writing charset file: %w", err)
+			return nil, nil, fmt.Errorf("writing charset file: %w", err)
 		}
 
-		charsets[i] = charsetFile.Name()
+		resolved[i] = charsetFile.Name()
 		charsetFiles = append(charsetFiles, charsetFile)
 	}
 
-	return charsetFiles, nil
+	return charsetFiles, resolved, nil
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 )
 
 func TestParseHashInfoLine(t *testing.T) {
@@ -194,7 +193,7 @@ func TestBenchmarkLineRe(t *testing.T) {
 func TestHandleBenchmarkStdOutLine_ValidLine(t *testing.T) {
 	t.Parallel()
 
-	var results []display.BenchmarkResult
+	var results []Result
 
 	handleBenchmarkStdOutLine("1:0:MD5:100:50:1234567.89", &results, nil)
 
@@ -214,7 +213,7 @@ func TestHandleBenchmarkStdOutLine_DeviceNameEnrichment(t *testing.T) {
 		{ID: 1, Name: "NVIDIA GeForce RTX 3090", Type: "GPU", Backend: "OpenCL", IsAvailable: true},
 	})
 
-	var results []display.BenchmarkResult
+	var results []Result
 
 	handleBenchmarkStdOutLine("1:0:MD5:100:50:1234567.89", &results, dm)
 
@@ -229,7 +228,7 @@ func TestHandleBenchmarkStdOutLine_UnknownDevice(t *testing.T) {
 		{ID: 2, Name: "Other GPU", Type: "GPU", Backend: "CUDA", IsAvailable: true},
 	})
 
-	var results []display.BenchmarkResult
+	var results []Result
 
 	handleBenchmarkStdOutLine("1:0:MD5:100:50:1234567.89", &results, dm)
 
@@ -240,7 +239,7 @@ func TestHandleBenchmarkStdOutLine_UnknownDevice(t *testing.T) {
 func TestHandleBenchmarkStdOutLine_MalformedLine(t *testing.T) {
 	t.Parallel()
 
-	var results []display.BenchmarkResult
+	var results []Result
 
 	handleBenchmarkStdOutLine("not a benchmark line", &results, nil)
 
@@ -250,7 +249,7 @@ func TestHandleBenchmarkStdOutLine_MalformedLine(t *testing.T) {
 func TestHandleBenchmarkStdOutLine_ScientificNotation(t *testing.T) {
 	t.Parallel()
 
-	var results []display.BenchmarkResult
+	var results []Result
 
 	handleBenchmarkStdOutLine("2:1000:NTLM:200:100:1.23e+09", &results, nil)
 

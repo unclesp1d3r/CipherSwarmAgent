@@ -15,7 +15,7 @@ import (
 // because they are shared across attacks and may be reused via checksum-based caching.
 // It is idempotent — files already removed (e.g., by Session.Cleanup) are silently skipped.
 // Errors during removal are logged but do not halt the cleanup process.
-func CleanupTaskFiles(attackID int64) {
+func CleanupTaskFiles(attackID int64, hashlistPath, restoreFilePath string) {
 	id := strconv.FormatInt(attackID, 10)
 
 	removeTaskFile := func(filePath string) {
@@ -24,9 +24,9 @@ func CleanupTaskFiles(attackID int64) {
 		}
 	}
 
-	hashFile := filepath.Join(agentstate.State.HashlistPath, id+".hsh")
+	hashFile := filepath.Join(hashlistPath, id+".hsh")
 	removeTaskFile(hashFile)
 
-	restoreFile := filepath.Join(agentstate.State.RestoreFilePath, id+".restore")
+	restoreFile := filepath.Join(restoreFilePath, id+".restore")
 	removeTaskFile(restoreFile)
 }

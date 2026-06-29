@@ -1,4 +1,4 @@
-package lib
+package agent
 
 import (
 	"context"
@@ -17,15 +17,29 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
-// stubGetDevicesList replaces getDevicesListFn with a stub that returns mock devices.
-// Returns a cleanup function to restore the original function.
+// stubMetadataProvider is a test double for metadataProvider with configurable
+// behavior for each method.
+type stubMetadataProvider struct {
+	hashcatPathErr error
+	devices        []string
+	devicesErr     error
+}
+
+func (s stubMetadataProvider) setNativeHashcatPath(context.Context) error {
+	return s.hashcatPathErr
+}
+
+func (s stubMetadataProvider) getDevicesList(context.Context) ([]string, error) {
+	return s.devices, s.devicesErr
+}
+
+// stubGetDevicesList injects a metadata provider returning mock devices.
+// Returns a cleanup function to restore the original provider.
 func stubGetDevicesList() func() {
-	original := getDevicesListFn
-	getDevicesListFn = func(_ context.Context) ([]string, error) {
-		return []string{"CPU", "GPU0"}, nil
-	}
+	original := metadataProviderImpl
+	metadataProviderImpl = stubMetadataProvider{devices: []string{"CPU", "GPU0"}}
 	return func() {
-		getDevicesListFn = original
+		metadataProviderImpl = original
 	}
 }
 
@@ -131,14 +145,12 @@ func TestAuthenticateAgent(t *testing.T) {
 
 // TestGetAgentConfiguration tests the GetAgentConfiguration function.
 func TestGetAgentConfiguration(t *testing.T) {
-	// Stub setNativeHashcatPath to avoid actual file system operations
-	originalFn := setNativeHashcatPathFn
+	// Inject a no-op metadata provider to avoid actual file system operations.
+	originalProvider := metadataProviderImpl
 	t.Cleanup(func() {
-		setNativeHashcatPathFn = originalFn
+		metadataProviderImpl = originalProvider
 	})
-	setNativeHashcatPathFn = func(_ context.Context) error {
-		return nil // No-op for tests
-	}
+	metadataProviderImpl = stubMetadataProvider{}
 
 	tests := []struct {
 		name             string
@@ -210,7 +222,7 @@ func TestGetAgentConfiguration(t *testing.T) {
 
 			if tt.expectedError == nil {
 				require.NoError(t, err)
-				require.Equal(t, tt.useNativeHashcat, GetConfiguration().Config.UseNativeHashcat)
+				require.Equal(t, tt.useNativeHashcat, getConfiguration().Config.UseNativeHashcat)
 			} else {
 				require.Error(t, err)
 				testhelpers.AssertErrorType(t, err, tt.expectedError)
@@ -287,17 +299,17 @@ func TestUpdateAgentMetadata(t *testing.T) {
 	}
 }
 
-// TestUpdateAgentMetadata_WithDeviceManager verifies that SetDevicesListManager
-// wires a DeviceManager into getDevicesListFn so UpdateAgentMetadata sends the
+// TestUpdateAgentMetadata_WithDeviceManager verifies that SetMetadataProvider
+// wires a DeviceManager into the metadata provider so UpdateAgentMetadata sends the
 // enumerated device names to the API. Uses a real DeviceManager created via
 // devices.NewDeviceManagerForTest to exercise the full integration path.
 func TestUpdateAgentMetadata_WithDeviceManager(t *testing.T) {
 	t.Cleanup(testhelpers.SetupHTTPMock())
 	t.Cleanup(testhelpers.SetupTestState(123, "https://test.api", "test-token"))
 
-	// Save and restore the original getDevicesListFn.
-	original := getDevicesListFn
-	t.Cleanup(func() { getDevicesListFn = original })
+	// Save and restore the original metadata provider.
+	original := metadataProviderImpl
+	t.Cleanup(func() { metadataProviderImpl = original })
 
 	// Create a real DeviceManager populated with test devices.
 	dm := devices.NewDeviceManagerForTest([]devices.Device{
@@ -305,8 +317,8 @@ func TestUpdateAgentMetadata_WithDeviceManager(t *testing.T) {
 		{ID: 2, Name: "Intel Core i9-12900K", Type: "CPU", Backend: "OpenCL"},
 	})
 
-	// Wire the DeviceManager through the real SetDevicesListManager path.
-	SetDevicesListManager(dm)
+	// Wire the DeviceManager through the real SetMetadataProvider path.
+	SetMetadataProvider(dm)
 
 	// Capture the request body sent to the update-agent endpoint.
 	var capturedDevices []string
@@ -681,44 +693,6 @@ func TestMapConfiguration_NilRecommendedSettings(t *testing.T) {
 	require.Nil(t, result.RecommendedTimeouts)
 	require.Nil(t, result.RecommendedRetry)
 	require.Nil(t, result.RecommendedCircuitBreaker)
-}
-
-// TestUnwrapOr tests the UnwrapOr generic utility function.
-func TestUnwrapOr(t *testing.T) {
-	t.Run("nil pointer returns default", func(t *testing.T) {
-		var p *string
-		require.Equal(t, "default", UnwrapOr(p, "default"))
-	})
-
-	t.Run("non-nil pointer returns value", func(t *testing.T) {
-		s := "hello"
-		require.Equal(t, "hello", UnwrapOr(&s, "default"))
-	})
-
-	t.Run("nil int pointer returns default", func(t *testing.T) {
-		var p *int
-		require.Equal(t, 42, UnwrapOr(p, 42))
-	})
-
-	t.Run("non-nil int pointer returns value", func(t *testing.T) {
-		v := 7
-		require.Equal(t, 7, UnwrapOr(&v, 42))
-	})
-
-	t.Run("nil bool pointer returns default", func(t *testing.T) {
-		var p *bool
-		require.True(t, UnwrapOr(p, true))
-	})
-
-	t.Run("non-nil bool pointer returns value", func(t *testing.T) {
-		v := false
-		require.False(t, UnwrapOr(&v, true))
-	})
-
-	t.Run("zero value pointer returns zero not default", func(t *testing.T) {
-		v := 0
-		require.Equal(t, 0, UnwrapOr(&v, 99))
-	})
 }
 
 // TestLogHeartbeatSent tests the logHeartbeatSent function.

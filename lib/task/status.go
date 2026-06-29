@@ -22,7 +22,13 @@ const (
 // sendStatusUpdate sends a status update to the server for a given task and session.
 // It ensures the update time is set, converts device statuses, and converts hashcat.Status to api.HashcatStatusUpdate.
 // Finally, it sends the status update to the server and handles the response.
-func (m *Manager) sendStatusUpdate(ctx context.Context, update hashcat.Status, task *api.Task, sess *hashcat.Session) {
+func (m *Manager) sendStatusUpdate(
+	ctx context.Context,
+	update hashcat.Status,
+	task *api.Task,
+	sess *hashcat.Session,
+	taskCancel context.CancelFunc,
+) {
 	// Ensure the update time is set
 	if update.Time.IsZero() {
 		update.Time = time.Now()
@@ -38,7 +44,7 @@ func (m *Manager) sendStatusUpdate(ctx context.Context, update hashcat.Status, t
 	// Send status update to the server
 	resp, err := m.tasksClient.SendStatus(ctx, task.Id, taskStatus)
 	if err != nil {
-		handleStatusUpdateError(ctx, err, task, sess)
+		handleStatusUpdateError(ctx, err, task, sess, taskCancel)
 		return
 	}
 
@@ -108,13 +114,13 @@ func (m *Manager) handleSendStatusResponse(ctx context.Context, resp *api.SendSt
 		}
 	case http.StatusAccepted:
 		agentstate.Logger.Debug("Status update sent, but stale")
-		zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash)
+		zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash, m.Config.ZapsPath)
 	default:
 		if resp.StatusCode() >= http.StatusOK && resp.StatusCode() < http.StatusMultipleChoices {
 			agentstate.Logger.Warn("Unexpected success status code for status update",
 				"status_code", resp.StatusCode(), "task_id", task.Id)
 			// Defensively fetch zaps for any other 2xx success code to avoid losing cracked hashes
-			zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash)
+			zap.GetZaps(ctx, m.tasksClient, task, m.sendCrackedHash, m.Config.ZapsPath)
 		} else {
 			agentstate.Logger.Error("Failed to send status update",
 				"status_code", resp.StatusCode(), "task_id", task.Id)
@@ -151,7 +157,7 @@ func (m *Manager) sendCrackedHash(ctx context.Context, timestamp time.Time, hash
 	}
 
 	if agentstate.State.WriteZapsToFile {
-		hashFile := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
+		hashFile := filepath.Join(m.Config.ZapsPath, fmt.Sprintf("%d_clientout.zap", task.Id))
 
 		file, err := os.OpenFile(
 			hashFile,

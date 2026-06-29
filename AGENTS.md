@@ -53,7 +53,7 @@ The agent is a long-lived CLI client interacting with the CipherSwarm server API
 ### Device Validation Flow
 
 - **Manager → DeviceConfig wiring:** Both `benchmark.Manager` and `task.Manager` hold a `DeviceConfig devices.DeviceConfig` field (value type, safe to copy), set via `devices.NewDeviceConfig(rawBackend, rawOpenCL, deviceMgr)` in `agent.StartAgent` and `handleReload`. `DeviceConfig` resolves backend devices based on DeviceManager availability: validated IDs when DM is present (or empty if no valid IDs), raw string forwarding (with format validation) when DM is nil. Managers pass `m.DeviceConfig.ResolvedBackendDevices()` and `m.DeviceConfig.ResolvedOpenCLDevices()` directly to `hashcat.Params.BackendDevices`/`OpenCLDevices` — no intermediate `ValidatedDevices` or resolve functions needed.
-- **Benchmark device enrichment:** `handleBenchmarkStdOutLine` and `drainStdout` in `lib/benchmark/parse.go` accept a `*devices.DeviceManager` parameter for optional device-name enrichment. When available, `BenchmarkResult.DeviceName` is populated from `DeviceManager.GetDevice()`. Pass `nil` when no device manager is available (e.g., in tests). The numeric `result.Device` string must never be replaced — it's used by `createBenchmark` for the API.
+- **Benchmark device enrichment:** `handleBenchmarkStdOutLine` and `drainStdout` in `lib/benchmark/parse.go` accept a `*devices.DeviceManager` parameter for optional device-name enrichment. When available, `benchmark.Result.DeviceName` is populated from `DeviceManager.GetDevice()`. Pass `nil` when no device manager is available (e.g., in tests). The numeric `result.Device` string must never be replaced — it's used by `createBenchmark` for the API.
 - **Benchmark parsing:** `handleBenchmarkStdOutLine` uses a compiled regex (`benchmarkLineRe`) with named submatch constants (`bmGroupDevice`, `bmGroupHashType`, etc.) to parse `--machine-readable --benchmark` output. The regex validates field types at parse time (device/hash-type must be numeric, speed accepts integers/decimals/scientific notation).
 - **handleReload device safety:** Always create a fresh `DeviceManager{}` — never reuse across re-enumeration. Set to `nil` on enumeration failure so managers don't use stale device data.
 - **Availability parsing:** `parseDeviceOutput` detects "Status...: Skipped" and standalone "\* Device #N: Skipped" lines, setting `Device.IsAvailable = false`. `ValidateDeviceIDsDetailed` classifies IDs as valid/unknown/unavailable.
@@ -139,7 +139,7 @@ The project follows standard, idiomatic Go practices (version 1.26+).
 - Use `spf13/viper` for config. Treat `viper.WriteConfig()` failures as non-fatal warnings.
 - **Config access:** Read from `agentstate.State` (wired in `SetupSharedState()`), not `viper.Get*()` directly.
 - Validate numeric/duration config fields in `SetupSharedState()` — clamp invalid values to defaults with a warning.
-- **Server-recommended config validation:** `applyRecommendedSettings` in `lib/agentClient.go` uses `config.ClampDuration`/`config.ClampInt` to cap server values. Never trust server-recommended values without clamping — treat them as external input.
+- **Server-recommended config validation:** `applyRecommendedSettings` in `lib/agent/client.go` uses `config.ClampDuration`/`config.ClampInt` to cap server values. Never trust server-recommended values without clamping — treat them as external input.
 
 ### Tooling
 
