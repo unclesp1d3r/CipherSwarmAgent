@@ -1,10 +1,10 @@
 ---
-title: "Replace platform-specific device detection with DeviceConfig value type"
+title: Replace platform-specific device detection with DeviceConfig value type
 category: architecture-patterns
 tags: [device-detection, hashcat, refactoring, value-type, cross-platform, input-validation]
 module: lib/devices, lib/benchmark, lib/hashcat, lib/agent, lib/task
-symptom: "Platform-specific GetDevices() (lspci, system_profiler, WMI) produced inconsistent device data that did not match what hashcat actually sees; device selection was scattered across 5+ files with duplicated string fields"
-root_cause: "Device detection used OS-level commands instead of hashcat's own -I enumeration, and device selection state (BackendDevices/OpenCLDevices strings) was duplicated across manager structs with no single owner"
+symptom: Platform-specific GetDevices() (lspci, system_profiler, WMI) produced inconsistent device data that did not match what hashcat actually sees; device selection was scattered across 5+ files with duplicated string fields
+root_cause: Device detection used OS-level commands instead of hashcat's own -I enumeration, and device selection state (BackendDevices/OpenCLDevices strings) was duplicated across manager structs with no single owner
 date: 2026-04-01
 ---
 
