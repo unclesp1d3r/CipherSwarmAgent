@@ -2,51 +2,51 @@
 
 ## Device Detection & Enumeration
 
-| Term | Definition | Aliases to avoid |
-|------|-----------|-----------------|
-| **DeviceManager** | A read-only registry of compute devices discovered by running `hashcat -I` | device list, device registry, enumerator |
-| **Device** | A single compute unit (GPU/CPU) enumerated by hashcat, identified by a numeric ID | hardware, card, accelerator |
-| **DeviceConfig** | A value type that encapsulates device selection state and owns the resolution logic for hashcat session parameters | device settings, device preferences |
-| **Backend** | The compute API that hashcat uses to talk to a device — one of OpenCL, CUDA, Metal, or HIP | driver, API, framework |
-| **Capability** | An optional device property parsed from `hashcat -I` output (e.g., processors, clock, memory) | spec, attribute, feature |
-| **Device Enumeration** | The process of running `hashcat -I` and parsing its text output into structured Device records | device detection, device discovery, device scanning |
+| Term                   | Definition                                                                                                         | Aliases to avoid                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| **DeviceManager**      | A read-only registry of compute devices discovered by running `hashcat -I`                                         | device list, device registry, enumerator            |
+| **Device**             | A single compute unit (GPU/CPU) enumerated by hashcat, identified by a numeric ID                                  | hardware, card, accelerator                         |
+| **DeviceConfig**       | A value type that encapsulates device selection state and owns the resolution logic for hashcat session parameters | device settings, device preferences                 |
+| **Backend**            | The compute API that hashcat uses to talk to a device — one of OpenCL, CUDA, Metal, or HIP                         | driver, API, framework                              |
+| **Capability**         | An optional device property parsed from `hashcat -I` output (e.g., processors, clock, memory)                      | spec, attribute, feature                            |
+| **Device Enumeration** | The process of running `hashcat -I` and parsing its text output into structured Device records                     | device detection, device discovery, device scanning |
 
 ## Device Selection & Validation
 
-| Term | Definition | Aliases to avoid |
-|------|-----------|-----------------|
-| **Enabled IDs** | The set of numeric device IDs the agent should pass to hashcat via `--backend-devices` | selected devices, active devices, configured devices |
-| **Validated Devices** | The result of checking Enabled IDs against the DeviceManager, filtering out unknown and unavailable IDs | filtered devices, resolved devices |
-| **3-Tier Resolution** | The DeviceConfig logic that produces the `--backend-devices` flag value: validated IDs when DM present, empty when all invalid, raw string when DM is nil | fallback chain, device fallback, resolution cascade |
-| **Nil DeviceManager** | The state where hashcat -I failed or hasn't run — DeviceConfig forwards raw server strings without validation | enumeration failure, no devices, unknown state |
-| **Unavailable Device** | A device that exists in the enumerated set but has `IsAvailable = false` (hashcat marked it as Skipped) | skipped device, disabled device, offline device |
+| Term                   | Definition                                                                                                                                                | Aliases to avoid                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Enabled IDs**        | The set of numeric device IDs the agent should pass to hashcat via `--backend-devices`                                                                    | selected devices, active devices, configured devices |
+| **Validated Devices**  | The result of checking Enabled IDs against the DeviceManager, filtering out unknown and unavailable IDs                                                   | filtered devices, resolved devices                   |
+| **3-Tier Resolution**  | The DeviceConfig logic that produces the `--backend-devices` flag value: validated IDs when DM present, empty when all invalid, raw string when DM is nil | fallback chain, device fallback, resolution cascade  |
+| **Nil DeviceManager**  | The state where hashcat -I failed or hasn't run — DeviceConfig forwards raw server strings without validation                                             | enumeration failure, no devices, unknown state       |
+| **Unavailable Device** | A device that exists in the enumerated set but has `IsAvailable = false` (hashcat marked it as Skipped)                                                   | skipped device, disabled device, offline device      |
 
 ## Benchmark & Parsing
 
-| Term | Definition | Aliases to avoid |
-|------|-----------|-----------------|
-| **Benchmark** | A hashcat speed test that measures hash-cracking throughput per device per hash type | speed test, performance test |
-| **Benchmark Result** | A parsed output line from `hashcat --machine-readable --benchmark` containing device ID, hash type, runtime, and speed | benchmark entry, benchmark line, benchmark record |
-| **DeviceName** | The human-readable name of a device (e.g., "NVIDIA GeForce RTX 3090") populated from DeviceManager lookup — display-only, never sent to the API | device label, friendly name |
-| **Machine-Readable Output** | Hashcat's colon-delimited output format (`device:hashtype:name:runtime:hashtime:speed`) enabled by `--machine-readable` | raw output, text output |
-| **Capability Detection** | Running `hashcat --hash-info --machine-readable` to discover supported hash types without executing benchmarks | hash type discovery, supported types scan |
+| Term                        | Definition                                                                                                                                      | Aliases to avoid                                  |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| **Benchmark**               | A hashcat speed test that measures hash-cracking throughput per device per hash type                                                            | speed test, performance test                      |
+| **Benchmark Result**        | A parsed output line from `hashcat --machine-readable --benchmark` containing device ID, hash type, runtime, and speed                          | benchmark entry, benchmark line, benchmark record |
+| **DeviceName**              | The human-readable name of a device (e.g., "NVIDIA GeForce RTX 3090") populated from DeviceManager lookup — display-only, never sent to the API | device label, friendly name                       |
+| **Machine-Readable Output** | Hashcat's colon-delimited output format (`device:hashtype:name:runtime:hashtime:speed`) enabled by `--machine-readable`                         | raw output, text output                           |
+| **Capability Detection**    | Running `hashcat --hash-info --machine-readable` to discover supported hash types without executing benchmarks                                  | hash type discovery, supported types scan         |
 
 ## Agent Lifecycle
 
-| Term | Definition | Aliases to avoid |
-|------|-----------|-----------------|
-| **Agent** | A long-lived CLI client that registers with the CipherSwarm server, polls for tasks, and executes hashcat sessions | client, worker, node |
-| **Task** | A server-assigned hash-cracking job with specific attack parameters, hash file, and device constraints | job, work unit, assignment |
-| **Heartbeat** | A periodic signal sent to the server to report the agent's current activity and receive state changes | ping, keepalive, health check |
+| Term              | Definition                                                                                                                       | Aliases to avoid                 |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| **Agent**         | A long-lived CLI client that registers with the CipherSwarm server, polls for tasks, and executes hashcat sessions               | client, worker, node             |
+| **Task**          | A server-assigned hash-cracking job with specific attack parameters, hash file, and device constraints                           | job, work unit, assignment       |
+| **Heartbeat**     | A periodic signal sent to the server to report the agent's current activity and receive state changes                            | ping, keepalive, health check    |
 | **Config Reload** | The process of re-fetching server configuration mid-run, re-enumerating devices, and recreating managers with fresh DeviceConfig | refresh, reconfigure, hot reload |
 
 ## Server Configuration
 
-| Term | Definition | Aliases to avoid |
-|------|-----------|-----------------|
-| **BackendDevices** | The server-provided comma-separated string of device IDs for the `--backend-devices` hashcat flag | backend device string, device list string |
-| **OpenCLDevices** | The server-provided comma-separated string of device type IDs for the `--opencl-device-types` hashcat flag | OpenCL types, device types |
-| **agentConfig** | The server data-transfer object that carries raw configuration strings — not the same as DeviceConfig | server config, raw config |
+| Term               | Definition                                                                                                 | Aliases to avoid                          |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **BackendDevices** | The server-provided comma-separated string of device IDs for the `--backend-devices` hashcat flag          | backend device string, device list string |
+| **OpenCLDevices**  | The server-provided comma-separated string of device type IDs for the `--opencl-device-types` hashcat flag | OpenCL types, device types                |
+| **agentConfig**    | The server data-transfer object that carries raw configuration strings — not the same as DeviceConfig      | server config, raw config                 |
 
 ## Relationships
 
