@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,6 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
@@ -47,13 +47,13 @@ func makeBenchmarkLines(n, device int) []string {
 func TestCreateBenchmark(t *testing.T) {
 	tests := []struct {
 		name          string
-		result        display.BenchmarkResult
+		result        Result
 		expectedError bool
 		checkFields   bool
 	}{
 		{
 			name: "valid benchmark result",
-			result: display.BenchmarkResult{
+			result: Result{
 				HashType:  "0",
 				RuntimeMs: "100",
 				SpeedHs:   "12345.67",
@@ -64,7 +64,7 @@ func TestCreateBenchmark(t *testing.T) {
 		},
 		{
 			name: "invalid hash type",
-			result: display.BenchmarkResult{
+			result: Result{
 				HashType:  "invalid",
 				RuntimeMs: "100",
 				SpeedHs:   "12345.67",
@@ -75,7 +75,7 @@ func TestCreateBenchmark(t *testing.T) {
 		},
 		{
 			name: "invalid runtime",
-			result: display.BenchmarkResult{
+			result: Result{
 				HashType:  "0",
 				RuntimeMs: "invalid",
 				SpeedHs:   "12345.67",
@@ -86,7 +86,7 @@ func TestCreateBenchmark(t *testing.T) {
 		},
 		{
 			name: "invalid speed",
-			result: display.BenchmarkResult{
+			result: Result{
 				HashType:  "0",
 				RuntimeMs: "100",
 				SpeedHs:   "invalid",
@@ -97,7 +97,7 @@ func TestCreateBenchmark(t *testing.T) {
 		},
 		{
 			name: "invalid device",
-			result: display.BenchmarkResult{
+			result: Result{
 				HashType:  "0",
 				RuntimeMs: "100",
 				SpeedHs:   "12345.67",
@@ -131,13 +131,13 @@ func TestCreateBenchmark(t *testing.T) {
 func TestSendBenchmarkResults(t *testing.T) {
 	tests := []struct {
 		name          string
-		results       []display.BenchmarkResult
+		results       []Result
 		setupMock     func(agentID int64)
 		expectedError bool
 	}{
 		{
 			name: "successful benchmark submission with receipt",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -163,7 +163,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name: "successful benchmark submission with 204 legacy",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -179,7 +179,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name: "200 with nil receipt body returns error",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -195,7 +195,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name:    "empty benchmark results",
-			results: []display.BenchmarkResult{},
+			results: []Result{},
 			setupMock: func(_ int64) {
 				// No mock needed — function returns early before API call
 			},
@@ -203,7 +203,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name: "API error during submission",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -219,7 +219,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name: "benchmark results with invalid entries",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -251,7 +251,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name: "200 with negative counts in receipt returns error",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -271,7 +271,7 @@ func TestSendBenchmarkResults(t *testing.T) {
 		},
 		{
 			name: "200 with all-failed receipt returns error",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{
 					HashType:  "0",
 					RuntimeMs: "100",
@@ -322,7 +322,7 @@ func TestSendBenchmarkResults_AllInvalid(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	t.Cleanup(cleanupState)
 
-	allInvalid := []display.BenchmarkResult{
+	allInvalid := []Result{
 		{HashType: "bad", RuntimeMs: "100", SpeedHs: "100.0", Device: "1"},
 		{HashType: "0", RuntimeMs: "bad", SpeedHs: "100.0", Device: "1"},
 		{HashType: "0", RuntimeMs: "100", SpeedHs: "bad", Device: "1"},
@@ -376,7 +376,7 @@ func TestHandleBenchmarkStdOutLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var results []display.BenchmarkResult
+			var results []Result
 			handleBenchmarkStdOutLine(tt.line, &results, nil)
 			assert.Len(t, results, tt.expectedCount)
 
@@ -394,7 +394,7 @@ func TestHandleBenchmarkStdOutLine(t *testing.T) {
 // TestHandleBenchmarkStdOutLine_MultipleLines verifies that successive valid lines
 // are appended to the same results slice.
 func TestHandleBenchmarkStdOutLine_MultipleLines(t *testing.T) {
-	var results []display.BenchmarkResult
+	var results []Result
 
 	handleBenchmarkStdOutLine("1:0:md5:100:50:12345.67", &results, nil)     // DevSkim: ignore DS126858
 	handleBenchmarkStdOutLine("2:100:sha1:200:100:54321.09", &results, nil) // DevSkim: ignore DS126858
@@ -413,7 +413,7 @@ func TestHandleBenchmarkStdOutLine_WithDeviceManager(t *testing.T) {
 		{ID: 2, Name: "Intel Core i9", Type: "CPU", Backend: "OpenCL", Vendor: "Intel", IsAvailable: true},
 	})
 
-	var results []display.BenchmarkResult
+	var results []Result
 
 	handleBenchmarkStdOutLine("1:0:md5:100:50:12345.67", &results, dm)     // DevSkim: ignore DS126858
 	handleBenchmarkStdOutLine("2:100:sha1:200:100:54321.09", &results, dm) // DevSkim: ignore DS126858
@@ -471,10 +471,10 @@ func TestHandleBenchmarkStdErrLine(t *testing.T) {
 	}
 }
 
-// TestCreateBenchmark_FieldMapping verifies that all fields from display.BenchmarkResult
+// TestCreateBenchmark_FieldMapping verifies that all fields from Result
 // are correctly mapped to the api.HashcatBenchmark struct.
 func TestCreateBenchmark_FieldMapping(t *testing.T) {
-	result := display.BenchmarkResult{
+	result := Result{
 		HashType:  "1000",
 		RuntimeMs: "5000",
 		SpeedHs:   "999999.99",
@@ -551,7 +551,7 @@ func TestUpdateBenchmarks_CachedAllAlreadySubmitted(t *testing.T) {
 	t.Cleanup(cleanupState)
 
 	// Pre-populate cache with all-submitted results
-	submitted := []display.BenchmarkResult{
+	submitted := []Result{
 		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "12345.67", Submitted: true},
 		{Device: "2", HashType: "100", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "54321.09", Submitted: true},
 	}
@@ -581,7 +581,7 @@ func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 	t.Cleanup(cleanupState)
 
 	// Pre-populate cache with mixed submitted/unsubmitted
-	mixed := []display.BenchmarkResult{
+	mixed := []Result{
 		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "12345.67", Submitted: true},
 		{Device: "2", HashType: "100", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "54321.09"},
 	}
@@ -603,22 +603,22 @@ func TestUpdateBenchmarks_CachedPartiallySubmitted(t *testing.T) {
 func TestUnsubmittedResults(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    []display.BenchmarkResult
+		input    []Result
 		expected int
 	}{
 		{
 			name:     "all unsubmitted",
-			input:    []display.BenchmarkResult{{HashType: "0"}, {HashType: "1"}},
+			input:    []Result{{HashType: "0"}, {HashType: "1"}},
 			expected: 2,
 		},
 		{
 			name:     "all submitted",
-			input:    []display.BenchmarkResult{{HashType: "0", Submitted: true}, {HashType: "1", Submitted: true}},
+			input:    []Result{{HashType: "0", Submitted: true}, {HashType: "1", Submitted: true}},
 			expected: 0,
 		},
 		{
 			name:     "mixed",
-			input:    []display.BenchmarkResult{{HashType: "0", Submitted: true}, {HashType: "1"}},
+			input:    []Result{{HashType: "0", Submitted: true}, {HashType: "1"}},
 			expected: 1,
 		},
 		{
@@ -628,7 +628,7 @@ func TestUnsubmittedResults(t *testing.T) {
 		},
 		{
 			name:     "empty input",
-			input:    []display.BenchmarkResult{},
+			input:    []Result{},
 			expected: 0,
 		},
 	}
@@ -645,14 +645,14 @@ func TestUnsubmittedResults(t *testing.T) {
 func TestAllSubmitted(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    []display.BenchmarkResult
+		input    []Result
 		expected bool
 	}{
-		{name: "all submitted", input: []display.BenchmarkResult{{Submitted: true}, {Submitted: true}}, expected: true},
-		{name: "none submitted", input: []display.BenchmarkResult{{}, {}}, expected: false},
-		{name: "mixed", input: []display.BenchmarkResult{{Submitted: true}, {}}, expected: false},
+		{name: "all submitted", input: []Result{{Submitted: true}, {Submitted: true}}, expected: true},
+		{name: "none submitted", input: []Result{{}, {}}, expected: false},
+		{name: "mixed", input: []Result{{Submitted: true}, {}}, expected: false},
 		{name: "nil", input: nil, expected: true},
-		{name: "empty", input: []display.BenchmarkResult{}, expected: true},
+		{name: "empty", input: []Result{}, expected: true},
 	}
 
 	for _, tt := range tests {
@@ -703,7 +703,7 @@ func TestMarkSubmitted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := make([]display.BenchmarkResult, tt.count)
+			results := make([]Result, tt.count)
 			markSubmitted(results, tt.startIdx, tt.endIdx)
 			for i, r := range results {
 				assert.Equal(t, tt.expected[i], r.Submitted, "index %d", i)
@@ -1074,7 +1074,7 @@ func TestDrainStdout_BufferedLines(t *testing.T) {
 	sess, err := testhelpers.NewMockSession("drain-test")
 	require.NoError(t, err)
 
-	var results []display.BenchmarkResult
+	var results []Result
 
 	// Buffer valid benchmark lines
 	sess.StdoutLines <- "1:0:name:100:50:1000.0"
@@ -1093,7 +1093,7 @@ func TestDrainStdout_EmptyChannel(t *testing.T) {
 	sess, err := testhelpers.NewMockSession("drain-empty")
 	require.NoError(t, err)
 
-	var results []display.BenchmarkResult
+	var results []Result
 
 	drainStdout(sess, &results, nil)
 
@@ -1126,9 +1126,9 @@ func TestSubmitBatchIfReady_ExactBoundary(t *testing.T) {
 	mgr := NewManager(agentstate.State.GetAPIClient().Agents())
 
 	// Exactly benchmarkBatchSize results — should trigger batch
-	results := make([]display.BenchmarkResult, benchmarkBatchSize)
+	results := make([]Result, benchmarkBatchSize)
 	for i := range results {
-		results[i] = display.BenchmarkResult{
+		results[i] = Result{
 			Device: "1", HashType: strconv.Itoa(i),
 			RuntimeMs: "100", SpeedHs: "1000.0",
 		}
@@ -1144,8 +1144,30 @@ func TestSubmitBatchIfReady_ExactBoundary(t *testing.T) {
 func TestSubmitBatchIfReady_BelowBoundary(t *testing.T) {
 	mgr := NewManager(nil)
 
-	results := make([]display.BenchmarkResult, benchmarkBatchSize-1)
+	results := make([]Result, benchmarkBatchSize-1)
 	newIdx := mgr.submitBatchIfReady(context.Background(), results, 0)
 	assert.Equal(t, 0, newIdx, "should not have submitted below batch size")
 	assert.False(t, allSubmitted(results))
+}
+
+// TestKillAndDrain_NoDeadlock verifies that killAndDrain returns within the
+// flush grace period even when the session has no backing process (mock
+// session, proc=nil). DoneChan is never signaled so the timer branch fires.
+func TestKillAndDrain_NoDeadlock(t *testing.T) {
+	cleanupState := testhelpers.SetupMinimalTestState(789)
+	t.Cleanup(cleanupState)
+
+	sess := hashcat.NewTestSession(true)
+	// Must return within processFlushTimeout (100ms) + test overhead.
+	// Any deadlock here is a regression in the helper.
+	done := make(chan struct{})
+	go func() {
+		killAndDrain(sess, "test kill message")
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("killAndDrain did not return; deadlock regression")
+	}
 }

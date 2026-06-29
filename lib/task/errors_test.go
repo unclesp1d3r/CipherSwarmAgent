@@ -36,24 +36,34 @@ func assertSubmitErrorCalledIfAPIError(t *testing.T, err error) {
 // TestHandleStatusUpdateError tests the handleStatusUpdateError function.
 func TestHandleStatusUpdateError(t *testing.T) {
 	tests := []struct {
-		name string
-		err  error
-		task *api.Task
+		name             string
+		err              error
+		task             *api.Task
+		wantCancelCalled bool
 	}{
 		{
-			name: "APIError_ClientError",
-			err:  testhelpers.NewValidationAPIError("status update error"),
-			task: testhelpers.NewTestTask(456, 789),
+			name:             "APIError_ClientError",
+			err:              testhelpers.NewValidationAPIError("status update error"),
+			task:             testhelpers.NewTestTask(456, 789),
+			wantCancelCalled: false,
 		},
 		{
-			name: "APIError_NotFound",
-			err:  testhelpers.NewAPIError(http.StatusNotFound, "not found"),
-			task: testhelpers.NewTestTask(456, 789),
+			name:             "APIError_NotFound",
+			err:              testhelpers.NewAPIError(http.StatusNotFound, "not found"),
+			task:             testhelpers.NewTestTask(456, 789),
+			wantCancelCalled: true,
 		},
 		{
-			name: "generic error",
-			err:  errors.New("generic error"),
-			task: testhelpers.NewTestTask(456, 789),
+			name:             "APIError_Gone",
+			err:              testhelpers.NewAPIError(http.StatusGone, "gone"),
+			task:             testhelpers.NewTestTask(456, 789),
+			wantCancelCalled: true,
+		},
+		{
+			name:             "generic error",
+			err:              errors.New("generic error"),
+			task:             testhelpers.NewTestTask(456, 789),
+			wantCancelCalled: false,
 		},
 	}
 
@@ -76,84 +86,59 @@ func TestHandleStatusUpdateError(t *testing.T) {
 			}
 			t.Cleanup(sess.Cleanup)
 
+			cancelCalled := false
+			taskCancel := func() { cancelCalled = true }
+
 			// This function doesn't return an error
-			handleStatusUpdateError(context.Background(), tt.err, tt.task, sess)
+			handleStatusUpdateError(context.Background(), tt.err, tt.task, sess, taskCancel)
+
+			assert.Equal(t, tt.wantCancelCalled, cancelCalled,
+				"taskCancel invocation should match the 404/410 classification")
 		})
 	}
 }
 
-// TestHandleTaskNotFound tests the handleTaskNotFound function.
+// TestHandleTaskNotFound asserts that a not-found task signals taskCancel so the
+// event loop (the sole owner of Kill+Cleanup) tears the session down — preventing
+// the P1 stall where the handler killed inline and the loop blocked until the 24h timer.
 func TestHandleTaskNotFound(t *testing.T) {
-	tests := []struct {
-		name string
-		task *api.Task
-	}{
-		{
-			name: "task not found",
-			task: testhelpers.NewTestTask(456, 789),
-		},
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	sess, err := testhelpers.NewMockSession("test-session")
+	if err != nil {
+		t.Skipf("Skipping test: failed to create mock session: %v", err)
+		return
 	}
+	t.Cleanup(sess.Cleanup)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			t.Cleanup(cleanupHTTP)
+	cancelCalled := false
+	taskCancel := func() { cancelCalled = true }
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			t.Cleanup(cleanupState)
+	handleTaskNotFound(context.Background(), testhelpers.NewTestTask(456, 789), sess, taskCancel)
 
-			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
-
-			// Create a mock session
-			sess, err := testhelpers.NewMockSession("test-session")
-			if err != nil {
-				t.Skipf("Skipping test: failed to create mock session: %v", err)
-				return
-			}
-			t.Cleanup(sess.Cleanup)
-
-			// This function doesn't return an error
-			handleTaskNotFound(context.Background(), tt.task, sess)
-		})
-	}
+	assert.True(t, cancelCalled, "handleTaskNotFound must signal taskCancel")
 }
 
-// TestHandleTaskGone tests the handleTaskGone function.
+// TestHandleTaskGone asserts that a gone task signals taskCancel rather than
+// killing the session inline.
 func TestHandleTaskGone(t *testing.T) {
-	tests := []struct {
-		name string
-		task *api.Task
-	}{
-		{
-			name: "task gone",
-			task: testhelpers.NewTestTask(456, 789),
-		},
+	cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
+	t.Cleanup(cleanupState)
+
+	sess, err := testhelpers.NewMockSession("test-session")
+	if err != nil {
+		t.Skipf("Skipping test: failed to create mock session: %v", err)
+		return
 	}
+	t.Cleanup(sess.Cleanup)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cleanupHTTP := testhelpers.SetupHTTPMock()
-			t.Cleanup(cleanupHTTP)
+	cancelCalled := false
+	taskCancel := func() { cancelCalled = true }
 
-			cleanupState := testhelpers.SetupTestState(123, "https://test.api", "test-token")
-			t.Cleanup(cleanupState)
+	handleTaskGone(context.Background(), testhelpers.NewTestTask(456, 789), sess, taskCancel)
 
-			// Mock SubmitErrorAgent endpoint
-			testhelpers.MockSubmitErrorSuccess(123)
-
-			// Create a mock session
-			sess, err := testhelpers.NewMockSession("test-session")
-			if err != nil {
-				t.Skipf("Skipping test: failed to create mock session: %v", err)
-				return
-			}
-			t.Cleanup(sess.Cleanup)
-
-			// This function doesn't return an error
-			handleTaskGone(context.Background(), tt.task, sess)
-		})
-	}
+	assert.True(t, cancelCalled, "handleTaskGone must signal taskCancel")
 }
 
 // TestHandleAcceptTaskError tests the handleAcceptTaskError function.

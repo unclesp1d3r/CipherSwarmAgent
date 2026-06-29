@@ -33,6 +33,10 @@ const (
 	DefaultInsecureDownloads = false
 	// DefaultMaxHeartbeatBackoff is the max heartbeat backoff multiplier (caps at 64x).
 	DefaultMaxHeartbeatBackoff = 6
+	// MaxBackoffShift caps exponential-backoff shift exponents (1 << n) so a large
+	// retry count or backoff multiplier cannot overflow time.Duration into a
+	// negative value. 1<<20 (~1e6 * base) already dwarfs any sane backoff.
+	MaxBackoffShift = 20
 	// DefaultConnectTimeout is the TCP connect timeout for API requests.
 	DefaultConnectTimeout = 10 * time.Second
 	// DefaultReadTimeout is the read timeout for API responses.
@@ -57,6 +61,9 @@ const (
 // MaxReasonableTimeout caps server-recommended timeout values to prevent a
 // misconfigured server from setting absurdly large timeouts (e.g., 24 hours).
 const MaxReasonableTimeout = 5 * time.Minute
+
+// AgentVersion is the current version of the agent software.
+const AgentVersion = "0.5.5"
 
 // MaxReasonableRetries caps server-recommended retry count to prevent excessive
 // retry storms from a misconfigured server.
@@ -201,6 +208,11 @@ func SetupSharedState() {
 	agentstate.State.StatusTimer = viper.GetInt(
 		"status_timer",
 	) // Set the status timer in the shared state
+	if agentstate.State.StatusTimer < 1 {
+		agentstate.Logger.Warn("status_timer must be >= 1, using default",
+			"configured", agentstate.State.StatusTimer, "default", DefaultStatusTimer)
+		agentstate.State.StatusTimer = DefaultStatusTimer
+	}
 	agentstate.State.WriteZapsToFile = viper.GetBool(
 		"write_zaps_to_file",
 	) // Set the write zaps to file flag in the shared state
@@ -246,6 +258,10 @@ func SetupSharedState() {
 		agentstate.Logger.Warn("max_heartbeat_backoff must be >= 0, using default",
 			"configured", agentstate.State.MaxHeartbeatBackoff, "default", DefaultMaxHeartbeatBackoff)
 		agentstate.State.MaxHeartbeatBackoff = DefaultMaxHeartbeatBackoff
+	} else if agentstate.State.MaxHeartbeatBackoff > MaxBackoffShift {
+		agentstate.Logger.Warn("max_heartbeat_backoff exceeds safe ceiling, clamping",
+			"configured", agentstate.State.MaxHeartbeatBackoff, "ceiling", MaxBackoffShift)
+		agentstate.State.MaxHeartbeatBackoff = MaxBackoffShift
 	}
 
 	agentstate.State.SleepOnFailure = viper.GetDuration("sleep_on_failure")

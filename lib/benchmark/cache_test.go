@@ -13,15 +13,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
 // newSampleBenchmarkResults returns a fresh slice of benchmark results for each
 // test invocation. This prevents mutation (e.g., Submitted flag changes) from
 // leaking across subtests.
-func newSampleBenchmarkResults() []display.BenchmarkResult {
-	return []display.BenchmarkResult{
+func newSampleBenchmarkResults() []Result {
+	return []Result{
 		{
 			Device:     "1",
 			HashType:   "0",
@@ -42,7 +41,7 @@ func newSampleBenchmarkResults() []display.BenchmarkResult {
 func TestSaveBenchmarkCache(t *testing.T) {
 	tests := []struct {
 		name        string
-		results     []display.BenchmarkResult
+		results     []Result
 		setupPath   bool
 		expectError bool
 	}{
@@ -60,7 +59,7 @@ func TestSaveBenchmarkCache(t *testing.T) {
 		},
 		{
 			name:        "saves empty slice",
-			results:     []display.BenchmarkResult{},
+			results:     []Result{},
 			setupPath:   true,
 			expectError: false,
 		},
@@ -91,7 +90,7 @@ func TestSaveBenchmarkCache(t *testing.T) {
 			data, readErr := os.ReadFile(agentstate.State.BenchmarkCachePath)
 			require.NoError(t, readErr)
 
-			var loaded []display.BenchmarkResult
+			var loaded []Result
 			require.NoError(t, json.Unmarshal(data, &loaded))
 			assert.Equal(t, tt.results, loaded)
 		})
@@ -122,7 +121,7 @@ func TestSaveBenchmarkCache_SubmittedField(t *testing.T) {
 
 	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
-	results := []display.BenchmarkResult{
+	results := []Result{
 		{Device: "1", HashType: "0", RuntimeMs: "100", HashTimeMs: "50", SpeedHs: "100.0", Submitted: true},
 		{Device: "2", HashType: "1", RuntimeMs: "200", HashTimeMs: "100", SpeedHs: "200.0"},
 	}
@@ -265,7 +264,7 @@ func TestSaveThenLoadBenchmarkCache(t *testing.T) {
 func TestCacheAndSubmitBenchmarks(t *testing.T) {
 	tests := []struct {
 		name                   string
-		results                []display.BenchmarkResult
+		results                []Result
 		setupCachePath         func(t *testing.T) string
 		setupMock              func()
 		expectError            bool
@@ -332,7 +331,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 		},
 		{
 			name: "all already submitted skips send",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 				{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0", Submitted: true},
 			},
@@ -346,7 +345,7 @@ func TestCacheAndSubmitBenchmarks(t *testing.T) {
 		},
 		{
 			name: "partially submitted sends only unsubmitted",
-			results: []display.BenchmarkResult{
+			results: []Result{
 				{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 				{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
 			},
@@ -492,7 +491,7 @@ func TestTrySubmitCachedBenchmarks_AllSubmittedInCache(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	t.Cleanup(cleanupState)
 
-	submitted := []display.BenchmarkResult{
+	submitted := []Result{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0", Submitted: true},
 	}
@@ -520,7 +519,7 @@ func TestTrySubmitCachedBenchmarks_PartiallySubmitted(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	t.Cleanup(cleanupState)
 
-	mixed := []display.BenchmarkResult{
+	mixed := []Result{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
 	}
@@ -551,7 +550,7 @@ func TestTrySubmitCachedBenchmarks_MixedCacheServerFailure(t *testing.T) {
 	cleanupState := testhelpers.SetupTestState(789, "https://test.api", "test-token")
 	t.Cleanup(cleanupState)
 
-	mixed := []display.BenchmarkResult{
+	mixed := []Result{
 		{Device: "1", HashType: "0", RuntimeMs: "100", SpeedHs: "100.0", Submitted: true},
 		{Device: "2", HashType: "1", RuntimeMs: "200", SpeedHs: "200.0"},
 	}

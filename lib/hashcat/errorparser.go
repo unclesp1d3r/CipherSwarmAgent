@@ -689,37 +689,29 @@ func extractHashfileAccessContext(_ string, submatch []string) map[string]any {
 	}
 }
 
-// extractKernelBuildContext extracts device ID and kernel path from kernel build failures.
+// extractKernelContext returns an extractor for kernel build/create failures.
 // submatch: [full, deviceID, kernelPath]
-func extractKernelBuildContext(_ string, submatch []string) map[string]any {
-	ctx := map[string]any{
-		"error_type": "kernel_build_failed",
+func extractKernelContext(errorType string) contextExtractor {
+	return func(_ string, submatch []string) map[string]any {
+		ctx := map[string]any{
+			"error_type": errorType,
+		}
+
+		if deviceID, err := strconv.Atoi(submatch[1]); err == nil {
+			ctx["device_id"] = deviceID
+		}
+
+		ctx["kernel_path"] = submatch[2]
+
+		return ctx
 	}
-
-	if deviceID, err := strconv.Atoi(submatch[1]); err == nil {
-		ctx["device_id"] = deviceID
-	}
-
-	ctx["kernel_path"] = submatch[2]
-
-	return ctx
 }
 
-// extractKernelCreateContext extracts device ID and kernel path from kernel create failures.
-// submatch: [full, deviceID, kernelPath]
-func extractKernelCreateContext(_ string, submatch []string) map[string]any {
-	ctx := map[string]any{
-		"error_type": "kernel_create_failed",
-	}
-
-	if deviceID, err := strconv.Atoi(submatch[1]); err == nil {
-		ctx["device_id"] = deviceID
-	}
-
-	ctx["kernel_path"] = submatch[2]
-
-	return ctx
-}
+// Kernel build and create failures share the same extraction logic, differing only by error_type.
+var (
+	extractKernelBuildContext  = extractKernelContext("kernel_build_failed")
+	extractKernelCreateContext = extractKernelContext("kernel_create_failed")
+)
 
 // extractHashModeContext extracts hash mode from "Invalid hash-mode" errors.
 // submatch: [full, hashMode]

@@ -559,6 +559,20 @@ func TestClassifyStderr_KernelBuildContext(t *testing.T) {
 	)
 }
 
+func TestClassifyStderr_KernelCreateContext(t *testing.T) {
+	info := ClassifyStderr(
+		"* Device #2: Kernel /usr/share/hashcat/OpenCL/m00020_a0-pure.cl create failed.",
+	)
+
+	require.NotNil(t, info.Context)
+	assert.Equal(t, "kernel_create_failed", info.Context["error_type"])
+	assert.Equal(t, 2, info.Context["device_id"])
+	assert.Equal(t,
+		"/usr/share/hashcat/OpenCL/m00020_a0-pure.cl",
+		info.Context["kernel_path"],
+	)
+}
+
 func TestClassifyStderr_InvalidHashModeContext(t *testing.T) {
 	info := ClassifyStderr("Invalid hash-mode '99999' selected.")
 

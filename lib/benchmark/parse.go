@@ -52,7 +52,7 @@ var hashInfoLineRe = regexp.MustCompile(`^\s*(\d+)\s*\|`) //nolint:gochecknoglob
 
 // handleBenchmarkStdOutLine processes a line of benchmark output, extracting relevant data and appending it to result.
 // When dm is non-nil, it enriches the result with the human-readable device name looked up from the DeviceManager.
-func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult, dm *devices.DeviceManager) {
+func handleBenchmarkStdOutLine(line string, results *[]Result, dm *devices.DeviceManager) {
 	matches := benchmarkLineRe.FindStringSubmatch(line)
 	if len(matches) != benchmarkMatchGroups {
 		agentstate.Logger.Debug("Unknown benchmark line", "length", len(line))
@@ -60,7 +60,7 @@ func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult, 
 		return
 	}
 
-	result := display.BenchmarkResult{
+	result := Result{
 		Device:     matches[bmGroupDevice],
 		HashType:   matches[bmGroupHashType],
 		RuntimeMs:  matches[bmGroupRuntime],
@@ -76,14 +76,14 @@ func handleBenchmarkStdOutLine(line string, results *[]display.BenchmarkResult, 
 		}
 	}
 
-	display.Benchmark(result)
+	logBenchmarkResult(result)
 	*results = append(*results, result)
 }
 
 // drainStdout reads and processes any remaining buffered lines from the
 // session's StdoutLines channel. This ensures no benchmark results are lost
 // when DoneChan fires before all buffered output has been consumed.
-func drainStdout(sess *hashcat.Session, results *[]display.BenchmarkResult, dm *devices.DeviceManager) {
+func drainStdout(sess *hashcat.Session, results *[]Result, dm *devices.DeviceManager) {
 	for {
 		select {
 		case line := <-sess.StdoutLines:

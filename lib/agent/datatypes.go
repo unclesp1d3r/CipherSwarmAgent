@@ -1,4 +1,4 @@
-package lib
+package agent
 
 // agentConfig holds the various configuration settings for an agent.
 type agentConfig struct {

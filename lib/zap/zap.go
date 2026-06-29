@@ -17,17 +17,19 @@ import (
 )
 
 const (
-	zapLineParts = 2     // Expected number of parts when splitting zap line by colon
-	zapFileMode  = 0o600 // Restrictive permissions for cracked hash data
+	zapPlaintextSeparator = ":"   // Default hash-list separator the server joins hash and plaintext with
+	zapFileMode           = 0o600 // Restrictive permissions for cracked hash data
 )
 
 // GetZaps fetches zap data for a given task, handles errors, and processes the response stream if available.
 // Logs an error if the task is nil, displays job progress, and retrieves zaps via the injected TasksClient.
+// zapsPath is the directory where zap files should be written.
 func GetZaps(
 	ctx context.Context,
 	tasksClient api.TasksClient,
 	task *api.Task,
 	sendCrackedHashFunc func(context.Context, time.Time, string, string, *api.Task),
+	zapsPath string,
 ) {
 	if task == nil {
 		agentstate.Logger.Error("Task is nil")
@@ -50,7 +52,7 @@ func GetZaps(
 		return
 	}
 
-	if err := handleResponseStream(ctx, task, responseStream, sendCrackedHashFunc); err != nil {
+	if err := handleResponseStream(ctx, task, responseStream, sendCrackedHashFunc, zapsPath); err != nil {
 		agentstate.Logger.Warn("Failed to process zap response stream; cracked hashes may be lost",
 			"task_id", task.Id, "error", err)
 	}
@@ -62,7 +64,7 @@ func removeExistingZapFile(zapFilePath string) error {
 	err := os.Remove(zapFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		agentstate.Logger.Debug("Error removing zap file", "path", zapFilePath, "error", err)
-		return err
+		return fmt.Errorf("removing existing zap file %q: %w", zapFilePath, err)
 	}
 
 	return nil
@@ -100,11 +102,13 @@ func createAndWriteZapFile(ctx context.Context, zapFilePath string, responseStre
 
 // handleResponseStream processes the response stream from a zap request.
 // It writes the stream to a zap file on disk and then processes its contents.
+// zapsPath is the directory where the zap file should be written.
 func handleResponseStream(
 	ctx context.Context,
 	task *api.Task,
 	responseStream io.ReadCloser,
 	sendCrackedHashFunc func(context.Context, time.Time, string, string, *api.Task),
+	zapsPath string,
 ) error {
 	defer func(responseStream io.ReadCloser) {
 		err := responseStream.Close()
@@ -113,7 +117,7 @@ func handleResponseStream(
 		}
 	}(responseStream)
 
-	zapFilePath := filepath.Join(agentstate.State.ZapsPath, fmt.Sprintf("%d.zap", task.Id))
+	zapFilePath := filepath.Join(zapsPath, fmt.Sprintf("%d.zap", task.Id))
 	if err := removeExistingZapFile(zapFilePath); err != nil {
 		// Log but continue — os.OpenFile in createAndWriteZapFile will truncate the file anyway.
 		//nolint:errcheck // LogAndSendError handles logging+sending internally
@@ -149,7 +153,7 @@ func processZapFile(
 		zapFilePath,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("opening zap file %q: %w", zapFilePath, err)
 	}
 	defer func(file *os.File) {
 		err := file.Close()
@@ -162,13 +166,23 @@ func processZapFile(
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		parts := strings.SplitN(line, ":", zapLineParts)
-		if len(parts) != zapLineParts {
+		// The server serializes each cracked entry as `hash<sep>plaintext` using the
+		// hash list's separator (default ":"). Many hash types embed colons (NTLMv2,
+		// Kerberos krb5asrep, PBKDF2 sha256:rounds:salt), so split on the LAST
+		// separator: everything before it is the hash (internal colons preserved),
+		// everything after is the plaintext.
+		//
+		// Limitation (KTD3): a plaintext that itself contains a colon is
+		// misattributed. This is accepted because hash colons are systematic while
+		// plaintext colons are rare, and LastIndex is strictly better than splitting
+		// on the first colon, which truncated every colon-bearing hash.
+		idx := strings.LastIndex(line, zapPlaintextSeparator)
+		if idx < 0 {
 			continue
 		}
 
-		hash := parts[0]
-		plaintext := parts[1]
+		hash := line[:idx]
+		plaintext := line[idx+len(zapPlaintextSeparator):]
 		sendCrackedHashFunc(ctx, time.Now(), hash, plaintext, task)
 	}
 
