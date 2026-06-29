@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"testing"
 
@@ -23,12 +24,24 @@ var (
 	abandonTaskPattern = regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/\d+/set_abandoned$`)
 )
 
-// newTestManager creates a Manager using the current agentstate API client.
+// newTestManager creates a Manager using the current agentstate API client and
+// mirrors the path/timer fields from agentstate.State into m.Config, matching
+// the production injection performed by agent.StartAgent.
 func newTestManager() *Manager {
-	return NewManager(
+	m := NewManager(
 		agentstate.State.GetAPIClient().Tasks(),
 		agentstate.State.GetAPIClient().Attacks(),
 	)
+	m.Config = Config{
+		HashlistPath:           agentstate.State.HashlistPath,
+		RestoreFilePath:        agentstate.State.RestoreFilePath,
+		FilePath:               agentstate.State.FilePath,
+		OutPath:                agentstate.State.OutPath,
+		ZapsPath:               agentstate.State.ZapsPath,
+		StatusTimer:            agentstate.State.StatusTimer,
+		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
+	}
+	return m
 }
 
 // TestGetNewTask tests the Manager.GetNewTask method with various scenarios.
@@ -311,4 +324,45 @@ func TestAbandonTask(t *testing.T) {
 			mgr.AbandonTask(context.Background(), tt.task)
 		})
 	}
+}
+
+// TestCreateJobParams_UsesConfigValues verifies that createJobParams uses path and timer
+// values from m.Config rather than reading them from agentstate.State.
+func TestCreateJobParams_UsesConfigValues(t *testing.T) {
+	t.Cleanup(testhelpers.SetupMinimalTestState(1))
+
+	injectedHashlistPath := t.TempDir()
+	injectedRestoreFilePath := t.TempDir()
+
+	m := &Manager{}
+	m.Config = Config{
+		HashlistPath:           injectedHashlistPath,
+		RestoreFilePath:        injectedRestoreFilePath,
+		OutPath:                "/injected/out",
+		ZapsPath:               "/injected/zaps",
+		FilePath:               "/injected/files",
+		StatusTimer:            42,
+		RetainZapsOnCompletion: true,
+	}
+
+	// Point agentstate to different paths so any accidental State read is detectable.
+	agentstate.State.HashlistPath = "/wrong/hashes"
+	agentstate.State.RestoreFilePath = "/wrong/restore"
+	agentstate.State.OutPath = "/wrong/out"
+	agentstate.State.ZapsPath = "/wrong/zaps"
+	agentstate.State.FilePath = "/wrong/files"
+	agentstate.State.StatusTimer = 99
+
+	attack := &api.Attack{Id: 77, AttackModeHashcat: 0, HashMode: 1000}
+	tsk := testhelpers.NewTestTask(1, 77)
+
+	params := m.createJobParams(tsk, attack)
+
+	assert.Equal(t, filepath.Join(injectedHashlistPath, "77.hsh"), params.HashFile)
+	assert.Equal(t, filepath.Join(injectedRestoreFilePath, "77.restore"), params.RestoreFilePath)
+	assert.Equal(t, "/injected/out", params.OutPath)
+	assert.Equal(t, "/injected/zaps", params.ZapsPath)
+	assert.Equal(t, "/injected/files", params.FilePath)
+	assert.Equal(t, 42, params.StatusTimer)
+	assert.True(t, params.RetainZapsOnCompletion)
 }

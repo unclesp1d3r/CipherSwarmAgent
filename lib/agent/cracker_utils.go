@@ -1,4 +1,4 @@
-package lib
+package agent
 
 import (
 	"context"
@@ -16,7 +16,7 @@ func setNativeHashcatPath(ctx context.Context) error {
 
 	binPath, err := cracker.FindHashcatBinary()
 	if err != nil {
-		agentstate.Logger.Error("Error finding hashcat binary: ", err)
+		agentstate.Logger.Error("error finding hashcat binary", "error", err)
 		cserrors.SendAgentError(ctx, err.Error(), nil, api.SeverityCritical)
 
 		return err

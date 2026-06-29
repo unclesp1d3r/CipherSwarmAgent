@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/spf13/viper"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
-	"github.com/unclesp1d3r/cipherswarmagent/lib"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/apierrors"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/benchmark"
@@ -28,43 +27,71 @@ import (
 
 const (
 	maxBenchmarkRetries = 10 // Stop retrying cached benchmark submission after this many failures
+	// bgBenchStopTimeout bounds how long a reload/new-task waits for the previous
+	// background-benchmark goroutine to exit (its hashcat proc.Wait() teardown)
+	// before giving up. On expiry the restart is skipped to avoid two benchmark
+	// processes contending for the GPU.
+	bgBenchStopTimeout = 600 * time.Millisecond
 )
 
-// Package-level managers — written once in StartAgent, then accessed exclusively
-// from the agent-loop goroutine (startAgentLoop + handleReload). The single-goroutine
-// invariant means no mutex is required, but these must NOT be accessed from the
-// heartbeat goroutine or any other concurrent goroutine.
+// bgBenchHandle bundles a background-benchmark goroutine's cancel func with a
+// done channel that is closed when the goroutine returns. Stored atomically so
+// StartAgent (main goroutine) and the agent loop can coordinate without a race.
+type bgBenchHandle struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+}
+
+// Package-level managers — initialized by initManagers() in StartAgent and rebuilt
+// on each handleReload. They are written and read from a single goroutine at a time
+// (StartAgent before the loop launches, then the agent-loop goroutine), so no mutex
+// is required, but they must NOT be accessed from the heartbeat goroutine or any
+// other concurrent goroutine.
 //
 //nolint:gochecknoglobals // Package-level managers, initialized in StartAgent
 var (
-	benchmarkMgr  *benchmark.Manager
-	taskMgr       *task.Manager
-	deviceMgr     *devices.DeviceManager
-	bgBenchCancel context.CancelFunc
+	benchmarkMgr *benchmark.Manager
+	taskMgr      *task.Manager
+	deviceMgr    *devices.DeviceManager
 )
 
-// StartAgent initializes and starts the CipherSwarm agent.
-func StartAgent() {
-	// Ensure API URL and token are set
-	if viper.GetString("api_url") == "" {
-		agentstate.Logger.Fatal("API URL not set")
+// bgBench holds the current background-benchmark goroutine handle. Unlike the
+// managers above it is written from StartAgent before the loop starts and
+// swapped from the loop goroutine, so it is synchronized with atomic.Pointer.
+//
+//nolint:gochecknoglobals // Synchronized background-benchmark lifecycle handle
+var bgBench atomic.Pointer[bgBenchHandle]
+
+// ErrAPIURLNotSet indicates the api_url configuration value is empty.
+var ErrAPIURLNotSet = errors.New("API URL not set")
+
+// ErrAPITokenNotSet indicates the api_token configuration value is empty.
+var ErrAPITokenNotSet = errors.New("API token not set")
+
+// validateAPICredentials checks that the API URL and token are present in shared
+// state. It is read AFTER SetupSharedState (not via an early viper.GetString) so the
+// values reflect the fully-loaded configuration. Returned as an error rather than a
+// fatal call so the check is testable without exiting the process.
+func validateAPICredentials() error {
+	if agentstate.State.URL == "" {
+		return ErrAPIURLNotSet
 	}
 
-	if viper.GetString("api_token") == "" {
-		agentstate.Logger.Fatal("API token not set")
+	if agentstate.State.APIToken == "" {
+		return ErrAPITokenNotSet
 	}
 
-	// Initialize shared state and logger
-	config.SetupSharedState()
-	initLogger()
+	return nil
+}
 
-	// Create a shared circuit breaker that survives client rebuilds
+// setupAPIClient builds the shared circuit breaker and API client transport chain
+// and stores the client in shared state. Fatal on construction failure.
+func setupAPIClient() {
 	circuitBreaker = api.NewCircuitBreaker(
 		agentstate.State.CircuitBreakerFailureThreshold,
 		agentstate.State.CircuitBreakerTimeout,
 	)
 
-	// Initialize API client with transport chain (timeouts, retry, circuit breaker)
 	apiClient, err := api.NewAgentClient(
 		agentstate.State.URL,
 		agentstate.State.APIToken,
@@ -74,15 +101,16 @@ func StartAgent() {
 		agentstate.Logger.Fatal("Failed to initialize API client", "error", err)
 	}
 	agentstate.State.SetAPIClient(apiClient)
+}
 
-	display.Startup()
-
-	// Check for an existing lock file to prevent multiple instances
+// prepareWorkspace guards against a second instance, creates data directories and
+// the lock file, and clears orphaned hashcat session files from previous runs.
+// The caller is responsible for deferring cleanupLockFile.
+func prepareWorkspace() {
 	if cracker.CheckForExistingClient(agentstate.State.PidFile) {
 		agentstate.Logger.Fatal("Aborting agent start, lock file found", "path", agentstate.State.PidFile)
 	}
 
-	// Create necessary data directories and lock file
 	if err := cracker.CreateDataDirs(); err != nil {
 		agentstate.Logger.Fatal("Error creating data directories", "error", err)
 	}
@@ -91,9 +119,6 @@ func StartAgent() {
 		agentstate.Logger.Fatal("Error creating lock file", "error", err)
 	}
 
-	defer cleanupLockFile(agentstate.State.PidFile)
-
-	// Clean up orphaned session files from previous agent runs.
 	// On POSIX, the session directory is resolved from $HOME, not the binary path,
 	// so cleanup works even when hashcat is not yet installed.
 	binaryPath, binaryErr := cracker.FindHashcatBinary()
@@ -101,125 +126,129 @@ func StartAgent() {
 		agentstate.Logger.Debug("hashcat binary not found, using empty path for session cleanup", "error", binaryErr)
 	}
 	hashcat.CleanupOrphanedSessionFiles(binaryPath)
+}
 
-	// Create context that cancels on OS signal (SIGINT, SIGTERM)
-	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Wrap with a manual cancel so heartbeat StateError can trigger shutdown
-	ctx, cancel := context.WithCancel(signalCtx)
-	defer cancel()
-
-	// Authenticate with the CipherSwarm API
-	if err := lib.AuthenticateAgent(ctx); err != nil {
-		agentstate.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
-	}
-
-	display.Authenticated()
-
-	// Fetch agent configuration, rebuild client with server-recommended settings, update metadata
-	if err := fetchAgentConfig(ctx); err != nil {
-		agentstate.Logger.Fatal("Failed to fetch agent configuration", "error", err)
-	}
-
-	if err := rebuildAPIClient(); err != nil {
-		agentstate.Logger.Fatal("Failed to rebuild API client with server settings", "error", err)
-	}
-
-	// Enumerate compute devices via hashcat -I before sending metadata.
-	// Warn-only on failure so the agent can still start (e.g., first-run before hashcat download).
+// setupDevicesAndMetadata enumerates compute devices and pushes agent metadata to
+// the server. Device enumeration is warn-only (first run may precede hashcat
+// install); metadata failure is fatal.
+func setupDevicesAndMetadata(ctx context.Context) {
 	deviceMgr = &devices.DeviceManager{}
 	if dmErr := deviceMgr.EnumerateDevices(ctx, agentstate.State.HashcatPath); dmErr != nil {
 		agentstate.Logger.Warn("Device enumeration failed, metadata will report no devices", "error", dmErr)
 		deviceMgr = nil
 	}
-	lib.SetDevicesListManager(deviceMgr)
+	SetMetadataProvider(deviceMgr)
 
-	err = lib.UpdateAgentMetadata(ctx)
-	if err != nil {
+	if err := UpdateAgentMetadata(ctx); err != nil {
 		agentstate.Logger.Fatal("Failed to update agent metadata", "error", err)
 	}
 
 	agentstate.Logger.Info("Sent agent metadata to the CipherSwarm API")
+}
 
-	// Start heartbeat loop early so UI can see agent is connected
-	go startHeartbeatLoop(ctx, cancel)
-
-	// Initialize managers
-	client := agentstate.State.GetAPIClient()
-	cfg := lib.GetConfiguration()
-	dc := devices.NewDeviceConfig(cfg.Config.BackendDevices, cfg.Config.OpenCLDevices, deviceMgr)
-
-	benchmarkMgr = benchmark.NewManager(client.Agents())
-	benchmarkMgr.DeviceConfig = dc
-
-	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
-	taskMgr.DeviceConfig = dc
-
-	// Log warnings for unrecognized device IDs at startup.
-	dc.WarnInvalidDevices(agentstate.Logger.Warn)
-
-	// Run benchmarks when the server requests them OR when the user explicitly
-	// passed --force-benchmark. Without this check the CLI flag is silently
-	// ignored whenever the server reports valid benchmarks on file.
+// runBenchmarkPhase submits benchmarks at startup. When benchmarks are needed (or
+// forced) it runs either quick capability detection (deferred mode) or a full
+// benchmark; otherwise it marks benchmarks submitted from the server's valid cache.
+func runBenchmarkPhase(ctx context.Context, benchmarksNeeded bool) {
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 	forceBenchmark := agentstate.State.GetForceBenchmarkRun()
-	if cfg.BenchmarksNeeded || forceBenchmark {
-		if forceBenchmark && !cfg.BenchmarksNeeded {
-			agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
-		}
 
-		if agentstate.State.DeferBenchmarks && !forceBenchmark {
-			// Deferred path: run quick capability detection instead of full benchmarks
-			agentstate.Logger.Info("Deferred benchmarks enabled: running quick capability detection")
-
-			capResults, capErr := benchmarkMgr.RunCapabilityDetection(ctx)
-			if capErr != nil {
-				agentstate.Logger.Fatal("Capability detection failed", "error", capErr)
-			}
-
-			if len(capResults) == 0 {
-				agentstate.Logger.Fatal("Capability detection returned no hash types; " +
-					"check GPU drivers and hashcat installation")
-			}
-
-			if submitErr := benchmarkMgr.SubmitCapabilityResults(ctx, capResults); submitErr != nil {
-				agentstate.Logger.Fatal("Failed to submit capability detection results", "error", submitErr)
-			}
-		} else {
-			// Full benchmark path
-			if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
-				agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
-			}
-		}
-	} else {
+	if !benchmarksNeeded && !forceBenchmark {
 		agentstate.Logger.Info("Server reports valid benchmarks on file, skipping benchmark run")
 		agentstate.State.SetBenchmarksSubmitted(true)
+
+		return
 	}
+
+	if forceBenchmark && !benchmarksNeeded {
+		agentstate.Logger.Info("Force-benchmark flag set, overriding server benchmark status")
+	}
+
+	if agentstate.State.DeferBenchmarks && !forceBenchmark {
+		// Deferred path: run quick capability detection instead of full benchmarks.
+		agentstate.Logger.Info("Deferred benchmarks enabled: running quick capability detection")
+
+		capResults, capErr := benchmarkMgr.RunCapabilityDetection(ctx)
+		if capErr != nil {
+			agentstate.Logger.Fatal("Capability detection failed", "error", capErr)
+		}
+
+		if len(capResults) == 0 {
+			agentstate.Logger.Fatal("Capability detection returned no hash types; " +
+				"check GPU drivers and hashcat installation")
+		}
+
+		if submitErr := benchmarkMgr.SubmitCapabilityResults(ctx, capResults); submitErr != nil {
+			agentstate.Logger.Fatal("Failed to submit capability detection results", "error", submitErr)
+		}
+
+		return
+	}
+
+	// Full benchmark path.
+	if err := benchmarkMgr.UpdateBenchmarks(ctx); err != nil {
+		agentstate.Logger.Fatal("Failed to submit initial benchmarks", "error", err)
+	}
+}
+
+// StartAgent initializes and starts the CipherSwarm agent.
+func StartAgent() {
+	config.SetupSharedState()
+	initLogger()
+
+	if err := validateAPICredentials(); err != nil {
+		agentstate.Logger.Fatal("Missing required API configuration", "error", err)
+	}
+
+	setupAPIClient()
+	display.Startup()
+
+	prepareWorkspace()
+	defer cleanupLockFile(agentstate.State.PidFile)
+
+	// Context that cancels on OS signal; manual cancel lets heartbeat StateError shut down.
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ctx, cancel := context.WithCancel(signalCtx)
+	defer cancel()
+
+	if err := AuthenticateAgent(ctx); err != nil {
+		agentstate.Logger.Fatal("Failed to authenticate with the CipherSwarm API", "error", err)
+	}
+	display.Authenticated()
+
+	if err := fetchAgentConfig(ctx); err != nil {
+		agentstate.Logger.Fatal("Failed to fetch agent configuration", "error", err)
+	}
+	if err := rebuildAPIClient(); err != nil {
+		agentstate.Logger.Fatal("Failed to rebuild API client with server settings", "error", err)
+	}
+
+	setupDevicesAndMetadata(ctx)
+
+	// Start heartbeat loop early so the UI can see the agent is connected.
+	go startHeartbeatLoop(ctx, cancel)
+
+	benchmarksNeeded := initManagers()
+	runBenchmarkPhase(ctx, benchmarksNeeded)
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityStarting)
 
-	// Kill any dangling hashcat processes
 	if cracker.CheckForExistingClient(agentstate.State.HashcatPidFile) {
 		agentstate.Logger.Info("Killed dangling hashcat process")
 	}
 
-	// Start agent loop (heartbeat loop already started above)
+	// Launch background benchmarking BEFORE the loop so the bgBench handle is stored
+	// (atomically) before the loop goroutine can read it on reload/new-task.
+	startBackgroundBenchmarks(ctx)
 	go startAgentLoop(ctx)
 
-	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
-		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called in handleReload
-		bgCtx, bgCancel := context.WithCancel(ctx)
-		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
-	}
-
-	// Wait for context cancellation (OS signal or heartbeat StateError)
+	// Wait for context cancellation (OS signal or heartbeat StateError), then shut down.
 	<-ctx.Done()
 	agentstate.Logger.Debug("Agent context cancelled, shutting down")
-	// Use context.Background() for shutdown messages — must complete even after cancellation
+	// Use context.Background() for shutdown messages — must complete even after cancellation.
 	cserrors.SendAgentError(context.Background(), "Received signal to terminate. Shutting down", nil, api.SeverityInfo)
-	lib.SendAgentShutdown(context.Background())
+	SendAgentShutdown(context.Background())
 	display.ShuttingDown()
 }
 
@@ -232,6 +261,105 @@ func cleanupLockFile(pidFile string) {
 				"path", pidFile, "error", err)
 		}
 	}
+}
+
+// agentIsIdle reports whether the agent is currently waiting (idle), reading the
+// shared activity state. It is injected into background benchmarking so lib/benchmark
+// does not read agentstate directly for activity.
+func agentIsIdle() bool {
+	return agentstate.State.GetCurrentActivity() == agentstate.CurrentActivityWaiting
+}
+
+// startBackgroundBenchmarks launches the background-benchmark goroutine when
+// deferred idle benchmarking is enabled, recording a handle (cancel + done) so a
+// later reload or new task can stop it deterministically. No-op when disabled.
+func startBackgroundBenchmarks(ctx context.Context) {
+	if !agentstate.State.DeferBenchmarks || !agentstate.State.BenchmarkWhileIdle {
+		return
+	}
+
+	//nolint:gosec // G118 - cancel stored in bgBench handle, invoked by stopBackgroundBenchmarks
+	bgCtx, bgCancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	bgBench.Store(&bgBenchHandle{cancel: bgCancel, done: done})
+
+	// Capture the manager in the agent-loop goroutine so the background goroutine
+	// does not read the package-level benchmarkMgr (which handleReload reassigns) —
+	// otherwise a reload during a still-running benchmark would race the read.
+	mgr := benchmarkMgr
+	go func() {
+		defer close(done)
+		mgr.RunBackgroundBenchmarks(bgCtx, agentIsIdle)
+	}()
+}
+
+// stopBackgroundBenchmarks cancels the running background-benchmark goroutine (if
+// any) and waits, bounded by bgBenchStopTimeout, for it to exit. It returns true
+// only once the goroutine has confirmed exit (so a new benchmark may start), and
+// clears the handle. On timeout it returns false AND leaves the handle in place:
+// the old goroutine may still hold a live hashcat process, so the next stop rechecks
+// the same handle rather than a cleared slot — guaranteeing a later poll cannot start
+// a second benchmark that overlaps the still-running one on the GPU.
+func stopBackgroundBenchmarks() bool {
+	handle := bgBench.Load()
+	if handle == nil {
+		return true
+	}
+
+	handle.cancel()
+
+	timer := time.NewTimer(bgBenchStopTimeout)
+	defer timer.Stop()
+
+	select {
+	case <-handle.done:
+		// Confirmed exited — clear the slot (CAS guards against a concurrent replace).
+		bgBench.CompareAndSwap(handle, nil)
+		return true
+	case <-timer.C:
+		// Still running: retain the handle so a later stop observes its done channel,
+		// and refuse the restart so two benchmarks never run at once.
+		agentstate.Logger.Warn(
+			"Background benchmark did not stop within timeout; skipping restart to avoid GPU overlap")
+		return false
+	}
+}
+
+// initManagers rebuilds the benchmark and task managers from the current API
+// client, server configuration, and the package-level deviceMgr — wiring
+// DeviceConfig and task.Config. Shared by StartAgent and handleReload. It reads
+// agentstate (the single legitimate reader) and returns whether the server says
+// benchmarks are needed.
+func initManagers() bool {
+	client := agentstate.State.GetAPIClient()
+	cfg := getConfiguration()
+	dc := devices.NewDeviceConfig(cfg.Config.BackendDevices, cfg.Config.OpenCLDevices, deviceMgr)
+
+	benchmarkMgr = benchmark.NewManager(client.Agents())
+	benchmarkMgr.DeviceConfig = dc
+	benchmarkMgr.Config = benchmark.Config{
+		OutPath:                   agentstate.State.OutPath,
+		ZapsPath:                  agentstate.State.ZapsPath,
+		RetainZapsOnCompletion:    agentstate.State.RetainZapsOnCompletion,
+		EnableAdditionalHashTypes: agentstate.State.EnableAdditionalHashTypes,
+	}
+
+	taskMgr = task.NewManager(client.Tasks(), client.Attacks())
+	taskMgr.DeviceConfig = dc
+	taskMgr.Config = task.Config{
+		HashlistPath:           agentstate.State.HashlistPath,
+		RestoreFilePath:        agentstate.State.RestoreFilePath,
+		FilePath:               agentstate.State.FilePath,
+		OutPath:                agentstate.State.OutPath,
+		ZapsPath:               agentstate.State.ZapsPath,
+		StatusTimer:            agentstate.State.StatusTimer,
+		RetainZapsOnCompletion: agentstate.State.RetainZapsOnCompletion,
+	}
+
+	// Log warnings for unrecognized device IDs.
+	dc.WarnInvalidDevices(agentstate.Logger.Warn)
+
+	return cfg.BenchmarksNeeded
 }
 
 // calculateHeartbeatBackoff computes the exponential backoff duration for heartbeat retries.
@@ -254,6 +382,9 @@ func calculateHeartbeatBackoff(
 	}
 	// Cap the multiplier to prevent overflow
 	multiplier := min(consecutiveFailures, maxBackoffMultiplier)
+	// Defensive shift cap: even if the config clamp were bypassed, the shift can
+	// never overflow time.Duration into a negative value.
+	multiplier = min(multiplier, config.MaxBackoffShift)
 	// Exponential backoff: baseInterval * 2^multiplier
 	return baseInterval * time.Duration(1<<multiplier)
 }
@@ -281,7 +412,7 @@ func startHeartbeatLoop(ctx context.Context, cancel context.CancelFunc) {
 
 	for {
 		err := heartbeat(ctx, cancel)
-		baseInterval := time.Duration(lib.GetConfiguration().Config.AgentUpdateInterval) * time.Second
+		baseInterval := time.Duration(getConfiguration().Config.AgentUpdateInterval) * time.Second
 
 		if err != nil {
 			consecutiveFailures++
@@ -350,7 +481,7 @@ func startAgentLoop(ctx context.Context) {
 			handleNewTask(ctx)
 		}
 
-		sleepTime := time.Duration(lib.GetConfiguration().Config.AgentUpdateInterval) * time.Second
+		sleepTime := time.Duration(getConfiguration().Config.AgentUpdateInterval) * time.Second
 		display.Inactive(sleepTime)
 
 		if sleepWithContext(ctx, sleepTime) {
@@ -382,10 +513,9 @@ func handleReload(ctx context.Context) {
 	}
 
 	// Cancel any running background benchmark goroutine before replacing the manager.
-	if bgBenchCancel != nil {
-		bgBenchCancel()
-		bgBenchCancel = nil
-	}
+	// canRestartBg is false if the old goroutine did not stop in time, in which case
+	// the restart below is skipped to avoid overlapping GPU work.
+	canRestartBg := stopBackgroundBenchmarks()
 
 	// Re-enumerate devices in case hashcat was upgraded or drivers changed.
 	// Always create a fresh DeviceManager so stale device data is never reused.
@@ -398,25 +528,12 @@ func handleReload(ctx context.Context) {
 		)
 		deviceMgr = nil
 	}
-	lib.SetDevicesListManager(deviceMgr)
+	SetMetadataProvider(deviceMgr)
 
-	// Recreate managers with new API client sub-clients and update configs
-	reloadClient := agentstate.State.GetAPIClient()
-	reloadCfg := lib.GetConfiguration()
-	reloadDC := devices.NewDeviceConfig(
-		reloadCfg.Config.BackendDevices, reloadCfg.Config.OpenCLDevices, deviceMgr,
-	)
+	// Recreate managers with new API client sub-clients and updated configs.
+	benchmarksNeeded := initManagers()
 
-	benchmarkMgr = benchmark.NewManager(reloadClient.Agents())
-	benchmarkMgr.DeviceConfig = reloadDC
-
-	taskMgr = task.NewManager(reloadClient.Tasks(), reloadClient.Attacks())
-	taskMgr.DeviceConfig = reloadDC
-
-	// Log warnings for unrecognized device IDs after reload.
-	reloadDC.WarnInvalidDevices(agentstate.Logger.Warn)
-
-	if reloadCfg.BenchmarksNeeded {
+	if benchmarksNeeded {
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityBenchmarking)
 		// Server-initiated reload must re-run benchmarks (not use stale cache).
 		// Use defer to ensure the flag is always reset even if UpdateBenchmarks panics.
@@ -438,12 +555,10 @@ func handleReload(ctx context.Context) {
 		agentstate.State.SetBenchmarksSubmitted(true)
 	}
 
-	// Restart background benchmarking if deferred mode is active and placeholders may remain.
-	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
-		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called on next reload
-		bgCtx, bgCancel := context.WithCancel(ctx)
-		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
+	// Restart background benchmarking if deferred mode is active and the prior
+	// goroutine stopped cleanly (canRestartBg). If it timed out, skip the restart.
+	if canRestartBg {
+		startBackgroundBenchmarks(ctx)
 	}
 
 	agentstate.State.SetReload(false)
@@ -455,12 +570,8 @@ func handleNewTask(ctx context.Context) {
 		return
 	}
 
-	// Cancel background benchmarks while a task is running to avoid device contention.
-	if bgBenchCancel != nil {
-		bgBenchCancel()
-		bgBenchCancel = nil
-	}
-
+	// GetNewTask only polls the API — it does not use the GPU — so background
+	// benchmarks keep running undisturbed during the poll.
 	newTask, err := taskMgr.GetNewTask(ctx)
 	if err != nil {
 		if errors.Is(err, task.ErrNoTaskAvailable) {
@@ -478,16 +589,18 @@ func handleNewTask(ctx context.Context) {
 		return
 	}
 
-	if newTask != nil {
-		processTask(ctx, newTask)
+	if newTask == nil {
+		return
 	}
 
-	// Restart background benchmarks after task completes.
-	if agentstate.State.DeferBenchmarks && agentstate.State.BenchmarkWhileIdle {
-		//nolint:gosec // G118 - cancel stored in bgBenchCancel, called on next task/reload
-		bgCtx, bgCancel := context.WithCancel(ctx)
-		bgBenchCancel = bgCancel
-		go benchmarkMgr.RunBackgroundBenchmarks(bgCtx)
+	// A real task is about to run — stop background benchmarks now to avoid GPU contention.
+	canRestartBg := stopBackgroundBenchmarks()
+	processTask(ctx, newTask)
+
+	// Restart background benchmarks after the task completes, unless the prior
+	// goroutine did not stop cleanly above.
+	if canRestartBg {
+		startBackgroundBenchmarks(ctx)
 	}
 }
 
@@ -514,6 +627,11 @@ func processTask(ctx context.Context, t *api.Task) {
 		return
 	}
 
+	// cleanupFiles removes this attack's local hashlist and restore files.
+	cleanupFiles := func() {
+		task.CleanupTaskFiles(attack.Id, taskMgr.Config.HashlistPath, taskMgr.Config.RestoreFilePath)
+	}
+
 	display.NewAttack(attack)
 
 	err = taskMgr.AcceptTask(ctx, t)
@@ -524,14 +642,14 @@ func processTask(ctx context.Context, t *api.Task) {
 		if errors.Is(err, task.ErrTaskAcceptNotFound) {
 			// Task vanished before we could accept it — normal race condition.
 			// No server state transition needed; just clean up local files.
-			task.CleanupTaskFiles(attack.Id)
+			cleanupFiles()
 
 			return
 		}
 
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
-		task.CleanupTaskFiles(attack.Id)
+		cleanupFiles()
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return
@@ -541,13 +659,13 @@ func processTask(ctx context.Context, t *api.Task) {
 
 	agentstate.State.SetCurrentActivity(agentstate.CurrentActivityDownloading)
 
-	if err := task.DownloadFiles(ctx, attack); err != nil {
+	if err := task.DownloadFiles(ctx, attack, taskMgr.Config.FilePath, taskMgr.Config.HashlistPath); err != nil {
 		agentstate.Logger.Error("Failed to download files", "error", err)
 		cserrors.SendAgentError(ctx, err.Error(), t, api.SeverityFatal)
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
 		//nolint:contextcheck // must-complete: prevents task starvation on server
 		taskMgr.AbandonTask(context.Background(), t)
-		task.CleanupTaskFiles(attack.Id)
+		cleanupFiles()
 		sleepWithContext(ctx, agentstate.State.SleepOnFailure)
 
 		return
@@ -560,7 +678,7 @@ func processTask(ctx context.Context, t *api.Task) {
 		// cleanup via sess.Cleanup()). This fallback only triggers for
 		// NewHashcatSession failures.
 		agentstate.State.SetCurrentActivity(agentstate.CurrentActivityWaiting)
-		task.CleanupTaskFiles(attack.Id)
+		cleanupFiles()
 
 		return
 	}
@@ -576,7 +694,7 @@ func heartbeat(ctx context.Context, cancel context.CancelFunc) error {
 		agentstate.Logger.Debug("Sending heartbeat")
 	}
 
-	state, err := lib.SendHeartBeat(ctx)
+	state, err := SendHeartBeat(ctx)
 	if err != nil {
 		return err
 	}
@@ -619,7 +737,7 @@ func heartbeat(ctx context.Context, cancel context.CancelFunc) error {
 }
 
 func fetchAgentConfig(ctx context.Context) error {
-	err := lib.GetAgentConfiguration(ctx)
+	err := GetAgentConfiguration(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get agent configuration from the CipherSwarm API: %w", err)
 	}
@@ -627,9 +745,9 @@ func fetchAgentConfig(ctx context.Context) error {
 	// This read-modify-write is safe because fetchAgentConfig is only called
 	// from the single agent-loop goroutine. If this changes, use a mutex or CAS.
 	if agentstate.State.AlwaysUseNativeHashcat {
-		fetchedCfg := lib.GetConfiguration()
+		fetchedCfg := getConfiguration()
 		fetchedCfg.Config.UseNativeHashcat = true
-		lib.SetConfiguration(fetchedCfg)
+		SetConfiguration(fetchedCfg)
 	}
 
 	return nil

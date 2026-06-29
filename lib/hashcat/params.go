@@ -12,8 +12,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
 )
 
 const (
@@ -75,6 +73,15 @@ type Params struct {
 	OpenCLDevices             string   `json:"opencl_devices,omitempty"`     // OpenCL device types (pre-resolved by DeviceConfig)
 	EnableAdditionalHashTypes bool     `json:"enable_additional_hash_types"` // Enable all hash types in benchmark mode
 	RestoreFilePath           string   `json:"restore_file_path,omitempty"`  // Path to restore file for session resumption
+
+	// Runtime configuration injected by the agent at session construction. These are
+	// NOT part of the server API contract (json:"-"); they replace direct agentstate
+	// reads in lib/hashcat so sessions are constructable and testable in isolation.
+	OutPath                string `json:"-"` // Directory for the output file and charset temp files
+	ZapsPath               string `json:"-"` // Directory for zaps (--outfile-check-dir); also cleaned up
+	FilePath               string `json:"-"` // Base directory for wordlist/rule/mask files
+	StatusTimer            int    `json:"-"` // Status/outfile-check timer in seconds
+	RetainZapsOnCompletion bool   `json:"-"` // Whether Cleanup keeps the zaps directory
 }
 
 // Validate verifies that the Params configuration is valid for the specified attack mode.
@@ -222,10 +229,10 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 		"--outfile", outFile,
 		"--status",
 		"--status-json",
-		"--status-timer", strconv.FormatInt(int64(agentstate.State.StatusTimer), 10),
+		"--status-timer", strconv.FormatInt(int64(params.StatusTimer), 10),
 		"--potfile-disable",
-		"--outfile-check-timer", strconv.FormatInt(int64(agentstate.State.StatusTimer), 10),
-		"--outfile-check-dir", agentstate.State.ZapsPath,
+		"--outfile-check-timer", strconv.FormatInt(int64(params.StatusTimer), 10),
+		"--outfile-check-dir", params.ZapsPath,
 		"-a", strconv.FormatInt(params.AttackMode, 10),
 		"-m", strconv.FormatInt(params.HashType, 10),
 	)
@@ -253,39 +260,27 @@ func (params Params) toCmdArgs(session, hashFile, outFile string) ([]string, err
 	}
 
 	if strings.TrimSpace(params.WordListFilename) != "" {
-		wordList, err := safePath(agentstate.State.FilePath, params.WordListFilename)
+		wordList, err := resolveOptionalPath(params.FilePath, params.WordListFilename, ErrWordlistNotOpened)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrWordlistNotOpened, err)
-		}
-
-		if _, err := os.Stat(wordList); os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrWordlistNotOpened, wordList)
+			return nil, err
 		}
 
 		params.WordListFilename = wordList
 	}
 
 	if strings.TrimSpace(params.RuleListFilename) != "" {
-		ruleList, err := safePath(agentstate.State.FilePath, params.RuleListFilename)
+		ruleList, err := resolveOptionalPath(params.FilePath, params.RuleListFilename, ErrRuleListNotOpened)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrRuleListNotOpened, err)
-		}
-
-		if _, err := os.Stat(ruleList); os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrRuleListNotOpened, ruleList)
+			return nil, err
 		}
 
 		params.RuleListFilename = ruleList
 	}
 
 	if strings.TrimSpace(params.MaskListFilename) != "" {
-		maskList, err := safePath(agentstate.State.FilePath, params.MaskListFilename)
+		maskList, err := resolveOptionalPath(params.FilePath, params.MaskListFilename, ErrMaskListNotOpened)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrMaskListNotOpened, err)
-		}
-
-		if _, err := os.Stat(maskList); os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrMaskListNotOpened, maskList)
+			return nil, err
 		}
 
 		params.Mask = maskList
@@ -375,6 +370,25 @@ func safePath(base, filename string) (string, error) {
 	}
 
 	return absJoined, nil
+}
+
+// resolveOptionalPath resolves a relative filename against base using safePath,
+// verifies the result exists on disk, and returns the absolute path.
+// If either check fails, sentinel is returned wrapped around the underlying error.
+func resolveOptionalPath(base, filename string, sentinel error) (string, error) {
+	resolved, err := safePath(base, filename)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", sentinel, err)
+	}
+
+	// Any stat failure (not just not-exist — e.g. permission denied) returns the
+	// sentinel so the caller sees a clear validation error instead of hashcat
+	// failing later on an unusable path.
+	if _, err := os.Stat(resolved); err != nil {
+		return "", fmt.Errorf("%w: %s: %w", sentinel, resolved, err)
+	}
+
+	return resolved, nil
 }
 
 // hashFileReadBufSize is the number of bytes read to check for non-whitespace content.
