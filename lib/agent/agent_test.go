@@ -535,6 +535,28 @@ func TestStopBackgroundBenchmarks_TimeoutSkipsRestart(t *testing.T) {
 
 	assert.False(t, stopBackgroundBenchmarks(), "timeout must signal the caller to skip restart")
 	assert.True(t, cancelCalled, "stop must still cancel the benchmark goroutine")
+	// On timeout the handle is retained (not cleared) so a later stop rechecks it —
+	// this is what prevents a subsequent poll from starting a second, overlapping run.
+	assert.NotNil(t, bgBench.Load(), "a still-running goroutine's handle must be retained on timeout")
+}
+
+// TestStopBackgroundBenchmarks_ZombieSelfHeals verifies that after a stop times out
+// (handle retained), a later stop returns true and clears the slot once the goroutine
+// finally exits — so a restart only becomes possible after confirmed exit, never
+// overlapping the previous run.
+func TestStopBackgroundBenchmarks_ZombieSelfHeals(t *testing.T) {
+	t.Cleanup(func() { bgBench.Store(nil) })
+
+	done := make(chan struct{})
+	bgBench.Store(&bgBenchHandle{cancel: func() {}, done: done})
+
+	require.False(t, stopBackgroundBenchmarks(), "first stop times out and skips restart")
+	require.NotNil(t, bgBench.Load(), "handle retained while goroutine is alive")
+
+	close(done) // goroutine finally exits
+
+	require.True(t, stopBackgroundBenchmarks(), "second stop sees the closed done and permits restart")
+	require.Nil(t, bgBench.Load(), "handle cleared once exit is confirmed")
 }
 
 // TestBgBenchHandle_ConcurrentStoreSwap exercises the atomic handle under

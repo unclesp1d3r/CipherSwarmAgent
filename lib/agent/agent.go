@@ -295,11 +295,13 @@ func startBackgroundBenchmarks(ctx context.Context) {
 
 // stopBackgroundBenchmarks cancels the running background-benchmark goroutine (if
 // any) and waits, bounded by bgBenchStopTimeout, for it to exit. It returns true
-// when it is safe to start a new background benchmark. On timeout it returns false
-// so the caller skips the restart — the old goroutine may still hold a live hashcat
-// process, and overlapping two would contend for the GPU.
+// only once the goroutine has confirmed exit (so a new benchmark may start), and
+// clears the handle. On timeout it returns false AND leaves the handle in place:
+// the old goroutine may still hold a live hashcat process, so the next stop rechecks
+// the same handle rather than a cleared slot — guaranteeing a later poll cannot start
+// a second benchmark that overlaps the still-running one on the GPU.
 func stopBackgroundBenchmarks() bool {
-	handle := bgBench.Swap(nil)
+	handle := bgBench.Load()
 	if handle == nil {
 		return true
 	}
@@ -311,8 +313,12 @@ func stopBackgroundBenchmarks() bool {
 
 	select {
 	case <-handle.done:
+		// Confirmed exited — clear the slot (CAS guards against a concurrent replace).
+		bgBench.CompareAndSwap(handle, nil)
 		return true
 	case <-timer.C:
+		// Still running: retain the handle so a later stop observes its done channel,
+		// and refuse the restart so two benchmarks never run at once.
 		agentstate.Logger.Warn(
 			"Background benchmark did not stop within timeout; skipping restart to avoid GPU overlap")
 		return false
