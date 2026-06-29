@@ -278,7 +278,6 @@ func startBackgroundBenchmarks(ctx context.Context) {
 		return
 	}
 
-	//nolint:gosec // G118 - cancel stored in bgBench handle, invoked by stopBackgroundBenchmarks
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	bgBench.Store(&bgBenchHandle{cancel: bgCancel, done: done})

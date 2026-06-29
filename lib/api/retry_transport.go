@@ -55,7 +55,7 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			}
 			lastErr = err
 			if t.Logger != nil {
-				t.Logger.Debug("API request failed, will retry",
+				t.Logger.DebugContext(req.Context(), "API request failed, will retry",
 					"attempt", attempt+1, "max", maxAttempts, "error", err)
 			}
 			continue
@@ -69,7 +69,7 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		// Retryable status: drain and close body before retry to avoid leaking connections
 		if t.Logger != nil {
-			t.Logger.Debug("API request returned retryable status, will retry",
+			t.Logger.DebugContext(req.Context(), "API request returned retryable status, will retry",
 				"attempt", attempt+1, "max", maxAttempts, "status", resp.StatusCode)
 		}
 		lastStatusCode = resp.StatusCode

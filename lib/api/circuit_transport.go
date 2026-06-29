@@ -20,7 +20,7 @@ type CircuitTransport struct {
 func (ct *CircuitTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !ct.Breaker.Allow() {
 		if ct.Logger != nil {
-			ct.Logger.Warn("Circuit breaker is open, rejecting API request",
+			ct.Logger.WarnContext(req.Context(), "Circuit breaker is open, rejecting API request",
 				"url", req.URL.String())
 		}
 		return nil, fmt.Errorf("%w: server appears unresponsive", ErrCircuitOpen)
@@ -30,7 +30,7 @@ func (ct *CircuitTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	if err != nil {
 		ct.Breaker.RecordFailure()
 		if ct.Logger != nil {
-			ct.Logger.Debug("Circuit breaker recorded failure",
+			ct.Logger.DebugContext(req.Context(), "Circuit breaker recorded failure",
 				"reason", "network_error", "error", err)
 		}
 		return nil, err
@@ -39,7 +39,7 @@ func (ct *CircuitTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	if resp.StatusCode >= http.StatusInternalServerError {
 		ct.Breaker.RecordFailure()
 		if ct.Logger != nil {
-			ct.Logger.Debug("Circuit breaker recorded failure",
+			ct.Logger.DebugContext(req.Context(), "Circuit breaker recorded failure",
 				"reason", "server_error", "status", resp.StatusCode)
 		}
 	} else {
