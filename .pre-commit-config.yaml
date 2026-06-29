@@ -21,7 +21,7 @@ repos:
       - id: check-vcs-permalinks
 
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.11
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
     hooks:
       - id: actionlint
         files: ".github/workflows/"
