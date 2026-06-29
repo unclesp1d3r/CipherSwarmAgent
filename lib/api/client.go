@@ -125,45 +125,27 @@ type agentTasksClient struct {
 }
 
 func (t *agentTasksClient) GetNewTask(ctx context.Context) (*GetNewTaskResponse, error) {
-	resp, err := t.client.GetNewTaskWithResponse(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*GetNewTaskResponse, error) { return t.client.GetNewTaskWithResponse(ctx) },
+		func(r *GetNewTaskResponse) []byte { return r.Body },
+	)
 }
 
 func (t *agentTasksClient) SetTaskAccepted(ctx context.Context, id int64) (*SetTaskAcceptedResponse, error) {
-	resp, err := t.client.SetTaskAcceptedWithResponse(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*SetTaskAcceptedResponse, error) { return t.client.SetTaskAcceptedWithResponse(ctx, id) },
+		func(r *SetTaskAcceptedResponse) []byte { return r.Body },
+	)
 }
 
 func (t *agentTasksClient) SetTaskExhausted(
 	ctx context.Context,
 	id int64,
 ) (*SetTaskExhaustedResponse, error) {
-	resp, err := t.client.SetTaskExhaustedWithResponse(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*SetTaskExhaustedResponse, error) { return t.client.SetTaskExhaustedWithResponse(ctx, id) },
+		func(r *SetTaskExhaustedResponse) []byte { return r.Body },
+	)
 }
 
 func (t *agentTasksClient) SetTaskAbandoned(
@@ -198,16 +180,10 @@ func (t *agentTasksClient) SendStatus(
 	id int64,
 	status HashcatStatusUpdate,
 ) (*SendStatusResponse, error) {
-	resp, err := t.client.SendStatusWithResponse(ctx, id, status)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*SendStatusResponse, error) { return t.client.SendStatusWithResponse(ctx, id, status) },
+		func(r *SendStatusResponse) []byte { return r.Body },
+	)
 }
 
 func (t *agentTasksClient) SendCrack(
@@ -215,29 +191,17 @@ func (t *agentTasksClient) SendCrack(
 	id int64,
 	hashcatResult HashcatResult,
 ) (*SendCrackResponse, error) {
-	resp, err := t.client.SendCrackWithResponse(ctx, id, hashcatResult)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*SendCrackResponse, error) { return t.client.SendCrackWithResponse(ctx, id, hashcatResult) },
+		func(r *SendCrackResponse) []byte { return r.Body },
+	)
 }
 
 func (t *agentTasksClient) GetTaskZaps(ctx context.Context, id int64) (*GetTaskZapsResponse, error) {
-	resp, err := t.client.GetTaskZapsWithResponse(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*GetTaskZapsResponse, error) { return t.client.GetTaskZapsWithResponse(ctx, id) },
+		func(r *GetTaskZapsResponse) []byte { return r.Body },
+	)
 }
 
 // ---------------------------------------------------------------------------
@@ -249,29 +213,17 @@ type agentAttacksClient struct {
 }
 
 func (a *agentAttacksClient) GetAttack(ctx context.Context, id int64) (*GetAttackResponse, error) {
-	resp, err := a.client.GetAttackWithResponse(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*GetAttackResponse, error) { return a.client.GetAttackWithResponse(ctx, id) },
+		func(r *GetAttackResponse) []byte { return r.Body },
+	)
 }
 
 func (a *agentAttacksClient) GetHashList(ctx context.Context, id int64) (*GetHashListResponse, error) {
-	resp, err := a.client.GetHashListWithResponse(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*GetHashListResponse, error) { return a.client.GetHashListWithResponse(ctx, id) },
+		func(r *GetHashListResponse) []byte { return r.Body },
+	)
 }
 
 // ---------------------------------------------------------------------------
@@ -288,16 +240,10 @@ func (a *agentAgentsClient) SendHeartbeat(
 	activity string,
 ) (*SendHeartbeatResponse, error) {
 	body := SendHeartbeatJSONRequestBody{Activity: &activity}
-	resp, err := a.client.SendHeartbeatWithResponse(ctx, id, body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*SendHeartbeatResponse, error) { return a.client.SendHeartbeatWithResponse(ctx, id, body) },
+		func(r *SendHeartbeatResponse) []byte { return r.Body },
+	)
 }
 
 func (a *agentAgentsClient) UpdateAgent(
@@ -305,16 +251,10 @@ func (a *agentAgentsClient) UpdateAgent(
 	id int64,
 	body UpdateAgentJSONRequestBody,
 ) (*UpdateAgentResponse, error) {
-	resp, err := a.client.UpdateAgentWithResponse(ctx, id, body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*UpdateAgentResponse, error) { return a.client.UpdateAgentWithResponse(ctx, id, body) },
+		func(r *UpdateAgentResponse) []byte { return r.Body },
+	)
 }
 
 func (a *agentAgentsClient) SubmitBenchmark(
@@ -322,16 +262,10 @@ func (a *agentAgentsClient) SubmitBenchmark(
 	id int64,
 	body SubmitBenchmarkJSONRequestBody,
 ) (*SubmitBenchmarkResponse, error) {
-	resp, err := a.client.SubmitBenchmarkWithResponse(ctx, id, body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*SubmitBenchmarkResponse, error) { return a.client.SubmitBenchmarkWithResponse(ctx, id, body) },
+		func(r *SubmitBenchmarkResponse) []byte { return r.Body },
+	)
 }
 
 func (a *agentAgentsClient) SubmitErrorAgent(
@@ -339,32 +273,22 @@ func (a *agentAgentsClient) SubmitErrorAgent(
 	id int64,
 	body SubmitErrorAgentJSONRequestBody,
 ) (*SubmitErrorAgentResponse, error) {
-	resp, err := a.client.SubmitErrorAgentWithResponse(ctx, id, body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*SubmitErrorAgentResponse, error) {
+			return a.client.SubmitErrorAgentWithResponse(ctx, id, body)
+		},
+		func(r *SubmitErrorAgentResponse) []byte { return r.Body },
+	)
 }
 
 func (a *agentAgentsClient) SetAgentShutdown(
 	ctx context.Context,
 	id int64,
 ) (*SetAgentShutdownResponse, error) {
-	resp, err := a.client.SetAgentShutdownWithResponse(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*SetAgentShutdownResponse, error) { return a.client.SetAgentShutdownWithResponse(ctx, id) },
+		func(r *SetAgentShutdownResponse) []byte { return r.Body },
+	)
 }
 
 // ---------------------------------------------------------------------------
@@ -376,29 +300,17 @@ type agentAuthClient struct {
 }
 
 func (a *agentAuthClient) Authenticate(ctx context.Context) (*AuthenticateResponse, error) {
-	resp, err := a.client.AuthenticateWithResponse(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*AuthenticateResponse, error) { return a.client.AuthenticateWithResponse(ctx) },
+		func(r *AuthenticateResponse) []byte { return r.Body },
+	)
 }
 
 func (a *agentAuthClient) GetConfiguration(ctx context.Context) (*GetConfigurationResponse, error) {
-	resp, err := a.client.GetConfigurationWithResponse(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode() >= http.StatusBadRequest {
-		return resp, newAPIError(resp.StatusCode(), resp.Status(), resp.Body)
-	}
-
-	return resp, nil
+	return checkResponse(
+		func() (*GetConfigurationResponse, error) { return a.client.GetConfigurationWithResponse(ctx) },
+		func(r *GetConfigurationResponse) []byte { return r.Body },
+	)
 }
 
 // ---------------------------------------------------------------------------
@@ -440,6 +352,31 @@ func newAPIError(statusCode int, status string, body []byte) *APIError {
 		Message:    status,
 		Body:       string(body),
 	}
+}
+
+// apiResponse is the common interface satisfied by all generated response wrapper types.
+// The generated types define StatusCode() and Status() as value receivers, so pointer
+// types (e.g. *GetNewTaskResponse) also satisfy this interface.
+type apiResponse interface {
+	StatusCode() int
+	Status() string
+}
+
+// checkResponse executes call and checks the HTTP response for errors.
+// On a transport or parse error it returns (zero, err).
+// On an HTTP >=400 status it returns (resp, *APIError).
+// On success it returns (resp, nil).
+// readBody extracts the raw response body from resp for inclusion in the APIError.
+func checkResponse[R apiResponse](call func() (R, error), readBody func(R) []byte) (R, error) {
+	resp, err := call()
+	if err != nil {
+		var zero R
+		return zero, err
+	}
+	if resp.StatusCode() >= http.StatusBadRequest {
+		return resp, newAPIError(resp.StatusCode(), resp.Status(), readBody(resp))
+	}
+	return resp, nil
 }
 
 // ResponseStream extracts the response body as an io.ReadCloser from a GetTaskZapsResponse.

@@ -7,13 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
-	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 )
 
 func TestLoadPlaceholderResults(t *testing.T) {
 	tests := []struct {
 		name      string
-		cache     []display.BenchmarkResult
+		cache     []Result
 		wantCount int
 		wantOrder []string
 		expectNil bool
@@ -25,14 +24,14 @@ func TestLoadPlaceholderResults(t *testing.T) {
 		},
 		{
 			name: "no placeholders returns nil",
-			cache: []display.BenchmarkResult{
+			cache: []Result{
 				{HashType: "0", SpeedHs: "1000", Placeholder: false},
 			},
 			expectNil: true,
 		},
 		{
 			name: "returns only placeholders",
-			cache: []display.BenchmarkResult{
+			cache: []Result{
 				{HashType: "0", SpeedHs: "1000", Placeholder: false},
 				{HashType: "200", SpeedHs: "1", Placeholder: true},
 				{HashType: "300", SpeedHs: "1", Placeholder: true},
@@ -42,7 +41,7 @@ func TestLoadPlaceholderResults(t *testing.T) {
 		},
 		{
 			name: "priority types sort first",
-			cache: []display.BenchmarkResult{
+			cache: []Result{
 				{HashType: "500", SpeedHs: "1", Placeholder: true},
 				{HashType: "100", SpeedHs: "1", Placeholder: true},
 				{HashType: "0", SpeedHs: "1", Placeholder: true},
@@ -55,7 +54,7 @@ func TestLoadPlaceholderResults(t *testing.T) {
 		},
 		{
 			name:      "empty cache returns nil",
-			cache:     []display.BenchmarkResult{},
+			cache:     []Result{},
 			expectNil: true,
 		},
 	}
@@ -93,7 +92,7 @@ func TestLoadPlaceholderResults_SortConsistency(t *testing.T) {
 	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
 	// Mix of parseable and unparseable hash types
-	cache := []display.BenchmarkResult{
+	cache := []Result{
 		{HashType: "abc", SpeedHs: "1", Placeholder: true},
 		{HashType: "500", SpeedHs: "1", Placeholder: true},
 		{HashType: "xyz", SpeedHs: "1", Placeholder: true},
@@ -118,7 +117,7 @@ func TestLoadPlaceholderResults_AllPlaceholdersArePriority(t *testing.T) {
 	agentstate.State.BenchmarkCachePath = filepath.Join(tmpDir, "benchmark_cache.json")
 	t.Cleanup(func() { agentstate.State.BenchmarkCachePath = "" })
 
-	cache := []display.BenchmarkResult{
+	cache := []Result{
 		{HashType: "1000", SpeedHs: "1", Placeholder: true},
 		{HashType: "0", SpeedHs: "1", Placeholder: true},
 		{HashType: "100", SpeedHs: "1", Placeholder: true},

@@ -1,5 +1,4 @@
-// Package lib provides core functionality for the CipherSwarm agent.
-package lib
+package agent
 
 import (
 	"context"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/unclesp1d3r/cipherswarmagent/agentstate"
+	"github.com/unclesp1d3r/cipherswarmagent/internal/util"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/api"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	cserrors "github.com/unclesp1d3r/cipherswarmagent/lib/cserrors"
@@ -22,36 +22,65 @@ const (
 	defaultAgentUpdateInterval = 300 // Default agent update interval in seconds
 )
 
+// metadataProvider supplies host metadata (hashcat binary path, device list) for
+// agent registration and metadata updates. It replaces the former mutable
+// package-level function-var test stubs with an injectable interface.
+type metadataProvider interface {
+	setNativeHashcatPath(ctx context.Context) error
+	getDevicesList(ctx context.Context) ([]string, error)
+}
+
+// realMetadataProvider is the production metadataProvider. dm may be nil when device
+// enumeration has not run or failed, in which case an empty device list is reported.
+type realMetadataProvider struct {
+	dm *devices.DeviceManager
+}
+
+func (p realMetadataProvider) setNativeHashcatPath(ctx context.Context) error {
+	return setNativeHashcatPath(ctx)
+}
+
+func (p realMetadataProvider) getDevicesList(ctx context.Context) ([]string, error) {
+	return getDevicesList(ctx, p.dm)
+}
+
 var (
 	// configuration stores the agent configuration atomically for safe concurrent access.
-	// Use GetConfiguration() and SetConfiguration() — never access directly.
+	// Use getConfiguration() and SetConfiguration() — never access directly.
 	configuration atomic.Value //nolint:gochecknoglobals // Global agent configuration
 
-	// setNativeHashcatPathFn allows stubbing setNativeHashcatPath for testing.
-	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
-	setNativeHashcatPathFn = setNativeHashcatPath //nolint:gochecknoglobals // Used for testing
-	// getDevicesListFn allows stubbing getDevicesList for testing.
-	// TODO: Replace with interface-based dependency injection when lib/ is decomposed.
-	getDevicesListFn = func(ctx context.Context) ([]string, error) { //nolint:gochecknoglobals // Used for testing
-		return getDevicesList(ctx, nil)
-	}
+	// metadataProviderImpl is the active metadata provider, injected at startup and
+	// reload via SetMetadataProvider. Tests substitute a double through the same seam.
+	metadataProviderImpl metadataProvider = realMetadataProvider{} //nolint:gochecknoglobals // injected provider
 )
 
 func init() {
 	configuration.Store(agentConfiguration{})
 }
 
-// GetConfiguration returns a shallow copy of the current agent configuration.
-// Value-type fields are safe to use without synchronization. Pointer fields
-// (RecommendedTimeouts, RecommendedRetry, RecommendedCircuitBreaker) are shared
-// with the stored value — callers must not mutate through them.
+// getConfiguration returns a fully independent copy of the current agent configuration.
+// Value-type fields are copied by value. Pointer fields (RecommendedTimeouts,
+// RecommendedRetry, RecommendedCircuitBreaker) are deep-copied so callers receive
+// an independent snapshot; nil is preserved (meaning the server did not provide that setting).
 // Safe for concurrent use from any goroutine.
-//
-//nolint:revive // unexported-return: agentConfiguration is internal; callers are all within lib/ and lib/agent/
-func GetConfiguration() agentConfiguration {
+func getConfiguration() agentConfiguration {
 	cfg, ok := configuration.Load().(agentConfiguration)
 	if !ok {
 		agentstate.Logger.Error("configuration type assertion failed, returning zero-value config")
+	}
+
+	// Deep-copy pointer fields to prevent aliasing of the stored atomic value.
+	if cfg.RecommendedTimeouts != nil {
+		t := *cfg.RecommendedTimeouts
+		cfg.RecommendedTimeouts = &t
+	}
+	if cfg.RecommendedRetry != nil {
+		r := *cfg.RecommendedRetry
+		cfg.RecommendedRetry = &r
+	}
+	if cfg.RecommendedCircuitBreaker != nil {
+		cb := *cfg.RecommendedCircuitBreaker
+		cfg.RecommendedCircuitBreaker = &cb
 	}
 
 	return cfg
@@ -75,7 +104,7 @@ var (
 // an error is logged and returned.
 func AuthenticateAgent(ctx context.Context) error {
 	// Set agent version in shared state so cserrors.SendAgentError can include it in error reports.
-	agentstate.State.AgentVersion = AgentVersion
+	agentstate.State.AgentVersion = config.AgentVersion
 
 	response, err := agentstate.State.GetAPIClient().Auth().Authenticate(ctx)
 	if err != nil {
@@ -151,7 +180,7 @@ func GetAgentConfiguration(ctx context.Context) error {
 	applyRecommendedSettings(agentConfig)
 
 	if agentConfig.Config.UseNativeHashcat {
-		if err := setNativeHashcatPathFn(ctx); err != nil {
+		if err := metadataProviderImpl.setNativeHashcatPath(ctx); err != nil {
 			return err
 		}
 	} else {
@@ -177,10 +206,10 @@ func mapConfiguration(
 		APIVersion:       int64(apiVersion),
 		BenchmarksNeeded: benchmarksNeeded,
 		Config: agentConfig{
-			UseNativeHashcat:    UnwrapOr(agentCfg.UseNativeHashcat, false),
-			AgentUpdateInterval: int64(UnwrapOr(agentCfg.AgentUpdateInterval, defaultAgentUpdateInterval)),
-			BackendDevices:      UnwrapOr(agentCfg.BackendDevice, ""),
-			OpenCLDevices:       UnwrapOr(agentCfg.OpenclDevices, ""),
+			UseNativeHashcat:    util.UnwrapOr(agentCfg.UseNativeHashcat, false),
+			AgentUpdateInterval: int64(util.UnwrapOr(agentCfg.AgentUpdateInterval, defaultAgentUpdateInterval)),
+			BackendDevices:      util.UnwrapOr(agentCfg.BackendDevice, ""),
+			OpenCLDevices:       util.UnwrapOr(agentCfg.OpenclDevices, ""),
 		},
 		RecommendedTimeouts:       timeouts,
 		RecommendedRetry:          retry,
@@ -242,15 +271,6 @@ func applyRecommendedSettings(cfg agentConfiguration) {
 	}
 }
 
-// UnwrapOr returns the dereferenced pointer value, or the given default if the pointer is nil.
-func UnwrapOr[T any](ptr *T, defaultVal T) T {
-	if ptr != nil {
-		return *ptr
-	}
-
-	return defaultVal
-}
-
 // UpdateAgentMetadata updates the agent's metadata and sends it to the CipherSwarm API.
 // It retrieves host information, device list, constructs the agent update request body,
 // and sends the updated metadata to the API. Logs relevant information and handles any API errors.
@@ -260,9 +280,9 @@ func UpdateAgentMetadata(ctx context.Context) error {
 		return cserrors.LogAndSendError(ctx, "Error getting host info", err, api.SeverityCritical, nil)
 	}
 
-	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", AgentVersion, info.OS, info.KernelArch)
+	clientSignature := fmt.Sprintf("CipherSwarm Agent/%s %s/%s", config.AgentVersion, info.OS, info.KernelArch)
 
-	deviceNames, err := getDevicesListFn(ctx)
+	deviceNames, err := metadataProviderImpl.getDevicesList(ctx)
 	if err != nil {
 		return cserrors.LogAndSendError(ctx, "Error getting devices", err, api.SeverityCritical, nil)
 	}
@@ -309,12 +329,11 @@ func UpdateAgentMetadata(ctx context.Context) error {
 	return nil
 }
 
-// SetDevicesListManager wires the enumerated DeviceManager into getDevicesListFn.
-// Called by StartAgent and handleReload after device enumeration completes.
-func SetDevicesListManager(dm *devices.DeviceManager) {
-	getDevicesListFn = func(ctx context.Context) ([]string, error) {
-		return getDevicesList(ctx, dm)
-	}
+// SetMetadataProvider wires the enumerated DeviceManager into the metadata provider
+// used by UpdateAgentMetadata. Called by StartAgent and handleReload after device
+// enumeration completes.
+func SetMetadataProvider(dm *devices.DeviceManager) {
+	metadataProviderImpl = realMetadataProvider{dm: dm}
 }
 
 // getDevicesList retrieves a list of device names from the pre-enumerated DeviceManager.

@@ -19,11 +19,13 @@ import (
 // 1. Logs the start of the download process.
 // 2. Downloads the hash list associated with the attack.
 // 3. Iterates over resource files (word list, rule list, and mask list) and downloads each one.
-// If any step encounters an error, the function returns that error.
-func DownloadFiles(ctx context.Context, attack *api.Attack) error {
+// filePath is the directory where resource files should be saved; hashlistPath is
+// the directory for the downloaded hash list. If any step encounters an error, the
+// function returns that error.
+func DownloadFiles(ctx context.Context, attack *api.Attack, filePath, hashlistPath string) error {
 	display.DownloadFileStart(attack)
 
-	if err := downloader.DownloadHashList(ctx, attack); err != nil {
+	if err := downloader.DownloadHashList(ctx, attack, hashlistPath); err != nil {
 		return err
 	}
 
@@ -34,7 +36,7 @@ func DownloadFiles(ctx context.Context, attack *api.Attack) error {
 	}
 
 	for _, resource := range resourceFiles {
-		if err := downloadResourceFile(ctx, resource); err != nil {
+		if err := downloadResourceFile(ctx, resource, filePath); err != nil {
 			return err
 		}
 	}
@@ -43,17 +45,17 @@ func DownloadFiles(ctx context.Context, attack *api.Attack) error {
 }
 
 // downloadResourceFile downloads a resource file if the provided resource is not nil.
-// Constructs the file path based on the resource file name and logs the download action.
+// Constructs the file path based on filePath (the resource directory) and the resource file name.
 // If checksum verification is not always skipped, converts the checksum bytes to hex.
 // Downloads the file using the resource's download URL, target file path, and checksum for verification.
 // Logs and sends an error report if file download fails or if the downloaded file is empty.
-func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile) error {
+func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile, filePath string) error {
 	if resource == nil {
 		return nil
 	}
 
-	filePath := filepath.Join(agentstate.State.FilePath, resource.FileName)
-	agentstate.Logger.Debug("Downloading resource file", "url", resource.DownloadUrl, "path", filePath)
+	destPath := filepath.Join(filePath, resource.FileName)
+	agentstate.Logger.Debug("Downloading resource file", "url", resource.DownloadUrl, "path", destPath)
 
 	checksum := ""
 	if !agentstate.State.AlwaysTrustFiles {
@@ -62,11 +64,11 @@ func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile)
 		agentstate.Logger.Debug("Skipping checksum verification")
 	}
 
-	if err := downloader.DownloadFile(ctx, resource.DownloadUrl, filePath, checksum); err != nil {
+	if err := downloader.DownloadFile(ctx, resource.DownloadUrl, destPath, checksum); err != nil {
 		return cserrors.LogAndSendError(ctx, "Error downloading attack resource", err, api.SeverityCritical, nil)
 	}
 
-	fileInfo, statErr := os.Stat(filePath)
+	fileInfo, statErr := os.Stat(destPath)
 	if statErr != nil {
 		return cserrors.LogAndSendError(ctx, "Error checking downloaded file", statErr, api.SeverityCritical, nil)
 	}
@@ -74,14 +76,14 @@ func downloadResourceFile(ctx context.Context, resource *api.AttackResourceFile)
 	if fileInfo.Size() == 0 {
 		return cserrors.LogAndSendError(
 			ctx,
-			"Downloaded file is empty: "+filePath,
-			fmt.Errorf("file %s has zero bytes", filePath),
+			"Downloaded file is empty: "+destPath,
+			fmt.Errorf("file %s has zero bytes", destPath),
 			api.SeverityCritical,
 			nil,
 		)
 	}
 
-	agentstate.Logger.Debug("Downloaded resource file", "path", filePath)
+	agentstate.Logger.Debug("Downloaded resource file", "path", destPath)
 
 	return nil
 }

@@ -179,6 +179,110 @@ func TestCleanup_DoubleCallIdempotent(t *testing.T) {
 	require.True(t, os.IsNotExist(err), ".log file should still be removed")
 }
 
+// TestCleanup_ClosesAndRemovesOutFile verifies that Cleanup closes the output
+// file descriptor (not just unlinks the path) so it is not leaked.
+func TestCleanup_ClosesAndRemovesOutFile(t *testing.T) {
+	setupSessionTestState(t)
+
+	outPath := filepath.Join(t.TempDir(), "session.hcout")
+	outFile, err := os.Create(outPath)
+	require.NoError(t, err)
+
+	sess := &Session{outFile: outFile}
+
+	sess.Cleanup()
+
+	// Closing an already-closed file returns os.ErrClosed — proves Cleanup closed it.
+	require.ErrorIs(t, outFile.Close(), os.ErrClosed, "outFile should be closed by Cleanup")
+	_, statErr := os.Stat(outPath)
+	require.True(t, os.IsNotExist(statErr), "outfile path should be removed after Cleanup")
+	require.Nil(t, sess.outFile, "outFile field should be cleared after Cleanup")
+}
+
+// TestCleanup_ClosesAndRemovesCharsetFiles verifies that Cleanup closes each
+// charset file descriptor and removes its path, and clears the slice.
+func TestCleanup_ClosesAndRemovesCharsetFiles(t *testing.T) {
+	setupSessionTestState(t)
+
+	tempDir := t.TempDir()
+	charsetFiles := make([]*os.File, 0, 2)
+	paths := make([]string, 0, 2)
+	for i := range 2 {
+		p := filepath.Join(tempDir, "charset"+string(rune('0'+i)))
+		f, err := os.Create(p)
+		require.NoError(t, err)
+		charsetFiles = append(charsetFiles, f)
+		paths = append(paths, p)
+	}
+
+	sess := &Session{charsetFiles: charsetFiles}
+
+	sess.Cleanup()
+
+	for i, f := range charsetFiles {
+		require.ErrorIs(t, f.Close(), os.ErrClosed, "charset file should be closed by Cleanup")
+		_, statErr := os.Stat(paths[i])
+		require.True(t, os.IsNotExist(statErr), "charset path should be removed after Cleanup")
+	}
+	require.Nil(t, sess.charsetFiles, "charsetFiles slice should be cleared after Cleanup")
+}
+
+// TestCleanup_DoubleCallWithDescriptorsIdempotent verifies that a second Cleanup
+// call after descriptors are already closed does not panic (supports the task
+// cancellation double-cleanup guard).
+func TestCleanup_DoubleCallWithDescriptorsIdempotent(t *testing.T) {
+	setupSessionTestState(t)
+
+	tempDir := t.TempDir()
+	outFile, err := os.Create(filepath.Join(tempDir, "session.hcout"))
+	require.NoError(t, err)
+	charsetFile, err := os.Create(filepath.Join(tempDir, "charset0"))
+	require.NoError(t, err)
+
+	sess := &Session{outFile: outFile, charsetFiles: []*os.File{charsetFile}}
+
+	require.NotPanics(t, func() {
+		sess.Cleanup()
+		sess.Cleanup() // second call must be a no-op
+	})
+}
+
+// TestCreateCharsetFiles_DoesNotMutateInput verifies that createCharsetFiles returns
+// resolved temp paths without mutating the caller's slice, and writes the charset content.
+func TestCreateCharsetFiles_DoesNotMutateInput(t *testing.T) {
+	outPath := t.TempDir()
+
+	input := []string{"abc", "", "xyz"}
+	original := append([]string(nil), input...)
+
+	files, resolved, err := createCharsetFiles(outPath, input)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		for _, f := range files {
+			_ = f.Close()
+			_ = os.Remove(f.Name())
+		}
+	})
+
+	// Input slice contents must be unchanged.
+	require.Equal(t, original, input, "createCharsetFiles must not mutate the input slice")
+
+	// Non-empty entries resolve to temp paths; empty entry preserved by position.
+	require.Len(t, resolved, 3)
+	require.NotEqual(t, "abc", resolved[0], "non-empty charset should resolve to a temp path")
+	require.Empty(t, resolved[1], "empty charset entry should be preserved by position")
+	require.NotEqual(t, "xyz", resolved[2], "non-empty charset should resolve to a temp path")
+	require.Len(t, files, 2, "one file per non-empty charset")
+
+	// Files contain the original charset content.
+	content0, err := os.ReadFile(resolved[0])
+	require.NoError(t, err)
+	require.Equal(t, "abc", string(content0))
+	content2, err := os.ReadFile(resolved[2])
+	require.NoError(t, err)
+	require.Equal(t, "xyz", string(content2))
+}
+
 // testTimeout is the maximum time to wait for a goroutine to exit in cancellation tests.
 const testTimeout = 5 * time.Second
 

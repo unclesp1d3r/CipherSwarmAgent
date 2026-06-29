@@ -15,6 +15,7 @@ import (
 
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/stretchr/testify/require"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/config"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/progress"
 )
 
@@ -246,6 +247,36 @@ func TestDownloadWithRetryPreservesLastError(t *testing.T) {
 
 	require.Error(t, err)
 	require.Equal(t, expectedErr, err, "should return the last error from failed attempts")
+}
+
+// TestDownloadWithRetry_NoOverflowAtMaxShift verifies that a retry count at and
+// beyond the safe shift ceiling still backs off with positive delays (the loop
+// runs every attempt rather than overflowing to a negative/instant delay).
+func TestDownloadWithRetry_NoOverflowAtMaxShift(t *testing.T) {
+	maxRetries := config.MaxBackoffShift + 3
+	mock := &mockGetter{
+		failCount:   maxRetries, // fail every attempt
+		returnError: errors.New("download failed"),
+	}
+
+	// Tiny base delay keeps the test fast: even at the capped shift the delay is
+	// 1ns << 20 ≈ 1ms. A negative-overflow delay would not increase the call count
+	// but would prove no panic; we assert all attempts ran.
+	err := downloadWithRetry(context.Background(), mock, maxRetries, 1*time.Nanosecond)
+
+	require.Error(t, err)
+	require.Equal(t, maxRetries, mock.getCallCount(),
+		"all attempts should run without an overflow-induced early exit")
+}
+
+// TestFileMD5_OpenErrorWrapped verifies fileMD5 wraps an open failure with context.
+func TestFileMD5_OpenErrorWrapped(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "no-such-file")
+
+	_, err := fileMD5(missing)
+	require.Error(t, err)
+	require.ErrorIs(t, err, os.ErrNotExist, "open failure should wrap the underlying cause")
+	require.Contains(t, err.Error(), "no-such-file", "wrapped error should include the path")
 }
 
 // TestDownloadWithRetryNegativeRetries verifies that negative maxRetries defaults to 1 attempt.

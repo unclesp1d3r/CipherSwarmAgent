@@ -21,7 +21,7 @@ func TestCleanupTaskFiles_RemovesHashFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(hashFile), 0o750))
 	require.NoError(t, os.WriteFile(hashFile, []byte("hashes"), 0o600))
 
-	CleanupTaskFiles(attackID)
+	CleanupTaskFiles(attackID, agentstate.State.HashlistPath, agentstate.State.RestoreFilePath)
 
 	_, err := os.Stat(hashFile)
 	require.True(t, os.IsNotExist(err), "hash file should be removed")
@@ -38,7 +38,7 @@ func TestCleanupTaskFiles_RemovesRestoreFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(restoreFile), 0o750))
 	require.NoError(t, os.WriteFile(restoreFile, []byte("data"), 0o600))
 
-	CleanupTaskFiles(attackID)
+	CleanupTaskFiles(attackID, agentstate.State.HashlistPath, agentstate.State.RestoreFilePath)
 
 	_, err := os.Stat(restoreFile)
 	require.True(t, os.IsNotExist(err), "restore file should be removed")
@@ -51,7 +51,7 @@ func TestCleanupTaskFiles_HandlesNonexistentFiles(t *testing.T) {
 	t.Cleanup(cleanupState)
 
 	// Should not panic with a nonexistent attack ID
-	CleanupTaskFiles(99999)
+	CleanupTaskFiles(99999, agentstate.State.HashlistPath, agentstate.State.RestoreFilePath)
 }
 
 // TestCleanupTaskFiles_RemovesBothFiles verifies that both hash and restore
@@ -69,7 +69,7 @@ func TestCleanupTaskFiles_RemovesBothFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(hashFile, []byte("hashes"), 0o600))
 	require.NoError(t, os.WriteFile(restoreFile, []byte("data"), 0o600))
 
-	CleanupTaskFiles(attackID)
+	CleanupTaskFiles(attackID, agentstate.State.HashlistPath, agentstate.State.RestoreFilePath)
 
 	_, hashErr := os.Stat(hashFile)
 	require.True(t, os.IsNotExist(hashErr), "hash file should be removed")
