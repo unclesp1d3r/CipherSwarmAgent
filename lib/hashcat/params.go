@@ -385,7 +385,7 @@ func resolveOptionalPath(base, filename string, sentinel error) (string, error) 
 	// sentinel so the caller sees a clear validation error instead of hashcat
 	// failing later on an unusable path.
 	if _, err := os.Stat(resolved); err != nil {
-		return "", fmt.Errorf("%w: %s", sentinel, resolved)
+		return "", fmt.Errorf("%w: %s: %w", sentinel, resolved, err)
 	}
 
 	return resolved, nil

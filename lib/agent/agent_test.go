@@ -22,6 +22,9 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
+// agentTaskNewPattern matches the tasks/new API endpoint used in agent tests.
+var agentTaskNewPattern = regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
+
 // saveAndRestoreState saves the current agentstate fields and returns a cleanup function
 // that restores them. Uses per-field save/restore to avoid copying sync primitives.
 func saveAndRestoreState(t *testing.T) func() {
@@ -832,7 +835,7 @@ func TestSleepWithContext_Cancelled(t *testing.T) {
 // is no reason to stop background benchmarks before it.
 func TestHandleNewTask_IdleDoesNotStopBackgroundBenchmarks(t *testing.T) {
 	cleanup := saveAndRestoreState(t)
-	defer cleanup()
+	t.Cleanup(cleanup)
 	t.Cleanup(func() { bgBench.Store(nil) })
 
 	cleanupHTTP := testhelpers.SetupHTTPMock()
@@ -842,8 +845,7 @@ func TestHandleNewTask_IdleDoesNotStopBackgroundBenchmarks(t *testing.T) {
 	t.Cleanup(cleanupState)
 
 	// Respond to GET /api/v1/client/tasks/new with HTTP 204 → ErrNoTaskAvailable.
-	taskNewPattern := regexp.MustCompile(`^https?://[^/]+/api/v1/client/tasks/new$`)
-	httpmock.RegisterRegexpResponder("GET", taskNewPattern,
+	httpmock.RegisterRegexpResponder("GET", agentTaskNewPattern,
 		httpmock.NewStringResponder(http.StatusNoContent, ""))
 
 	// Wire taskMgr to the mock API client.

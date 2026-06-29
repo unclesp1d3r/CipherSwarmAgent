@@ -194,7 +194,7 @@ func TestRemoveExistingZapFile_WrapsError(t *testing.T) {
 
 	err := removeExistingZapFile(target)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "nonempty.zap", "wrapped error should include the path")
+	require.ErrorContains(t, err, target)
 }
 
 // TestProcessZapFile tests the processZapFile function through a file.

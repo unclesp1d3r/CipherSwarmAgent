@@ -28,7 +28,7 @@ func logBenchmarkResult(result Result) {
 		keyvals = append(keyvals, "device_name", result.DeviceName)
 	}
 
-	agentstate.Logger.Info("Benchmark result", keyvals...)
+	agentstate.Logger.Debug("Benchmark result", keyvals...)
 }
 
 // logBenchmarksComplete logs the completion of a benchmark session along with the benchmark results.

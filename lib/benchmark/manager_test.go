@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -1159,5 +1160,14 @@ func TestKillAndDrain_NoDeadlock(t *testing.T) {
 	sess := hashcat.NewTestSession(true)
 	// Must return within processFlushTimeout (100ms) + test overhead.
 	// Any deadlock here is a regression in the helper.
-	killAndDrain(sess, "test kill message")
+	done := make(chan struct{})
+	go func() {
+		killAndDrain(sess, "test kill message")
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("killAndDrain did not return; deadlock regression")
+	}
 }

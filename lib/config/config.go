@@ -242,10 +242,6 @@ func SetupSharedState() {
 		agentstate.Logger.Warn("download_max_retries must be >= 1, using default",
 			"configured", agentstate.State.DownloadMaxRetries, "default", DefaultDownloadMaxRetries)
 		agentstate.State.DownloadMaxRetries = DefaultDownloadMaxRetries
-	} else if agentstate.State.DownloadMaxRetries > MaxBackoffShift {
-		agentstate.Logger.Warn("download_max_retries exceeds safe ceiling, clamping",
-			"configured", agentstate.State.DownloadMaxRetries, "ceiling", MaxBackoffShift)
-		agentstate.State.DownloadMaxRetries = MaxBackoffShift
 	}
 
 	agentstate.State.DownloadRetryDelay = viper.GetDuration("download_retry_delay")

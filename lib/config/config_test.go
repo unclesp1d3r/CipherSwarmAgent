@@ -238,8 +238,8 @@ func TestSetupSharedState_ClampsOverflowingBackoffValues(t *testing.T) {
 
 	SetupSharedState()
 
-	assert.Equal(t, MaxBackoffShift, agentstate.State.DownloadMaxRetries,
-		"download_max_retries should be clamped to the safe ceiling")
+	assert.Equal(t, 65, agentstate.State.DownloadMaxRetries,
+		"download_max_retries must not be clamped (retry count, not shift exponent)")
 	assert.Equal(t, MaxBackoffShift, agentstate.State.MaxHeartbeatBackoff,
 		"max_heartbeat_backoff should be clamped to the safe ceiling")
 }

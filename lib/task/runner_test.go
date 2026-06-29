@@ -491,9 +491,17 @@ func TestRunEventLoop_ContextCancel(t *testing.T) {
 	mgr := newTestManager()
 
 	taskCtx, taskCancel := context.WithCancel(context.Background())
-	defer taskCancel()
+	t.Cleanup(taskCancel)
 
 	taskTimer := time.NewTimer(24 * time.Hour) // long duration; must not fire during test
+	t.Cleanup(func() {
+		if !taskTimer.Stop() {
+			select {
+			case <-taskTimer.C:
+			default:
+			}
+		}
+	})
 	waitChan := make(chan struct{})
 
 	mgr.runEventLoop(
