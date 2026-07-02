@@ -419,6 +419,24 @@ func TestRun_ReportsPartialFailure(t *testing.T) {
 	<-done
 }
 
+func TestRun_PrimesPerCPUWhenEnabled(t *testing.T) {
+	src := healthySource()
+	mon := New(src, Options{
+		Interval:      time.Hour, // long enough that the ticker never fires during the test
+		CollectPerCPU: true,
+		Log:           func(any, ...any) {},
+		now:           fixedNow,
+	})
+
+	// A pre-cancelled context still runs the priming block before the loop exits.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	mon.Run(ctx)
+
+	assert.Positive(t, src.perCoreCalls.Load(),
+		"Run must prime per-CPU counters when CollectPerCPU is enabled")
+}
+
 func TestRound2(t *testing.T) {
 	tests := []struct {
 		in   float64

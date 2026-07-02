@@ -158,15 +158,18 @@ func (sess *Session) Start() error {
 		return fmt.Errorf("couldn't start hashcat: %w", err)
 	}
 
-	// Publish the hashcat PID so the performance monitor can sample the running
-	// job's per-process CPU/memory. Cleared in Cleanup when the process exits.
-	sess.startedPID = int32(sess.proc.Process.Pid) //nolint:gosec // G115 - a process ID always fits in int32
-	agentstate.State.SetHashcatPID(sess.startedPID)
-
 	tailer, err := sess.startTailer()
 	if err != nil {
 		return err
 	}
+
+	// Publish the hashcat PID so the performance monitor can sample the running
+	// job's per-process CPU/memory. Published only after every fallible startup
+	// step succeeds: Start's error paths call sess.Kill (not sess.Cleanup), so an
+	// early publish followed by a startTailer failure would leave a stale PID in
+	// agentstate that never gets cleared. Cleared in Cleanup when the process exits.
+	sess.startedPID = int32(sess.proc.Process.Pid) //nolint:gosec // G115 - a process ID always fits in int32
+	agentstate.State.SetHashcatPID(sess.startedPID)
 
 	sess.wg.Go(func() { ; sess.handleTailerOutput(tailer) })
 	sess.wg.Go(func() { ; sess.handleStdout() })

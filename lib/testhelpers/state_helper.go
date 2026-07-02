@@ -243,6 +243,7 @@ func SetupMinimalTestState(agentID int64) func() {
 		agentstate.State.PerformanceMonitoringInterval = 0
 		agentstate.State.CollectProcessMetrics = false
 		agentstate.State.CollectPerCPUMetrics = false
+		agentstate.State.SetHashcatPID(0)
 	}
 }
 

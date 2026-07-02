@@ -178,12 +178,17 @@ func (m *Monitor) Collect(ctx context.Context) (Metrics, error) {
 // the configured logger. The first sample is taken one interval in (the initial
 // interval also primes delta-based CPU counters), and Run returns when ctx is done.
 func (m *Monitor) Run(ctx context.Context) {
-	// Prime delta-based CPU counters so the first reported sample is meaningful
-	// rather than measuring usage since boot. Priming failures are non-fatal (the
-	// first real sample simply falls back to since-boot values), but are logged at
-	// debug rather than swallowed silently.
+	// Prime delta-based CPU (and per-core CPU) and process counters so the first
+	// reported sample reflects recent usage rather than since-boot averages.
+	// Priming failures are non-fatal (the first real sample simply falls back to
+	// since-boot values) but are reported rather than swallowed silently.
 	if _, err := m.source.CPUPercent(ctx, false); err != nil {
 		m.opts.Log("Failed to prime CPU counters", "error", err)
+	}
+	if m.opts.CollectPerCPU {
+		if _, err := m.source.CPUPercent(ctx, true); err != nil {
+			m.opts.Log("Failed to prime per-CPU counters", "error", err)
+		}
 	}
 	if m.opts.CollectProcess {
 		if pid, ok := m.opts.PIDProvider(); ok {
