@@ -132,6 +132,7 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.SetCurrentActivity("")
 		agentstate.State.SetJobCheckingStopped(false)
 		agentstate.State.SetBenchmarksSubmitted(false)
+		agentstate.State.SetHashcatPID(0)
 		// Deactivate httpmock
 		httpmock.DeactivateAndReset()
 	}
@@ -191,6 +192,7 @@ func ResetTestState() {
 	agentstate.State.SetCurrentActivity("")
 	agentstate.State.SetJobCheckingStopped(false)
 	agentstate.State.SetBenchmarksSubmitted(false)
+	agentstate.State.SetHashcatPID(0)
 }
 
 // SetupMinimalTestState sets up minimal state (just AgentID and basic paths)

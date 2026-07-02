@@ -288,6 +288,7 @@ func startPerformanceMonitor(ctx context.Context) {
 		Interval:       agentstate.State.PerformanceMonitoringInterval,
 		CollectPerCPU:  agentstate.State.CollectPerCPUMetrics,
 		CollectProcess: agentstate.State.CollectProcessMetrics,
+		PIDProvider:    hashcatOrSelfPID,
 		Log:            agentstate.Logger.Info,
 	})
 
@@ -296,6 +297,18 @@ func startPerformanceMonitor(ctx context.Context) {
 		"process_metrics", agentstate.State.CollectProcessMetrics)
 
 	go mon.Run(ctx)
+}
+
+// hashcatOrSelfPID selects which process the performance monitor samples: the
+// running hashcat job when one is active (satisfying issue #15's requirement for
+// hashcat-specific process metrics), otherwise the agent's own process — which
+// keeps the <1% monitoring-overhead target observable while idle.
+func hashcatOrSelfPID() (int32, bool) {
+	if pid := agentstate.State.GetHashcatPID(); pid > 0 {
+		return pid, true
+	}
+
+	return int32(os.Getpid()), true //nolint:gosec // G115 - a process ID always fits in int32
 }
 
 // startBackgroundBenchmarks launches the background-benchmark goroutine when

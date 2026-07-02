@@ -181,9 +181,10 @@ You can specify a custom config file location:
 The agent can run a lightweight background monitor that samples host resource
 usage (CPU, memory, swap, system load, and cumulative disk/network I/O) on a
 fixed interval and reports each sample through the structured logger. When
-process metrics are enabled, it also tracks the agent's own CPU and memory
-footprint, which is useful for verifying that monitoring overhead stays
-negligible. Metrics that a platform does not expose (e.g. load averages on
+process metrics are enabled, it tracks the **running hashcat process** (CPU and
+resident memory) while a job is active, and falls back to the agent's own process
+when idle — which keeps monitoring overhead observable against the <1% target.
+Metrics that a platform does not expose (e.g. load averages on
 Windows, disk/network counters in restricted containers) are omitted gracefully
 rather than failing the sample. GPU temperature and utilization are not
 duplicated here — they are already reported to the server per device as part of
@@ -210,7 +211,7 @@ task status updates.
 - **Flag**: `--collect-process-metrics`
 - **Type**: Boolean
 - **Default**: `true`
-- **Description**: Collect per-process CPU and memory metrics alongside host metrics
+- **Description**: Collect per-process CPU and memory metrics for the running hashcat process (or the agent process when idle) alongside host metrics
 
 #### `collect_per_cpu_metrics` / `COLLECT_PER_CPU_METRICS`
 

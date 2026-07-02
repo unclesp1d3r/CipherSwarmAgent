@@ -231,8 +231,51 @@ func TestCollect_DiskAndNetErrorsAreSoft(t *testing.T) {
 	require.NoError(t, err, "disk/net counter failures must not fail the whole sample")
 	assert.False(t, metrics.DiskIOAvailable)
 	assert.False(t, metrics.NetIOAvailable)
-	assert.Contains(t, logged, "Failed to read disk I/O counters")
-	assert.Contains(t, logged, "Failed to read network I/O counters")
+	assert.Contains(t, logged, "Disk I/O counters unavailable; suppressing repeat warnings until recovery")
+	assert.Contains(t, logged, "Network I/O counters unavailable; suppressing repeat warnings until recovery")
+}
+
+func TestCollect_DiskNetSoftFailuresLogOncePerStreak(t *testing.T) {
+	src := healthySource()
+	src.diskErr = errors.New("disk counters unavailable")
+
+	countDiskLogs := func(logs []string) int {
+		n := 0
+		for _, s := range logs {
+			if s == "Disk I/O counters unavailable; suppressing repeat warnings until recovery" {
+				n++
+			}
+		}
+
+		return n
+	}
+
+	var logged []string
+	mon := New(src, Options{
+		now: fixedNow,
+		Log: func(msg any, _ ...any) {
+			if s, ok := msg.(string); ok {
+				logged = append(logged, s)
+			}
+		},
+	})
+
+	// Three consecutive failing samples should log exactly once (transition in).
+	for range 3 {
+		_, err := mon.Collect(context.Background())
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 1, countDiskLogs(logged), "repeat failures must be suppressed")
+
+	// Recovery re-arms the warning; the next failure logs again.
+	src.diskErr = nil
+	_, err := mon.Collect(context.Background())
+	require.NoError(t, err)
+
+	src.diskErr = errors.New("disk counters unavailable again")
+	_, err = mon.Collect(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 2, countDiskLogs(logged), "a failure after recovery should log again")
 }
 
 func TestReport_IncludesAvailableSections(t *testing.T) {

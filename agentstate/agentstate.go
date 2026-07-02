@@ -79,6 +79,7 @@ type agentState struct {
 	jobCheckingStopped  atomic.Bool
 	benchmarksSubmitted atomic.Bool
 	forceBenchmarkRun   atomic.Bool
+	hashcatPID          atomic.Int32
 	currentActivityMu   sync.RWMutex
 	currentActivity     Activity
 }
@@ -142,6 +143,25 @@ func (s *agentState) GetForceBenchmarkRun() bool {
 // SetForceBenchmarkRun sets whether a fresh benchmark run should be forced.
 func (s *agentState) SetForceBenchmarkRun(v bool) {
 	s.forceBenchmarkRun.Store(v)
+}
+
+// SetHashcatPID records the process ID of the currently running hashcat process,
+// or 0 when none is running. Read by the performance monitor to sample the job's
+// per-process metrics.
+func (s *agentState) SetHashcatPID(pid int32) {
+	s.hashcatPID.Store(pid)
+}
+
+// GetHashcatPID returns the PID of the running hashcat process, or 0 if none.
+func (s *agentState) GetHashcatPID() int32 {
+	return s.hashcatPID.Load()
+}
+
+// ClearHashcatPID zeroes the stored hashcat PID only if it still equals pid.
+// The compare-and-swap guard prevents an older session's teardown from clearing
+// a newer session's PID had they briefly overlapped.
+func (s *agentState) ClearHashcatPID(pid int32) {
+	s.hashcatPID.CompareAndSwap(pid, 0)
 }
 
 // GetCurrentActivity returns the current activity of the agent (thread-safe).

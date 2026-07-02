@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"time"
 
@@ -47,6 +48,15 @@ type Options struct {
 type Monitor struct {
 	source Source
 	opts   Options
+
+	// Soft-failure suppression flags. Disk and network I/O counters are
+	// unavailable in some environments (e.g. restricted containers); without
+	// suppression the monitor would log the same failure every interval forever.
+	// These track whether we are currently in a failing streak so we log only on
+	// the available→unavailable transition. Accessed only from the single Collect
+	// caller (the Run goroutine, or a test), so no synchronization is needed.
+	diskIOUnavailable bool
+	netIOUnavailable  bool
 }
 
 // New returns a Monitor that draws samples from source using opts, applying
@@ -122,19 +132,29 @@ func (m *Monitor) Collect(ctx context.Context) (Metrics, error) {
 
 	// Disk and network I/O are cumulative counters. They are best-effort: some
 	// environments (restricted containers) do not expose them, so a failure is
-	// soft and simply omits the section rather than failing the sample.
+	// soft and simply omits the section. To avoid steady log noise where they are
+	// permanently unavailable, the failure is logged only on the transition into
+	// unavailability (and the streak re-arms once the source recovers).
 	if diskStats, err := m.source.DiskIO(ctx); err != nil {
-		m.opts.Log("Failed to read disk I/O counters", "error", err)
+		if !m.diskIOUnavailable {
+			m.opts.Log("Disk I/O counters unavailable; suppressing repeat warnings until recovery", "error", err)
+			m.diskIOUnavailable = true
+		}
 	} else {
 		metrics.DiskIO = diskStats
 		metrics.DiskIOAvailable = true
+		m.diskIOUnavailable = false
 	}
 
 	if netStats, err := m.source.NetIO(ctx); err != nil {
-		m.opts.Log("Failed to read network I/O counters", "error", err)
+		if !m.netIOUnavailable {
+			m.opts.Log("Network I/O counters unavailable; suppressing repeat warnings until recovery", "error", err)
+			m.netIOUnavailable = true
+		}
 	} else {
 		metrics.NetIO = netStats
 		metrics.NetIOAvailable = true
+		m.netIOUnavailable = false
 	}
 
 	if m.opts.CollectProcess {
@@ -148,7 +168,7 @@ func (m *Monitor) Collect(ctx context.Context) (Metrics, error) {
 	}
 
 	if len(errs) > 0 {
-		return metrics, errors.Join(errs...)
+		return metrics, fmt.Errorf("collecting performance sample: %w", errors.Join(errs...))
 	}
 
 	return metrics, nil

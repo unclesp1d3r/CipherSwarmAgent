@@ -128,6 +128,26 @@ func TestStartPerformanceMonitor(t *testing.T) {
 	})
 }
 
+func TestHashcatOrSelfPID(t *testing.T) {
+	orig := agentstate.State.GetHashcatPID()
+	t.Cleanup(func() { agentstate.State.SetHashcatPID(orig) })
+
+	t.Run("returns hashcat PID when a job is running", func(t *testing.T) {
+		agentstate.State.SetHashcatPID(54321)
+		pid, ok := hashcatOrSelfPID()
+		assert.True(t, ok)
+		assert.Equal(t, int32(54321), pid, "should sample the running hashcat process")
+	})
+
+	t.Run("falls back to the agent process when idle", func(t *testing.T) {
+		agentstate.State.SetHashcatPID(0)
+		wantPID := int32(os.Getpid()) //nolint:gosec // G115 - a process ID always fits in int32
+		pid, ok := hashcatOrSelfPID()
+		assert.True(t, ok)
+		assert.Equal(t, wantPID, pid, "should fall back to the agent's own PID when idle")
+	})
+}
+
 func TestCleanupLockFile_Success(t *testing.T) {
 	tempDir := t.TempDir()
 	pidFile := filepath.Join(tempDir, "test.pid")

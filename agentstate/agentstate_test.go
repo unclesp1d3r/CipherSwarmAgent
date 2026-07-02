@@ -193,3 +193,21 @@ func TestState_BooleanFlags(t *testing.T) {
 	assert.True(t, State.GetJobCheckingStopped())
 	assert.True(t, State.GetBenchmarksSubmitted())
 }
+
+func TestState_HashcatPID(t *testing.T) {
+	orig := State.GetHashcatPID()
+	t.Cleanup(func() { State.SetHashcatPID(orig) })
+
+	State.SetHashcatPID(0)
+	assert.Equal(t, int32(0), State.GetHashcatPID(), "default hashcat PID should be zero")
+
+	State.SetHashcatPID(4321)
+	assert.Equal(t, int32(4321), State.GetHashcatPID())
+
+	// ClearHashcatPID only zeroes when the current PID matches.
+	State.ClearHashcatPID(1111)
+	assert.Equal(t, int32(4321), State.GetHashcatPID(), "clear with non-matching PID must be a no-op")
+
+	State.ClearHashcatPID(4321)
+	assert.Equal(t, int32(0), State.GetHashcatPID(), "clear with matching PID should zero it")
+}
