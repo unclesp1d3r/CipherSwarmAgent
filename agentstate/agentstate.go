@@ -69,6 +69,10 @@ type agentState struct {
 	BenchmarkWhileIdle             bool          // BenchmarkWhileIdle enables background benchmarking during idle periods.
 	Platform                       string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin"). Set once before goroutines start; safe to read from any goroutine.
 	AgentVersion                   string        // AgentVersion is the current version of the agent software. Set once in AuthenticateAgent before goroutines start; safe to read from any goroutine.
+	PerformanceMonitoringEnabled   bool          // PerformanceMonitoringEnabled enables the background system performance monitor. Set once in SetupSharedState; safe to read from any goroutine.
+	PerformanceMonitoringInterval  time.Duration // PerformanceMonitoringInterval is the sampling interval for the performance monitor. Set once in SetupSharedState; safe to read from any goroutine.
+	CollectProcessMetrics          bool          // CollectProcessMetrics enables per-process sampling in the performance monitor. Set once in SetupSharedState; safe to read from any goroutine.
+	CollectPerCPUMetrics           bool          // CollectPerCPUMetrics enables per-core CPU sampling in the performance monitor. Set once in SetupSharedState; safe to read from any goroutine.
 
 	// Synchronized fields — use getter/setter methods; do not access directly.
 	reload              atomic.Bool

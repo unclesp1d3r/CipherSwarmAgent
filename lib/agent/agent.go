@@ -22,6 +22,7 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/devices"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/display"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/hashcat"
+	"github.com/unclesp1d3r/cipherswarmagent/lib/monitor"
 	"github.com/unclesp1d3r/cipherswarmagent/lib/task"
 )
 
@@ -229,6 +230,9 @@ func StartAgent() {
 	// Start heartbeat loop early so the UI can see the agent is connected.
 	go startHeartbeatLoop(ctx, cancel)
 
+	// Start background system performance monitoring (no-op when disabled).
+	startPerformanceMonitor(ctx)
+
 	benchmarksNeeded := initManagers()
 	runBenchmarkPhase(ctx, benchmarksNeeded)
 
@@ -268,6 +272,30 @@ func cleanupLockFile(pidFile string) {
 // does not read agentstate directly for activity.
 func agentIsIdle() bool {
 	return agentstate.State.GetCurrentActivity() == agentstate.CurrentActivityWaiting
+}
+
+// startPerformanceMonitor launches the background system performance monitor
+// when enabled in configuration. It samples host (and optionally per-process)
+// metrics on the configured interval and reports them through the agent logger,
+// exiting when ctx is cancelled. No-op when monitoring is disabled.
+func startPerformanceMonitor(ctx context.Context) {
+	if !agentstate.State.PerformanceMonitoringEnabled {
+		agentstate.Logger.Debug("Performance monitoring disabled")
+		return
+	}
+
+	mon := monitor.New(monitor.NewGopsutilSource(), monitor.Options{
+		Interval:       agentstate.State.PerformanceMonitoringInterval,
+		CollectPerCPU:  agentstate.State.CollectPerCPUMetrics,
+		CollectProcess: agentstate.State.CollectProcessMetrics,
+		Log:            agentstate.Logger.Info,
+	})
+
+	agentstate.Logger.Info("Starting performance monitor",
+		"interval", agentstate.State.PerformanceMonitoringInterval,
+		"process_metrics", agentstate.State.CollectProcessMetrics)
+
+	go mon.Run(ctx)
 }
 
 // startBackgroundBenchmarks launches the background-benchmark goroutine when

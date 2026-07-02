@@ -74,6 +74,12 @@ retain_zaps_on_completion: false
 enable_additional_hash_types: true
 hashcat_path: ''  # Leave empty for auto-detection
 
+# System performance monitoring
+performance_monitoring_enabled: true
+performance_monitoring_interval: 30s
+collect_process_metrics: true
+collect_per_cpu_metrics: false
+
 # Fault tolerance settings
 task_timeout: 24h
 download_max_retries: 3
@@ -169,6 +175,46 @@ You can specify a custom config file location:
 - **Description**: How long to wait after a task failure before retrying
 - **Examples**: `30s`, `2m`, `1m30s`
 - **Note**: Deprecated alias `--sleep_on_failure` remains functional for backward compatibility
+
+### System Performance Monitoring
+
+The agent can run a lightweight background monitor that samples host resource
+usage (CPU, memory, swap, and system load) on a fixed interval and reports each
+sample through the structured logger. When process metrics are enabled, it also
+tracks the agent's own CPU and memory footprint, which is useful for verifying
+that monitoring overhead stays negligible. GPU temperature and utilization are
+not duplicated here — they are already reported to the server per device as part
+of task status updates.
+
+#### `performance_monitoring_enabled` / `PERFORMANCE_MONITORING_ENABLED`
+
+- **Flag**: `--performance-monitoring-enabled`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Enable the background system performance monitor
+
+#### `performance_monitoring_interval` / `PERFORMANCE_MONITORING_INTERVAL`
+
+- **Flag**: `--performance-monitoring-interval`
+- **Type**: Duration
+- **Default**: `30s`
+- **Description**: Sampling interval for system performance monitoring
+- **Minimum**: `5s` (lower values are clamped up to keep overhead minimal)
+- **Examples**: `15s`, `1m`
+
+#### `collect_process_metrics` / `COLLECT_PROCESS_METRICS`
+
+- **Flag**: `--collect-process-metrics`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Collect per-process CPU and memory metrics alongside host metrics
+
+#### `collect_per_cpu_metrics` / `COLLECT_PER_CPU_METRICS`
+
+- **Flag**: `--collect-per-cpu-metrics`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Collect per-logical-core CPU utilization in addition to the overall figure
 
 ### Hashcat Integration
 

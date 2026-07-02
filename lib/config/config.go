@@ -56,7 +56,23 @@ const (
 	DefaultCircuitBreakerFailureThreshold = 5
 	// DefaultCircuitBreakerTimeout is the duration before a tripped circuit half-opens.
 	DefaultCircuitBreakerTimeout = 30 * time.Second
+	// DefaultPerformanceMonitoringEnabled controls whether background system
+	// performance monitoring is active.
+	DefaultPerformanceMonitoringEnabled = true
+	// DefaultPerformanceMonitoringInterval is the sampling interval for system
+	// performance monitoring.
+	DefaultPerformanceMonitoringInterval = 30 * time.Second
+	// DefaultCollectProcessMetrics controls whether per-process metrics are
+	// collected alongside host-level metrics.
+	DefaultCollectProcessMetrics = true
+	// DefaultCollectPerCPUMetrics controls whether per-logical-core CPU
+	// utilization is collected in addition to the overall figure.
+	DefaultCollectPerCPUMetrics = false
 )
+
+// MinPerformanceMonitoringInterval is the smallest allowed sampling interval —
+// values below this are clamped up to keep monitoring overhead negligible.
+const MinPerformanceMonitoringInterval = 5 * time.Second
 
 // MaxReasonableTimeout caps server-recommended timeout values to prevent a
 // misconfigured server from setting absurdly large timeouts (e.g., 24 hours).
@@ -236,6 +252,18 @@ func SetupSharedState() {
 	agentstate.State.DeferBenchmarks = viper.GetBool("defer_benchmarks")
 	agentstate.State.BenchmarkWhileIdle = viper.GetBool("benchmark_while_idle")
 
+	agentstate.State.PerformanceMonitoringEnabled = viper.GetBool("performance_monitoring_enabled")
+	agentstate.State.CollectProcessMetrics = viper.GetBool("collect_process_metrics")
+	agentstate.State.CollectPerCPUMetrics = viper.GetBool("collect_per_cpu_metrics")
+
+	agentstate.State.PerformanceMonitoringInterval = viper.GetDuration("performance_monitoring_interval")
+	if agentstate.State.PerformanceMonitoringInterval < MinPerformanceMonitoringInterval {
+		agentstate.Logger.Warn("performance_monitoring_interval below minimum, clamping",
+			"configured", agentstate.State.PerformanceMonitoringInterval,
+			"minimum", MinPerformanceMonitoringInterval)
+		agentstate.State.PerformanceMonitoringInterval = MinPerformanceMonitoringInterval
+	}
+
 	// Validate numeric/duration config fields — clamp to defaults with a warning.
 	agentstate.State.DownloadMaxRetries = viper.GetInt("download_max_retries")
 	if agentstate.State.DownloadMaxRetries < 1 {
@@ -367,4 +395,8 @@ func SetDefaultConfigValues() {
 	viper.SetDefault("circuit_breaker_timeout", DefaultCircuitBreakerTimeout)
 	viper.SetDefault("defer_benchmarks", false)
 	viper.SetDefault("benchmark_while_idle", true)
+	viper.SetDefault("performance_monitoring_enabled", DefaultPerformanceMonitoringEnabled)
+	viper.SetDefault("performance_monitoring_interval", DefaultPerformanceMonitoringInterval)
+	viper.SetDefault("collect_process_metrics", DefaultCollectProcessMetrics)
+	viper.SetDefault("collect_per_cpu_metrics", DefaultCollectPerCPUMetrics)
 }
