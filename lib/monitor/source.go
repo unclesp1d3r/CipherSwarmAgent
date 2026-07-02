@@ -8,8 +8,10 @@ import (
 	"sync"
 
 	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/load"
 	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/process"
 )
 
@@ -39,6 +41,10 @@ type Source interface {
 	// LoadAverage returns system load averages, or ErrLoadUnavailable when the
 	// platform does not support them.
 	LoadAverage(ctx context.Context) (LoadStats, error)
+	// DiskIO returns cumulative disk I/O counters aggregated across all disks.
+	DiskIO(ctx context.Context) (DiskIOStats, error)
+	// NetIO returns cumulative network I/O counters aggregated across all interfaces.
+	NetIO(ctx context.Context) (NetIOStats, error)
 	// ProcessStats returns per-process counters for pid. CPU utilization is
 	// measured relative to the previous call for the same pid (non-blocking).
 	ProcessStats(ctx context.Context, pid int32) (ProcessStats, error)
@@ -104,6 +110,37 @@ func (s *gopsutilSource) LoadAverage(ctx context.Context) (LoadStats, error) {
 	}
 
 	return LoadStats{Load1: avg.Load1, Load5: avg.Load5, Load15: avg.Load15}, nil
+}
+
+func (s *gopsutilSource) DiskIO(ctx context.Context) (DiskIOStats, error) {
+	counters, err := disk.IOCountersWithContext(ctx)
+	if err != nil {
+		return DiskIOStats{}, fmt.Errorf("collecting disk io counters: %w", err)
+	}
+
+	var stats DiskIOStats
+	for _, c := range counters {
+		stats.ReadBytes += c.ReadBytes
+		stats.WriteBytes += c.WriteBytes
+	}
+
+	return stats, nil
+}
+
+func (s *gopsutilSource) NetIO(ctx context.Context) (NetIOStats, error) {
+	// pernic=false returns a single entry aggregated across all interfaces.
+	counters, err := net.IOCountersWithContext(ctx, false)
+	if err != nil {
+		return NetIOStats{}, fmt.Errorf("collecting network io counters: %w", err)
+	}
+
+	var stats NetIOStats
+	for _, c := range counters {
+		stats.BytesSent += c.BytesSent
+		stats.BytesRecv += c.BytesRecv
+	}
+
+	return stats, nil
 }
 
 func (s *gopsutilSource) ProcessStats(ctx context.Context, pid int32) (ProcessStats, error) {

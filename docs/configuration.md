@@ -179,12 +179,15 @@ You can specify a custom config file location:
 ### System Performance Monitoring
 
 The agent can run a lightweight background monitor that samples host resource
-usage (CPU, memory, swap, and system load) on a fixed interval and reports each
-sample through the structured logger. When process metrics are enabled, it also
-tracks the agent's own CPU and memory footprint, which is useful for verifying
-that monitoring overhead stays negligible. GPU temperature and utilization are
-not duplicated here — they are already reported to the server per device as part
-of task status updates.
+usage (CPU, memory, swap, system load, and cumulative disk/network I/O) on a
+fixed interval and reports each sample through the structured logger. When
+process metrics are enabled, it also tracks the agent's own CPU and memory
+footprint, which is useful for verifying that monitoring overhead stays
+negligible. Metrics that a platform does not expose (e.g. load averages on
+Windows, disk/network counters in restricted containers) are omitted gracefully
+rather than failing the sample. GPU temperature and utilization are not
+duplicated here — they are already reported to the server per device as part of
+task status updates.
 
 #### `performance_monitoring_enabled` / `PERFORMANCE_MONITORING_ENABLED`
 

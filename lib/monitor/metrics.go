@@ -31,9 +31,39 @@ type Metrics struct {
 	// LoadAvailable reports whether the platform provided load averages
 	// (unsupported on some platforms, e.g. Windows).
 	LoadAvailable bool
+	// DiskIO holds cumulative disk I/O counters aggregated across all disks.
+	// Only meaningful when DiskIOAvailable is true.
+	DiskIO DiskIOStats
+	// DiskIOAvailable reports whether disk I/O counters were collected.
+	DiskIOAvailable bool
+	// NetIO holds cumulative network I/O counters aggregated across all interfaces.
+	// Only meaningful when NetIOAvailable is true.
+	NetIO NetIOStats
+	// NetIOAvailable reports whether network I/O counters were collected.
+	NetIOAvailable bool
 	// Process holds per-process metrics for the monitored PID, or nil when
 	// process collection is disabled or the process could not be sampled.
 	Process *ProcessStats
+}
+
+// DiskIOStats holds cumulative disk I/O counters (since boot) summed across all
+// physical disks. These are monotonic totals; consumers delta successive samples
+// to derive throughput.
+type DiskIOStats struct {
+	// ReadBytes is the total bytes read across all disks.
+	ReadBytes uint64
+	// WriteBytes is the total bytes written across all disks.
+	WriteBytes uint64
+}
+
+// NetIOStats holds cumulative network I/O counters (since boot) summed across all
+// interfaces. These are monotonic totals; consumers delta successive samples to
+// derive throughput.
+type NetIOStats struct {
+	// BytesSent is the total bytes transmitted across all interfaces.
+	BytesSent uint64
+	// BytesRecv is the total bytes received across all interfaces.
+	BytesRecv uint64
 }
 
 // MemoryStats describes physical memory usage at sample time.

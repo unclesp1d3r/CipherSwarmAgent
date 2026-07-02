@@ -59,6 +59,22 @@ func TestGopsutilSource_LoadAverage(t *testing.T) {
 	assert.GreaterOrEqual(t, stats.Load1, 0.0)
 }
 
+func TestGopsutilSource_DiskIO(t *testing.T) {
+	src := NewGopsutilSource()
+
+	// Disk I/O counters may be empty in restricted environments, but the call
+	// must not error on supported platforms.
+	_, err := src.DiskIO(context.Background())
+	require.NoError(t, err)
+}
+
+func TestGopsutilSource_NetIO(t *testing.T) {
+	src := NewGopsutilSource()
+
+	_, err := src.NetIO(context.Background())
+	require.NoError(t, err)
+}
+
 func TestGopsutilSource_ProcessStats_Self(t *testing.T) {
 	src := NewGopsutilSource()
 	pid := selfPID()

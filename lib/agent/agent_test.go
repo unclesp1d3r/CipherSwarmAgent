@@ -94,6 +94,40 @@ func saveAndRestoreState(t *testing.T) func() {
 	}
 }
 
+func TestStartPerformanceMonitor(t *testing.T) {
+	// Save/restore the performance-monitoring state fields this test mutates.
+	origEnabled := agentstate.State.PerformanceMonitoringEnabled
+	origInterval := agentstate.State.PerformanceMonitoringInterval
+	origProcess := agentstate.State.CollectProcessMetrics
+	origPerCPU := agentstate.State.CollectPerCPUMetrics
+	t.Cleanup(func() {
+		agentstate.State.PerformanceMonitoringEnabled = origEnabled
+		agentstate.State.PerformanceMonitoringInterval = origInterval
+		agentstate.State.CollectProcessMetrics = origProcess
+		agentstate.State.CollectPerCPUMetrics = origPerCPU
+	})
+
+	t.Run("disabled is a no-op", func(_ *testing.T) {
+		agentstate.State.PerformanceMonitoringEnabled = false
+		// Should return immediately without launching a goroutine or panicking.
+		startPerformanceMonitor(context.Background())
+	})
+
+	t.Run("enabled launches monitor that stops with context", func(_ *testing.T) {
+		agentstate.State.PerformanceMonitoringEnabled = true
+		agentstate.State.PerformanceMonitoringInterval = 10 * time.Millisecond
+		agentstate.State.CollectProcessMetrics = true
+		agentstate.State.CollectPerCPUMetrics = false
+
+		// An already-cancelled context makes the monitor goroutine exit promptly.
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		startPerformanceMonitor(ctx)
+		// Give the goroutine a moment to observe cancellation and exit cleanly.
+		time.Sleep(20 * time.Millisecond)
+	})
+}
+
 func TestCleanupLockFile_Success(t *testing.T) {
 	tempDir := t.TempDir()
 	pidFile := filepath.Join(tempDir, "test.pid")

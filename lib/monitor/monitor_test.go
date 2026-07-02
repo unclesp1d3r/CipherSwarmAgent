@@ -19,12 +19,16 @@ type fakeSource struct {
 	memStats   MemoryStats
 	swapStats  SwapStats
 	loadStats  LoadStats
+	diskStats  DiskIOStats
+	netStats   NetIOStats
 	procStats  ProcessStats
 	cpuErr     error
 	perCoreErr error
 	memErr     error
 	swapErr    error
 	loadErr    error
+	diskErr    error
+	netErr     error
 	procErr    error
 
 	cpuCalls     atomic.Int32
@@ -54,6 +58,14 @@ func (f *fakeSource) LoadAverage(context.Context) (LoadStats, error) {
 	return f.loadStats, f.loadErr
 }
 
+func (f *fakeSource) DiskIO(context.Context) (DiskIOStats, error) {
+	return f.diskStats, f.diskErr
+}
+
+func (f *fakeSource) NetIO(context.Context) (NetIOStats, error) {
+	return f.netStats, f.netErr
+}
+
 func (f *fakeSource) ProcessStats(_ context.Context, _ int32) (ProcessStats, error) {
 	f.procCalls.Add(1)
 	return f.procStats, f.procErr
@@ -66,6 +78,8 @@ func healthySource() *fakeSource {
 		memStats:  MemoryStats{UsedPercent: 68.5, UsedBytes: 8 << 30, TotalBytes: 16 << 30, AvailableBytes: 4 << 30},
 		swapStats: SwapStats{UsedPercent: 10, UsedBytes: 1 << 30, TotalBytes: 8 << 30},
 		loadStats: LoadStats{Load1: 2.1, Load5: 1.8, Load15: 1.6},
+		diskStats: DiskIOStats{ReadBytes: 100 << 20, WriteBytes: 50 << 20},
+		netStats:  NetIOStats{BytesSent: 10 << 20, BytesRecv: 20 << 20},
 		procStats: ProcessStats{PID: 12345, CPUPercent: 85.3, MemoryRSSBytes: 512 << 20},
 	}
 }
@@ -107,6 +121,12 @@ func TestCollect_Healthy(t *testing.T) {
 	assert.InDelta(t, 10.0, metrics.Swap.UsedPercent, 0.001)
 	assert.True(t, metrics.LoadAvailable)
 	assert.InDelta(t, 2.1, metrics.Load.Load1, 0.001)
+	assert.True(t, metrics.DiskIOAvailable)
+	assert.Equal(t, uint64(100<<20), metrics.DiskIO.ReadBytes)
+	assert.Equal(t, uint64(50<<20), metrics.DiskIO.WriteBytes)
+	assert.True(t, metrics.NetIOAvailable)
+	assert.Equal(t, uint64(10<<20), metrics.NetIO.BytesSent)
+	assert.Equal(t, uint64(20<<20), metrics.NetIO.BytesRecv)
 	require.NotNil(t, metrics.Process)
 	assert.Equal(t, int32(12345), metrics.Process.PID)
 	assert.InDelta(t, 85.3, metrics.Process.CPUPercent, 0.001)
@@ -173,6 +193,95 @@ func TestCollect_ProcessErrorIsSoft(t *testing.T) {
 	assert.Nil(t, metrics.Process)
 }
 
+func TestCollect_AllCoreErrorsJoined(t *testing.T) {
+	src := healthySource()
+	src.cpuErr = errors.New("cpu boom")
+	src.perCoreErr = errors.New("percpu boom")
+	src.memErr = errors.New("mem boom")
+	src.swapErr = errors.New("swap boom")
+
+	mon := New(src, Options{CollectPerCPU: true, now: fixedNow})
+
+	metrics, err := mon.Collect(context.Background())
+	require.Error(t, err)
+	// errors.Join surfaces every core failure.
+	require.ErrorContains(t, err, "cpu boom")
+	require.ErrorContains(t, err, "percpu boom")
+	require.ErrorContains(t, err, "mem boom")
+	require.ErrorContains(t, err, "swap boom")
+	assert.Nil(t, metrics.PerCPUPercent)
+}
+
+func TestCollect_DiskAndNetErrorsAreSoft(t *testing.T) {
+	src := healthySource()
+	src.diskErr = errors.New("disk counters unavailable")
+	src.netErr = errors.New("net counters unavailable")
+
+	var logged []string
+	mon := New(src, Options{
+		now: fixedNow,
+		Log: func(msg any, _ ...any) {
+			if s, ok := msg.(string); ok {
+				logged = append(logged, s)
+			}
+		},
+	})
+
+	metrics, err := mon.Collect(context.Background())
+	require.NoError(t, err, "disk/net counter failures must not fail the whole sample")
+	assert.False(t, metrics.DiskIOAvailable)
+	assert.False(t, metrics.NetIOAvailable)
+	assert.Contains(t, logged, "Failed to read disk I/O counters")
+	assert.Contains(t, logged, "Failed to read network I/O counters")
+}
+
+func TestReport_IncludesAvailableSections(t *testing.T) {
+	src := healthySource()
+	mon := New(src, Options{
+		now:            fixedNow,
+		CollectProcess: true,
+		PIDProvider:    func() (int32, bool) { return 12345, true },
+	})
+
+	metrics, err := mon.Collect(context.Background())
+	require.NoError(t, err)
+
+	var captured []any
+	mon.opts.Log = func(msg any, keyvals ...any) {
+		if msg == "System performance" {
+			captured = keyvals
+		}
+	}
+	mon.report(metrics)
+
+	require.NotNil(t, captured)
+	assert.Contains(t, captured, "disk_read")
+	assert.Contains(t, captured, "net_sent")
+	assert.Contains(t, captured, "load_1m")
+	assert.Contains(t, captured, "proc_pid")
+}
+
+func TestReport_OmitsUnavailableSections(t *testing.T) {
+	// A metrics value with everything unavailable and no process should report
+	// only the always-present host fields.
+	mon := New(healthySource(), Options{now: fixedNow})
+
+	var captured []any
+	mon.opts.Log = func(msg any, keyvals ...any) {
+		if msg == "System performance" {
+			captured = keyvals
+		}
+	}
+	mon.report(Metrics{Timestamp: fixedNow()})
+
+	require.NotNil(t, captured)
+	assert.Contains(t, captured, "cpu_percent")
+	assert.NotContains(t, captured, "load_1m")
+	assert.NotContains(t, captured, "disk_read")
+	assert.NotContains(t, captured, "net_sent")
+	assert.NotContains(t, captured, "proc_pid")
+}
+
 func TestCollect_PerCPUDisabledSkips(t *testing.T) {
 	src := healthySource()
 	mon := New(src, Options{CollectPerCPU: false, now: fixedNow})
@@ -232,6 +341,39 @@ func TestRun_ReportsUntilCancelled(t *testing.T) {
 	// Run primes CPU/process counters before the loop, so both were sampled.
 	assert.Positive(t, src.cpuCalls.Load())
 	assert.Positive(t, src.procCalls.Load())
+}
+
+func TestRun_ReportsPartialFailure(t *testing.T) {
+	src := healthySource()
+	src.cpuErr = errors.New("cpu boom") // forces Collect to return an error each tick
+
+	sawPartial := make(chan struct{}, 1)
+	logFn := func(msg any, _ ...any) {
+		if msg == "Performance sampling partially failed" {
+			select {
+			case sawPartial <- struct{}{}:
+			default:
+			}
+		}
+	}
+
+	mon := New(src, Options{Interval: 5 * time.Millisecond, Log: logFn, now: fixedNow})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		mon.Run(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-sawPartial:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected a partial-failure log from Run")
+	}
+	cancel()
+	<-done
 }
 
 func TestRound2(t *testing.T) {

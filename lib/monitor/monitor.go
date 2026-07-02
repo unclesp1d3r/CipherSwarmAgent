@@ -116,6 +116,23 @@ func (m *Monitor) Collect(ctx context.Context) (Metrics, error) {
 		metrics.LoadAvailable = true
 	}
 
+	// Disk and network I/O are cumulative counters. They are best-effort: some
+	// environments (restricted containers) do not expose them, so a failure is
+	// soft and simply omits the section rather than failing the sample.
+	if diskStats, err := m.source.DiskIO(ctx); err != nil {
+		m.opts.Log("Failed to read disk I/O counters", "error", err)
+	} else {
+		metrics.DiskIO = diskStats
+		metrics.DiskIOAvailable = true
+	}
+
+	if netStats, err := m.source.NetIO(ctx); err != nil {
+		m.opts.Log("Failed to read network I/O counters", "error", err)
+	} else {
+		metrics.NetIO = netStats
+		metrics.NetIOAvailable = true
+	}
+
 	if m.opts.CollectProcess {
 		if pid, ok := m.opts.PIDProvider(); ok {
 			if procStats, err := m.source.ProcessStats(ctx, pid); err != nil {
@@ -183,6 +200,20 @@ func (m *Monitor) report(metrics Metrics) {
 			"load_1m", round2(metrics.Load.Load1),
 			"load_5m", round2(metrics.Load.Load5),
 			"load_15m", round2(metrics.Load.Load15),
+		)
+	}
+
+	if metrics.DiskIOAvailable {
+		keyvals = append(keyvals,
+			"disk_read", humanize.IBytes(metrics.DiskIO.ReadBytes),
+			"disk_write", humanize.IBytes(metrics.DiskIO.WriteBytes),
+		)
+	}
+
+	if metrics.NetIOAvailable {
+		keyvals = append(keyvals,
+			"net_sent", humanize.IBytes(metrics.NetIO.BytesSent),
+			"net_recv", humanize.IBytes(metrics.NetIO.BytesRecv),
 		)
 	}
 
