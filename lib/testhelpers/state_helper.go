@@ -123,6 +123,10 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.APIRetryMaxDelay = 0
 		agentstate.State.CircuitBreakerFailureThreshold = 0
 		agentstate.State.CircuitBreakerTimeout = 0
+		agentstate.State.PerformanceMonitoringEnabled = false
+		agentstate.State.PerformanceMonitoringInterval = 0
+		agentstate.State.CollectProcessMetrics = false
+		agentstate.State.CollectPerCPUMetrics = false
 		// Reset synchronized fields via setters
 		agentstate.State.SetReload(false)
 		agentstate.State.SetCurrentActivity("")
@@ -178,6 +182,10 @@ func ResetTestState() {
 	agentstate.State.APIRetryMaxDelay = 0
 	agentstate.State.CircuitBreakerFailureThreshold = 0
 	agentstate.State.CircuitBreakerTimeout = 0
+	agentstate.State.PerformanceMonitoringEnabled = false
+	agentstate.State.PerformanceMonitoringInterval = 0
+	agentstate.State.CollectProcessMetrics = false
+	agentstate.State.CollectPerCPUMetrics = false
 	// Reset synchronized fields via setters
 	agentstate.State.SetReload(false)
 	agentstate.State.SetCurrentActivity("")
@@ -229,6 +237,10 @@ func SetupMinimalTestState(agentID int64) func() {
 		agentstate.State.APIRetryMaxDelay = 0
 		agentstate.State.CircuitBreakerFailureThreshold = 0
 		agentstate.State.CircuitBreakerTimeout = 0
+		agentstate.State.PerformanceMonitoringEnabled = false
+		agentstate.State.PerformanceMonitoringInterval = 0
+		agentstate.State.CollectProcessMetrics = false
+		agentstate.State.CollectPerCPUMetrics = false
 	}
 }
 

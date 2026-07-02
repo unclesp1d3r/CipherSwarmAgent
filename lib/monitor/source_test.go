@@ -109,3 +109,35 @@ func TestErrLoadUnavailable_IsWrapped(t *testing.T) {
 	wrapped := errors.Join(ErrLoadUnavailable, errors.New("underlying"))
 	assert.ErrorIs(t, wrapped, ErrLoadUnavailable)
 }
+
+func TestIsPartitionOfAny(t *testing.T) {
+	names := []string{"sda", "sda1", "sda2", "nvme0n1", "nvme0n1p1", "mmcblk0", "mmcblk0p1", "disk0", "loop0"}
+	tests := []struct {
+		device string
+		want   bool
+	}{
+		{"sda", false},      // whole disk
+		{"sda1", true},      // SATA partition
+		{"sda2", true},      // SATA partition
+		{"nvme0n1", false},  // whole NVMe namespace
+		{"nvme0n1p1", true}, // NVMe partition (p-separated)
+		{"mmcblk0", false},  // whole eMMC device
+		{"mmcblk0p1", true}, // eMMC partition (p-separated)
+		{"disk0", false},    // macOS whole disk, no partition parent present
+		{"loop0", false},    // loop device, no parent
+		{"sdb", false},      // not present as a partition of anything
+	}
+	for _, tt := range tests {
+		t.Run(tt.device, func(t *testing.T) {
+			assert.Equal(t, tt.want, isPartitionOfAny(tt.device, names))
+		})
+	}
+}
+
+func TestIsAllDigits(t *testing.T) {
+	assert.True(t, isAllDigits("0"))
+	assert.True(t, isAllDigits("123"))
+	assert.False(t, isAllDigits(""))
+	assert.False(t, isAllDigits("1a"))
+	assert.False(t, isAllDigits("p1"))
+}

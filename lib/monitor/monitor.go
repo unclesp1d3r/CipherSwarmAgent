@@ -52,15 +52,19 @@ type Monitor struct {
 // New returns a Monitor that draws samples from source using opts, applying
 // defaults for any unset option. source must be non-nil.
 func New(source Source, opts Options) *Monitor {
+	// Resolve the logger first so interval coercion below can warn.
+	if opts.Log == nil {
+		opts.Log = func(any, ...any) {}
+	}
 	if opts.Interval <= 0 {
+		// Never silently correct an invalid input — warn before falling back.
+		opts.Log("Non-positive performance monitoring interval, using default",
+			"configured", opts.Interval, "default", DefaultInterval)
 		opts.Interval = DefaultInterval
 	}
 	if opts.PIDProvider == nil {
 		pid := selfPID()
 		opts.PIDProvider = func() (int32, bool) { return pid, true }
-	}
-	if opts.Log == nil {
-		opts.Log = func(any, ...any) {}
 	}
 	if opts.now == nil {
 		opts.now = time.Now
@@ -155,14 +159,17 @@ func (m *Monitor) Collect(ctx context.Context) (Metrics, error) {
 // interval also primes delta-based CPU counters), and Run returns when ctx is done.
 func (m *Monitor) Run(ctx context.Context) {
 	// Prime delta-based CPU counters so the first reported sample is meaningful
-	// rather than measuring usage since boot. Errors here are non-fatal — the
-	// priming call exists only to seed the previous-counter baseline.
-	//nolint:errcheck // priming call: result and error intentionally discarded
-	_, _ = m.source.CPUPercent(ctx, false)
+	// rather than measuring usage since boot. Priming failures are non-fatal (the
+	// first real sample simply falls back to since-boot values), but are logged at
+	// debug rather than swallowed silently.
+	if _, err := m.source.CPUPercent(ctx, false); err != nil {
+		m.opts.Log("Failed to prime CPU counters", "error", err)
+	}
 	if m.opts.CollectProcess {
 		if pid, ok := m.opts.PIDProvider(); ok {
-			//nolint:errcheck // priming call: result and error intentionally discarded
-			_, _ = m.source.ProcessStats(ctx, pid)
+			if _, err := m.source.ProcessStats(ctx, pid); err != nil {
+				m.opts.Log("Failed to prime process counters", "pid", pid, "error", err)
+			}
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -118,13 +119,60 @@ func (s *gopsutilSource) DiskIO(ctx context.Context) (DiskIOStats, error) {
 		return DiskIOStats{}, fmt.Errorf("collecting disk io counters: %w", err)
 	}
 
+	// On Linux, IOCounters returns both whole-disk (e.g. "sda", "nvme0n1") and
+	// partition (e.g. "sda1", "nvme0n1p1") entries read from /proc/diskstats.
+	// A partition's I/O is already included in its parent disk's counters, so
+	// summing every entry double-counts. Skip any device that is a partition of
+	// another device present in the same result set. macOS/Windows report only
+	// physical devices, so the filter is a harmless no-op there.
+	names := make([]string, 0, len(counters))
+	for name := range counters {
+		names = append(names, name)
+	}
+
 	var stats DiskIOStats
-	for _, c := range counters {
+	for name, c := range counters {
+		if isPartitionOfAny(name, names) {
+			continue
+		}
 		stats.ReadBytes += c.ReadBytes
 		stats.WriteBytes += c.WriteBytes
 	}
 
 	return stats, nil
+}
+
+// isPartitionOfAny reports whether device is a partition of some other device in
+// names — i.e. another entry's name is a strict prefix of device and the trailing
+// remainder is a partition suffix (digits, optionally after a "p" separator as
+// used by nvme/mmc/loop devices, e.g. "nvme0n1p1", "mmcblk0p1"). Whole disks like
+// "sda" or "nvme0n1" have no such parent and are retained.
+func isPartitionOfAny(device string, names []string) bool {
+	for _, parent := range names {
+		if parent == device || !strings.HasPrefix(device, parent) {
+			continue
+		}
+		suffix := device[len(parent):]
+		if suffix != "" && suffix[0] == 'p' {
+			suffix = suffix[1:]
+		}
+		if suffix != "" && isAllDigits(suffix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isAllDigits reports whether s is non-empty and composed only of ASCII digits.
+func isAllDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+
+	return s != ""
 }
 
 func (s *gopsutilSource) NetIO(ctx context.Context) (NetIOStats, error) {
