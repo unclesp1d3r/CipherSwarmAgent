@@ -69,12 +69,17 @@ type agentState struct {
 	BenchmarkWhileIdle             bool          // BenchmarkWhileIdle enables background benchmarking during idle periods.
 	Platform                       string        // Platform is the OS platform the agent is running on (e.g., "linux", "darwin"). Set once before goroutines start; safe to read from any goroutine.
 	AgentVersion                   string        // AgentVersion is the current version of the agent software. Set once in AuthenticateAgent before goroutines start; safe to read from any goroutine.
+	PerformanceMonitoringEnabled   bool          // PerformanceMonitoringEnabled enables the background system performance monitor. Set once in SetupSharedState; safe to read from any goroutine.
+	PerformanceMonitoringInterval  time.Duration // PerformanceMonitoringInterval is the sampling interval for the performance monitor. Set once in SetupSharedState; safe to read from any goroutine.
+	CollectProcessMetrics          bool          // CollectProcessMetrics enables per-process sampling in the performance monitor. Set once in SetupSharedState; safe to read from any goroutine.
+	CollectPerCPUMetrics           bool          // CollectPerCPUMetrics enables per-core CPU sampling in the performance monitor. Set once in SetupSharedState; safe to read from any goroutine.
 
 	// Synchronized fields — use getter/setter methods; do not access directly.
 	reload              atomic.Bool
 	jobCheckingStopped  atomic.Bool
 	benchmarksSubmitted atomic.Bool
 	forceBenchmarkRun   atomic.Bool
+	hashcatPID          atomic.Int32
 	currentActivityMu   sync.RWMutex
 	currentActivity     Activity
 }
@@ -138,6 +143,25 @@ func (s *agentState) GetForceBenchmarkRun() bool {
 // SetForceBenchmarkRun sets whether a fresh benchmark run should be forced.
 func (s *agentState) SetForceBenchmarkRun(v bool) {
 	s.forceBenchmarkRun.Store(v)
+}
+
+// SetHashcatPID records the process ID of the currently running hashcat process,
+// or 0 when none is running. Read by the performance monitor to sample the job's
+// per-process metrics.
+func (s *agentState) SetHashcatPID(pid int32) {
+	s.hashcatPID.Store(pid)
+}
+
+// GetHashcatPID returns the PID of the running hashcat process, or 0 if none.
+func (s *agentState) GetHashcatPID() int32 {
+	return s.hashcatPID.Load()
+}
+
+// ClearHashcatPID zeroes the stored hashcat PID only if it still equals pid.
+// The compare-and-swap guard prevents an older session's teardown from clearing
+// a newer session's PID had they briefly overlapped.
+func (s *agentState) ClearHashcatPID(pid int32) {
+	s.hashcatPID.CompareAndSwap(pid, 0)
 }
 
 // GetCurrentActivity returns the current activity of the agent (thread-safe).
