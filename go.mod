@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/charmbracelet/log v1.0.0
-	github.com/cheggaaa/pb/v3 v3.1.7
+	github.com/cheggaaa/pb/v3 v3.2.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/jarcoal/httpmock v1.4.1
 	github.com/muesli/go-app-paths v0.2.2
