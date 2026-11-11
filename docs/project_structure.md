@@ -25,6 +25,7 @@ CipherSwarmAgent/
 │   ├── display/           # User-facing output (status, progress)
 │   ├── downloader/        # File download with checksum verification
 │   ├── hashcat/           # Hashcat session management and parsing
+│   ├── monitor/           # Background system performance monitoring
 │   ├── progress/          # Progress calculation utilities
 │   ├── task/              # Task lifecycle management
 │   ├── testdata/          # Test fixtures and data files
@@ -338,6 +339,20 @@ Platform-specific functionality for cross-platform support:
 **Note**: The `BenchmarkResult` type has been moved to `benchmark.Result` in the `lib/benchmark` package.
 
 #### `lib/downloader/` — File download with checksum verification and retries
+
+#### `lib/monitor/` — Background system performance monitoring
+
+Samples host resource usage (CPU, memory, swap, system load, disk/network I/O) on a configurable interval and reports through structured logging.
+
+- **`metrics.go`**: Domain types for `Metrics`, `MemoryStats`, `SwapStats`, `LoadStats`, `DiskIOStats`, `NetIOStats`, and `ProcessStats`
+- **`source.go`**: `Source` interface abstracting `gopsutil/v4` for testability, with production `gopsutilSource` implementation. Sampling is non-blocking (delta-based CPU counters, primed before the loop).
+- **`monitor.go`**: `Monitor` implementation with `Collect(ctx)` for single samples and `Run(ctx)` for background sampling loop (exits on context cancellation)
+- **Key Features**:
+  - **Graceful degradation**: Unsupported system load averages (e.g., Windows) and transient per-process errors are soft failures; core-counter (CPU/memory/swap) failures return partial metrics alongside an error
+  - **Configurable sampling**: Default 30-second interval (clamped to ≥5s), toggles for per-CPU and per-process collection
+  - **Local reporting**: Metrics flow through the agent's structured logger; no server-side API exists in the v1 contract
+
+**Note**: GPU temperature/utilization are intentionally not duplicated here — they already flow to the server per device via `DeviceStatus` task status updates.
 
 #### `lib/progress/` — Progress calculation utilities
 

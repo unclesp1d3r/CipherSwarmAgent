@@ -164,6 +164,36 @@ func init() {
 	err = viper.BindPFlag("benchmark_while_idle", RootCmd.PersistentFlags().Lookup("benchmark-while-idle"))
 	cobra.CheckErr(err)
 
+	RootCmd.PersistentFlags().
+		Bool("performance-monitoring-enabled", config.DefaultPerformanceMonitoringEnabled,
+			"Enable background system performance monitoring (CPU, memory, load)")
+	err = viper.BindPFlag(
+		"performance_monitoring_enabled",
+		RootCmd.PersistentFlags().Lookup("performance-monitoring-enabled"),
+	)
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		Duration("performance-monitoring-interval", config.DefaultPerformanceMonitoringInterval,
+			"Sampling interval for system performance monitoring")
+	err = viper.BindPFlag(
+		"performance_monitoring_interval",
+		RootCmd.PersistentFlags().Lookup("performance-monitoring-interval"),
+	)
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		Bool("collect-process-metrics", config.DefaultCollectProcessMetrics,
+			"Collect per-process metrics alongside host performance metrics")
+	err = viper.BindPFlag("collect_process_metrics", RootCmd.PersistentFlags().Lookup("collect-process-metrics"))
+	cobra.CheckErr(err)
+
+	RootCmd.PersistentFlags().
+		Bool("collect-per-cpu-metrics", config.DefaultCollectPerCPUMetrics,
+			"Collect per-logical-core CPU utilization in addition to the overall figure")
+	err = viper.BindPFlag("collect_per_cpu_metrics", RootCmd.PersistentFlags().Lookup("collect-per-cpu-metrics"))
+	cobra.CheckErr(err)
+
 	// Register deprecated underscore aliases for backward compatibility.
 	registerDeprecatedAliases()
 

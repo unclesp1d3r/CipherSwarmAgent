@@ -60,6 +60,7 @@ type Session struct {
 	sessionPidFile     string         // Absolute path to hashcat session .pid file for cleanup
 	pStdout            io.ReadCloser  // Stdout pipe from hashcat process
 	pStderr            io.ReadCloser  // Stderr pipe from hashcat process
+	startedPID         int32          // OS PID of the running hashcat process (0 until started), published to agentstate for performance monitoring
 }
 
 // NewHashcatSession creates and initializes a new hashcat session.
@@ -161,6 +162,14 @@ func (sess *Session) Start() error {
 	if err != nil {
 		return err
 	}
+
+	// Publish the hashcat PID so the performance monitor can sample the running
+	// job's per-process CPU/memory. Published only after every fallible startup
+	// step succeeds: Start's error paths call sess.Kill (not sess.Cleanup), so an
+	// early publish followed by a startTailer failure would leave a stale PID in
+	// agentstate that never gets cleared. Cleared in Cleanup when the process exits.
+	sess.startedPID = int32(sess.proc.Process.Pid) //nolint:gosec // G115 - a process ID always fits in int32
+	agentstate.State.SetHashcatPID(sess.startedPID)
 
 	sess.wg.Go(func() { ; sess.handleTailerOutput(tailer) })
 	sess.wg.Go(func() { ; sess.handleStdout() })
@@ -449,6 +458,13 @@ func (sess *Session) Cleanup() {
 		agentstate.Logger.Warn("Failed to kill hashcat process during cleanup", "error", err)
 	}
 	sess.wg.Wait() // Wait for all I/O goroutines to exit before removing files
+
+	// Stop publishing this session's PID to the performance monitor. Compare-and-clear
+	// so a newer session that already registered its own PID is left untouched.
+	if sess.startedPID != 0 {
+		agentstate.State.ClearHashcatPID(sess.startedPID)
+		sess.startedPID = 0
+	}
 
 	agentstate.Logger.Info("Cleaning up session files")
 

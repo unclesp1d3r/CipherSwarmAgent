@@ -20,6 +20,23 @@ import (
 	"github.com/unclesp1d3r/cipherswarmagent/lib/testhelpers"
 )
 
+// skipIfDirWritable skips the test when files can still be created in dir despite
+// it having been made read-only. Running with elevated privileges (e.g. as root)
+// bypasses directory permission checks, so the file-open error path cannot be
+// exercised. See GOTCHAS.md ("os.Chmod ... does not prevent ... when running as root").
+func skipIfDirWritable(t *testing.T, dir string) {
+	t.Helper()
+
+	probe := filepath.Join(dir, ".write-probe")
+
+	file, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY, 0o600)
+	if err == nil {
+		require.NoError(t, file.Close())
+		require.NoError(t, os.Remove(probe))
+		t.Skip("running with elevated privileges; read-only directory is still writable")
+	}
+}
+
 // TestConvertToTaskStatusGuessBasePercentage tests percentage field mapping.
 func TestConvertToTaskStatusGuessBasePercentage(t *testing.T) {
 	data := `{
@@ -321,6 +338,7 @@ func TestSendCrackedHash(t *testing.T) {
 					t,
 					os.Chmod(tempDir, 0o500), //nolint:gosec // test: set dir read-only to exercise error path
 				)
+				skipIfDirWritable(t, tempDir)
 
 				agentstate.State.ZapsPath = tempDir
 			case "file write error - read-only file":
@@ -340,6 +358,7 @@ func TestSendCrackedHash(t *testing.T) {
 				require.NoError(t, file.Close())
 
 				require.NoError(t, os.Chmod(tempDir, 0o500)) //nolint:gosec // Read-only directory for error path
+				skipIfDirWritable(t, tempDir)
 
 				agentstate.State.ZapsPath = tempDir
 			}

@@ -123,11 +123,16 @@ func SetupTestState(agentID int64, apiURL, apiToken string) func() {
 		agentstate.State.APIRetryMaxDelay = 0
 		agentstate.State.CircuitBreakerFailureThreshold = 0
 		agentstate.State.CircuitBreakerTimeout = 0
+		agentstate.State.PerformanceMonitoringEnabled = false
+		agentstate.State.PerformanceMonitoringInterval = 0
+		agentstate.State.CollectProcessMetrics = false
+		agentstate.State.CollectPerCPUMetrics = false
 		// Reset synchronized fields via setters
 		agentstate.State.SetReload(false)
 		agentstate.State.SetCurrentActivity("")
 		agentstate.State.SetJobCheckingStopped(false)
 		agentstate.State.SetBenchmarksSubmitted(false)
+		agentstate.State.SetHashcatPID(0)
 		// Deactivate httpmock
 		httpmock.DeactivateAndReset()
 	}
@@ -178,11 +183,16 @@ func ResetTestState() {
 	agentstate.State.APIRetryMaxDelay = 0
 	agentstate.State.CircuitBreakerFailureThreshold = 0
 	agentstate.State.CircuitBreakerTimeout = 0
+	agentstate.State.PerformanceMonitoringEnabled = false
+	agentstate.State.PerformanceMonitoringInterval = 0
+	agentstate.State.CollectProcessMetrics = false
+	agentstate.State.CollectPerCPUMetrics = false
 	// Reset synchronized fields via setters
 	agentstate.State.SetReload(false)
 	agentstate.State.SetCurrentActivity("")
 	agentstate.State.SetJobCheckingStopped(false)
 	agentstate.State.SetBenchmarksSubmitted(false)
+	agentstate.State.SetHashcatPID(0)
 }
 
 // SetupMinimalTestState sets up minimal state (just AgentID and basic paths)
@@ -229,6 +239,11 @@ func SetupMinimalTestState(agentID int64) func() {
 		agentstate.State.APIRetryMaxDelay = 0
 		agentstate.State.CircuitBreakerFailureThreshold = 0
 		agentstate.State.CircuitBreakerTimeout = 0
+		agentstate.State.PerformanceMonitoringEnabled = false
+		agentstate.State.PerformanceMonitoringInterval = 0
+		agentstate.State.CollectProcessMetrics = false
+		agentstate.State.CollectPerCPUMetrics = false
+		agentstate.State.SetHashcatPID(0)
 	}
 }
 

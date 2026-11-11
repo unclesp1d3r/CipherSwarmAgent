@@ -369,6 +369,40 @@ func TestSetupSharedState_ValidationClampsRetryDelays(t *testing.T) {
 		"api_retry_max_delay should be clamped to default when <= 0")
 }
 
+func TestSetDefaultConfigValues_PerformanceMonitoring(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	assert.True(t, viper.GetBool("performance_monitoring_enabled"),
+		"performance_monitoring_enabled should default to true")
+	assert.Equal(t, DefaultPerformanceMonitoringInterval, viper.GetDuration("performance_monitoring_interval"))
+	assert.True(t, viper.GetBool("collect_process_metrics"),
+		"collect_process_metrics should default to true")
+	assert.False(t, viper.GetBool("collect_per_cpu_metrics"),
+		"collect_per_cpu_metrics should default to false")
+}
+
+func TestSetupSharedState_ClampsPerformanceInterval(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	viper.Set("performance_monitoring_interval", time.Second)
+	SetupSharedState()
+
+	assert.Equal(t, MinPerformanceMonitoringInterval, agentstate.State.PerformanceMonitoringInterval,
+		"a sub-minimum interval should be clamped up to the minimum")
+}
+
+func TestSetupSharedState_HonoursPerformanceInterval(t *testing.T) {
+	viper.Reset()
+	SetDefaultConfigValues()
+
+	viper.Set("performance_monitoring_interval", 45*time.Second)
+	SetupSharedState()
+
+	assert.Equal(t, 45*time.Second, agentstate.State.PerformanceMonitoringInterval)
+}
+
 func TestSetupSharedState_DerivedPathsFromDataRoot(t *testing.T) {
 	t.Run("default data_path derives files_path and zap_path", func(t *testing.T) {
 		viper.Reset()
